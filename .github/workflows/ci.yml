@@ -254,26 +254,37 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Before pushing: the binary in the release image must be a release build (no e2e tag), read
-      # from its own build info.
+      # Before pushing: the binary in each platform's release image must be a release build (no
+      # e2e tag), read from its own build info. A loaded image is one platform, so each is built
+      # and checked; the push below rebuilds both from the same cache.
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: linux/amd64
           load: true
           push: false
-          tags: opencozy-release-check
+          tags: opencozy-release-check:amd64
+          cache-from: type=gha
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/arm64
+          load: true
+          push: false
+          tags: opencozy-release-check:arm64
           cache-from: type=gha
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
-      - name: The release image's binary is a release build
+      - name: The release images' binaries are release builds
         run: |
-          cid=$(docker create opencozy-release-check)
-          docker cp "$cid:/app" ./release-app
-          docker rm "$cid"
-          scripts/check-release-binary.sh ./release-app
+          for arch in amd64 arm64; do
+            cid=$(docker create --platform "linux/$arch" "opencozy-release-check:$arch")
+            docker cp "$cid:/app" "./release-app-$arch"
+            docker rm "$cid"
+            scripts/check-release-binary.sh "./release-app-$arch"
+          done
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
