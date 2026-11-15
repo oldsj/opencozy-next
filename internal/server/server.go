@@ -22,6 +22,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/config"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/httpx"
+	"github.com/oldsj/opencozy-next/internal/live"
 	"github.com/oldsj/opencozy-next/web"
 )
 
@@ -35,6 +36,7 @@ type Server struct {
 	table    *authz.Table
 	runner   command.Runner
 	draining atomic.Bool
+	live     atomic.Pointer[live.Hub] // slice 0d: StartLive
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -154,6 +156,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 		requireKey,
 		validator,
 		s.authorize,
+		s.serveLive,
 		s.commands,
 	), nil
 }

@@ -8,7 +8,7 @@ A Go + React web app: one Go binary serves a JSON API under `/api` and the embed
 ```text
 api/src/*.yaml          The wire contract, one file per domain; bundled into api/openapi.yaml, from
                         which the Go server types and the TS client are generated.
-cmd/app/                main: `app serve` (default), `migrate`, `bootstrap-owner`, `add-adult`, `rekey`
+cmd/app/                main: `app serve` (default), `migrate`, `bootstrap-owner`, `add-adult`, `rekey`, `import`
 internal/config/        The only package that reads the environment (lint-enforced)
 internal/db/            Pool, goose migrations (migrations/*.sql), sqlc queries (queries/*.sql)
 internal/db/dbq/        sqlc output. Generated: never edit.

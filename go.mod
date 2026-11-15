@@ -4,6 +4,7 @@ go 1.27.4
 
 require (
 	github.com/caarlos0/env/v11 v11.4.2
+	github.com/coder/websocket v1.8.15
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/google/uuid v1.6.0

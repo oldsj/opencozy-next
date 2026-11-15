@@ -184,6 +184,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live updates (WebSocket)
+         * @description A same-origin WebSocket that tells the client what to refetch. The server only sends; each
+         *     message is `{"topic": "...", "childId": "..."}` (childId when the change is about one
+         *     child), or `{"topic": "resync"}` when the server may have missed changes and the client
+         *     should refetch everything. Messages carry no names or values. Topics: resync, household,
+         *     children, credentials, today, tv, calendar, meals, dashboard.
+         *
+         *     A cookie-authenticated upgrade must carry an Origin equal to the app's own origin; the
+         *     library's own same-host check stays on as well. The credential is checked again every
+         *     60 seconds, and the socket closes when it is revoked or expires. A display receives only
+         *     topics its display scopes cover.
+         */
+        get: operations["openLive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -770,6 +799,36 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    openLive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Switched to the WebSocket protocol */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Not a WebSocket upgrade request */
+            426: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             default: components["responses"]["Error"];
         };
     };

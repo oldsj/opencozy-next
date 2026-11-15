@@ -77,8 +77,11 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 			return err
 		}
 		go srv.SweepSessions(ctx)
+		srv.StartLive(ctx)
 		go command.DeleteExpired(ctx, dbq.New(pool), log)
 		return server.Serve(ctx, log, cfg.ListenAddr, h, srv.Drain)
+	case "import": // copy the old app's data into this empty installation
+		return runImport(ctx, cfg, log, args, stdout)
 	case "bootstrap-owner", "add-adult", "rekey":
 		pool, err := db.Open(ctx, cfg.DatabaseURL)
 		if err != nil {
@@ -93,7 +96,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		return addAdult(ctx, pool, args, stdin, stdout)
 	default:
-		return fmt.Errorf("unknown command %q (want serve, migrate, bootstrap-owner, add-adult or rekey)", cmd)
+		return fmt.Errorf("unknown command %q (want serve, migrate, bootstrap-owner, add-adult, rekey or import)", cmd)
 	}
 }
 
