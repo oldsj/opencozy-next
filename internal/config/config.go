@@ -69,7 +69,20 @@ type Config struct {
 	// WebAuthnOrigins are the origins passkeys are used from, e.g. https://cozy.example.test.
 	// Required with WEBAUTHN_RP_ID.
 	WebAuthnOrigins []string `env:"WEBAUTHN_ORIGINS" envSeparator:","`
+
+	// Slice 13b: Google calendar. Both or neither; neither turns Google off. The client is the
+	// installation's own OAuth client (a "Web application" in Google Cloud) whose redirect URI
+	// is GoogleRedirectURL(). Google needs PUBLIC_ORIGIN and OPENCOZY_SECRET_KEYS.
+	GoogleClientID string `env:"GOOGLE_CLIENT_ID"`
+	// GoogleClientSecret is the OAuth client's secret. Secret: no default.
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
 }
+
+// GoogleRedirectURL is where Google sends an adult back after consent; register it exactly.
+func (c Config) GoogleRedirectURL() string { return c.PublicOrigin + "/api/calendar/google/callback" }
+
+// GoogleEnabled reports whether Google calendar is configured.
+func (c Config) GoogleEnabled() bool { return c.GoogleClientID != "" }
 
 // Load reads the environment and validates it.
 func Load() (Config, error) {
@@ -101,6 +114,7 @@ func (c Config) validate() error {
 	if c.PublicOrigin != "" && !validOrigin(c.PublicOrigin) {
 		errs = append(errs, fmt.Errorf("PUBLIC_ORIGIN: %q must be https://host[:port] (http only for localhost)", c.PublicOrigin))
 	}
+	errs = append(errs, c.validateGoogle()...)
 	if c.MigrationDatabaseURL != "" && c.DatabaseRuntimeRole == "" {
 		errs = append(errs, errors.New("DATABASE_RUNTIME_ROLE is required with MIGRATION_DATABASE_URL"))
 	}
@@ -139,6 +153,20 @@ func (c Config) validateWebAuthn() []error {
 		}
 	}
 	return errs
+}
+
+func (c Config) validateGoogle() []error {
+	switch {
+	case c.GoogleClientID == "" && c.GoogleClientSecret == "":
+		return nil
+	case c.GoogleClientID == "" || c.GoogleClientSecret == "":
+		return []error{errors.New("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together")}
+	case c.PublicOrigin == "":
+		return []error{errors.New("GOOGLE_CLIENT_ID needs PUBLIC_ORIGIN: Google returns adults to it")}
+	case c.SecretKeys == nil:
+		return []error{errors.New("GOOGLE_CLIENT_ID needs OPENCOZY_SECRET_KEYS: Google tokens are stored encrypted")}
+	}
+	return nil
 }
 
 func isLocalDatabase(url string) bool {

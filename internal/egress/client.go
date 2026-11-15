@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,6 +42,9 @@ type Options struct {
 	PrivateCIDRs []netip.Prefix
 	// Ports are the destination ports allowed. Nil means 443 only.
 	Ports []uint16
+	// Hosts, when set, are the only host names this client may reach (exact, lower case; an
+	// IP literal never matches). Every address they resolve to is still checked.
+	Hosts []string
 	// Timeout bounds each request, from dial to the end of the body.
 	Timeout time.Duration
 	// MaxResponseBytes caps each response body after decompression.
@@ -86,11 +90,21 @@ func build(o Options, allowOverride func(netip.Addr) bool) (*http.Client, error)
 			return nil, fmt.Errorf("egress %s: private CIDR %s: %w", o.Name, p, err)
 		}
 	}
+	hosts := map[string]bool{}
+	for _, h := range o.Hosts {
+		if h == "" || h != strings.ToLower(h) || strings.ContainsAny(h, ":/ ") {
+			return nil, fmt.Errorf("egress %s: host %q must be a lower-case name", o.Name, h)
+		}
+		if _, err := netip.ParseAddr(h); err == nil {
+			return nil, fmt.Errorf("egress %s: host %q is an address, not a name", o.Name, h)
+		}
+		hosts[h] = true
+	}
 	ports := o.Ports
 	if ports == nil {
 		ports = []uint16{443}
 	}
-	d := &dialer{name: o.Name, private: o.PrivateCIDRs, ports: map[uint16]bool{}, resolver: net.DefaultResolver}
+	d := &dialer{name: o.Name, private: o.PrivateCIDRs, ports: map[uint16]bool{}, hosts: hosts, resolver: net.DefaultResolver}
 	for _, p := range ports {
 		d.ports[p] = true
 	}
@@ -144,6 +158,7 @@ type dialer struct {
 	name     string
 	private  []netip.Prefix
 	ports    map[uint16]bool
+	hosts    map[string]bool // empty: any host
 	resolver interface {
 		LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
 	}
@@ -171,6 +186,9 @@ func (d *dialer) dial(ctx context.Context, network, address string) (net.Conn, e
 	port, err := strconv.ParseUint(portText, 10, 16)
 	if err != nil || !d.ports[uint16(port)] {
 		return nil, d.refuse("port %s is not allowed", portText)
+	}
+	if len(d.hosts) > 0 && !d.hosts[strings.ToLower(strings.TrimSuffix(host, "."))] {
+		return nil, d.refuse("host %q is not one this client may reach", host)
 	}
 	var addrs []netip.Addr
 	if a, ok := literalHost(host); ok {
