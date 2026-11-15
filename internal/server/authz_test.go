@@ -73,6 +73,14 @@ func TestAuthzMatrix(t *testing.T) {
 				}
 				u = strings.ReplaceAll(u, "{entryId}", h.entry.String())
 				u = strings.ReplaceAll(u, "{rewardId}", h.reward.String())
+				u = strings.ReplaceAll(u, "{eventId}", h.event.String())
+				u = strings.ReplaceAll(u, "{calendarId}", h.calendar.String())
+				switch op {
+				case "GET /calendar":
+					u += "?from=2026-09-14&to=2026-09-21"
+				case "DELETE /calendars/{calendarId}":
+					u += "?expectedVersion=1"
+				}
 				return "/api" + u
 			}
 			body := func() any {
@@ -170,6 +178,8 @@ func allowed(p authz.Policy, name string, kind actor.Kind) bool {
 		return displayHas(p, "today")
 	case "display-meals":
 		return displayHas(p, "meals")
+	case "display-calendar":
+		return displayHas(p, "calendar")
 	}
 	return true
 }

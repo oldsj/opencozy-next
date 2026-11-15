@@ -24,6 +24,138 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AssignChildrenScope.
+const (
+	Occurrence AssignChildrenScope = "occurrence"
+	Series     AssignChildrenScope = "series"
+)
+
+// Valid indicates whether the value is a known member of the AssignChildrenScope enum.
+func (e AssignChildrenScope) Valid() bool {
+	switch e {
+	case Occurrence:
+		return true
+	case Series:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CalendarErrorCode.
+const (
+	CalendarErrorCodeAccessDenied    CalendarErrorCode = "access_denied"
+	CalendarErrorCodeInvalidCalendar CalendarErrorCode = "invalid_calendar"
+	CalendarErrorCodeNotFound        CalendarErrorCode = "not_found"
+	CalendarErrorCodeRateLimited     CalendarErrorCode = "rate_limited"
+	CalendarErrorCodeTimeout         CalendarErrorCode = "timeout"
+	CalendarErrorCodeTokenExpired    CalendarErrorCode = "token_expired"
+	CalendarErrorCodeTooLarge        CalendarErrorCode = "too_large"
+	CalendarErrorCodeTooManyEvents   CalendarErrorCode = "too_many_events"
+)
+
+// Valid indicates whether the value is a known member of the CalendarErrorCode enum.
+func (e CalendarErrorCode) Valid() bool {
+	switch e {
+	case CalendarErrorCodeAccessDenied:
+		return true
+	case CalendarErrorCodeInvalidCalendar:
+		return true
+	case CalendarErrorCodeNotFound:
+		return true
+	case CalendarErrorCodeRateLimited:
+		return true
+	case CalendarErrorCodeTimeout:
+		return true
+	case CalendarErrorCodeTokenExpired:
+		return true
+	case CalendarErrorCodeTooLarge:
+		return true
+	case CalendarErrorCodeTooManyEvents:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CalendarEventStatus.
+const (
+	CalendarEventStatusConfirmed CalendarEventStatus = "confirmed"
+	CalendarEventStatusTentative CalendarEventStatus = "tentative"
+)
+
+// Valid indicates whether the value is a known member of the CalendarEventStatus enum.
+func (e CalendarEventStatus) Valid() bool {
+	switch e {
+	case CalendarEventStatusConfirmed:
+		return true
+	case CalendarEventStatusTentative:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CalendarEventDetailStatus.
+const (
+	CalendarEventDetailStatusConfirmed CalendarEventDetailStatus = "confirmed"
+	CalendarEventDetailStatusTentative CalendarEventDetailStatus = "tentative"
+)
+
+// Valid indicates whether the value is a known member of the CalendarEventDetailStatus enum.
+func (e CalendarEventDetailStatus) Valid() bool {
+	switch e {
+	case CalendarEventDetailStatusConfirmed:
+		return true
+	case CalendarEventDetailStatusTentative:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CalendarSourceProvider.
+const (
+	Google CalendarSourceProvider = "google"
+	Icloud CalendarSourceProvider = "icloud"
+	Ics    CalendarSourceProvider = "ics"
+)
+
+// Valid indicates whether the value is a known member of the CalendarSourceProvider enum.
+func (e CalendarSourceProvider) Valid() bool {
+	switch e {
+	case Google:
+		return true
+	case Icloud:
+		return true
+	case Ics:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CalendarSourceStatus.
+const (
+	CalendarSourceStatusError       CalendarSourceStatus = "error"
+	CalendarSourceStatusNeedsReauth CalendarSourceStatus = "needs_reauth"
+	CalendarSourceStatusOk          CalendarSourceStatus = "ok"
+)
+
+// Valid indicates whether the value is a known member of the CalendarSourceStatus enum.
+func (e CalendarSourceStatus) Valid() bool {
+	switch e {
+	case CalendarSourceStatusError:
+		return true
+	case CalendarSourceStatusNeedsReauth:
+		return true
+	case CalendarSourceStatusOk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CredentialKind.
 const (
 	CredentialKindAssistant CredentialKind = "assistant"
@@ -321,6 +453,109 @@ func (e CreateCredentialJSONBodyKind) Valid() bool {
 	}
 }
 
+// AssignChildren defines model for AssignChildren.
+type AssignChildren struct {
+	Children []Id                `json:"children"`
+	Scope    AssignChildrenScope `json:"scope"`
+}
+
+// AssignChildrenScope defines model for AssignChildren.Scope.
+type AssignChildrenScope string
+
+// CalendarEdit defines model for CalendarEdit.
+type CalendarEdit struct {
+	Color           ProfileColor `json:"color"`
+	ExpectedVersion int          `json:"expectedVersion"`
+	Name            CalendarName `json:"name"`
+	ShowOnDisplay   bool         `json:"showOnDisplay"`
+}
+
+// CalendarErrorCode defines model for CalendarErrorCode.
+type CalendarErrorCode string
+
+// CalendarEvent defines model for CalendarEvent.
+type CalendarEvent struct {
+	AllDay   bool        `json:"allDay"`
+	Calendar CalendarRef `json:"calendar"`
+	Children []Id        `json:"children"`
+
+	// End RFC3339, or the exclusive end date when allDay
+	End      string  `json:"end"`
+	Id       Id      `json:"id"`
+	Location *string `json:"location,omitempty"`
+	SeriesId Id      `json:"seriesId"`
+
+	// Start RFC3339 in household time, or a date when allDay
+	Start  string              `json:"start"`
+	Status CalendarEventStatus `json:"status"`
+
+	// Title Up to 500 characters; missing means busy
+	Title *string `json:"title,omitempty"`
+}
+
+// CalendarEventStatus defines model for CalendarEvent.Status.
+type CalendarEventStatus string
+
+// CalendarEventDetail defines model for CalendarEventDetail.
+type CalendarEventDetail struct {
+	AllDay   bool        `json:"allDay"`
+	Calendar CalendarRef `json:"calendar"`
+	Children []Id        `json:"children"`
+
+	// Description Up to 4000 characters; never sent to displays
+	Description *string                   `json:"description,omitempty"`
+	End         string                    `json:"end"`
+	Id          Id                        `json:"id"`
+	Location    *string                   `json:"location,omitempty"`
+	Recurring   bool                      `json:"recurring"`
+	SeriesId    Id                        `json:"seriesId"`
+	Start       string                    `json:"start"`
+	Status      CalendarEventDetailStatus `json:"status"`
+	Title       *string                   `json:"title,omitempty"`
+}
+
+// CalendarEventDetailStatus defines model for CalendarEventDetail.Status.
+type CalendarEventDetailStatus string
+
+// CalendarList defines model for CalendarList.
+type CalendarList struct {
+	Calendars []CalendarSource `json:"calendars"`
+}
+
+// CalendarName defines model for CalendarName.
+type CalendarName = string
+
+// CalendarRef defines model for CalendarRef.
+type CalendarRef struct {
+	Color ProfileColor `json:"color"`
+	Id    Id           `json:"id"`
+	Name  string       `json:"name"`
+}
+
+// CalendarResponse defines model for CalendarResponse.
+type CalendarResponse struct {
+	Events []CalendarEvent `json:"events"`
+}
+
+// CalendarSource defines model for CalendarSource.
+type CalendarSource struct {
+	Color         ProfileColor           `json:"color"`
+	Error         *CalendarErrorCode     `json:"error,omitempty"`
+	Id            Id                     `json:"id"`
+	LastSyncAt    *time.Time             `json:"lastSyncAt,omitempty"`
+	Name          string                 `json:"name"`
+	Provider      CalendarSourceProvider `json:"provider"`
+	ShowOnDisplay bool                   `json:"showOnDisplay"`
+	Status        CalendarSourceStatus   `json:"status"`
+	Version       int                    `json:"version"`
+}
+
+// CalendarSourceProvider defines model for CalendarSource.Provider.
+type CalendarSourceProvider string
+
+// CalendarSourceStatus defines model for CalendarSource.Status.
+type CalendarSourceStatus string
+
 // Child defines model for Child.
 type Child struct {
 	Archived bool         `json:"archived"`
@@ -509,6 +744,16 @@ type MealSlot string
 type MealWeek struct {
 	Days      []MealDay          `json:"days"`
 	WeekStart openapi_types.Date `json:"weekStart"`
+}
+
+// NewCalendarLink defines model for NewCalendarLink.
+type NewCalendarLink struct {
+	Color         ProfileColor `json:"color"`
+	Name          CalendarName `json:"name"`
+	ShowOnDisplay bool         `json:"showOnDisplay"`
+
+	// Url https, http or webcal
+	Url string `json:"url"`
 }
 
 // NewChore defines model for NewChore.
@@ -762,6 +1007,44 @@ type ConfirmSignInJSONBody struct {
 	Password string `json:"password"`
 }
 
+// GetCalendarParams defines parameters for GetCalendar.
+type GetCalendarParams struct {
+	From openapi_types.Date `form:"from" json:"from"`
+
+	// To Exclusive
+	To openapi_types.Date `form:"to" json:"to"`
+}
+
+// AssignEventChildrenParams defines parameters for AssignEventChildren.
+type AssignEventChildrenParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// AddCalendarLinkParams defines parameters for AddCalendarLink.
+type AddCalendarLinkParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RemoveCalendarParams defines parameters for RemoveCalendar.
+type RemoveCalendarParams struct {
+	ExpectedVersion int `form:"expectedVersion" json:"expectedVersion"`
+
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateCalendarParams defines parameters for UpdateCalendar.
+type UpdateCalendarParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ListChildrenParams defines parameters for ListChildren.
 type ListChildrenParams struct {
 	IncludeArchived *bool `form:"includeArchived,omitempty" json:"includeArchived,omitempty"`
@@ -990,6 +1273,15 @@ type ConfirmSignInJSONRequestBody ConfirmSignInJSONBody
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = Credentials
 
+// AssignEventChildrenJSONRequestBody defines body for AssignEventChildren for application/json ContentType.
+type AssignEventChildrenJSONRequestBody = AssignChildren
+
+// AddCalendarLinkJSONRequestBody defines body for AddCalendarLink for application/json ContentType.
+type AddCalendarLinkJSONRequestBody = NewCalendarLink
+
+// UpdateCalendarJSONRequestBody defines body for UpdateCalendar for application/json ContentType.
+type UpdateCalendarJSONRequestBody = CalendarEdit
+
 // CreateChildJSONRequestBody defines body for CreateChild for application/json ContentType.
 type CreateChildJSONRequestBody CreateChildJSONBody
 
@@ -1046,6 +1338,27 @@ type ServerInterface interface {
 	// GetMe The signed-in adult and their household
 	// (GET /auth/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetCalendar Events between two household days
+	// (GET /calendar)
+	GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams)
+	// GetCalendarEvent One event, with its description
+	// (GET /calendar/events/{eventId})
+	GetCalendarEvent(w http.ResponseWriter, r *http.Request, eventId Id)
+	// AssignEventChildren Say which children an event is for
+	// (PUT /calendar/events/{eventId}/children)
+	AssignEventChildren(w http.ResponseWriter, r *http.Request, eventId Id, params AssignEventChildrenParams)
+	// ListCalendars The calendars the household follows
+	// (GET /calendars)
+	ListCalendars(w http.ResponseWriter, r *http.Request)
+	// AddCalendarLink Follow a calendar by its link (ICS or webcal)
+	// (POST /calendars)
+	AddCalendarLink(w http.ResponseWriter, r *http.Request, params AddCalendarLinkParams)
+	// RemoveCalendar Stop following a calendar, with its events and assignments
+	// (DELETE /calendars/{calendarId})
+	RemoveCalendar(w http.ResponseWriter, r *http.Request, calendarId Id, params RemoveCalendarParams)
+	// UpdateCalendar Rename a calendar, recolour it, or show or hide it on displays
+	// (PATCH /calendars/{calendarId})
+	UpdateCalendar(w http.ResponseWriter, r *http.Request, calendarId Id, params UpdateCalendarParams)
 	// ListChildren The children the caller may act for
 	// (GET /children)
 	ListChildren(w http.ResponseWriter, r *http.Request, params ListChildrenParams)
@@ -1224,6 +1537,312 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCalendar operation middleware
+func (siw *ServerInterfaceWrapper) GetCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCalendarParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCalendar(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCalendarEvent operation middleware
+func (siw *ServerInterfaceWrapper) GetCalendarEvent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCalendarEvent(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AssignEventChildren operation middleware
+func (siw *ServerInterfaceWrapper) AssignEventChildren(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", r.PathValue("eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AssignEventChildrenParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AssignEventChildren(w, r, eventId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCalendars operation middleware
+func (siw *ServerInterfaceWrapper) ListCalendars(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCalendars(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddCalendarLink operation middleware
+func (siw *ServerInterfaceWrapper) AddCalendarLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AddCalendarLinkParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddCalendarLink(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveCalendar operation middleware
+func (siw *ServerInterfaceWrapper) RemoveCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "calendarId" -------------
+	var calendarId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "calendarId", r.PathValue("calendarId"), &calendarId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "calendarId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RemoveCalendarParams
+
+	// ------------- Required query parameter "expectedVersion" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedVersion", r.URL.Query(), &params.ExpectedVersion, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedVersion"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedVersion", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveCalendar(w, r, calendarId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCalendar operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "calendarId" -------------
+	var calendarId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "calendarId", r.PathValue("calendarId"), &calendarId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "calendarId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateCalendarParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCalendar(w, r, calendarId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2928,6 +3547,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/recipes", wrapper.CreateRecipe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/recipes/{recipeId}", wrapper.GetRecipe)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/recipes/{recipeId}", wrapper.UpdateRecipe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/calendar", wrapper.GetCalendar)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/calendar/events/{eventId}", wrapper.GetCalendarEvent)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/calendar/events/{eventId}/children", wrapper.AssignEventChildren)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/calendars", wrapper.ListCalendars)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/calendars", wrapper.AddCalendarLink)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/calendars/{calendarId}", wrapper.RemoveCalendar)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/calendars/{calendarId}", wrapper.UpdateCalendar)
 
 	return m
 }
@@ -3253,6 +3879,804 @@ type GetMedefaultJSONResponse struct {
 }
 
 func (response GetMedefaultJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarRequestObject struct {
+	Params GetCalendarParams
+}
+
+type GetCalendarResponseObject interface {
+	VisitGetCalendarResponse(w http.ResponseWriter) error
+}
+
+type GetCalendar200JSONResponse CalendarResponse
+
+func (response GetCalendar200JSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendar400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetCalendar400JSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendar401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetCalendar401JSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendar403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetCalendar403JSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendardefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetCalendardefaultJSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarEventRequestObject struct {
+	EventId Id `json:"eventId"`
+}
+
+type GetCalendarEventResponseObject interface {
+	VisitGetCalendarEventResponse(w http.ResponseWriter) error
+}
+
+type GetCalendarEvent200JSONResponse CalendarEventDetail
+
+func (response GetCalendarEvent200JSONResponse) VisitGetCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarEvent400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetCalendarEvent400JSONResponse) VisitGetCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarEvent401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetCalendarEvent401JSONResponse) VisitGetCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarEvent403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetCalendarEvent403JSONResponse) VisitGetCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarEvent404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetCalendarEvent404JSONResponse) VisitGetCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarEventdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetCalendarEventdefaultJSONResponse) VisitGetCalendarEventResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildrenRequestObject struct {
+	EventId Id `json:"eventId"`
+	Params  AssignEventChildrenParams
+	Body    *AssignEventChildrenJSONRequestBody
+}
+
+type AssignEventChildrenResponseObject interface {
+	VisitAssignEventChildrenResponse(w http.ResponseWriter) error
+}
+
+type AssignEventChildren200JSONResponse CalendarEvent
+
+func (response AssignEventChildren200JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AssignEventChildren400JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response AssignEventChildren401JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response AssignEventChildren403JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AssignEventChildren404JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren409JSONResponse struct{ ConflictJSONResponse }
+
+func (response AssignEventChildren409JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response AssignEventChildren413JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildren422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response AssignEventChildren422JSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignEventChildrendefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AssignEventChildrendefaultJSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendarsRequestObject struct {
+}
+
+type ListCalendarsResponseObject interface {
+	VisitListCalendarsResponse(w http.ResponseWriter) error
+}
+
+type ListCalendars200JSONResponse CalendarList
+
+func (response ListCalendars200JSONResponse) VisitListCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendars400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListCalendars400JSONResponse) VisitListCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendars401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListCalendars401JSONResponse) VisitListCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendars403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListCalendars403JSONResponse) VisitListCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCalendarsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListCalendarsdefaultJSONResponse) VisitListCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLinkRequestObject struct {
+	Params AddCalendarLinkParams
+	Body   *AddCalendarLinkJSONRequestBody
+}
+
+type AddCalendarLinkResponseObject interface {
+	VisitAddCalendarLinkResponse(w http.ResponseWriter) error
+}
+
+type AddCalendarLink201JSONResponse CalendarSource
+
+func (response AddCalendarLink201JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AddCalendarLink400JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response AddCalendarLink401JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response AddCalendarLink403JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AddCalendarLink404JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink409JSONResponse struct{ ConflictJSONResponse }
+
+func (response AddCalendarLink409JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response AddCalendarLink413JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLink422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response AddCalendarLink422JSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCalendarLinkdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AddCalendarLinkdefaultJSONResponse) VisitAddCalendarLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendarRequestObject struct {
+	CalendarId Id `json:"calendarId"`
+	Params     RemoveCalendarParams
+}
+
+type RemoveCalendarResponseObject interface {
+	VisitRemoveCalendarResponse(w http.ResponseWriter) error
+}
+
+type RemoveCalendar204Response struct {
+}
+
+func (response RemoveCalendar204Response) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveCalendar400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RemoveCalendar400JSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendar401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RemoveCalendar401JSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendar403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RemoveCalendar403JSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendar404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RemoveCalendar404JSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendar409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RemoveCalendar409JSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendar422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RemoveCalendar422JSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveCalendardefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RemoveCalendardefaultJSONResponse) VisitRemoveCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendarRequestObject struct {
+	CalendarId Id `json:"calendarId"`
+	Params     UpdateCalendarParams
+	Body       *UpdateCalendarJSONRequestBody
+}
+
+type UpdateCalendarResponseObject interface {
+	VisitUpdateCalendarResponse(w http.ResponseWriter) error
+}
+
+type UpdateCalendar200JSONResponse CalendarSource
+
+func (response UpdateCalendar200JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateCalendar400JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateCalendar401JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateCalendar403JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateCalendar404JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateCalendar409JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response UpdateCalendar413JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendar422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response UpdateCalendar422JSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCalendardefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateCalendardefaultJSONResponse) VisitUpdateCalendarResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -7004,6 +8428,27 @@ type StrictServerInterface interface {
 	// GetMe The signed-in adult and their household
 	// (GET /auth/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetCalendar Events between two household days
+	// (GET /calendar)
+	GetCalendar(ctx context.Context, request GetCalendarRequestObject) (GetCalendarResponseObject, error)
+	// GetCalendarEvent One event, with its description
+	// (GET /calendar/events/{eventId})
+	GetCalendarEvent(ctx context.Context, request GetCalendarEventRequestObject) (GetCalendarEventResponseObject, error)
+	// AssignEventChildren Say which children an event is for
+	// (PUT /calendar/events/{eventId}/children)
+	AssignEventChildren(ctx context.Context, request AssignEventChildrenRequestObject) (AssignEventChildrenResponseObject, error)
+	// ListCalendars The calendars the household follows
+	// (GET /calendars)
+	ListCalendars(ctx context.Context, request ListCalendarsRequestObject) (ListCalendarsResponseObject, error)
+	// AddCalendarLink Follow a calendar by its link (ICS or webcal)
+	// (POST /calendars)
+	AddCalendarLink(ctx context.Context, request AddCalendarLinkRequestObject) (AddCalendarLinkResponseObject, error)
+	// RemoveCalendar Stop following a calendar, with its events and assignments
+	// (DELETE /calendars/{calendarId})
+	RemoveCalendar(ctx context.Context, request RemoveCalendarRequestObject) (RemoveCalendarResponseObject, error)
+	// UpdateCalendar Rename a calendar, recolour it, or show or hide it on displays
+	// (PATCH /calendars/{calendarId})
+	UpdateCalendar(ctx context.Context, request UpdateCalendarRequestObject) (UpdateCalendarResponseObject, error)
 	// ListChildren The children the caller may act for
 	// (GET /children)
 	ListChildren(ctx context.Context, request ListChildrenRequestObject) (ListChildrenResponseObject, error)
@@ -7268,6 +8713,210 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCalendar operation middleware
+func (sh *strictHandler) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
+	var request GetCalendarRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCalendar(ctx, request.(GetCalendarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCalendar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCalendarResponseObject); ok {
+		if err := validResponse.VisitGetCalendarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCalendarEvent operation middleware
+func (sh *strictHandler) GetCalendarEvent(w http.ResponseWriter, r *http.Request, eventId Id) {
+	var request GetCalendarEventRequestObject
+
+	request.EventId = eventId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCalendarEvent(ctx, request.(GetCalendarEventRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCalendarEvent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCalendarEventResponseObject); ok {
+		if err := validResponse.VisitGetCalendarEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AssignEventChildren operation middleware
+func (sh *strictHandler) AssignEventChildren(w http.ResponseWriter, r *http.Request, eventId Id, params AssignEventChildrenParams) {
+	var request AssignEventChildrenRequestObject
+
+	request.EventId = eventId
+	request.Params = params
+
+	var body AssignEventChildrenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AssignEventChildren(ctx, request.(AssignEventChildrenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AssignEventChildren")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AssignEventChildrenResponseObject); ok {
+		if err := validResponse.VisitAssignEventChildrenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCalendars operation middleware
+func (sh *strictHandler) ListCalendars(w http.ResponseWriter, r *http.Request) {
+	var request ListCalendarsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCalendars(ctx, request.(ListCalendarsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCalendars")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCalendarsResponseObject); ok {
+		if err := validResponse.VisitListCalendarsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddCalendarLink operation middleware
+func (sh *strictHandler) AddCalendarLink(w http.ResponseWriter, r *http.Request, params AddCalendarLinkParams) {
+	var request AddCalendarLinkRequestObject
+
+	request.Params = params
+
+	var body AddCalendarLinkJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddCalendarLink(ctx, request.(AddCalendarLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddCalendarLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddCalendarLinkResponseObject); ok {
+		if err := validResponse.VisitAddCalendarLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveCalendar operation middleware
+func (sh *strictHandler) RemoveCalendar(w http.ResponseWriter, r *http.Request, calendarId Id, params RemoveCalendarParams) {
+	var request RemoveCalendarRequestObject
+
+	request.CalendarId = calendarId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveCalendar(ctx, request.(RemoveCalendarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveCalendar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveCalendarResponseObject); ok {
+		if err := validResponse.VisitRemoveCalendarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCalendar operation middleware
+func (sh *strictHandler) UpdateCalendar(w http.ResponseWriter, r *http.Request, calendarId Id, params UpdateCalendarParams) {
+	var request UpdateCalendarRequestObject
+
+	request.CalendarId = calendarId
+	request.Params = params
+
+	var body UpdateCalendarJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCalendar(ctx, request.(UpdateCalendarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCalendar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCalendarResponseObject); ok {
+		if err := validResponse.VisitUpdateCalendarResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8414,134 +10063,158 @@ func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"cE133XyYln8tuvt09/8HAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

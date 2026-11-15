@@ -33,6 +33,8 @@ tags:
     description: Live updates over a WebSocket
   - name: meals
     description: Recipes and the meal plan
+  - name: calendar
+    description: Followed calendars, their events, and who they are for
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -104,6 +106,16 @@ paths:
     $ref: meals.yaml#/recipes
   /recipes/{recipeId}:
     $ref: meals.yaml#/recipe
+  /calendar:
+    $ref: calendar.yaml#/calendar
+  /calendar/events/{eventId}:
+    $ref: calendar.yaml#/event
+  /calendar/events/{eventId}/children:
+    $ref: calendar.yaml#/eventChildren
+  /calendars:
+    $ref: calendar.yaml#/calendars
+  /calendars/{calendarId}:
+    $ref: calendar.yaml#/calendarSource
 
 components:
   securitySchemes:
