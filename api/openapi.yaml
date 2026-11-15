@@ -31,6 +31,8 @@ tags:
     description: Service and assistant credentials
   - name: live
     description: Live updates over a WebSocket
+  - name: meals
+    description: Recipes and the meal plan
 paths:
   /auth/login:
     post:
@@ -1390,6 +1392,304 @@ paths:
                 $ref: '#/components/schemas/Error'
         default:
           $ref: '#/components/responses/Error'
+  /meals:
+    get:
+      operationId: getMealWeek
+      summary: The meal plan for the household week containing a date
+      description: |
+        A week runs Monday to Sunday, in the household's time zone. Without `week`, it is the
+        current week. At most one meal per slot per day.
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - meals
+      parameters:
+        - name: week
+          in: query
+          required: false
+          description: Any date in the week
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: The week, seven days
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealWeek'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /meals/{date}/{slot}:
+    parameters:
+      - name: date
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: slot
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/MealSlot'
+    put:
+      operationId: setMeal
+      summary: Plan a meal, or change the planned one
+      description: |
+        `expectedVersion` is 0 when the slot is empty, and otherwise the planned meal's version, so
+        two adults can't overwrite each other unseen.
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 2048
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetMeal'
+            example:
+              title: Leftovers
+              note: Finish the soup.
+              expectedVersion: 0
+      responses:
+        '200':
+          description: Planned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: clearMeal
+      summary: Clear a planned meal
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: expectedVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        '204':
+          description: Cleared
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /recipes:
+    get:
+      operationId: listRecipes
+      summary: The household's recipes, by title
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - meals
+      parameters:
+        - name: archived
+          in: query
+          required: false
+          description: Include archived recipes
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: The recipes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createRecipe
+      summary: Add a recipe
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 393216
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewRecipe'
+            example:
+              title: Lentil soup
+              servings: 4
+              ingredients:
+                - 1 cup red lentils
+                - 1 onion
+              steps:
+                - Soften the onion.
+                - Add the lentils and simmer.
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipe'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /recipes/{recipeId}:
+    parameters:
+      - name: recipeId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Id'
+    get:
+      operationId: getRecipe
+      summary: One recipe, to cook from or edit
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - meals
+      responses:
+        '200':
+          description: The recipe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipe'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: updateRecipe
+      summary: Edit a recipe, or archive or restore it
+      description: Planned meals keep an archived recipe.
+      tags:
+        - meals
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 393216
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeEdit'
+            example:
+              title: Lentil soup
+              servings: 6
+              ingredients:
+                - 1 cup red lentils
+              steps:
+                - Simmer.
+              archived: false
+              expectedVersion: 1
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipe'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     session:
@@ -2027,6 +2327,203 @@ components:
           maxItems: 20
           items:
             $ref: '#/components/schemas/Title'
+    MealSlot:
+      type: string
+      enum:
+        - breakfast
+        - lunch
+        - dinner
+    Meal:
+      type: object
+      required:
+        - id
+        - slot
+        - title
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        slot:
+          $ref: '#/components/schemas/MealSlot'
+        title:
+          type: string
+          description: The recipe's title when recipeId is set
+        recipeId:
+          $ref: '#/components/schemas/Id'
+        note:
+          type: string
+        version:
+          type: integer
+    MealDay:
+      type: object
+      required:
+        - date
+        - meals
+      properties:
+        date:
+          type: string
+          format: date
+        meals:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Meal'
+    MealWeek:
+      type: object
+      required:
+        - weekStart
+        - days
+      properties:
+        weekStart:
+          type: string
+          format: date
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          items:
+            $ref: '#/components/schemas/MealDay'
+    Title-2:
+      type: string
+      minLength: 1
+      maxLength: 160
+      pattern: \S
+    SetMeal:
+      type: object
+      additionalProperties: false
+      required:
+        - expectedVersion
+      description: Exactly one of recipeId and title.
+      properties:
+        recipeId:
+          $ref: '#/components/schemas/Id'
+        title:
+          $ref: '#/components/schemas/Title-2'
+        note:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: \S
+        expectedVersion:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+    RecipeSummary:
+      type: object
+      required:
+        - id
+        - title
+        - servings
+        - archived
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        servings:
+          type: integer
+        archived:
+          type: boolean
+    RecipeList:
+      type: object
+      required:
+        - recipes
+      properties:
+        recipes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeSummary'
+    Ingredients:
+      type: array
+      maxItems: 40
+      items:
+        type: string
+        minLength: 1
+        maxLength: 200
+        pattern: \S
+    Steps:
+      type: array
+      maxItems: 40
+      items:
+        type: string
+        minLength: 1
+        maxLength: 2000
+        pattern: \S
+    NewRecipe:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - servings
+        - ingredients
+        - steps
+      properties:
+        title:
+          $ref: '#/components/schemas/Title-2'
+        servings:
+          type: integer
+          minimum: 1
+          maximum: 100
+        ingredients:
+          $ref: '#/components/schemas/Ingredients'
+        steps:
+          $ref: '#/components/schemas/Steps'
+    Recipe:
+      type: object
+      required:
+        - id
+        - title
+        - servings
+        - archived
+        - ingredients
+        - steps
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        servings:
+          type: integer
+        archived:
+          type: boolean
+        ingredients:
+          type: array
+          items:
+            type: string
+        steps:
+          type: array
+          items:
+            type: string
+        version:
+          type: integer
+    RecipeEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - servings
+        - ingredients
+        - steps
+        - archived
+        - expectedVersion
+      properties:
+        title:
+          $ref: '#/components/schemas/Title-2'
+        servings:
+          type: integer
+          minimum: 1
+          maximum: 100
+        ingredients:
+          $ref: '#/components/schemas/Ingredients'
+        steps:
+          $ref: '#/components/schemas/Steps'
+        archived:
+          type: boolean
+        expectedVersion:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
   responses:
     Error:
       description: Unexpected error
