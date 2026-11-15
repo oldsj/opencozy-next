@@ -24,6 +24,8 @@ import {
   PageHeader,
   PeopleBoard,
   PersonCard,
+  PointsBadge,
+  pointsLabel,
   PersonTab,
   ProfileAvatar,
   QrCode,
@@ -296,6 +298,15 @@ describe('screen time', () => {
     expect(countdownSpoken(1499)).toBe('25 minutes left');
     expect(countdownSpoken(3660)).toBe('1 hour 1 minute left');
     expect(countdownSpoken(0)).toBe('Time’s up');
+  });
+
+  it('says point for one and points otherwise, everywhere', () => {
+    expect([0, 1, -1, 2, 12].map((n) => pointsLabel(n))).toEqual(['0 points', '1 point', '-1 point', '2 points', '12 points']);
+    expect(pointsLabel(-3, '−3')).toBe('−3 points');
+    const { rerender } = render(<PointsBadge points={1} />);
+    expect(document.querySelector('.oc-points-badge')).toHaveTextContent('1 point');
+    rerender(<PointsBadge points={4} />);
+    expect(document.querySelector('.oc-points-badge')).toHaveTextContent('4 points');
   });
 
   it('a countdown is a silent timer named in whole minutes', () => {

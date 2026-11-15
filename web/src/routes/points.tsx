@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { Button, ConfirmDialog, List, ListRow, Notice, PageHeader, PointsBadge, ProfileAvatar, Section, Tag } from '@app/design';
+import { Button, ConfirmDialog, List, ListRow, Notice, PageHeader, PointsBadge, pointsLabel, ProfileAvatar, Section, Tag } from '@app/design';
 import type { TagTone } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type HistoryEntry } from '../api/client';
@@ -52,7 +52,7 @@ export function PointsPage({ childId }: { childId: string }) {
               const undone = entry.reversedBy !== undefined;
               const tag = kindTags[entry.kind];
               const at = when.format(new Date(entry.at));
-              const meta = [`${signed(entry.points)} points`, at, entry.by === undefined ? null : `by ${entry.by}`, entry.reason ?? null]
+              const meta = [pointsLabel(entry.points, signed(entry.points)), at, entry.by === undefined ? null : `by ${entry.by}`, entry.reason ?? null]
                 .filter(Boolean)
                 .join(' · ');
               return (
@@ -80,7 +80,7 @@ export function PointsPage({ childId }: { childId: string }) {
       )}
       <ConfirmDialog
         open={reversing !== null}
-        title={reversing ? `Take back ${String(reversing.points)} points for ${reversing.title}?` : ''}
+        title={reversing ? `Take back ${pointsLabel(reversing.points)} for ${reversing.title}?` : ''}
         description={`${name} loses the points, and the chore is open again today. The original stays in the history.`}
         confirmLabel="Take back"
         tone="danger"

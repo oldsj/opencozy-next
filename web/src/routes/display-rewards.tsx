@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { Button, ChoiceGroup, Notice, PageHeader, PointsBadge, RewardTile, Sheet } from '@app/design';
+import { Button, ChoiceGroup, Notice, PageHeader, PointsBadge, pointsLabel, RewardTile, Sheet } from '@app/design';
 
 import { client, errorMessage, idempotencyKey, type Today } from '../api/client';
 
@@ -36,7 +36,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
         <PageHeader title="Rewards" description="Who’s choosing?" />
         <ChoiceGroup
           label="Who’s choosing?"
-          choices={children.map((c) => ({ value: c.id, label: c.name, detail: `${String(c.points)} points` }))}
+          choices={children.map((c) => ({ value: c.id, label: c.name, detail: pointsLabel(c.points) }))}
           onChoose={(id) => { setChildId(id); setSent(null); setProblem(null); }}
         />
       </section>
@@ -75,7 +75,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
       />
       {sent && (
         <Notice tone="info" title={`Asked for ${sent.title}`}>
-          An adult will see it in the inbox. If they say no, your {sent.cost} points come back.
+          An adult will see it in the inbox. If they say no, your {pointsLabel(sent.cost)} come back.
         </Notice>
       )}
       {problem && <Notice tone="error">{problem}</Notice>}
@@ -95,7 +95,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
         open={choosing !== null}
         onClose={() => { setChoosing(null); }}
         title={choosing ? `Choose ${choosing.title}?` : ''}
-        description={choosing ? `This uses ${String(choosing.cost)} of ${child.name}’s ${String(child.points)} points. If an adult says no, they come back.` : undefined}
+        description={choosing ? `This uses ${String(choosing.cost)} of ${child.name}’s ${pointsLabel(child.points)}. If an adult says no, they come back.` : undefined}
         footer={
           <>
             <Button onClick={() => { setChoosing(null); }}>Not now</Button>

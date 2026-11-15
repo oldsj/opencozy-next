@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Check, Gift } from 'lucide-react';
 
 import { cx } from '../cx';
+import { pointsLabel, pointsWord } from '../points';
 import { ProgressBar } from './ProgressBar';
 
 export interface RewardTileProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onSelect'> {
@@ -13,7 +14,6 @@ export interface RewardTileProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   icon?: ReactNode;
 }
 
-const plural = (n: number) => (n === 1 ? '' : 's');
 
 /**
  * A reward the child can work toward. It takes the width of its grid cell. Its accessible name is
@@ -24,7 +24,7 @@ export function RewardTile({ balance, className, cost, icon, name, onSelect, typ
   const ready = balance >= safeCost;
   const remaining = Math.max(0, safeCost - balance);
   const progress = Math.min(Math.max(0, balance), safeCost);
-  const stateLabel = ready ? 'Ready' : `${String(remaining)} more point${plural(remaining)}`;
+  const stateLabel = ready ? 'Ready' : `${String(remaining)} more ${pointsWord(remaining)}`;
 
   return (
     <button
@@ -38,9 +38,9 @@ export function RewardTile({ balance, className, cost, icon, name, onSelect, typ
       </span>
       <span className="oc-reward-tile__name">{name}</span>{' '}
       <span className="oc-reward-tile__cost">
-        {cost} point{plural(cost)}
+        {pointsLabel(cost)}
       </span>{' '}
-      <ProgressBar aria-hidden="true" className="oc-reward-tile__progress" value={progress} max={safeCost} label={`${name} progress: ${String(progress)} of ${String(safeCost)} points`} />
+      <ProgressBar aria-hidden="true" className="oc-reward-tile__progress" value={progress} max={safeCost} label={`${name} progress: ${String(progress)} of ${pointsLabel(safeCost)}`} />
       <span className="oc-reward-tile__state">
         {ready && <Check aria-hidden="true" size={16} strokeWidth={2.4} />}
         {stateLabel}
