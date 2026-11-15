@@ -2958,6 +2958,7 @@ components:
         - code
         - token
         - qrPayload
+        - qrModules
         - expiresAt
       properties:
         id:
@@ -2973,6 +2974,14 @@ components:
         qrPayload:
           type: string
           description: opencozy-pair:v1?origin=<url-encoded origin>&token=<token>
+        qrModules:
+          type: array
+          description: The QR code of qrPayload (error correction M), row by row; "1" is a dark module
+          maxItems: 177
+          items:
+            type: string
+            pattern: ^[01]+$
+            maxLength: 177
         expiresAt:
           type: string
           format: date-time
@@ -2982,12 +2991,16 @@ components:
       required:
         - id
         - name
+        - timeZone
         - lockMessage
       properties:
         id:
           $ref: '#/components/schemas/Id'
         name:
           type: string
+        timeZone:
+          type: string
+          description: IANA zone name; the household day follows it
         lockMessage:
           description: The message to show; the default when the household has none
           $ref: '#/components/schemas/LockMessage'

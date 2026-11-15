@@ -18,7 +18,9 @@ import { ChoresPage } from './routes/chores';
 import { InboxPage } from './routes/inbox';
 import { PointsPage } from './routes/points';
 import { RewardsPage } from './routes/rewards';
+import { DevicesPage } from './routes/devices';
 import { DisplaysPage } from './routes/displays';
+import { DeviceExpiredPage, KidPage } from './routes/kid';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
 
@@ -48,6 +50,7 @@ const nav = [
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/displays', label: 'Displays' },
+  { to: '/devices', label: 'Devices' },
 ] as const;
 
 // The manage pages' column, with the main navigation once signed in.
@@ -215,6 +218,33 @@ const rewardsRoute = createRoute({
   component: RewardsPage,
 });
 
+// Manage: the children's iPads and phones.
+const devicesRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/devices',
+  staticData: { title: 'Devices' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: DevicesPage,
+});
+
+// The kid view in a child's iPad app (signed in as the device), and where a used link lands.
+const kidRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/kid',
+  staticData: { title: 'Today' },
+  component: KidPage,
+});
+const deviceExpiredRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/device/expired',
+  staticData: { title: 'One moment' },
+  component: DeviceExpiredPage,
+});
+
 // The wall display itself: pairs, then shows the household's day. No adult sign-in.
 const displayRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -224,8 +254,10 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, devicesRoute]),
   displayRoute,
+  kidRoute,
+  deviceExpiredRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

@@ -45,7 +45,7 @@ export function onSignedOut(handler: () => void) {
 client.use({
   onResponse({ request, response }) {
     const path = new URL(request.url).pathname;
-    if (response.status === 401 && !path.startsWith('/api/auth/') && !window.location.pathname.startsWith('/display')) {
+    if (response.status === 401 && !path.startsWith('/api/auth/') && !window.location.pathname.startsWith('/display') && !window.location.pathname.startsWith('/kid')) {
       signedOut?.();
     }
     return undefined;
@@ -66,6 +66,8 @@ export const meQuery = queryOptions({
 
 export type Display = components['schemas']['Display'];
 export type DisplayScope = components['schemas']['DisplayScope'];
+export type Device = components['schemas']['Device'];
+export type DevicePairingOffer = components['schemas']['DevicePairingOffer'];
 
 // A fresh Idempotency-Key for one change. Reuse the same key when retrying that change.
 export function idempotencyKey(): { header: { 'Idempotency-Key': string } } {

@@ -1,11 +1,26 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Gift, House, Sunrise } from 'lucide-react';
+import { ClipboardCheck, Gift, Hourglass, House, Sunrise } from 'lucide-react';
 import { useState } from 'react';
 
-import { AppFrame, Button, ConnectionBanner, EmptyState, PeopleBoard, PersonCard, TabBar, TaskGroup, TaskRow, TopBar } from '@app/design';
+import {
+  AppFrame,
+  Button,
+  ComingLaterTile,
+  ConnectionBanner,
+  EmptyState,
+  PageHeader,
+  PeopleBoard,
+  PersonCard,
+  PointsBadge,
+  Section,
+  TabBar,
+  TaskGroup,
+  TaskRow,
+  TopBar,
+} from '@app/design';
 import type { TaskRowCheck } from '@app/design';
 
-import { client, useAttempts, type Household, type TodayGroup, type TodayItem } from '../api/client';
+import { client, useAttempts, type Child, type TodayGroup, type TodayItem } from '../api/client';
 import { DisplayRewards } from './display-rewards';
 
 export const todayKey = ['display', 'today'] as const;
@@ -27,9 +42,26 @@ function clock(at: Date, timeZone: string) {
   };
 }
 
+function greeting(at: Date, timeZone: string) {
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone, hour: 'numeric', hourCycle: 'h23' }).format(at));
+  if (hour < 12) return 'Good morning';
+  return hour < 18 ? 'Good afternoon' : 'Good evening';
+}
+
 // The wall display's Today: every child's routines and chores. A tap marks one done; it then
 // waits for an adult's approval before the points land.
-export function TodayBoard({ household }: { household: Household }) {
+//
+// With `kid`, the same board on a child's own device (/kid): only their day, in their colour,
+// and Rewards without "Who's choosing?". `onSignedOut` is called when the session has ended.
+export function TodayBoard({
+  household,
+  kid,
+  onSignedOut,
+}: {
+  household: { name: string; timeZone: string };
+  kid?: Child | undefined;
+  onSignedOut?: (() => void) | undefined;
+}) {
   const queryClient = useQueryClient();
   const [local, setLocal] = useState<Local>({});
   const attempts = useAttempts();
@@ -42,7 +74,8 @@ export function TodayBoard({ household }: { household: Household }) {
   const today = useQuery({
     queryKey: todayKey,
     queryFn: async () => {
-      const { data } = await client.GET('/today');
+      const { data, response } = await client.GET('/today');
+      if (response.status === 401) onSignedOut?.();
       if (!data) throw new Error('Today could not be loaded.');
       return data;
     },
@@ -73,11 +106,39 @@ export function TodayBoard({ household }: { household: Household }) {
     await queryClient.invalidateQueries({ queryKey: todayKey }).catch(() => undefined);
   };
 
-  const now = clock(today.data ? new Date(today.data.serverTime) : new Date(), household.timeZone);
+  const at = today.data ? new Date(today.data.serverTime) : new Date();
+  const now = clock(at, household.timeZone);
+  const groupsOf = (groups: TodayGroup[]) =>
+    groups.map((group) => (
+      <TaskGroup
+        key={group.id}
+        title={group.title}
+        icon={group.kind === 'routine' ? Sunrise : ClipboardCheck}
+        status={group.status}
+        done={group.done}
+        earned={group.done}
+        pending={group.pending}
+      >
+        {group.items.map((item) => (
+          <TaskRow
+            key={item.id}
+            title={item.title}
+            points={item.points}
+            status={item.state}
+            check={checkFor(item, local[item.id], () => void mark(group, item)())}
+            message={item.rejectedReason}
+            error={local[item.id] === 'failed' ? 'Couldn’t save — tap to try again.' : undefined}
+          />
+        ))}
+      </TaskGroup>
+    ));
+  const mine = kid ? today.data?.children.find((c) => c.child.id === kid.id) : undefined;
   const updated = today.dataUpdatedAt ? clock(new Date(today.dataUpdatedAt), household.timeZone).time : undefined;
   return (
     <AppFrame
-      topBar={<TopBar time={now.time} date={now.date} householdName={household.name} />}
+      person={kid?.color}
+      aria-busy={today.isPending || undefined}
+      topBar={<TopBar time={now.time} date={now.date} householdName={kid ? `${kid.name}’s day` : household.name} />}
       tabBar={
         <TabBar
           items={[
@@ -95,7 +156,20 @@ export function TodayBoard({ household }: { household: Household }) {
         />
       )}
       {tab === 'rewards' ? (
-        <DisplayRewards today={today.data} todayKey={todayKey} />
+        <DisplayRewards today={today.data} todayKey={todayKey} childId={kid?.id} />
+      ) : kid ? (
+        <>
+          <PageHeader title={`${greeting(at, household.timeZone)}, ${kid.name}`} actions={<PointsBadge points={mine?.child.points ?? 0} />} />
+          {today.isPending ? (
+            <p className="m-0 text-muted-foreground">Getting {kid.name}’s day…</p>
+          ) : mine && mine.groups.length > 0 ? (
+            <Section title="Your list">{groupsOf(mine.groups)}</Section>
+          ) : (
+            <EmptyState variant="surface" title="Nothing on your list today" description="When a routine or chore is ready, it will show up here." />
+          )}
+          {/* Screen time (banked time, use 30 min, ask for more) arrives with the allowances slice. */}
+          <ComingLaterTile title="Screen time" icon={Hourglass} description="Your iPad time will show here." />
+        </>
       ) : (
       <PeopleBoard>
         {today.data?.children.map(({ child, groups }) => (
@@ -111,29 +185,7 @@ export function TodayBoard({ household }: { household: Household }) {
             {groups.length === 0 ? (
               <EmptyState title="Nothing on the list today" description="When a routine or chore is ready, it will appear here." />
             ) : (
-              groups.map((group) => (
-                <TaskGroup
-                  key={group.id}
-                  title={group.title}
-                  icon={group.kind === 'routine' ? Sunrise : ClipboardCheck}
-                  status={group.status}
-                  done={group.done}
-                  earned={group.done}
-                  pending={group.pending}
-                >
-                  {group.items.map((item) => (
-                    <TaskRow
-                      key={item.id}
-                      title={item.title}
-                      points={item.points}
-                      status={item.state}
-                      check={checkFor(item, local[item.id], () => void mark(group, item)())}
-                      message={item.rejectedReason}
-                      error={local[item.id] === 'failed' ? 'Couldn’t save — tap to try again.' : undefined}
-                    />
-                  ))}
-                </TaskGroup>
-              ))
+              groupsOf(groups)
             )}
           </PersonCard>
         ))}

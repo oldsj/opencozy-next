@@ -50,7 +50,7 @@ WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < clock_timestamp() - in
 -- name: GetDeviceView :one
 SELECT d.id, d.name, d.platform, d.paired_at, d.last_seen_at,
        c.id AS child_id, c.name AS child_name, c.color AS child_color,
-       h.name AS household_name, h.lock_message
+       h.name AS household_name, h.time_zone, h.lock_message
 FROM device d
 JOIN household h ON h.id = d.household_id
 LEFT JOIN child c ON c.household_id = d.household_id AND c.id = d.child_id AND c.archived_at IS NULL

@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"rsc.io/qr"
 
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/api"
@@ -42,6 +43,28 @@ func newDeviceCode() (string, error) {
 
 func deviceCodeHash(code string) []byte {
 	return auth.HashToken("device-pairing:" + normalizeCode(code))
+}
+
+// qrModules encodes text as a QR code, row by row ("1" dark), for the design system's QrCode.
+func qrModules(text string) ([]string, error) {
+	c, err := qr.Encode(text, qr.M)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]string, c.Size)
+	var b strings.Builder
+	for y := range c.Size {
+		b.Reset()
+		for x := range c.Size {
+			if c.Black(x, y) {
+				b.WriteByte('1')
+			} else {
+				b.WriteByte('0')
+			}
+		}
+		rows[y] = b.String()
+	}
+	return rows, nil
 }
 
 type originKey struct{}
@@ -88,7 +111,7 @@ func (s *Server) deviceSelf(ctx context.Context, q *dbq.Queries, household, id u
 	}
 	return api.DeviceSelf{
 		Device:     toDevice(v.ID, v.Name, v.Platform, v.PairedAt, v.LastSeenAt, v.ChildID, v.ChildName, v.ChildColor),
-		Household:  api.DeviceHousehold{Id: household, Name: v.HouseholdName, LockMessage: lockMessageOf(v.LockMessage)},
+		Household:  api.DeviceHousehold{Id: household, Name: v.HouseholdName, TimeZone: v.TimeZone, LockMessage: lockMessageOf(v.LockMessage)},
 		ServerTime: time.Now().UTC(),
 	}, nil
 }
@@ -129,8 +152,12 @@ func (s *Server) CreateDevicePairing(ctx context.Context, req api.CreateDevicePa
 	if err != nil {
 		return nil, err
 	}
-	qr := "opencozy-pair:v1?origin=" + url.QueryEscape(originFrom(ctx)) + "&token=" + token
-	return api.CreateDevicePairing201JSONResponse{Id: row.ID, Code: code, Token: token, QrPayload: qr, ExpiresAt: row.ExpiresAt}, nil
+	payload := "opencozy-pair:v1?origin=" + url.QueryEscape(originFrom(ctx)) + "&token=" + token
+	modules, err := qrModules(payload)
+	if err != nil {
+		return nil, err
+	}
+	return api.CreateDevicePairing201JSONResponse{Id: row.ID, Code: code, Token: token, QrPayload: payload, QrModules: modules, ExpiresAt: row.ExpiresAt}, nil
 }
 
 var errPairingUnavailable = apiError("pairing_unavailable", "This pairing isn't available. Ask an adult for a new code.")

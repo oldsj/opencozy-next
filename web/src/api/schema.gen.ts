@@ -1187,12 +1187,16 @@ export interface components {
             token: string;
             /** @description opencozy-pair:v1?origin=<url-encoded origin>&token=<token> */
             qrPayload: string;
+            /** @description The QR code of qrPayload (error correction M), row by row; "1" is a dark module */
+            qrModules: string[];
             /** Format: date-time */
             expiresAt: string;
         };
         DeviceHousehold: {
             id: components["schemas"]["Id"];
             name: string;
+            /** @description IANA zone name; the household day follows it */
+            timeZone: string;
             /** @description The message to show; the default when the household has none */
             lockMessage: components["schemas"]["LockMessage"];
         };

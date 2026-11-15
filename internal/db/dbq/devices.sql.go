@@ -140,7 +140,7 @@ func (q *Queries) DeleteExpiredDeviceState(ctx context.Context) error {
 const getDeviceView = `-- name: GetDeviceView :one
 SELECT d.id, d.name, d.platform, d.paired_at, d.last_seen_at,
        c.id AS child_id, c.name AS child_name, c.color AS child_color,
-       h.name AS household_name, h.lock_message
+       h.name AS household_name, h.time_zone, h.lock_message
 FROM device d
 JOIN household h ON h.id = d.household_id
 LEFT JOIN child c ON c.household_id = d.household_id AND c.id = d.child_id AND c.archived_at IS NULL
@@ -162,6 +162,7 @@ type GetDeviceViewRow struct {
 	ChildName     *string
 	ChildColor    *string
 	HouseholdName string
+	TimeZone      string
 	LockMessage   *string
 }
 
@@ -178,6 +179,7 @@ func (q *Queries) GetDeviceView(ctx context.Context, arg GetDeviceViewParams) (G
 		&i.ChildName,
 		&i.ChildColor,
 		&i.HouseholdName,
+		&i.TimeZone,
 		&i.LockMessage,
 	)
 	return i, err

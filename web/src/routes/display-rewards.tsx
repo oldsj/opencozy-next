@@ -10,10 +10,12 @@ type Reward = { id: string; title: string; cost: number; available: boolean };
 const rewardsKey = ['display', 'rewards'] as const;
 
 // The wall display's Rewards: a child picks who they are, then a reward. The points are spent
-// at once and come back if an adult says no.
-export function DisplayRewards({ today, todayKey }: { today: Today | undefined; todayKey: readonly unknown[] }) {
+// at once and come back if an adult says no. On a child's own device (`childId`), there is no
+// choosing who.
+export function DisplayRewards({ today, todayKey, childId: own }: { today: Today | undefined; todayKey: readonly unknown[]; childId?: string | undefined }) {
   const queryClient = useQueryClient();
-  const [childId, setChildId] = useState<string | null>(null);
+  const [chosen, setChildId] = useState<string | null>(null);
+  const childId = own ?? chosen;
   const [choosing, setChoosing] = useState<Reward | null>(null);
   const [sent, setSent] = useState<Reward | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -32,6 +34,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
 
   const children = today?.children.map((c) => c.child) ?? [];
   const child = children.find((c) => c.id === childId);
+  if (!child && own) return null; // the day hasn't loaded yet
   if (!child) {
     return (
       <section className="flex flex-col gap-6">
@@ -85,12 +88,12 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
   return (
     <section className="flex flex-col gap-6">
       <PageHeader
-        title={`${child.name}’s rewards`}
+        title={own ? 'Rewards' : `${child.name}’s rewards`}
         description="Choose one, then an adult says yes."
         actions={
           <>
             <PointsBadge points={child.points} />
-            <Button onClick={() => { setChildId(null); }}>Someone else</Button>
+            {!own && <Button onClick={() => { setChildId(null); }}>Someone else</Button>}
           </>
         }
       />

@@ -51,6 +51,9 @@ func TestDevices(t *testing.T) {
 	if qr := o["qrPayload"].(string); !strings.HasPrefix(qr, "opencozy-pair:v1?origin=https%3A%2F%2F127.0.0.1") || !strings.HasSuffix(qr, "&token="+o["token"].(string)) {
 		t.Errorf("qrPayload %q", qr)
 	}
+	if m := o["qrModules"].([]any); len(m) < 21 || len(m[0].(string)) != len(m) {
+		t.Errorf("qrModules: %d rows", len(m))
+	}
 	kit := newDeviceKey()
 	// A proof by another key is refused, and leaves the offer usable.
 	bad := pairBody(kit, "code", strings.ToLower(strings.ReplaceAll(code, "-", "")))
