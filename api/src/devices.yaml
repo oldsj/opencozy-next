@@ -161,7 +161,10 @@ lockMessage:
             required: [lockMessage]
             properties:
               lockMessage:
-                $ref: '#/schemas/LockMessage'
+                description: 1–200 characters after trimming; null goes back to the default
+                oneOf:
+                  - $ref: '#/schemas/LockMessage'
+                  - type: 'null'
           example: { lockMessage: Time for a break. Ask an adult if you need more. }
     responses:
       '204':
@@ -305,8 +308,9 @@ schemas:
     maxLength: 80
   LockMessage:
     type: string
+    minLength: 1
     maxLength: 200
-    description: Empty means the app's own words.
+    description: Shown on a locked device's shield
   Platform:
     type: string
     enum: [ipad, iphone]
@@ -367,6 +371,9 @@ schemas:
     type: object
     additionalProperties: false
     required: [id, name, platform, child, pairedAt]
+    description: >
+      `child` is null when the device's child was archived. Such a device can't act (its signed
+      requests get 401) until an adult gives it to another child.
     properties:
       id:
         $ref: common.yaml#/schemas/Id
@@ -375,7 +382,9 @@ schemas:
       platform:
         $ref: '#/schemas/Platform'
       child:
-        $ref: '#/schemas/DeviceChild'
+        oneOf:
+          - $ref: '#/schemas/DeviceChild'
+          - type: 'null'
       pairedAt:
         type: string
         format: date-time
@@ -385,7 +394,7 @@ schemas:
   Devices:
     type: object
     additionalProperties: false
-    required: [devices, lockMessage]
+    required: [devices, lockMessage, defaultLockMessage]
     properties:
       devices:
         type: array
@@ -393,6 +402,11 @@ schemas:
         items:
           $ref: '#/schemas/Device'
       lockMessage:
+        description: The household's own message; null means the default
+        oneOf:
+          - $ref: '#/schemas/LockMessage'
+          - type: 'null'
+      defaultLockMessage:
         $ref: '#/schemas/LockMessage'
   DeviceHousehold:
     type: object
@@ -404,6 +418,7 @@ schemas:
       name:
         type: string
       lockMessage:
+        description: The message to show; the default when the household has none
         $ref: '#/schemas/LockMessage'
   DeviceSelf:
     type: object

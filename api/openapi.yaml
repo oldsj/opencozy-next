@@ -1044,7 +1044,10 @@ paths:
                 - lockMessage
               properties:
                 lockMessage:
-                  $ref: '#/components/schemas/LockMessage'
+                  description: 1–200 characters after trimming; null goes back to the default
+                  oneOf:
+                    - $ref: '#/components/schemas/LockMessage'
+                    - type: 'null'
             example:
               lockMessage: Time for a break. Ask an adult if you need more.
       responses:
@@ -2903,6 +2906,8 @@ components:
         - platform
         - child
         - pairedAt
+      description: |
+        `child` is null when the device's child was archived. Such a device can't act (its signed requests get 401) until an adult gives it to another child.
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -2911,7 +2916,9 @@ components:
         platform:
           $ref: '#/components/schemas/Platform'
         child:
-          $ref: '#/components/schemas/DeviceChild'
+          oneOf:
+            - $ref: '#/components/schemas/DeviceChild'
+            - type: 'null'
         pairedAt:
           type: string
           format: date-time
@@ -2920,14 +2927,16 @@ components:
           format: date-time
     LockMessage:
       type: string
+      minLength: 1
       maxLength: 200
-      description: Empty means the app's own words.
+      description: Shown on a locked device's shield
     Devices:
       type: object
       additionalProperties: false
       required:
         - devices
         - lockMessage
+        - defaultLockMessage
       properties:
         devices:
           type: array
@@ -2935,6 +2944,11 @@ components:
           items:
             $ref: '#/components/schemas/Device'
         lockMessage:
+          description: The household's own message; null means the default
+          oneOf:
+            - $ref: '#/components/schemas/LockMessage'
+            - type: 'null'
+        defaultLockMessage:
           $ref: '#/components/schemas/LockMessage'
     DevicePairingOffer:
       type: object
@@ -2975,6 +2989,7 @@ components:
         name:
           type: string
         lockMessage:
+          description: The message to show; the default when the household has none
           $ref: '#/components/schemas/LockMessage'
     DeviceSelf:
       type: object

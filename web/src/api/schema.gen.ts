@@ -1157,21 +1157,24 @@ export interface components {
             name: string;
             color: components["schemas"]["ProfileColor"];
         };
+        /** @description `child` is null when the device's child was archived. Such a device can't act (its signed requests get 401) until an adult gives it to another child. */
         Device: {
             id: components["schemas"]["Id"];
             name: components["schemas"]["DeviceName"];
             platform: components["schemas"]["Platform"];
-            child: components["schemas"]["DeviceChild"];
+            child: components["schemas"]["DeviceChild"] | null;
             /** Format: date-time */
             pairedAt: string;
             /** Format: date-time */
             lastSeenAt?: string;
         };
-        /** @description Empty means the app's own words. */
+        /** @description Shown on a locked device's shield */
         LockMessage: string;
         Devices: {
             devices: components["schemas"]["Device"][];
-            lockMessage: components["schemas"]["LockMessage"];
+            /** @description The household's own message; null means the default */
+            lockMessage: components["schemas"]["LockMessage"] | null;
+            defaultLockMessage: components["schemas"]["LockMessage"];
         };
         DevicePairingOffer: {
             id: components["schemas"]["Id"];
@@ -1190,6 +1193,7 @@ export interface components {
         DeviceHousehold: {
             id: components["schemas"]["Id"];
             name: string;
+            /** @description The message to show; the default when the household has none */
             lockMessage: components["schemas"]["LockMessage"];
         };
         DeviceSelf: {
@@ -2506,7 +2510,8 @@ export interface operations {
                  *     }
                  */
                 "application/json": {
-                    lockMessage: components["schemas"]["LockMessage"];
+                    /** @description 1–200 characters after trimming; null goes back to the default */
+                    lockMessage: components["schemas"]["LockMessage"] | null;
                 };
             };
         };
