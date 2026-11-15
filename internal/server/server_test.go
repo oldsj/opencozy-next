@@ -738,3 +738,97 @@ func TestInbox(t *testing.T) {
 		t.Fatalf("an adult's completion went to the inbox: %d items", n)
 	}
 }
+
+// Points history and taking points back: once per award, not after they are spent, and the
+// chore is open again afterwards.
+func TestPointsHistory(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	adult := h.actors["adult"]
+	history := func(child uuid.UUID) resp {
+		r := e.send(adult, "GET", "/api/children/"+child.String()+"/history", nil)
+		if r.status != 200 {
+			t.Fatalf("history: %d %s", r.status, r.raw)
+		}
+		return r
+	}
+	entries := func(r resp) []map[string]any {
+		var out []map[string]any
+		for _, x := range r.body["entries"].([]any) {
+			out = append(out, x.(map[string]any))
+		}
+		return out
+	}
+	reverse := func(id any) resp {
+		return e.send(adult, "POST", fmt.Sprintf("/api/points/%v/reverse", id), map[string]any{"reason": "Marked done by mistake."})
+	}
+	complete := func() {
+		if r := e.send(adult, "POST", "/api/today/chores/"+h.chore.String()+"/complete", nil); r.status != 200 || r.body["state"] != "complete" {
+			t.Fatalf("complete: %d %s", r.status, r.raw)
+		}
+	}
+
+	start := history(h.child1).body["balance"].(float64) // the fixture's 5
+	complete()
+	got := history(h.child1)
+	first := entries(got)[0]
+	if got.body["balance"] != start+4 || first["kind"] != "earned" || first["points"] != float64(4) || first["title"] != "Feed the cat" || first["by"] == nil {
+		t.Fatalf("after earning: %s", got.raw)
+	}
+
+	r := reverse(first["id"])
+	if r.status != 200 || r.body["kind"] != "reversed" || r.body["points"] != float64(-4) || r.body["reverses"] != first["id"] || r.body["reason"] != "Marked done by mistake." {
+		t.Fatalf("reverse: %d %s", r.status, r.raw)
+	}
+	got = history(h.child1)
+	if got.body["balance"] != start || entries(got)[1]["reversedBy"] != r.body["id"] {
+		t.Fatalf("after reversing: %s", got.raw)
+	}
+	if r := reverse(first["id"]); r.status != 409 || r.code() != "already_reversed" {
+		t.Fatalf("reverse twice: %d %s", r.status, r.raw)
+	}
+
+	// The chore is open again; done again, it pays again, and the old award stays reversed.
+	complete()
+	second := entries(history(h.child1))[0]
+	if r := reverse(first["id"]); r.status != 409 || r.code() != "already_reversed" {
+		t.Fatalf("reverse the old award after a new one: %d %s", r.status, r.raw)
+	}
+	if r := reverse(r.body["id"]); r.status != 409 || r.code() != "not_an_award" {
+		t.Fatalf("reverse a reversal: %d %s", r.status, r.raw)
+	}
+
+	// Spent: the child redeemed everything, so the award can't be taken back.
+	e.exec(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id)
+		VALUES ($1, $2, $3, 'redemption', 'redemption', gen_random_uuid())`, h.id, h.child1, -int(start+4))
+	if r := reverse(second["id"]); r.status != 409 || r.code() != "points_spent" {
+		t.Fatalf("reverse spent points: %d %s", r.status, r.raw)
+	}
+	if b := history(h.child1).body["balance"]; b != float64(0) {
+		t.Fatalf("balance after a refused reversal: %v", b)
+	}
+
+	if r := e.send(adult, "GET", "/api/children/"+uuid.NewString()+"/history", nil); r.status != 404 {
+		t.Fatalf("unknown child: %d", r.status)
+	}
+	if r := reverse(uuid.New()); r.status != 404 {
+		t.Fatalf("unknown entry: %d", r.status)
+	}
+}
+
+// An archived child's waiting items leave the inbox, and deciding one is a clear refusal.
+func TestInboxArchivedChild(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	e.exec(`UPDATE child SET archived_at = now() WHERE id = $1`, h.child1)
+	r := e.send(h.actors["adult"], "GET", "/api/inbox", nil)
+	if r.status != 200 || len(r.body["items"].([]any)) != 0 {
+		t.Fatalf("inbox with an archived child: %d %s", r.status, r.raw)
+	}
+	if r := e.send(h.actors["adult"], "POST", "/api/inbox/"+h.approval.String()+"/approve", map[string]any{}); r.status != 409 || r.code() != "child_archived" {
+		t.Fatalf("approve for an archived child: %d %s", r.status, r.raw)
+	}
+	if r := e.send(h.actors["adult"], "POST", "/api/points/"+h.entry.String()+"/reverse", map[string]any{}); r.status != 409 || r.code() != "child_archived" {
+		t.Fatalf("reverse for an archived child: %d %s", r.status, r.raw)
+	}
+}

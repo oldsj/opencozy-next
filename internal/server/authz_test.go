@@ -71,6 +71,7 @@ func TestAuthzMatrix(t *testing.T) {
 				if op == "DELETE /meals/{date}/{slot}" {
 					u += "?expectedVersion=1" // a required query parameter
 				}
+				u = strings.ReplaceAll(u, "{entryId}", h.entry.String())
 				return "/api" + u
 			}
 			body := func() any {

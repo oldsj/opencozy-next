@@ -7,7 +7,11 @@ import { calendar, dayHeadings, dayOf, kids, todayDate, when, type CalendarEvent
 
 import { mealSlots, slotLabels, today, week, type MealDay } from './fixtures-meals';
 
-/** Today's meals, slot by slot; an empty slot says so instead of disappearing. */
+/**
+ * Today's meals, slot by slot; an empty slot says so instead of disappearing. On a display, render
+ * it only when the display has the meals scope; without it, leave the widget out entirely rather
+ * than showing a hint (the feature exists, it is just not shared with this screen).
+ */
 export function MealsToday({ day = week.days.find((d) => d.date === today) }: { day?: MealDay | undefined }) {
   const meals = day?.meals ?? [];
   return (

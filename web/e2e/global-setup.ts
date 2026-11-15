@@ -11,10 +11,11 @@ export default function globalSetup() {
     execFileSync(
       '../bin/app',
       ['bootstrap-owner', '-household', 'The Example Family', '-time-zone', 'Europe/Amsterdam', '-email', owner.email, '-name', 'Sam'],
-      { env, input: `${owner.password}\n`, stdio: ['pipe', 'ignore', 'pipe'] },
+      { env, input: `${owner.password}\n`, stdio: ['pipe', 'pipe', 'pipe'] },
     );
   } catch (e) {
-    const stderr = String((e as { stderr?: Buffer }).stderr ?? '');
-    if (!stderr.includes('already exists')) throw e;
+    // The app logs (to stdout or stderr) that a household already exists on a rerun.
+    const { stdout, stderr } = e as { stdout?: Buffer; stderr?: Buffer };
+    if (!`${String(stdout ?? '')}${String(stderr ?? '')}`.includes('already exists')) throw e;
   }
 }
