@@ -26,12 +26,12 @@ struct ShieldTextTests {
 
     @Test func closedUntilTomorrow() {
         let content = ShieldContent(message: "Locked.", bankedSeconds: 600, opensAt: date("2026-03-03T13:00:00Z"))
-        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Locked.\n\nScreen time opens at 8:00 AM tomorrow.\n\nYou have 10 min saved.")
+        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Locked.\n\nScreen time starts at 8:00 AM tomorrow.\n\nYou have 10 min saved.")
     }
 
     @Test func closedUntilLaterToday() {
         let content = ShieldContent(message: "Locked.", opensAt: date("2026-03-03T01:15:00Z"))
-        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Locked.\n\nScreen time opens at 8:15 PM.")
+        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Locked.\n\nScreen time starts at 8:15 PM.")
     }
 
     @Test func aPassedOpeningIsDropped() {
@@ -55,16 +55,26 @@ struct ShieldTextTests {
     @Test func asksForMoreTime() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let base = ShieldContent(message: "Locked.")
-        #expect(ShieldText.subtitle(base, now: now, queued: true) == "Locked.\n\nYou asked a parent for more time.")
-        #expect(ShieldText.subtitle(base, now: now, queued: true, canOpenApp: false) == "Locked.\n\nOpen OpenCozy to send your request for more time.")
+        #expect(ShieldText.subtitle(base, now: now, queued: true) == "Locked.\n\nYou asked a parent for more time. Waiting for an answer.")
+        #expect(ShieldText.subtitle(base, now: now, queued: true, canOpenApp: false) == "Locked.\n\nOpen OpenCozy to send it.")
         var pending = base; pending.ask = .pending
         #expect(ShieldText.subtitle(pending, now: now) == "Locked.\n\nYou asked a parent for more time. Waiting for an answer.")
         var declined = base; declined.ask = .declined
-        #expect(ShieldText.subtitle(declined, now: now) == "Locked.\n\nA parent said not right now.")
-        #expect(ShieldText.subtitle(nil, now: now, queued: true) == "\(ShieldText.defaultMessage)\n\nYou asked a parent for more time.")
+        #expect(ShieldText.subtitle(declined, now: now) == "Locked.\n\nA parent said not right now. You can ask again in a few minutes.")
+        #expect(ShieldText.subtitle(nil, now: now, queued: true) == "\(ShieldText.defaultMessage)\n\nYou asked a parent for more time. Waiting for an answer.")
         #expect(ShieldText.askButton(nil, queued: false) == "Ask for more time")
         #expect(ShieldText.askButton(.pending, queued: false) == "Asked for more time")
         #expect(ShieldText.askButton(.declined, queued: true) == "Asked for more time")
+    }
+
+    /// While an ask applies, its status takes the saved line's place.
+    @Test func askReplacesSavedTime() {
+        var content = ShieldContent(message: "Locked.", bankedSeconds: 12 * 60)
+        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Locked.\n\nYou have 12 min saved. Open OpenCozy to use it.")
+        content.ask = .pending
+        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Locked.\n\nYou asked a parent for more time. Waiting for an answer.")
+        content.ask = nil
+        #expect(ShieldText.subtitle(content, now: now, queued: true, canOpenApp: false, timeZone: zone) == "Locked.\n\nOpen OpenCozy to send it.")
     }
 
     @Test func timePushes() {

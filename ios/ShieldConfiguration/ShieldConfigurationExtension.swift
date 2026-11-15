@@ -24,10 +24,9 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return ShieldConfiguration(
             backgroundBlurStyle: .systemThickMaterial,
             backgroundColor: nil,
-            icon: UIImage(systemName: "message.fill"),
+            icon: UIImage(systemName: "checkmark.circle"),
             title: .init(text: "\(name) is always allowed", color: .label),
-            subtitle: .init(text: "Close this and open \(name) again. If it's still locked, ask a parent to add it under Always allowed in OpenCozy.",
-                            color: .secondaryLabel),
+            subtitle: .init(text: "Close this and open \(name) again.", color: .secondaryLabel),
             primaryButtonLabel: .init(text: "OK", color: .white),
             primaryButtonBackgroundColor: .systemGreen,
             secondaryButtonLabel: nil
@@ -48,7 +47,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return ShieldConfiguration(
             backgroundBlurStyle: .systemThickMaterial,
             backgroundColor: nil,
-            icon: UIImage(systemName: "lock.fill"),
+            icon: UIImage(systemName: "hourglass"),
             title: .init(text: title, color: .label),
             subtitle: .init(text: ShieldText.subtitle(content, now: Date(), queued: queued, canOpenApp: ShieldCapabilities.canOpenApp),
                             color: .secondaryLabel),
