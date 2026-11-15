@@ -64,3 +64,8 @@ Icons come from `lucide-react` (named imports, default stroke) and stay paired w
 - A person's column is a `PersonCard` inside a `PeopleBoard`; routines and chores are `TaskGroup`s of `TaskRow`s. Rows take the person's `--profile-wash`.
 - Show stale or offline data with a `ConnectionBanner` above the content; the TopBar's `StatusPill` only flags it.
 - Display pairing uses `CodeInput` (six characters, no autocomplete).
+
+## Inbox and rewards (slice two)
+
+- Inbox and redemption rows are `ListRow`s in a `Section` (see the List previews `Inbox` and `Redemptions`): one primary action per row, `danger` for Reject… or Cancel and refund, a ConfirmDialog or Sheet before anything that can't be undone.
+- One-tap answers (who is watching, more time) are a `ChoiceGroup`; a choice's `detail` is part of its name, so keep it plain words.

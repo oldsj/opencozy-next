@@ -18,7 +18,7 @@
 }
 
 .oc-task-row--celebrate {
-  animation: oc-task-settle 420ms ease-out both;
+  animation: oc-task-settle var(--duration-celebrate) var(--ease-out) both;
 }
 
 .oc-task-row--pending,
@@ -120,3 +120,12 @@
   }
 }
 .oc-task-row--no-icon .oc-task-row__error { margin-left: 0; }
+
+/* A confirmed tick: the check pops on a spring while the row settles. */
+.oc-task-row--celebrate .oc-check-circle { animation: oc-check-pop var(--duration-celebrate) var(--ease-spring) both; }
+
+@keyframes oc-check-pop {
+  0% { transform: scale(0.82); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}

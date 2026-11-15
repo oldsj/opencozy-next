@@ -10,7 +10,7 @@
   background: var(--surface-raised);
   color: var(--primary);
   cursor: pointer;
-  transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
+  transition: background-color var(--duration-quick) var(--ease-out), border-color var(--duration-quick) var(--ease-out), transform var(--duration-quick) var(--ease-out);
 }
 
 .oc-check-circle:hover:not(:disabled) { border-color: var(--primary); transform: scale(1.04); }

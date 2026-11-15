@@ -13,6 +13,8 @@ export { Countdown } from './components/Countdown';
 export type { CountdownProps } from './components/Countdown';
 export { ConnectionBanner } from './components/ConnectionBanner';
 export type { ConnectionBannerProps, ConnectionBannerStatus } from './components/ConnectionBanner';
+export { ChoiceGroup } from './components/ChoiceGroup';
+export type { Choice, ChoiceGroupProps } from './components/ChoiceGroup';
 export { CodeInput } from './components/CodeInput';
 export type { CodeInputProps } from './components/CodeInput';
 export { ComingLaterTile } from './components/ComingLaterTile';
