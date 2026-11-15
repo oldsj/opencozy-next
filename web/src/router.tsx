@@ -23,6 +23,7 @@ import { DisplaysPage } from './routes/displays';
 import { DeviceExpiredPage, KidPage } from './routes/kid';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
+import { CalendarEventPage, CalendarPage, CalendarsPage } from './routes/calendar';
 import { ConnectionsPage } from './routes/connections';
 import { LearningPage } from './routes/learning';
 
@@ -49,6 +50,7 @@ const nav = [
   { to: '/inbox', label: 'Inbox' },
   { to: '/chores', label: 'Chores' },
   { to: '/rewards', label: 'Rewards' },
+  { to: '/calendar', label: 'Calendar' },
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/displays', label: 'Displays' },
@@ -222,6 +224,46 @@ const rewardsRoute = createRoute({
   component: RewardsPage,
 });
 
+// Manage: the week's events, one event and who it's for, and the followed calendars.
+const calendarRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/calendar',
+  staticData: { title: 'Calendar' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: CalendarPage,
+});
+
+const calendarEventRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/calendar/events/$eventId',
+  staticData: { title: 'Event' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: function CalendarEvent() {
+    const { eventId } = calendarEventRoute.useParams();
+    return <CalendarEventPage key={eventId} eventId={eventId} />;
+  },
+});
+
+const calendarsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/calendars',
+  staticData: { title: 'Calendars' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: CalendarsPage,
+});
+
 // Manage: services, assistants and learning apps, each with its own key.
 const connectionsRoute = createRoute({
   getParentRoute: () => pageRoute,
@@ -284,7 +326,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, connectionsRoute, learningRoute, devicesRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,
