@@ -8,8 +8,9 @@ test('the chore loop: pair the display, do a chore, approve it, spend the points
   const problems: string[] = [];
   const watch = (page: Page) => {
     page.on('console', (m) => {
-      // Chrome logs every 4xx; a display not yet paired gets 401 from /household.
-      if (m.type() === 'error' && !/status of 40[14]/.test(m.text())) problems.push(m.text());
+      // Chrome logs every 4xx (a display not yet paired gets 401 from /household) and the request
+      // the test drops on purpose (net::ERR_FAILED).
+      if (m.type() === 'error' && !/status of 40[14]|net::ERR_FAILED/.test(m.text())) problems.push(m.text());
     });
     page.on('pageerror', (e) => problems.push(e.message));
   };
@@ -92,11 +93,20 @@ test('the chore loop: pair the display, do a chore, approve it, spend the points
   await wall.getByRole('button', { name: new RegExp(`^${child}`) }).click();
   await expect(wall.getByRole('heading', { name: `${child}’s rewards` })).toBeVisible();
   await wall.getByRole('button', { name: new RegExp(reward) }).click();
+  // The first answer is lost after the server has spent the points (the request reaches it, the
+  // display never hears back). Trying again must not spend them twice.
+  await wall.route('**/api/children/*/redemptions', async (route) => {
+    await route.fetch();
+    await route.abort('failed');
+  }, { times: 1 });
+  await wall.getByRole('button', { name: 'Ask for it' }).click();
+  await expect(wall.getByText('Couldn’t reach the server. Check the connection and try again.')).toBeVisible();
   await wall.getByRole('button', { name: 'Ask for it' }).click();
   await expect(wall.getByText(`Asked for ${reward}`)).toBeVisible();
 
   // An adult approves it; the points stay spent.
   await adult.goto('/inbox');
+  await expect(adult.getByRole('button', { name: `Approve: ${reward} (${child})` })).toHaveCount(1);
   await adult.getByRole('button', { name: `Approve: ${reward} (${child})` }).click();
   await expect(adult.getByRole('button', { name: `Approve: ${reward} (${child})` })).toHaveCount(0);
   await wall.goto('/display');

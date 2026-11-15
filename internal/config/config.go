@@ -40,6 +40,9 @@ type Config struct {
 	TrustedProxies []netip.Prefix `env:"TRUSTED_PROXIES" envSeparator:","`
 	// AuthRatePerMinute is the sign-in and password-confirm attempts allowed per client address.
 	AuthRatePerMinute int `env:"AUTH_RATE_PER_MINUTE" envDefault:"10"`
+	// RecentAuthWindow is how recent an adult's sign-in must be for pairing, passkeys and
+	// issuing credentials. Shorter only for tests.
+	RecentAuthWindow time.Duration `env:"RECENT_AUTH_WINDOW" envDefault:"10m"`
 	// MigrateOnStart applies database migrations before serving.
 	MigrateOnStart bool `env:"MIGRATE_ON_START" envDefault:"true"`
 
@@ -76,6 +79,9 @@ func (c Config) validate() error {
 	var errs []error
 	if c.SessionTTL < time.Minute || c.SessionTTL > 90*24*time.Hour {
 		errs = append(errs, errors.New("SESSION_TTL must be between 1m and 2160h"))
+	}
+	if c.RecentAuthWindow != 0 && (c.RecentAuthWindow < 5*time.Second || c.RecentAuthWindow > time.Hour) {
+		errs = append(errs, errors.New("RECENT_AUTH_WINDOW must be between 5s and 1h"))
 	}
 	if c.AuthRatePerMinute < 1 {
 		errs = append(errs, errors.New("AUTH_RATE_PER_MINUTE must be at least 1"))

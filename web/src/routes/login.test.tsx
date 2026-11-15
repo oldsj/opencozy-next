@@ -45,8 +45,9 @@ describe('LoginPage', () => {
 });
 
 describe('errorMessage', () => {
-  it('falls back to a generic message', () => {
-    expect(errorMessage(undefined)).toMatch(/something went wrong/i);
+  it('says when the request got no answer', () => {
+    expect(errorMessage(undefined)).toMatch(/couldn’t reach the server/i);
+    expect(errorMessage(new TypeError('Failed to fetch'))).toMatch(/couldn’t reach the server/i);
     expect(errorMessage({ error: { code: 'x', message: 'Nope.' } })).toBe('Nope.');
   });
 });

@@ -197,4 +197,14 @@ func TestRecentAuthWindow(t *testing.T) {
 	if d := p.Check(a, true, nil, now); d != authz.Reauthenticate {
 		t.Errorf("outside the window: %v", d)
 	}
+	// RECENT_AUTH_WINDOW replaces the 10 minutes.
+	p.RecentAuthWindow = 30 * time.Second
+	a.AuthenticatedAt = now.Add(-29 * time.Second)
+	if d := p.Check(a, true, nil, now); d != authz.Allow {
+		t.Errorf("inside a configured window: %v", d)
+	}
+	a.AuthenticatedAt = now.Add(-31 * time.Second)
+	if d := p.Check(a, true, nil, now); d != authz.Reauthenticate {
+		t.Errorf("outside a configured window: %v", d)
+	}
 }

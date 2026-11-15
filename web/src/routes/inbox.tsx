@@ -48,7 +48,7 @@ export function InboxPage() {
         <Section title="Waiting for you" count={items.length}>
           <List aria-label="Waiting for you">
             {items.map((item) => {
-              const meta = [item.child.name, item.points === undefined ? null : pointsLabel(item.points), kindLabels[item.kind], when.format(new Date(item.submittedAt))]
+              const meta = [item.child.name, item.points === undefined ? null : item.kind === 'redemption' ? `costs ${pointsLabel(item.points)}` : pointsLabel(item.points), kindLabels[item.kind], when.format(new Date(item.submittedAt))]
                 .filter(Boolean)
                 .join(' · ');
               return (
@@ -85,7 +85,12 @@ export function InboxPage() {
         open={sendingBack !== null}
         onClose={() => { setSendingBack(null); }}
         title={sendingBack ? `Send back ${sendingBack.title}?` : ''}
-        description={sendingBack ? `${sendingBack.child.name} keeps it and can tick it again. No points move.` : undefined}
+        description={
+          sendingBack &&
+          (sendingBack.kind === 'redemption'
+            ? `${sendingBack.child.name} doesn’t get it, and the points come back.`
+            : `${sendingBack.child.name} can tick it again. No points are given.`)
+        }
         footer={
           <>
             <Button onClick={() => { setSendingBack(null); }}>Cancel</Button>

@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
 
-import { Button, ButtonPrimary, CodeInput, EmptyState, Input, List, ListRow, Notice, PageHeader } from '@app/design';
+import { Button, ButtonPrimary, CodeInput, ConfirmDialog, EmptyState, Input, List, ListRow, Notice, PageHeader } from '@app/design';
 
-import { $api, errorMessage, idempotencyKey, type DisplayScope } from '../api/client';
+import { $api, errorMessage, idempotencyKey, useAttempts, type Display, type DisplayScope } from '../api/client';
+import { useReauth } from './reauth';
 
 const scopeLabels: Record<DisplayScope, string> = {
   today: 'Today',
@@ -23,13 +24,24 @@ export function DisplaysPage() {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<DisplayScope[]>(['today']);
+  const [unpairing, setUnpairing] = useState<Display | null>(null);
+  const attempts = useAttempts();
+  const reauth = useReauth();
 
+  const pair = (body: { code: string; name: string; scopes: DisplayScope[] }) => {
+    const attempt = JSON.stringify(body);
+    create.mutate(
+      { params: attempts.params(attempt), body },
+      {
+        onSettled: attempts.settleIfAnswered(attempt),
+        onSuccess: () => { setCode(''); setName(''); },
+        onError: (error) => { reauth.ask(error, () => { pair(body); }); },
+      },
+    );
+  };
   const submit = (e: SyntheticEvent) => {
     e.preventDefault();
-    create.mutate(
-      { params: idempotencyKey(), body: { code, name, scopes } },
-      { onSuccess: () => { setCode(''); setName(''); } },
-    );
+    pair({ code, name, scopes });
   };
 
   return (
@@ -51,7 +63,7 @@ export function DisplaysPage() {
             </label>
           ))}
         </fieldset>
-        {create.error && <Notice tone="error">{errorMessage(create.error)}</Notice>}
+        {create.error && !reauth.needsPassword(create.error) && <Notice tone="error">{errorMessage(create.error)}</Notice>}
         <div>
           <ButtonPrimary type="submit" disabled={create.isPending || scopes.length === 0}>Pair display</ButtonPrimary>
         </div>
@@ -64,10 +76,7 @@ export function DisplaysPage() {
               title={d.name}
               meta={d.scopes.map((s) => scopeLabels[s]).join(' · ')}
               trailing={
-                <Button
-                  onClick={() => { revoke.mutate({ params: { ...idempotencyKey(), path: { displayId: d.id } } }); }}
-                  disabled={revoke.isPending}
-                >
+                <Button aria-label={`Unpair ${d.name}`} onClick={() => { setUnpairing(d); }}>
                   Unpair
                 </Button>
               }
@@ -77,6 +86,21 @@ export function DisplaysPage() {
       ) : (
         displays.isSuccess && <EmptyState title="No displays yet" description="Open this app's /display page on the wall display to get a code." variant="surface" />
       )}
+      <ConfirmDialog
+        open={unpairing !== null}
+        title={unpairing ? `Unpair ${unpairing.name}?` : ''}
+        description="It stops showing the family's day at once. To use it again, pair it with a new code."
+        confirmLabel="Unpair"
+        tone="danger"
+        pending={revoke.isPending}
+        error={revoke.error ? errorMessage(revoke.error) : undefined}
+        onCancel={() => { setUnpairing(null); revoke.reset(); }}
+        onConfirm={() => {
+          if (!unpairing) return;
+          revoke.mutate({ params: { ...idempotencyKey(), path: { displayId: unpairing.id } } }, { onSuccess: () => { setUnpairing(null); } });
+        }}
+      />
+      {reauth.dialog}
     </section>
   );
 }
