@@ -86,7 +86,7 @@ func TestLearningCredentials(t *testing.T) {
 	h := e.house("a", nil)
 	adult := h.actors["adult"]
 	body := func(scope string, children, rules []string) map[string]any {
-		b := map[string]any{"kind": "service", "name": "Block Buddy", "scopes": []string{scope}, "childIds": children}
+		b := map[string]any{"kind": "service", "name": "Example Learning App", "scopes": []string{scope}, "childIds": children}
 		if rules != nil {
 			b["awardRuleIds"] = rules
 		}

@@ -40,7 +40,7 @@ INSERT INTO assistant_credential (household_id, id, user_id, name, credential_ha
 -- Slice 6: a learning app's credential and its rule (one live rule, one archived), and links
 -- (one unlinked).
 INSERT INTO service_credential (household_id, id, name, credential_hash, scopes, created_at, revoked_at) VALUES
-  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d3', 'Block Buddy', '3c16630be7a020630b5a54d072cf939579d3f6d1483603ba9f127c602da24e59', '{external:award}', '2026-01-05T08:02:00Z', NULL);
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d3', 'Example Learning App', 'a2e1420d7c78ceb4137c1e5c2dd2941ae130982e1e9594ce95ed281aa712db54', '{external:award}', '2026-01-05T08:02:00Z', NULL);
 INSERT INTO service_credential_child (household_id, credential_id, child_id) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d3', '0190a000-0000-7000-8000-0000000000c1');
 INSERT INTO award_rule (household_id, id, activity_key, points, daily_limit, version, archived_at) VALUES

@@ -21,8 +21,7 @@ const (
 	SourceLearning = "learning"
 	// ScopeLearningAward lets a service credential award points for learning activities.
 	ScopeLearningAward = "learning:award"
-	// defaultProvider is the learning app an award names when it names none (Block Buddy, in
-	// Minecraft, as in the old app).
+	// defaultProvider is the learning app an award names when it names none, as in the old app.
 	defaultProvider = "minecraft"
 )
 

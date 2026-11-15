@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -32,10 +33,11 @@ var (
 
 // The fixture's secrets, made for it (testdata/old_seed.sql stores only their hashes).
 const (
-	fixturePassword  = "fixture-owner-password"
-	fixtureReadToken = "ocz_W1-v8zbJaANPs1JmBbtLUMuPg_JCKYayABFBJ4F6zZc"
-	fixtureGateToken = "ocz__koCd_CivNhz2YxuA1Boq99DgqwxWJ9ULvrZgF5RUd0"
-	fixtureAsstToken = "oca_O_Fo_u99Yi1dz98twjLyVAfg2GzHdo9FMd_EIYafaS4"
+	fixturePassword   = "fixture-owner-password"
+	fixtureReadToken  = "ocz_W1-v8zbJaANPs1JmBbtLUMuPg_JCKYayABFBJ4F6zZc"
+	fixtureGateToken  = "ocz__koCd_CivNhz2YxuA1Boq99DgqwxWJ9ULvrZgF5RUd0"
+	fixtureAsstToken  = "oca_O_Fo_u99Yi1dz98twjLyVAfg2GzHdo9FMd_EIYafaS4"
+	fixtureLearnToken = "ocz_f1QOWWJY-49KChmmsnZw7-vg4mzAPST9AS4AoWeo9P0"
 )
 
 // oldDB makes a database holding the old app's schema and the fictional seed, dropped when t
@@ -247,6 +249,14 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	a, ok, err := actor.Resolver{Q: q}.Resolve(ctx, r)
 	if err != nil || !ok || a.Kind != actor.Service || a.AllChildren || len(a.Children) != 1 {
 		t.Fatalf("old ocz_ secret: %+v ok=%v err=%v", a, ok, err)
+	}
+
+	// The learning credential's old secret authenticates too, with its scope renamed.
+	r, _ = http.NewRequest(http.MethodPost, "/api/learning/awards", nil)
+	r.Header.Set("Authorization", "Bearer "+fixtureLearnToken)
+	a, ok, err = actor.Resolver{Q: q}.Resolve(ctx, r)
+	if err != nil || !ok || a.Kind != actor.Service || len(a.Children) != 1 || !slices.Equal(a.Scopes, []string{"learning:award"}) {
+		t.Fatalf("old learning secret: %+v ok=%v err=%v", a, ok, err)
 	}
 
 	// bootstrap-owner and a second import both refuse now.
