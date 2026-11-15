@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- OpenCozy logo A: a rounded-roof cream house with an arched green door on a
+       green tile. Full bleed: iOS applies the rounded mask itself.
+       Regenerate the app icon with:
+       rsvg-convert -w 1024 -h 1024 Design/AppIcon.svg -o App/Assets.xcassets/AppIcon.appiconset/AppIcon.png -->
+  <rect width="1024" height="1024" fill="#3f625b"/>
+  <path d="M246 512 L446 326 Q512 266 578 326 L778 512 L724 512 L724 764 L300 764 L300 512 Z"
+        fill="#f4efe4" stroke="#f4efe4" stroke-width="56" stroke-linejoin="round"/>
+  <path d="M446 800 V648 A66 66 0 0 1 578 648 V800 Z" fill="#3f625b"/>
+</svg>
