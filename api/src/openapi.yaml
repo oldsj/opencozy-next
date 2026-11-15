@@ -74,6 +74,12 @@ paths:
     $ref: points.yaml#/history
   /points/{entryId}/reverse:
     $ref: points.yaml#/reverse
+  /rewards:
+    $ref: rewards.yaml#/rewards
+  /rewards/{rewardId}:
+    $ref: rewards.yaml#/reward
+  /children/{childId}/redemptions:
+    $ref: rewards.yaml#/redemptions
   /inbox:
     $ref: inbox.yaml#/inbox
   /inbox/{itemId}/approve:

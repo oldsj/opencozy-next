@@ -259,7 +259,7 @@ func finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurr
 		return updated, award(ctx, cmd, a.AdultID, updated)
 	}
 	_, err = cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
-		HouseholdID: cmd.HouseholdID(), ChildID: occ.ChildID, Kind: kind, OccurrenceID: occ.ID, Title: title, Points: occ.Points,
+		HouseholdID: cmd.HouseholdID(), ChildID: occ.ChildID, Kind: kind, OccurrenceID: &occ.ID, Title: title, Points: occ.Points,
 	})
 	return updated, err
 }

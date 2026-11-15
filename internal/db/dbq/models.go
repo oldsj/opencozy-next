@@ -43,7 +43,7 @@ type Approval struct {
 	HouseholdID  uuid.UUID
 	ChildID      uuid.UUID
 	Kind         string
-	OccurrenceID uuid.UUID
+	OccurrenceID *uuid.UUID
 	Title        string
 	Points       int32
 	State        string
@@ -52,6 +52,7 @@ type Approval struct {
 	DecidedAt    *time.Time
 	DecidedBy    *uuid.UUID
 	CreatedAt    time.Time
+	RedemptionID *uuid.UUID
 }
 
 type Child struct {
@@ -214,6 +215,31 @@ type Recipe struct {
 	Version     int32
 	CreatedAt   time.Time
 	ArchivedAt  *time.Time
+}
+
+type Redemption struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	RewardID    uuid.UUID
+	Title       string
+	Cost        int32
+	Minutes     pgtype.Int4
+	State       string
+	LedgerID    *uuid.UUID
+	CreatedAt   time.Time
+}
+
+type Reward struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Title       string
+	Cost        int32
+	Kind        string
+	Minutes     pgtype.Int4
+	Available   bool
+	ArchivedAt  *time.Time
+	CreatedAt   time.Time
 }
 
 type Routine struct {

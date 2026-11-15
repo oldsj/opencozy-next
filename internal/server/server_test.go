@@ -832,3 +832,100 @@ func TestInboxArchivedChild(t *testing.T) {
 		t.Fatalf("reverse for an archived child: %d %s", r.status, r.raw)
 	}
 }
+
+// Rewards: the points are spent when the child asks; an adult approves (they stay spent) or
+// says no (they come back). An adult's own redemption is approved at once.
+func TestRewards(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	adult, wall := h.actors["adult"], h.actors["display-today"]
+	balance := func() float64 {
+		r := e.send(adult, "GET", "/api/children/"+h.child1.String()+"/history", nil)
+		return r.body["balance"].(float64)
+	}
+	redeem := func(c cred, reward any) resp {
+		return e.send(c, "POST", "/api/children/"+h.child1.String()+"/redemptions", map[string]any{"rewardId": reward})
+	}
+	inbox := func() []any { return e.send(adult, "GET", "/api/inbox", nil).body["items"].([]any) }
+	waiting := func() map[string]any {
+		for _, it := range inbox() {
+			if it := it.(map[string]any); it["kind"] == "redemption" {
+				return it
+			}
+		}
+		return nil
+	}
+
+	if r := e.send(adult, "POST", "/api/rewards", map[string]any{"title": "iPad", "cost": 10, "kind": "screen_time"}); r.status != 422 || r.code() != "minutes_mismatch" {
+		t.Fatalf("screen time without minutes: %d %s", r.status, r.raw)
+	}
+	cheap := e.send(adult, "POST", "/api/rewards", map[string]any{"title": "A sticker", "cost": 1, "kind": "item"})
+	if cheap.status != 201 {
+		t.Fatalf("create reward: %d %s", cheap.status, cheap.raw)
+	}
+	list := e.send(wall, "GET", "/api/rewards", nil)
+	if list.status != 200 || len(list.body["rewards"].([]any)) != 2 {
+		t.Fatalf("rewards on the display: %d %s", list.status, list.raw)
+	}
+	if r := e.send(h.actors["display-none"], "GET", "/api/rewards", nil); r.status != 403 {
+		t.Fatalf("display without today: %d", r.status)
+	}
+
+	start := balance() // the fixture's 5
+	r := redeem(wall, h.reward)
+	if r.status != 201 || r.body["status"] != "pending" {
+		t.Fatalf("redeem: %d %s", r.status, r.raw)
+	}
+	if b := balance(); b != start-3 {
+		t.Fatalf("balance after asking: %v", b)
+	}
+	if r := redeem(wall, h.reward); r.status != 409 || r.code() != "not_enough_points" {
+		t.Fatalf("redeem without the points: %d %s", r.status, r.raw)
+	}
+	var reds int
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM redemption WHERE household_id = $1`, h.id).Scan(&reds); err != nil || reds != 1 {
+		t.Fatalf("redemptions after a refusal: %d %v", reds, err)
+	}
+
+	item := waiting()
+	if item == nil || item["title"] != "Choose a game" || item["points"] != float64(3) {
+		t.Fatalf("inbox: %v", inbox())
+	}
+	if r := e.send(adult, "POST", fmt.Sprintf("/api/inbox/%v/reject", item["id"]), map[string]any{"reason": "Not tonight."}); r.status != 200 {
+		t.Fatalf("say no: %d %s", r.status, r.raw)
+	}
+	if b := balance(); b != start {
+		t.Fatalf("balance after a no: %v, want %v", b, start)
+	}
+	hist := e.send(adult, "GET", "/api/children/"+h.child1.String()+"/history", nil).body["entries"].([]any)
+	if top := hist[0].(map[string]any); top["kind"] != "refunded" || top["points"] != float64(3) || top["title"] != "Choose a game" {
+		t.Fatalf("history after a no: %v", top)
+	}
+
+	if r := redeem(wall, h.reward); r.status != 201 {
+		t.Fatalf("ask again: %d %s", r.status, r.raw)
+	}
+	if r := e.send(adult, "POST", fmt.Sprintf("/api/inbox/%v/approve", waiting()["id"]), map[string]any{}); r.status != 200 {
+		t.Fatalf("approve: %d %s", r.status, r.raw)
+	}
+	if b := balance(); b != start-3 {
+		t.Fatalf("balance after approval: %v", b)
+	}
+
+	if r := redeem(adult, cheap.body["id"]); r.status != 201 || r.body["status"] != "approved" {
+		t.Fatalf("an adult's redemption: %d %s", r.status, r.raw)
+	}
+	if waiting() != nil {
+		t.Fatalf("an adult's redemption went to the inbox")
+	}
+	if b := balance(); b != start-4 {
+		t.Fatalf("balance after an adult's redemption: %v", b)
+	}
+
+	if r := e.send(adult, "DELETE", "/api/rewards/"+h.reward.String(), nil); r.status != 204 {
+		t.Fatalf("archive: %d", r.status)
+	}
+	if r := redeem(adult, h.reward); r.status != 404 {
+		t.Fatalf("an archived reward: %d %s", r.status, r.raw)
+	}
+}

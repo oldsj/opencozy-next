@@ -50,14 +50,19 @@ func award(ctx context.Context, cmd *command.Cmd, adult api.Id, occ dbq.Occurren
 	return err
 }
 
-// decision is a pending approval and its occurrence, locked (child first), ready to decide.
+// SourceRedemption is the ledger source kind for points spent on a reward.
+const SourceRedemption = "redemption"
+
+// decision is a pending approval and its subject (an occurrence or a redemption), locked
+// child first, ready to decide.
 type decision struct {
 	approval dbq.Approval
-	occ      dbq.Occurrence
+	occ      *dbq.Occurrence
+	red      *dbq.Redemption
 }
 
-// lockPending finds the approval, locks its child, then the approval and its occurrence. It
-// returns a refusal when there is no such approval or it is already decided.
+// lockPending finds the approval, locks its child, then the approval and its subject. It
+// returns a refusal when there is no such approval, its child is archived, or it is decided.
 func lockPending(ctx context.Context, cmd *command.Cmd, id api.Id) (*decision, *api.Error, int, error) {
 	h := cmd.HouseholdID()
 	a, err := cmd.Q.GetApproval(ctx, dbq.GetApprovalParams{HouseholdID: h, ID: id})
@@ -77,17 +82,33 @@ func lockPending(ctx context.Context, cmd *command.Cmd, id api.Id) (*decision, *
 	if a.State != "pending" {
 		return nil, &errAlreadyDecided, 409, nil
 	}
-	occ, err := cmd.Q.LockOccurrence(ctx, dbq.LockOccurrenceParams{HouseholdID: h, ID: a.OccurrenceID})
-	if err != nil {
-		return nil, nil, 0, err
+	d := &decision{approval: a}
+	switch {
+	case a.RedemptionID != nil:
+		red, err := cmd.Q.LockRedemption(ctx, dbq.LockRedemptionParams{HouseholdID: h, ID: *a.RedemptionID})
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		if red.State != "pending" || red.LedgerID == nil {
+			return nil, nil, 0, fmt.Errorf("approval %s: redemption %s is %s", a.ID, red.ID, red.State)
+		}
+		d.red = &red
+	case a.OccurrenceID != nil:
+		occ, err := cmd.Q.LockOccurrence(ctx, dbq.LockOccurrenceParams{HouseholdID: h, ID: *a.OccurrenceID})
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		if occ.State != "pending" {
+			return nil, nil, 0, fmt.Errorf("approval %s: occurrence %s is %s", a.ID, occ.ID, occ.State)
+		}
+		d.occ = &occ
+	default:
+		return nil, nil, 0, fmt.Errorf("approval %s has no subject", a.ID)
 	}
-	if occ.State != "pending" {
-		return nil, nil, 0, fmt.Errorf("approval %s: occurrence %s is %s", a.ID, occ.ID, occ.State)
-	}
-	return &decision{approval: a, occ: occ}, nil, 0, nil
+	return d, nil, 0, nil
 }
 
-// ApproveInboxItem says yes: the occurrence is complete and its points land.
+// ApproveInboxItem says yes: a completion's points land; a redemption's points stay spent.
 func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemRequestObject) (api.ApproveInboxItemResponseObject, error) {
 	a, cmd := mustActor(ctx), mustCmd(ctx)
 	d, refusal, status, err := lockPending(ctx, cmd, req.ItemId)
@@ -110,18 +131,25 @@ func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemR
 	if err != nil {
 		return nil, err
 	}
+	if d.red != nil {
+		if err := cmd.Q.SetRedemptionState(ctx, dbq.SetRedemptionStateParams{HouseholdID: a.HouseholdID, ID: d.red.ID, State: "approved"}); err != nil {
+			return nil, err
+		}
+		return api.ApproveInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateApproved}, nil
+	}
 	if _, err := cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
 		HouseholdID: a.HouseholdID, ID: d.occ.ID, State: "complete", CheckedSteps: d.occ.CheckedSteps, Points: d.occ.Points,
 	}); err != nil {
 		return nil, err
 	}
-	if err := award(ctx, cmd, a.AdultID, d.occ); err != nil {
+	if err := award(ctx, cmd, a.AdultID, *d.occ); err != nil {
 		return nil, err
 	}
-	return api.ApproveInboxItem200JSONResponse{Id: decided.ID, State: api.Approved}, nil
+	return api.ApproveInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateApproved}, nil
 }
 
-// RejectInboxItem sends it back: the child sees the reason and can do it again today.
+// RejectInboxItem says no: a completion goes back on the child's list with the reason; a
+// redemption's points come back.
 func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemRequestObject) (api.RejectInboxItemResponseObject, error) {
 	a, cmd := mustActor(ctx), mustCmd(ctx)
 	d, refusal, status, err := lockPending(ctx, cmd, req.ItemId)
@@ -144,11 +172,20 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 	if err != nil {
 		return nil, err
 	}
+	if d.red != nil {
+		if err := cmd.Q.SetRedemptionState(ctx, dbq.SetRedemptionStateParams{HouseholdID: a.HouseholdID, ID: d.red.ID, State: "rejected"}); err != nil {
+			return nil, err
+		}
+		if _, err := ledger.Refund(ctx, cmd, *d.red.LedgerID, ledger.Entry{Points: d.red.Cost, AdultID: &a.AdultID, Note: req.Body.Reason}); err != nil {
+			return nil, err
+		}
+		return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
+	}
 	// Open again, every step unticked, with the reason beside it.
 	if _, err := cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
 		HouseholdID: a.HouseholdID, ID: d.occ.ID, State: "open", CheckedSteps: []api.Id{}, Points: d.occ.Points, RejectedReason: req.Body.Reason,
 	}); err != nil {
 		return nil, err
 	}
-	return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.Rejected}, nil
+	return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
 }

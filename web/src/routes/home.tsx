@@ -27,6 +27,7 @@ export function HomePage({ me }: { me: Me }) {
           <Link to="/displays">Displays</Link>
           <Link to="/inbox">Inbox</Link>
           <Link to="/chores">Chores</Link>
+          <Link to="/rewards">Rewards</Link>
           <Link to="/meals">Meals</Link>
           <Link to="/recipes">Recipes</Link>
           <Button onClick={() => { logout.mutate({}); }} disabled={logout.isPending}>
