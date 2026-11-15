@@ -56,3 +56,19 @@ func TestLoadNeedsRuntimeRoleWithMigrationURL(t *testing.T) {
 		t.Errorf("MigrationURL = %q", cfg.MigrationURL())
 	}
 }
+
+func TestLoadValidatesPublicOrigin(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost/app")
+	for _, o := range []string{"https://cozy.example.test", "https://cozy.example.test:8443", "http://localhost:8080"} {
+		t.Setenv("PUBLIC_ORIGIN", o)
+		if _, err := Load(); err != nil {
+			t.Errorf("%s refused: %v", o, err)
+		}
+	}
+	for _, o := range []string{"http://cozy.example.test", "https://cozy.example.test/", "https://cozy.example.test/app", "cozy.example.test", "https://u@cozy.example.test"} {
+		t.Setenv("PUBLIC_ORIGIN", o)
+		if _, err := Load(); err == nil {
+			t.Errorf("%s accepted", o)
+		}
+	}
+}

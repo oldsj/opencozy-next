@@ -64,7 +64,7 @@ func (q *Queries) CreateAdult(ctx context.Context, arg CreateAdultParams) (Adult
 }
 
 const createHousehold = `-- name: CreateHousehold :one
-INSERT INTO household (name, time_zone) VALUES ($1, $2) RETURNING id, name, time_zone, archived_at, created_at
+INSERT INTO household (name, time_zone) VALUES ($1, $2) RETURNING id, name, time_zone, archived_at, created_at, lock_message
 `
 
 type CreateHouseholdParams struct {
@@ -81,6 +81,7 @@ func (q *Queries) CreateHousehold(ctx context.Context, arg CreateHouseholdParams
 		&i.TimeZone,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.LockMessage,
 	)
 	return i, err
 }
@@ -135,7 +136,7 @@ func (q *Queries) GetAdultByEmail(ctx context.Context, email string) (Adult, err
 }
 
 const getHousehold = `-- name: GetHousehold :one
-SELECT id, name, time_zone, archived_at, created_at FROM household WHERE id = $1
+SELECT id, name, time_zone, archived_at, created_at, lock_message FROM household WHERE id = $1
 `
 
 func (q *Queries) GetHousehold(ctx context.Context, id uuid.UUID) (Household, error) {
@@ -147,12 +148,13 @@ func (q *Queries) GetHousehold(ctx context.Context, id uuid.UUID) (Household, er
 		&i.TimeZone,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.LockMessage,
 	)
 	return i, err
 }
 
 const listHouseholds = `-- name: ListHouseholds :many
-SELECT id, name, time_zone, archived_at, created_at FROM household ORDER BY created_at LIMIT 100
+SELECT id, name, time_zone, archived_at, created_at, lock_message FROM household ORDER BY created_at LIMIT 100
 `
 
 func (q *Queries) ListHouseholds(ctx context.Context) ([]Household, error) {
@@ -170,6 +172,7 @@ func (q *Queries) ListHouseholds(ctx context.Context) ([]Household, error) {
 			&i.TimeZone,
 			&i.ArchivedAt,
 			&i.CreatedAt,
+			&i.LockMessage,
 		); err != nil {
 			return nil, err
 		}

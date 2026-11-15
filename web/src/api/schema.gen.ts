@@ -383,6 +383,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's paired devices, and the lock message */
+        get: operations["listDevices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/devices/pairings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Offer a pairing for one child's device
+         * @description The offer lasts 5 minutes and works once. Show `code` (and a QR code of `qrPayload`) to the device. The token and code are shown only in this answer.
+         */
+        post: operations["createDevicePairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/devices/lock-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the message the kid app shows on a locked device */
+        put: operations["setLockMessage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/devices/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unpair a device; it stops working at once */
+        delete: operations["revokeDevice"];
+        options?: never;
+        head?: never;
+        /** Rename a device, or give it to another child */
+        patch: operations["updateDevice"];
+        trace?: never;
+    };
+    "/device": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This device, its child and household; every sync starts here */
+        get: operations["getDevice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/device/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem a pairing offer with this device's new key
+         * @description Send exactly one of `token` (from the QR code) or `code` (typed; case, spaces and dashes don't matter). `proof` is the device key's signature (ECDSA P-256 over SHA-256, raw r||s, base64url) of `OPENCOZY-PAIR-V1\n<token or code, as sent>\n<publicKey>`, so nobody can pair or use up an offer with a key they do not hold. Every refusal of a well-formed request is the same 409 `pairing_unavailable`.
+         */
+        post: operations["pairDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/device/web-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A one-time link that signs the web view in as this device
+         * @description Open `url` in the app's web view within 60 seconds. GET /device/session?token=… (a page route, outside /api) sets the __Host-device cookie (24 hours), signs out any adult or display session in that cookie jar, and redirects to /kid. A used or expired link redirects to /device/expired, where the app makes a new one.
+         */
+        post: operations["createDeviceWebSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/device/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The kid view's own session, child and household */
+        get: operations["getDeviceWebSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/today": {
         parameters: {
             query?: never;
@@ -1099,6 +1247,72 @@ export interface components {
             name: string;
             scopes: components["schemas"]["DisplayScope"][];
         };
+        DeviceName: string;
+        /** @enum {string} */
+        Platform: "ios" | "android";
+        DeviceChild: {
+            id: components["schemas"]["Id"];
+            name: string;
+            color: components["schemas"]["ProfileColor"];
+        };
+        /** @description `child` is null when the device's child was archived. Such a device can't act (its signed requests get 401) until an adult gives it to another child. */
+        Device: {
+            id: components["schemas"]["Id"];
+            name: components["schemas"]["DeviceName"];
+            platform: components["schemas"]["Platform"];
+            child: components["schemas"]["DeviceChild"] | null;
+            /** Format: date-time */
+            pairedAt: string;
+            /** Format: date-time */
+            lastSeenAt?: string;
+        };
+        /** @description Shown on a locked device's shield */
+        LockMessage: string;
+        Devices: {
+            devices: components["schemas"]["Device"][];
+            /** @description The household's own message; null means the default */
+            lockMessage: components["schemas"]["LockMessage"] | null;
+            defaultLockMessage: components["schemas"]["LockMessage"];
+        };
+        DevicePairingOffer: {
+            id: components["schemas"]["Id"];
+            /**
+             * @description Eight characters as XXXX-XXXX, from an alphabet without look-alikes
+             * @example ABCD-EF23
+             */
+            code: string;
+            /** @description 43 characters, base64url */
+            token: string;
+            /** @description opencozy-pair:v1?origin=<url-encoded origin>&token=<token> */
+            qrPayload: string;
+            /** @description The QR code of qrPayload (error correction M), row by row; "1" is a dark module */
+            qrModules: string[];
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DeviceHousehold: {
+            id: components["schemas"]["Id"];
+            name: string;
+            /** @description IANA zone name; the household day follows it */
+            timeZone: string;
+            /** @description The message to show; the default when the household has none */
+            lockMessage: components["schemas"]["LockMessage"];
+        };
+        DeviceSelf: {
+            device: components["schemas"]["Device"];
+            household: components["schemas"]["DeviceHousehold"];
+            /** Format: date-time */
+            serverTime: string;
+        };
+        DevicePairRequest: {
+            token?: string;
+            code?: string;
+            /** @description The 65-byte uncompressed P-256 point (X9.63), standard base64 */
+            publicKey: string;
+            proof: string;
+            platform: components["schemas"]["Platform"];
+            name: components["schemas"]["DeviceName"];
+        };
         TodayItem: {
             id: components["schemas"]["Id"];
             title: string;
@@ -1527,6 +1741,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Not available on this server until it is configured */
+        ServiceUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
         /**
@@ -1576,6 +1799,15 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            /** @description A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             413: components["responses"]["TooLarge"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -1713,6 +1945,15 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            /** @description A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             413: components["responses"]["TooLarge"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -2368,6 +2609,306 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDevices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Devices, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Devices"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createDevicePairing: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "childId": "0195f2d4-0000-7000-8000-000000000001"
+                 *     }
+                 */
+                "application/json": {
+                    childId: components["schemas"]["Id"];
+                };
+            };
+        };
+        responses: {
+            /** @description The offer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePairingOffer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            503: components["responses"]["ServiceUnavailable"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setLockMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "lockMessage": "Time for a break. Ask an adult if you need more."
+                 *     }
+                 */
+                "application/json": {
+                    /** @description 1–200 characters after trimming; null goes back to the default */
+                    lockMessage: components["schemas"]["LockMessage"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    revokeDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unpaired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                deviceId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "Robin's iPad"
+                 *     }
+                 */
+                "application/json": {
+                    name?: components["schemas"]["DeviceName"];
+                    childId?: components["schemas"]["Id"];
+                };
+            };
+        };
+        responses: {
+            /** @description The device */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Device"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This device */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSelf"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    pairDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "code": "ABCD-EF23",
+                 *       "publicKey": "BPd0ExampleOnlyBase64X963PointOf65BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                 *       "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                 *       "platform": "ios",
+                 *       "name": "Robin's iPad"
+                 *     }
+                 */
+                "application/json": components["schemas"]["DevicePairRequest"];
+            };
+        };
+        responses: {
+            /** @description Paired. From now on, sign every request with the key. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceSelf"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createDeviceWebSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Same origin, /device/session?token=… */
+                        url: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDeviceWebSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        child: components["schemas"]["Child"];
+                        household: components["schemas"]["DeviceHousehold"];
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             default: components["responses"]["Error"];
         };
     };

@@ -1,0 +1,449 @@
+# Devices (slice 7): a child's iPad or iPhone running the kid app. An adult offers a pairing for
+# one child; the device redeems it with a P-256 key it made, and from then on signs its requests
+# (see "Signed device requests" in openapi.yaml). The kid view is a web page in the app's web view,
+# with a device web session: a one-time link from POST /device/web-session, exchanged at
+# GET /device/session (outside /api) for the __Host-device cookie, then /kid.
+
+# --- Adults: Manage → Devices ---------------------------------------------------------------
+
+pairings:
+  post:
+    operationId: createDevicePairing
+    summary: Offer a pairing for one child's device
+    description: >
+      The offer lasts 5 minutes and works once. Show `code` (and a QR code of `qrPayload`) to
+      the device. The token and code are shown only in this answer.
+    tags: [devices]
+    x-actors: [adult]
+    x-recent-auth: true
+    x-command: true
+    x-body-limit: 1024
+    x-record-response: false
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [childId]
+            properties:
+              childId:
+                $ref: common.yaml#/schemas/Id
+          example: { childId: 0195f2d4-0000-7000-8000-000000000001 }
+    responses:
+      '201':
+        description: The offer
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/DevicePairingOffer'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      '503':
+        $ref: common.yaml#/responses/ServiceUnavailable
+      default:
+        $ref: common.yaml#/responses/Error
+devices:
+  get:
+    operationId: listDevices
+    summary: The household's paired devices, and the lock message
+    tags: [devices]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: Devices, newest first
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Devices'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+device:
+  parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  patch:
+    operationId: updateDevice
+    summary: Rename a device, or give it to another child
+    tags: [devices]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            minProperties: 1
+            properties:
+              name:
+                $ref: '#/schemas/DeviceName'
+              childId:
+                $ref: common.yaml#/schemas/Id
+          example: { name: Robin's iPad }
+    responses:
+      '200':
+        description: The device
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Device'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+  delete:
+    operationId: revokeDevice
+    summary: Unpair a device; it stops working at once
+    tags: [devices]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    responses:
+      '204':
+        description: Unpaired
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+lockMessage:
+  put:
+    operationId: setLockMessage
+    summary: Set the message the kid app shows on a locked device
+    tags: [devices]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [lockMessage]
+            properties:
+              lockMessage:
+                description: 1–200 characters after trimming; null goes back to the default
+                oneOf:
+                  - $ref: '#/schemas/LockMessage'
+                  - type: 'null'
+          example: { lockMessage: Time for a break. Ask an adult if you need more. }
+    responses:
+      '204':
+        description: Set
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+# --- The device itself (the kid app, native) -------------------------------------------------
+
+pair:
+  post:
+    operationId: pairDevice
+    summary: Redeem a pairing offer with this device's new key
+    description: >
+      Send exactly one of `token` (from the QR code) or `code` (typed; case, spaces and dashes
+      don't matter). `proof` is the device key's signature (ECDSA P-256 over SHA-256, raw r||s,
+      base64url) of `OPENCOZY-PAIR-V1\n<token or code, as sent>\n<publicKey>`, so nobody can pair
+      or use up an offer with a key they do not hold. Every refusal of a well-formed request is
+      the same 409 `pairing_unavailable`.
+    tags: [devices]
+    x-actors: [public]
+    x-body-limit: 4096
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/DevicePairRequest'
+          example:
+            code: ABCD-EF23
+            publicKey: BPd0ExampleOnlyBase64X963PointOf65BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            proof: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            platform: ios
+            name: Robin's iPad
+    responses:
+      '201':
+        description: Paired. From now on, sign every request with the key.
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/DeviceSelf'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+self:
+  get:
+    operationId: getDevice
+    summary: This device, its child and household; every sync starts here
+    tags: [devices]
+    x-actors: [device]
+    responses:
+      '200':
+        description: This device
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/DeviceSelf'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      default:
+        $ref: common.yaml#/responses/Error
+webSession:
+  post:
+    operationId: createDeviceWebSession
+    summary: A one-time link that signs the web view in as this device
+    description: >
+      Open `url` in the app's web view within 60 seconds. GET /device/session?token=… (a page
+      route, outside /api) sets the __Host-device cookie (24 hours), signs out any adult or display
+      session in that cookie jar, and redirects to /kid. A used or expired link redirects to
+      /device/expired, where the app makes a new one.
+    tags: [devices]
+    x-actors: [device]
+    x-body-limit: 64
+    responses:
+      '201':
+        description: The link
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url, expiresAt]
+              properties:
+                url:
+                  type: string
+                  description: Same origin, /device/session?token=…
+                expiresAt:
+                  type: string
+                  format: date-time
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+session:
+  get:
+    operationId: getDeviceWebSession
+    summary: The kid view's own session, child and household
+    tags: [devices]
+    x-actors: [device-web]
+    responses:
+      '200':
+        description: The session
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [child, household, expiresAt]
+              properties:
+                child:
+                  $ref: children.yaml#/schemas/Child
+                household:
+                  $ref: '#/schemas/DeviceHousehold'
+                expiresAt:
+                  type: string
+                  format: date-time
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  DeviceName:
+    type: string
+    minLength: 1
+    maxLength: 80
+  LockMessage:
+    type: string
+    minLength: 1
+    maxLength: 200
+    description: Shown on a locked device's shield
+  Platform:
+    type: string
+    enum: [ios, android]
+  DevicePairingOffer:
+    type: object
+    additionalProperties: false
+    required: [id, code, token, qrPayload, qrModules, expiresAt]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      code:
+        type: string
+        description: Eight characters as XXXX-XXXX, from an alphabet without look-alikes
+        examples: [ABCD-EF23]
+      token:
+        type: string
+        description: 43 characters, base64url
+      qrPayload:
+        type: string
+        description: opencozy-pair:v1?origin=<url-encoded origin>&token=<token>
+      qrModules:
+        type: array
+        description: The QR code of qrPayload (error correction M), row by row; "1" is a dark module
+        maxItems: 177
+        items:
+          type: string
+          pattern: '^[01]+$'
+          maxLength: 177
+      expiresAt:
+        type: string
+        format: date-time
+  DevicePairRequest:
+    type: object
+    additionalProperties: false
+    required: [publicKey, proof, platform, name]
+    properties:
+      token:
+        type: string
+        maxLength: 64
+      code:
+        type: string
+        maxLength: 16
+      publicKey:
+        type: string
+        maxLength: 100
+        description: The 65-byte uncompressed P-256 point (X9.63), standard base64
+      proof:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{86}$'
+      platform:
+        $ref: '#/schemas/Platform'
+      name:
+        $ref: '#/schemas/DeviceName'
+  DeviceChild:
+    type: object
+    additionalProperties: false
+    required: [id, name, color]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+  Device:
+    type: object
+    additionalProperties: false
+    required: [id, name, platform, child, pairedAt]
+    description: >
+      `child` is null when the device's child was archived. Such a device can't act (its signed
+      requests get 401) until an adult gives it to another child.
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        $ref: '#/schemas/DeviceName'
+      platform:
+        $ref: '#/schemas/Platform'
+      child:
+        oneOf:
+          - $ref: '#/schemas/DeviceChild'
+          - type: 'null'
+      pairedAt:
+        type: string
+        format: date-time
+      lastSeenAt:
+        type: string
+        format: date-time
+  Devices:
+    type: object
+    additionalProperties: false
+    required: [devices, lockMessage, defaultLockMessage]
+    properties:
+      devices:
+        type: array
+        maxItems: 200
+        items:
+          $ref: '#/schemas/Device'
+      lockMessage:
+        description: The household's own message; null means the default
+        oneOf:
+          - $ref: '#/schemas/LockMessage'
+          - type: 'null'
+      defaultLockMessage:
+        $ref: '#/schemas/LockMessage'
+  DeviceHousehold:
+    type: object
+    additionalProperties: false
+    required: [id, name, timeZone, lockMessage]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      timeZone:
+        type: string
+        description: IANA zone name; the household day follows it
+      lockMessage:
+        description: The message to show; the default when the household has none
+        $ref: '#/schemas/LockMessage'
+  DeviceSelf:
+    type: object
+    additionalProperties: false
+    required: [device, household, serverTime]
+    properties:
+      device:
+        $ref: '#/schemas/Device'
+      household:
+        $ref: '#/schemas/DeviceHousehold'
+      serverTime:
+        type: string
+        format: date-time

@@ -20,6 +20,7 @@ require (
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
+	rsc.io/qr v0.2.0
 )
 
 require (
