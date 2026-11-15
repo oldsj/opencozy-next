@@ -20,10 +20,10 @@ test('add a recipe and plan it', async ({ page }) => {
 
   await page.goto('/recipes');
   await page.getByRole('link', { name: 'Add recipe' }).click();
-  await page.getByLabel('Name').fill(title);
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(title);
   await page.getByLabel('Serves').fill('4');
   await page.getByLabel('Ingredients').fill('1 cup red lentils\n1 onion');
-  await page.getByLabel('Step 1').fill('Soften the onion.\nSlowly.');
+  await page.getByRole('textbox', { name: 'Step 1', exact: true }).fill('Soften the onion.\nSlowly.');
   await page.getByRole('button', { name: 'Save recipe' }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByText('1 onion')).toBeVisible();
@@ -32,15 +32,15 @@ test('add a recipe and plan it', async ({ page }) => {
   const plan = page.getByRole('button', { name: /^Plan Dinner,/ }).first();
   const slot = ((await plan.getAttribute('aria-label')) ?? '').replace(/^Plan /, '');
   await plan.click();
-  await page.getByLabel('Meal').fill(title);
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('textbox', { name: 'Meal', exact: true }).fill(title);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   const change = page.getByRole('button', { name: `Change ${slot}` });
   await expect(change).toBeVisible();
   await expect(page.getByText(title)).toBeVisible();
 
   await change.click();
-  await page.getByLabel('Meal').fill(`Leftovers ${run}`);
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('textbox', { name: 'Meal', exact: true }).fill(`Leftovers ${run}`);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText(`Leftovers ${run}`)).toBeVisible();
   await expect(page.getByText(title)).toHaveCount(0);
 
