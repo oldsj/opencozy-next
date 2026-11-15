@@ -138,4 +138,10 @@ export const timeZones = ['America/New_York', 'America/Chicago', 'America/Denver
 export const catalogErrorText = {
   version_conflict: 'Someone else changed this while you were editing. It now shows their version; check it and save again.',
   already_used: 'That iPad time has already been used, so there’s nothing to refund.',
+  no_such_child: 'That child isn’t in the household any more. Choose someone else.',
+  no_such_step: 'A step was removed while you were editing. Check the routine and save again.',
+  minutes_mismatch: 'Give minutes for iPad time, and none for other rewards.',
+  not_approved: 'Only an approved reward can be marked as given.',
+  not_cancellable: 'This reward has already been given or cancelled.',
+  time_zone_unknown: 'Choose a time zone from the list.',
 } as const;
