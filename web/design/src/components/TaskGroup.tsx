@@ -12,7 +12,7 @@ export interface TaskGroupProps extends Omit<HTMLAttributes<HTMLElement>, 'title
    * The group's state beside the title: "5 points", "Waiting for approval". `earned` shows it in
    * the positive lane ("Points earned").
    */
-  status?: ReactNode;
+  status?: ReactNode | undefined;
   earned?: boolean;
   /**
    * Finished and waiting for an adult's approval: shows "Waiting for approval" (or `status`) in the

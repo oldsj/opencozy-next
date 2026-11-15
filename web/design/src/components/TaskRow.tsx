@@ -24,7 +24,7 @@ export interface TaskRowProps extends Omit<HTMLAttributes<HTMLElement>, 'title'>
   /** Whose task it is. */
   assignee?: string;
   /** Whole points the task is worth. */
-  points?: number;
+  points?: number | undefined;
   /** A date or schedule, e.g. "Today · morning". */
   metadata?: ReactNode;
   /**
@@ -43,14 +43,14 @@ export interface TaskRowProps extends Omit<HTMLAttributes<HTMLElement>, 'title'>
   /** A Lucide icon placed before the title. */
   icon?: ReactNode;
   /** Friendly recovery copy for a failed check. */
-  error?: ReactNode;
+  error?: ReactNode | undefined;
   /**
    * A note on its own line under the title, such as a parent's reason for not approving it
    * ("Not approved yet: the shoes are still on the stairs. Try again."). Wraps; up to a few lines.
    */
-  message?: ReactNode;
+  message?: ReactNode | undefined;
   /** Play the one-shot settle motion, only for a newly confirmed success. */
-  celebrate?: boolean;
+  celebrate?: boolean | undefined;
 }
 
 export function TaskRow({
