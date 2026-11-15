@@ -139,6 +139,7 @@ type house struct {
 	chore, routine, step              uuid.UUID // child1's, on every day
 	approval                          uuid.UUID // child1's chore on an earlier day, waiting
 	entry                             uuid.UUID // an award of 5 points to child1
+	reward                            uuid.UUID // costs 3
 	actors                            map[string]cred
 }
 
@@ -212,6 +213,7 @@ func (e *env) house(label string, scopes []string) house {
 		VALUES ($1, $2, 5, 'award', 'fixture', gen_random_uuid()) RETURNING id`, h.id, h.child1)
 	e.exec(`INSERT INTO active_award (source_kind, source_id, household_id, ledger_id)
 		SELECT source_kind, source_id, household_id, id FROM point_ledger WHERE id = $1`, h.entry)
+	h.reward = e.id(`INSERT INTO reward (household_id, title, cost, kind) VALUES ($1, 'Choose a game', 3, 'item') RETURNING id`, h.id)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)
 
 	credential := func(kind string, scopes []string, all bool, children []uuid.UUID, extra string) (cred, uuid.UUID) {

@@ -349,6 +349,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The rewards children can spend points on */
+        get: operations["listRewards"];
+        put?: never;
+        /** Add a reward */
+        post: operations["createReward"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rewards/{rewardId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a reward from now on (history stays) */
+        delete: operations["archiveReward"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/redemptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spend points on a reward
+         * @description The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once.
+         */
+        post: operations["redeemReward"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inbox": {
         parameters: {
             query?: never;
@@ -653,6 +708,32 @@ export interface components {
             /** @description The newest 200 */
             entries: components["schemas"]["HistoryEntry"][];
         };
+        Reward: {
+            id: components["schemas"]["Id"];
+            title: string;
+            cost: number;
+            /** @enum {string} */
+            kind: "item" | "screen_time";
+            minutes?: number;
+            available: boolean;
+        };
+        Rewards: {
+            rewards: components["schemas"]["Reward"][];
+        };
+        Title: string;
+        NewReward: {
+            title: components["schemas"]["Title"];
+            cost: number;
+            /** @enum {string} */
+            kind: "item" | "screen_time";
+            /** @description Required for screen_time, refused otherwise */
+            minutes?: number;
+        };
+        Redemption: {
+            id: components["schemas"]["Id"];
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected";
+        };
         InboxItem: {
             id: components["schemas"]["Id"];
             /** @enum {string} */
@@ -686,7 +767,6 @@ export interface components {
             points: number;
             days: components["schemas"]["Days"];
         };
-        Title: string;
         Points: number;
         NewChore: {
             childId: components["schemas"]["Id"];
@@ -1566,6 +1646,149 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listRewards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rewards, cheapest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rewards"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createReward: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "title": "20 minutes of iPad",
+                 *       "cost": 10,
+                 *       "kind": "screen_time",
+                 *       "minutes": 20
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewReward"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reward"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    archiveReward: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                rewardId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    redeemReward: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "rewardId": "0190f0e0-0000-7000-8000-000000000002"
+                 *     }
+                 */
+                "application/json": {
+                    rewardId: components["schemas"]["Id"];
+                };
+            };
+        };
+        responses: {
+            /** @description Spent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redemption"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];

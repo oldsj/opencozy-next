@@ -30,7 +30,7 @@ WHERE household_id = $1 AND reverses_id = $2 AND kind = 'refund';
 -- A child's newest entries, with what each was for and who decided it.
 SELECT l.id, l.kind, l.delta, l.created_at, l.note, l.reverses_id, l.source_kind,
        rv.id AS reversed_by,
-       COALESCE(ch.title, rt.title, ap.title, l.source_kind)::text AS title,
+       COALESCE(ch.title, rt.title, ap.title, rd.title, l.source_kind)::text AS title,
        ad.name AS adult_name
 FROM point_ledger l
 LEFT JOIN point_ledger rv ON rv.reverses_id = l.id AND rv.kind = 'reversal'
@@ -40,6 +40,7 @@ LEFT JOIN routine rt ON rt.household_id = oc.household_id AND rt.id = oc.definit
 LEFT JOIN LATERAL (
     SELECT a.title FROM approval a WHERE a.household_id = l.household_id AND a.occurrence_id = oc.id ORDER BY a.created_at DESC LIMIT 1
 ) ap ON true
+LEFT JOIN redemption rd ON l.source_kind = 'redemption' AND rd.household_id = l.household_id AND rd.id = l.source_id
 LEFT JOIN adult ad ON ad.household_id = l.household_id AND ad.id = l.adult_id
 WHERE l.household_id = $1 AND l.child_id = $2
 ORDER BY l.created_at DESC, l.id DESC

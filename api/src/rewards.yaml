@@ -1,0 +1,188 @@
+rewards:
+  get:
+    operationId: listRewards
+    summary: The rewards children can spend points on
+    tags: [rewards]
+    x-actors: [adult, phone, display]
+    x-display-scopes: [today]
+    responses:
+      '200':
+        description: The rewards, cheapest first
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Rewards'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: createReward
+    summary: Add a reward
+    tags: [rewards]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewReward'
+          example: { title: 20 minutes of iPad, cost: 10, kind: screen_time, minutes: 20 }
+    responses:
+      '201':
+        description: Added
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Reward'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+reward:
+  delete:
+    operationId: archiveReward
+    summary: Remove a reward from now on (history stays)
+    tags: [rewards]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: rewardId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    responses:
+      '204':
+        description: Removed
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+redemptions:
+  post:
+    operationId: redeemReward
+    summary: Spend points on a reward
+    description: >-
+      The points are spent at once. Asked for on a display, it waits for an adult, who approves it
+      or says no (and the points come back); asked for by an adult, it is approved at once.
+    tags: [rewards]
+    x-actors: [adult, phone, display]
+    x-display-scopes: [today]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 256
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: childId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [rewardId]
+            properties:
+              rewardId:
+                $ref: common.yaml#/schemas/Id
+          example: { rewardId: 0190f0e0-0000-7000-8000-000000000002 }
+    responses:
+      '201':
+        description: Spent
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Redemption'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  Rewards:
+    type: object
+    required: [rewards]
+    properties:
+      rewards:
+        type: array
+        items:
+          $ref: '#/schemas/Reward'
+  NewReward:
+    type: object
+    additionalProperties: false
+    required: [title, cost, kind]
+    properties:
+      title:
+        $ref: chores.yaml#/schemas/Title
+      cost:
+        type: integer
+        minimum: 1
+        maximum: 100000
+      kind:
+        type: string
+        enum: [item, screen_time]
+      minutes:
+        type: integer
+        minimum: 1
+        maximum: 1440
+        description: Required for screen_time, refused otherwise
+  Reward:
+    type: object
+    required: [id, title, cost, kind, available]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      title:
+        type: string
+      cost:
+        type: integer
+      kind:
+        type: string
+        enum: [item, screen_time]
+      minutes:
+        type: integer
+      available:
+        type: boolean
+  Redemption:
+    type: object
+    required: [id, status]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      status:
+        type: string
+        enum: [pending, approved, rejected]
