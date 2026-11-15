@@ -110,3 +110,56 @@ func Open(t testing.TB) DB {
 	}
 	return DB{Runtime: runtime, Owner: owner}
 }
+
+// Scratch makes an empty database with no migrations, runs each SQL script in it in order, and
+// returns its URL; it is dropped when t ends. The importer's tests use it for the old app's
+// database.
+func Scratch(t testing.TB, scripts ...string) string {
+	t.Helper()
+	admin := config.TestDatabaseURL()
+	if admin == "" {
+		if config.InCI() {
+			t.Fatal("TEST_DATABASE_URL is not set")
+		}
+		t.Skip("TEST_DATABASE_URL is not set; run `make test` for integration tests")
+	}
+	ctx := context.Background()
+	b := make([]byte, 6)
+	_, _ = rand.Read(b)
+	name := "scratch_" + hex.EncodeToString(b)
+	conn, err := pgx.Connect(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	if _, err := conn.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		c, err := pgx.Connect(context.Background(), admin)
+		if err != nil {
+			t.Errorf("cleanup: %v", err)
+			return
+		}
+		defer func() { _ = c.Close(context.Background()) }()
+		if _, err := c.Exec(context.Background(), "DROP DATABASE "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)"); err != nil {
+			t.Errorf("cleanup: %v", err)
+		}
+	})
+	u, err := url.Parse(admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Path = "/" + name
+	db, err := pgx.Connect(ctx, u.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close(ctx) }()
+	for _, sql := range scripts {
+		if _, err := db.Exec(ctx, sql); err != nil {
+			t.Fatalf("scratch database: %v", err)
+		}
+	}
+	return u.String()
+}

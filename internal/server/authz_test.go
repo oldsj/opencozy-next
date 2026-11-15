@@ -84,6 +84,7 @@ func TestAuthzMatrix(t *testing.T) {
 					u += "?expectedVersion=1"
 				}
 				u = strings.ReplaceAll(u, "{passkeyId}", h.passkey.String())
+				u = strings.ReplaceAll(u, "{deviceId}", h.device.String())
 				return "/api" + u
 			}
 			body := func() any {

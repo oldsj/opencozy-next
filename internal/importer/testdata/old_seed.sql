@@ -63,3 +63,21 @@ INSERT INTO recipe (household_id, id, title, servings, ingredients, instructions
 INSERT INTO meal_plan_entry (household_id, id, local_day, meal_type, recipe_id, version, created_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f3', '2026-01-12', 'dinner', '0190a000-0000-7000-8000-0000000000f1', 1, '2026-01-10 12:00:00+00'),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f4', '2026-01-13', 'breakfast', '0190a000-0000-7000-8000-0000000000f2', 3, '2026-01-10 12:00:00+00');
+
+-- Slice 13a: a calendar link (its token is fictional), a recurring series and one the old app
+-- had removed, an event (rebuilt, not carried), and assignments: the series is for one child, one
+-- occurrence is for nobody, and a cleared one the old app ignored.
+INSERT INTO calendar_source (household_id, id, provider, name, feed_url, show_on_display, version, created_at, last_success_at, feed_hash) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b1', 'ics', 'School', 'webcal://calendar.example.test/school.ics?token=fixture-feed-token', false, 2, '2026-01-07T08:00:00Z', '2026-01-08T08:00:00Z', repeat('a', 64));
+INSERT INTO calendar_series (household_id, id, source_id, provider_uid, summary, all_day, recurring, status, content_hash, removed_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b2', '0190a000-0000-7000-8000-0000000000b1', 'swim@example.test', 'Swimming lesson', false, true, 'confirmed', repeat('b', 64), NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b3', '0190a000-0000-7000-8000-0000000000b1', 'trip@example.test', 'Class trip', true, false, 'confirmed', repeat('c', 64), '2026-01-09T08:00:00Z');
+INSERT INTO calendar_occurrence (household_id, id, source_id, series_id, recurrence_key, all_day, start_date, end_date, summary, status, is_override, content_hash) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b4', '0190a000-0000-7000-8000-0000000000b1', '0190a000-0000-7000-8000-0000000000b3', 'single', true, '2026-01-09', '2026-01-10', 'Class trip', 'confirmed', false, repeat('d', 64));
+INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, version, active, cleared_from_version) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b5', '0190a000-0000-7000-8000-0000000000b2', NULL, 1, true, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b6', '0190a000-0000-7000-8000-0000000000b2', '20260114T163000Z', 1, true, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b7', '0190a000-0000-7000-8000-0000000000b2', '20260121T163000Z', 2, false, 1);
+INSERT INTO calendar_assignment_person (household_id, assignment_id, child_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b5', '0190a000-0000-7000-8000-0000000000c1'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b7', '0190a000-0000-7000-8000-0000000000c2');

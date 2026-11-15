@@ -52,12 +52,18 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	if len(args) > 0 {
 		cmd, args = args[0], args[1:]
 	}
+	if err := config.CheckE2EBuild(); err != nil {
+		return err
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(log)
+	if config.E2EBuild {
+		log.Warn("e2e build: the calendar client may fetch from 127.0.0.1; for browser tests only, never a household")
+	}
 
 	switch cmd {
 	case "migrate":

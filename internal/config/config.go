@@ -57,6 +57,11 @@ type Config struct {
 	// OIDCAllowedPrivateCIDRs are the private ranges an OIDC issuer may be reached in.
 	OIDCAllowedPrivateCIDRs egress.PrivateCIDRs `env:"OIDC_ALLOWED_PRIVATE_CIDRS"`
 
+	// PublicOrigin is the origin people reach OpenCozy at, e.g. https://cozy.example.test. Kid
+	// devices are told it in the pairing QR code; it is never taken from the request's Host.
+	// Without it, pairing a device works only on a loopback address (development).
+	PublicOrigin string `env:"PUBLIC_ORIGIN"`
+
 	// Slice 10: passkeys (design §6).
 	// WebAuthnRPID is the relying party ID: the site's hostname, which must never change once
 	// passkeys exist. Empty turns passkeys off.
@@ -93,6 +98,9 @@ func (c Config) validate() error {
 		errs = append(errs, errors.New("MIGRATION_DATABASE_URL: sslmode=disable is only allowed for localhost"))
 	}
 	errs = append(errs, c.validateWebAuthn()...)
+	if c.PublicOrigin != "" && !validOrigin(c.PublicOrigin) {
+		errs = append(errs, fmt.Errorf("PUBLIC_ORIGIN: %q must be https://host[:port] (http only for localhost)", c.PublicOrigin))
+	}
 	if c.MigrationDatabaseURL != "" && c.DatabaseRuntimeRole == "" {
 		errs = append(errs, errors.New("DATABASE_RUNTIME_ROLE is required with MIGRATION_DATABASE_URL"))
 	}
@@ -151,3 +159,12 @@ func TestDatabaseURL() string { return os.Getenv("TEST_DATABASE_URL") }
 
 // InCI reports whether tests run in CI, where a missing test database is a failure, not a skip.
 func InCI() bool { return os.Getenv("CI") == "true" }
+
+// validOrigin reports whether o is a bare origin: https://host[:port], or http for localhost.
+func validOrigin(o string) bool {
+	u, err := url.Parse(o)
+	if err != nil || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return false
+	}
+	return u.Scheme == "https" || (u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))
+}

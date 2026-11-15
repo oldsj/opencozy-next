@@ -64,6 +64,12 @@ responses:
       application/json:
         schema:
           $ref: '#/schemas/Error'
+  ServiceUnavailable:
+    description: Not available on this server until it is configured
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
   TooManyRequests:
     description: Rate limited; retry after the Retry-After header
     content:
