@@ -83,3 +83,7 @@ export type { ProfileColor } from './profile-colors';
 export { pointsLabel, pointsWord } from './points';
 export { useSurface } from './surface';
 export type { Surface } from './surface';
+export { Reading } from './components/Reading';
+export type { ReadingProps, ReadingStatus } from './components/Reading';
+export { DashboardGrid, DashboardItem } from './components/DashboardGrid';
+export type { DashboardGridProps, DashboardItemProps } from './components/DashboardGrid';

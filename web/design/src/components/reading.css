@@ -1,0 +1,96 @@
+.oc-reading {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  background: var(--surface-soft);
+  color: var(--foreground);
+}
+
+.oc-reading__label {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+}
+
+.oc-reading__label > span {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.oc-reading__icon {
+  flex: none;
+  margin-block-start: 0.1em;
+}
+
+/* Several readings: tiles at least 12rem wide (or the full width when narrower), as many as fit. */
+.oc-readings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(12rem, 100%), 1fr));
+  gap: var(--space-sm);
+}
+
+.oc-reading__value {
+  margin: 0;
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-page);
+  font-weight: var(--font-weight-heading);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-heading);
+  /* Breaks inside a word only when the word can't fit the tile at all. */
+  overflow-wrap: break-word;
+}
+
+.oc-reading__unit {
+  margin-inline-start: 0.15em;
+  color: var(--muted-foreground);
+  font-size: 0.6em;
+}
+
+.oc-reading__note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+
+/* Stale: the last good value, quieter, with its age in the note. */
+.oc-reading--stale .oc-reading__value {
+  color: var(--muted-foreground);
+}
+
+.oc-reading--stale {
+  border-style: dashed;
+}
+
+/* Nothing to show: say so in words, never a blank or a zero. */
+.oc-reading--error .oc-reading__value,
+.oc-reading--pending .oc-reading__value {
+  color: var(--muted-foreground);
+  font-family: var(--body-font);
+  font-variation-settings: normal;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-label);
+}
+
+.oc-reading--error .oc-reading__note {
+  color: var(--danger-ink);
+}
+
+.oc-reading--attention {
+  border-color: var(--attention-line);
+  background: var(--attention-soft);
+}
+
+.oc-reading--attention .oc-reading__value {
+  color: var(--attention-ink);
+}
