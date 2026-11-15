@@ -145,12 +145,14 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"service_credential_child": "pending",
 		"assistant_credential":     "pending",
 		"auth_session":             "not carried",
+		"recipe":                   "ok",
+		"meal_plan_entry":          "ok",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -200,6 +202,24 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	var oidcOnly *string
 	if err := target.Owner.QueryRow(ctx, `SELECT password_hash FROM adult WHERE email = 'sam@example.test'`).Scan(&oidcOnly); err != nil || oidcOnly != nil {
 		t.Fatalf("OIDC-only adult: %v %v", oidcOnly, err)
+	}
+	// Recipes keep their IDs, steps (line breaks included), versions and archive times; meals keep
+	// their day, slot and recipe.
+	var (
+		steps    []string
+		version  int32
+		archived bool
+	)
+	if err := target.Owner.QueryRow(ctx, `SELECT steps, version, archived_at IS NOT NULL FROM recipe WHERE id = '0190a000-0000-7000-8000-0000000000f1'`).Scan(&steps, &version, &archived); err != nil ||
+		len(steps) != 2 || steps[1] != "Add the lentils and stock.\nSimmer for 20 minutes." || version != 2 || archived {
+		t.Errorf("recipe: %q %d %v %v", steps, version, archived, err)
+	}
+	var meals int
+	if err := target.Owner.QueryRow(ctx, `SELECT count(*) FROM meal WHERE household_id = '0190a000-0000-7000-8000-00000000000a'
+		AND ((day = '2026-01-12' AND slot = 'dinner' AND recipe_id = '0190a000-0000-7000-8000-0000000000f1' AND version = 1)
+		  OR (day = '2026-01-13' AND slot = 'breakfast' AND recipe_id = '0190a000-0000-7000-8000-0000000000f2' AND version = 3))
+		AND title IS NULL AND note IS NULL`).Scan(&meals); err != nil || meals != 2 {
+		t.Errorf("meals: %d %v", meals, err)
 	}
 
 	// The old service secret authenticates, with exactly its old child.

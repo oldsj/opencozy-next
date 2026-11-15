@@ -140,6 +140,18 @@ type JobLease struct {
 	ExpiresAt time.Time
 }
 
+type Meal struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Day         pgtype.Date
+	Slot        string
+	RecipeID    *uuid.UUID
+	Title       *string
+	Note        *string
+	Version     int32
+	CreatedAt   time.Time
+}
+
 type Occurrence struct {
 	ID             uuid.UUID
 	HouseholdID    uuid.UUID
@@ -190,6 +202,18 @@ type PushOutbox struct {
 	Attempts      int32
 	NextAttemptAt time.Time
 	CreatedAt     time.Time
+}
+
+type Recipe struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Title       string
+	Servings    int32
+	Ingredients []string
+	Steps       []string
+	Version     int32
+	CreatedAt   time.Time
+	ArchivedAt  *time.Time
 }
 
 type Routine struct {

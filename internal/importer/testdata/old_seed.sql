@@ -36,3 +36,15 @@ INSERT INTO service_credential_child (household_id, credential_id, child_id) VAL
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d2', '0190a000-0000-7000-8000-0000000000c2');
 INSERT INTO assistant_credential (household_id, id, user_id, name, credential_hash, scopes, created_at, last_used_at, revoked_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000e1', 'fixtureOwnerUser01', 'Desktop assistant', '47d9a070fe7da7e7e22399db85bd24b62aff8560c86afdeca7957c4ba107c617', '{approvals:read}', '2026-01-06T08:00:00Z', NULL, NULL);
+
+-- Slice 14: recipes (one archived) and a meal plan that uses them.
+INSERT INTO recipe (household_id, id, title, servings, ingredients, instructions, version, created_at, archived_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f1', 'Lentil soup', 4,
+   ARRAY['1 cup red lentils', '1 onion', '4 cups stock'], ARRAY['Soften the onion.', E'Add the lentils and stock.\nSimmer for 20 minutes.'], 2,
+   '2026-01-05 18:00:00+00', NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f2', 'Pancakes', 2,
+   ARRAY['1 cup flour', '1 egg', '1 cup milk'], ARRAY['Whisk everything.', 'Cook in a hot pan.'], 1,
+   '2026-01-06 08:00:00+00', '2026-02-01 08:00:00+00');
+INSERT INTO meal_plan_entry (household_id, id, local_day, meal_type, recipe_id, version, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f3', '2026-01-12', 'dinner', '0190a000-0000-7000-8000-0000000000f1', 1, '2026-01-10 12:00:00+00'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f4', '2026-01-13', 'breakfast', '0190a000-0000-7000-8000-0000000000f2', 3, '2026-01-10 12:00:00+00');
