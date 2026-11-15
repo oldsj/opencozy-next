@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { Notice, PageHeader } from '@app/design';
+import { AppFrame, Notice, PageHeader, useSurface } from '@app/design';
 
 import { client } from '../api/client';
 import { TodayBoard } from './today';
@@ -11,6 +11,8 @@ const householdKey = ['display', 'household'] as const;
 // The wall display. Unpaired, it shows a code for an adult to enter under Displays; once the
 // adult has, it collects its session and shows Today.
 export function DisplayPage() {
+  // The wall display is full screen at kiosk size, outside the adult pages' reading column.
+  useSurface('kiosk');
   const household = useQuery({
     queryKey: householdKey,
     queryFn: async () => {
@@ -77,7 +79,7 @@ function Pairing() {
   }, [attempt, queryClient]);
 
   return (
-    <section>
+    <AppFrame contentClassName="grid place-content-center gap-6 text-center">
       <PageHeader title="Pair this display" description="On your phone or computer, open Displays and enter this code." />
       {problem && <Notice tone="attention">{problem}</Notice>}
       {code && (
@@ -85,6 +87,6 @@ function Pairing() {
           {code}
         </p>
       )}
-    </section>
+    </AppFrame>
   );
 }

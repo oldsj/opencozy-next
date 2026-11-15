@@ -79,3 +79,5 @@ export { cx } from './cx';
 export { initialOf, profileClass, profileColors } from './profile-colors';
 export type { ProfileColor } from './profile-colors';
 export { pointsLabel, pointsWord } from './points';
+export { useSurface } from './surface';
+export type { Surface } from './surface';
