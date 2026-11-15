@@ -73,6 +73,7 @@ func rekeyFeedURLs(ctx context.Context, pool *pgxpool.Pool, kr *keyring.Keyring)
 const (
 	claimBatch   = 10
 	batchesInRun = 5
+	parseTimeout = 20 * time.Second // the recurrence expansion of one feed
 )
 
 // Job refreshes due ICS feeds every minute (each feed every 15 minutes once it succeeds, backing
@@ -114,8 +115,9 @@ func Refresh(ctx context.Context, fence Txer, kr *keyring.Keyring, f Fetcher, lo
 // syncOne fetches and stores one feed. Fetch and parse failures are recorded on the source;
 // only database and lease errors are returned.
 func syncOne(ctx context.Context, fence Txer, kr *keyring.Keyring, f Fetcher, log *slog.Logger, now time.Time, row dbq.ClaimDueFeedsRow) error {
+	var feedURL string // set once decrypted; scrubbed from anything logged
 	failed := func(code string, err error) error {
-		log.InfoContext(ctx, "calendar refresh failed", "source", row.ID, "code", code, "err", err)
+		log.InfoContext(ctx, "calendar refresh failed", "source", row.ID, "code", code, "err", Scrub(withoutURL(err).Error(), feedURL))
 		return fence.Tx(ctx, func(q *dbq.Queries) error {
 			if err := q.FeedFailed(ctx, dbq.FeedFailedParams{ID: row.ID, ErrorCode: &code}); err != nil {
 				return err
@@ -141,7 +143,8 @@ func syncOne(ctx context.Context, fence Txer, kr *keyring.Keyring, f Fetcher, lo
 	if sameWindow { // a 304 is only enough when the stored window is still the right one
 		etag, lastMod = deref(row.HttpEtag), deref(row.HttpLastModified)
 	}
-	got, err := f.Fetch(ctx, string(plain), etag, lastMod)
+	feedURL = string(plain)
+	got, err := f.Fetch(ctx, feedURL, etag, lastMod)
 	if err != nil {
 		return failed(CodeOf(err), err)
 	}
@@ -154,18 +157,22 @@ func syncOne(ctx context.Context, fence Txer, kr *keyring.Keyring, f Fetcher, lo
 			return q.FeedUnchanged(ctx, dbq.FeedUnchangedParams{ID: row.ID, Etag: nonEmpty(got.ETag), LastModified: nonEmpty(got.LastModified)})
 		})
 	}
-	feed, err := Parse(got.Body, zone, w)
-	if err != nil {
+	pctx, cancel := context.WithTimeout(ctx, parseTimeout)
+	feed, err := Parse(pctx, got.Body, zone, w)
+	cancel()
+	if errors.Is(err, ErrTooComplex) {
+		return failed(CodeTooManyEvents, err) // the stored copy stays
+	} else if err != nil {
 		return failed(CodeInvalidCalendar, err)
 	}
 	return fence.Tx(ctx, func(q *dbq.Queries) error {
-		return store(ctx, q, row, feed, got, hash, w)
+		return store(ctx, q, row, feed, got, hash, w, now)
 	})
 }
 
 // store replaces the source's series and events with the feed's, under the household lock (the
 // order commands use) and the source row's.
-func store(ctx context.Context, q *dbq.Queries, row dbq.ClaimDueFeedsRow, feed Feed, got Fetched, hash string, w Window) error {
+func store(ctx context.Context, q *dbq.Queries, row dbq.ClaimDueFeedsRow, feed Feed, got Fetched, hash string, w Window, now time.Time) error {
 	if _, err := q.LockHousehold(ctx, row.HouseholdID); err != nil {
 		return err
 	}
@@ -179,7 +186,7 @@ func store(ctx context.Context, q *dbq.Queries, row dbq.ClaimDueFeedsRow, feed F
 	for i, s := range feed.Series {
 		uids[i], recurring[i] = s.UID, s.Recurring
 	}
-	series, err := q.UpsertSeries(ctx, dbq.UpsertSeriesParams{HouseholdID: row.HouseholdID, SourceID: row.ID, Uids: uids, Recurring: recurring})
+	series, err := q.UpsertSeries(ctx, dbq.UpsertSeriesParams{HouseholdID: row.HouseholdID, SourceID: row.ID, Uids: uids, Recurring: recurring, Now: now})
 	if err != nil {
 		return err
 	}
@@ -189,7 +196,8 @@ func store(ctx context.Context, q *dbq.Queries, row dbq.ClaimDueFeedsRow, feed F
 		ids[s.Uid] = s.ID
 		keep = append(keep, s.ID)
 	}
-	if err := q.DeleteSeriesNotIn(ctx, dbq.DeleteSeriesNotInParams{SourceID: row.ID, Keep: keep}); err != nil {
+	// A series missing from this feed keeps its row and assignments; after 30 days it goes.
+	if err := q.PruneSeries(ctx, dbq.PruneSeriesParams{SourceID: row.ID, Keep: keep, Now: now}); err != nil {
 		return err
 	}
 	p := dbq.UpsertEventsParams{HouseholdID: row.HouseholdID, SourceID: row.ID}

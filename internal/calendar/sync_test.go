@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -89,7 +90,8 @@ func TestRefreshStoresAndReplaces(t *testing.T) {
 		ShowOnDisplay: true, FeedUrl: &sealed, FeedUrlMac: &mac}); err != nil {
 		t.Fatal(err)
 	}
-	now := func() time.Time { return time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC) }
+	clock := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	now := func() time.Time { return clock }
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	run := func() {
 		t.Helper()
@@ -166,6 +168,29 @@ func TestRefreshStoresAndReplaces(t *testing.T) {
 		t.Fatalf("assignment kept: %d %v", n, err)
 	}
 
+	// An empty feed (or a truncated or damaged one) removes the events but keeps the series and
+	// what a parent assigned; after 30 days without it, the series goes.
+	assigned := func() int {
+		t.Helper()
+		var n int
+		if err := db.Owner.QueryRow(ctx, `SELECT count(*) FROM calendar_assignment_child c JOIN calendar_assignment a ON a.id = c.assignment_id
+			WHERE a.series_id = $1`, series).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	body.Store(string(cal()))
+	run()
+	if len(events()) != 0 || assigned() != 1 {
+		t.Fatalf("empty feed: %d events, %d assigned", len(events()), assigned())
+	}
+	body.Store(string(cal(ev("UID:swim@example.test", "DTSTART;TZID=America/New_York:20260914T160000", "DTEND;TZID=America/New_York:20260914T170000",
+		"RRULE:FREQ=WEEKLY;COUNT=3", "SUMMARY:Swimming (new time)"))))
+	run()
+	if len(events()) != 3 || assigned() != 1 {
+		t.Fatalf("back: %d events, %d assigned", len(events()), assigned())
+	}
+
 	// Failures are recorded and backed off (15 min, then 30, 60 … up to 6 h); a success clears them.
 	status.Store(http.StatusForbidden)
 	run()
@@ -181,9 +206,53 @@ func TestRefreshStoresAndReplaces(t *testing.T) {
 	if s := source(); s.ErrorCode != nil || s.ConsecutiveFailures != 0 {
 		t.Fatalf("recovered: %+v", s)
 	}
+	// Absent for more than 30 days: pruned with its assignment.
+	body.Store(string(cal()))
+	clock = clock.Add(31 * 24 * time.Hour)
+	run()
+	run()
+	if assigned() != 0 {
+		t.Fatalf("not pruned: %d", assigned())
+	}
 	// A removed source is skipped, not an error.
 	if _, err := db.Owner.Exec(ctx, `DELETE FROM calendar_source WHERE id = $1`, src); err != nil {
 		t.Fatal(err)
 	}
 	run()
+}
+
+// A failed fetch is logged with its code and cause, never with the feed's address or token.
+func TestFailureLogHasNoToken(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := t.Context()
+	kr := testKeyring(t)
+	var h uuid.UUID
+	if err := db.Owner.QueryRow(ctx, `INSERT INTO household (name, time_zone) VALUES ('Fictional', 'America/New_York') RETURNING id`).Scan(&h); err != nil {
+		t.Fatal(err)
+	}
+	// Nothing listens on port 1: the client's error names the whole URL.
+	const token = "s3cr3t-feed-token"
+	src := uuid.Must(uuid.NewV7())
+	sealed, mac, err := SealFeedURL(kr, h, src, "http://127.0.0.1:1/private/"+token+"/basic.ics?token="+token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := dbq.New(db.Runtime)
+	if _, err := q.CreateCalendarSource(ctx, dbq.CreateCalendarSourceParams{ID: src, HouseholdID: h, Name: "School", Color: "butter",
+		FeedUrl: &sealed, FeedUrlMac: &mac}); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	log := slog.New(slog.NewTextHandler(&out, nil))
+	f := Fetcher{client: &http.Client{Timeout: 5 * time.Second}}
+	if err := Refresh(ctx, poolTx{db.Runtime}, kr, f, log, time.Now); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "calendar refresh failed") || strings.Contains(out.String(), token) || strings.Contains(out.String(), "/private/") {
+		t.Fatalf("log: %s", out.String())
+	}
+	s, err := q.GetCalendarSource(ctx, dbq.GetCalendarSourceParams{HouseholdID: h, ID: src})
+	if err != nil || s.ErrorCode == nil || *s.ErrorCode != CodeTimeout {
+		t.Fatalf("source: %+v %v", s, err)
+	}
 }

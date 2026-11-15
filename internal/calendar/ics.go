@@ -9,6 +9,7 @@ package calendar
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -33,10 +34,13 @@ const (
 	// expandBudget is how many recurrence instances one series may step through, inside the
 	// window or not, before it is cut off.
 	expandBudget = 50000
-	maxTitle     = 500
-	maxLocation  = 500
-	maxDesc      = 4000
-	maxUID       = 1024
+	// feedBudget is how many recurrence instances a whole feed may step through: past it the
+	// feed is refused (ErrTooComplex) and the stored copy is kept.
+	feedBudget  = 500000
+	maxTitle    = 500
+	maxLocation = 500
+	maxDesc     = 4000
+	maxUID      = 1024
 )
 
 // WindowPast and WindowFuture bound the stored events around the household's today.
@@ -45,10 +49,16 @@ const (
 	WindowFuture = 366
 )
 
-// ErrInvalid means the body is not a calendar this package can read.
-var ErrInvalid = errors.New("calendar: not a readable calendar")
+var (
+	// ErrInvalid means the body is not a calendar this package can read.
+	ErrInvalid = errors.New("calendar: not a readable calendar")
+	// ErrTooComplex means expanding the feed took more work than one feed may (feedBudget), or
+	// ran out of time.
+	ErrTooComplex = errors.New("calendar: feed too complex to expand")
+)
 
-// Feed is a parsed feed: its series, each with the events inside the window.
+// Feed is a parsed feed: every series it has (by UID), each with its events inside the window.
+// A series with none in the window is still listed, so its row and assignments are kept.
 type Feed struct {
 	Series []Series
 	// Skipped counts components that could not be read (no UID, a bad date, an unsupported rule).
@@ -89,7 +99,8 @@ func WindowAround(today day.Date) Window {
 
 // Parse reads an iCalendar body and expands it within w, in the household zone (used for
 // floating times and unknown TZIDs).
-func Parse(body []byte, zone *time.Location, w Window) (feed Feed, err error) {
+// ctx bounds the expansion: when it ends, Parse returns ErrTooComplex.
+func Parse(ctx context.Context, body []byte, zone *time.Location, w Window) (feed Feed, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			feed, err = Feed{}, ErrInvalid
@@ -117,11 +128,18 @@ func Parse(body []byte, zone *time.Location, w Window) (feed Feed, err error) {
 			}
 		}
 	}
-	p := parser{zone: zone, w: w, winStart: w.From.Start(zone), winEnd: w.To.Start(zone)}
-	return p.build(comps), nil
+	p := parser{ctx: ctx, zone: zone, w: w, winStart: w.From.Start(zone), winEnd: w.To.Start(zone), budget: feedBudget}
+	feed = p.build(comps)
+	if p.exhausted {
+		return Feed{}, ErrTooComplex
+	}
+	return feed, nil
 }
 
 type parser struct {
+	ctx              context.Context
+	budget           int  // recurrence steps left for the whole feed
+	exhausted        bool // the budget or ctx ran out
 	zone             *time.Location
 	w                Window
 	winStart, winEnd time.Time
@@ -177,10 +195,10 @@ func (p *parser) build(comps []*ical.Component) Feed {
 	}
 	var feed Feed
 	for _, uid := range order {
-		s := p.series(uid, masters[uid], overrides[uid])
-		if len(s.Events) > 0 {
-			feed.Series = append(feed.Series, s)
+		if p.exhausted {
+			return Feed{}
 		}
+		feed.Series = append(feed.Series, p.series(uid, masters[uid], overrides[uid]))
 	}
 	feed.Skipped, feed.TooMany = p.skipped, p.tooMany
 	return feed
@@ -217,7 +235,7 @@ func (p *parser) series(uid string, m *vevent, over map[string]*vevent) Series {
 		starts, ok := p.expand(m)
 		if !ok {
 			p.skipped++
-			return Series{}
+			return s // an unsupported rule: listed, so its assignments stay, with no events
 		}
 		for _, t := range starts {
 			key := keyOf(t, m.allDay)
@@ -302,6 +320,10 @@ func (p *parser) expand(m *vevent) ([]time.Time, bool) {
 	var out []time.Time
 	next := set.Iterator()
 	for i := 0; i < expandBudget; i++ {
+		if p.budget--; p.budget < 0 || i%1024 == 0 && p.ctx.Err() != nil {
+			p.exhausted = true
+			return nil, true
+		}
 		t, ok := next()
 		if !ok || !t.Before(p.winEnd.Add(48*time.Hour)) {
 			return out, true

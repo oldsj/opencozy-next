@@ -60,14 +60,15 @@ UPDATE calendar_source SET error_code = $2, consecutive_failures = consecutive_f
 WHERE id = $1;
 
 -- name: UpsertSeries :many
-INSERT INTO calendar_series (household_id, source_id, uid, recurring)
-SELECT @household_id::uuid, @source_id::uuid, u.uid, u.recurring
+INSERT INTO calendar_series (household_id, source_id, uid, recurring, last_seen_at)
+SELECT @household_id::uuid, @source_id::uuid, u.uid, u.recurring, @now::timestamptz
 FROM (SELECT unnest(@uids::text[]) AS uid, unnest(@recurring::boolean[]) AS recurring) AS u
-ON CONFLICT (source_id, uid) DO UPDATE SET recurring = EXCLUDED.recurring
+ON CONFLICT (source_id, uid) DO UPDATE SET recurring = EXCLUDED.recurring, last_seen_at = EXCLUDED.last_seen_at
 RETURNING id, uid;
 
--- name: DeleteSeriesNotIn :exec
-DELETE FROM calendar_series WHERE source_id = $1 AND NOT (id = ANY(@keep::uuid[]));
+-- name: PruneSeries :exec
+DELETE FROM calendar_series
+WHERE source_id = @source_id::uuid AND NOT (id = ANY(@keep::uuid[])) AND last_seen_at + interval '30 days' < @now::timestamptz;
 
 -- name: UpsertEvents :many
 INSERT INTO calendar_event (household_id, source_id, series_id, recurrence_key, all_day, starts_at, ends_at,

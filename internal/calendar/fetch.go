@@ -43,7 +43,37 @@ type SyncError struct {
 func (e *SyncError) Error() string { return "calendar: " + e.Code + ": " + e.err.Error() }
 func (e *SyncError) Unwrap() error { return e.err }
 
-func fail(code string, err error) error { return &SyncError{Code: code, err: err} }
+// fail wraps a refresh error. The cause is unwrapped from any *url.Error first: Go's HTTP client
+// puts the full request (or redirect) URL, a feed's private token included, in that error's text.
+func fail(code string, err error) error { return &SyncError{Code: code, err: withoutURL(err)} }
+
+func withoutURL(err error) error {
+	for {
+		ue, ok := errors.AsType[*url.Error](err)
+		if !ok {
+			return err
+		}
+		if ue.Err == nil {
+			return errors.New(ue.Op + " failed")
+		}
+		err = ue.Err
+	}
+}
+
+// Scrub removes a feed's URL, and its host, path and query, from s: a last guard before an error
+// about that feed is logged.
+func Scrub(s, feedURL string) string {
+	parts := []string{feedURL}
+	if u, err := url.Parse(feedURL); err == nil {
+		parts = append(parts, u.Host, u.Hostname(), u.EscapedPath(), u.RawQuery, u.Path)
+	}
+	for _, p := range parts {
+		if len(p) > 1 {
+			s = strings.ReplaceAll(s, p, "[feed]")
+		}
+	}
+	return s
+}
 
 // CodeOf is the adult-facing code for a refresh error.
 func CodeOf(err error) string {

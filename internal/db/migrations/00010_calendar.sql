@@ -42,6 +42,10 @@ CREATE TABLE calendar_series (
     source_id    uuid NOT NULL,
     uid          text NOT NULL CHECK (length(uid) BETWEEN 1 AND 1024),
     recurring    boolean NOT NULL,
+    -- The last successful fetch whose feed had this UID. A series missing from a fetch keeps its
+    -- row and assignments (a briefly empty or damaged feed must not wipe them); one missing for
+    -- 30 days is pruned.
+    last_seen_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (source_id, uid),
     UNIQUE (household_id, id),
     FOREIGN KEY (household_id, source_id) REFERENCES calendar_source (household_id, id) ON DELETE CASCADE

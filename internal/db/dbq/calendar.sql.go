@@ -235,20 +235,6 @@ func (q *Queries) DeleteOccurrenceAssignments(ctx context.Context, arg DeleteOcc
 	return err
 }
 
-const deleteSeriesNotIn = `-- name: DeleteSeriesNotIn :exec
-DELETE FROM calendar_series WHERE source_id = $1 AND NOT (id = ANY($2::uuid[]))
-`
-
-type DeleteSeriesNotInParams struct {
-	SourceID uuid.UUID
-	Keep     []uuid.UUID
-}
-
-func (q *Queries) DeleteSeriesNotIn(ctx context.Context, arg DeleteSeriesNotInParams) error {
-	_, err := q.db.Exec(ctx, deleteSeriesNotIn, arg.SourceID, arg.Keep)
-	return err
-}
-
 const feedFailed = `-- name: FeedFailed :exec
 UPDATE calendar_source SET error_code = $2, consecutive_failures = consecutive_failures + 1,
     next_sync_at = now() + make_interval(mins => least(15 * (1 << least(consecutive_failures, 5)), 360))
@@ -632,6 +618,22 @@ func (q *Queries) LockCalendarSource(ctx context.Context, arg LockCalendarSource
 	return i, err
 }
 
+const pruneSeries = `-- name: PruneSeries :exec
+DELETE FROM calendar_series
+WHERE source_id = $1::uuid AND NOT (id = ANY($2::uuid[])) AND last_seen_at + interval '30 days' < $3::timestamptz
+`
+
+type PruneSeriesParams struct {
+	SourceID uuid.UUID
+	Keep     []uuid.UUID
+	Now      time.Time
+}
+
+func (q *Queries) PruneSeries(ctx context.Context, arg PruneSeriesParams) error {
+	_, err := q.db.Exec(ctx, pruneSeries, arg.SourceID, arg.Keep, arg.Now)
+	return err
+}
+
 const setFeedURL = `-- name: SetFeedURL :exec
 UPDATE calendar_source SET feed_url = $2, feed_url_mac = $3 WHERE id = $1
 `
@@ -783,16 +785,17 @@ func (q *Queries) UpsertEvents(ctx context.Context, arg UpsertEventsParams) ([]u
 }
 
 const upsertSeries = `-- name: UpsertSeries :many
-INSERT INTO calendar_series (household_id, source_id, uid, recurring)
-SELECT $1::uuid, $2::uuid, u.uid, u.recurring
-FROM (SELECT unnest($3::text[]) AS uid, unnest($4::boolean[]) AS recurring) AS u
-ON CONFLICT (source_id, uid) DO UPDATE SET recurring = EXCLUDED.recurring
+INSERT INTO calendar_series (household_id, source_id, uid, recurring, last_seen_at)
+SELECT $1::uuid, $2::uuid, u.uid, u.recurring, $3::timestamptz
+FROM (SELECT unnest($4::text[]) AS uid, unnest($5::boolean[]) AS recurring) AS u
+ON CONFLICT (source_id, uid) DO UPDATE SET recurring = EXCLUDED.recurring, last_seen_at = EXCLUDED.last_seen_at
 RETURNING id, uid
 `
 
 type UpsertSeriesParams struct {
 	HouseholdID uuid.UUID
 	SourceID    uuid.UUID
+	Now         time.Time
 	Uids        []string
 	Recurring   []bool
 }
@@ -806,6 +809,7 @@ func (q *Queries) UpsertSeries(ctx context.Context, arg UpsertSeriesParams) ([]U
 	rows, err := q.db.Query(ctx, upsertSeries,
 		arg.HouseholdID,
 		arg.SourceID,
+		arg.Now,
 		arg.Uids,
 		arg.Recurring,
 	)

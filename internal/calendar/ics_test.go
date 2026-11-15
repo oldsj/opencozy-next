@@ -1,6 +1,8 @@
 package calendar
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -30,7 +32,7 @@ var today = day.Date{Year: 2026, Month: time.September, Day: 14}
 
 func parse(t *testing.T, body []byte) Feed {
 	t.Helper()
-	f, err := Parse(body, ny(t), WindowAround(today))
+	f, err := Parse(t.Context(), body, ny(t), WindowAround(today))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,11 +111,11 @@ func TestAllDayRecurrenceAndWindow(t *testing.T) {
 		ev("UID:daily@example.test", "DTSTART;VALUE=DATE:20200101", "RRULE:FREQ=DAILY", "SUMMARY:Daily"),
 		// Yearly until a date (inclusive).
 		ev("UID:bday@example.test", "DTSTART;VALUE=DATE:20250916", "RRULE:FREQ=YEARLY;UNTIL=20260916", "SUMMARY:Birthday"),
-		// Entirely before the window.
+		// Entirely before the window: listed with no events, so its row and assignments stay.
 		ev("UID:old@example.test", "DTSTART:20200101T100000Z", "DTEND:20200101T110000Z"),
 	))
-	if len(f.Series) != 2 {
-		t.Fatalf("%+v", f.Series)
+	if len(f.Series) != 3 || f.Series[2].UID != "old@example.test" || len(f.Series[2].Events) != 0 {
+		t.Fatalf("%+v", f.Series[2])
 	}
 	d := f.Series[0]
 	if n := len(d.Events); n != WindowPast+WindowFuture {
@@ -133,8 +135,23 @@ func TestCapsAndHostileInput(t *testing.T) {
 	for i := 0; i < MaxEvents+10; i++ {
 		many = append(many, ev(fmt.Sprintf("UID:%d@example.test", i), "DTSTART:20260914T120000Z", "DTEND:20260914T130000Z"))
 	}
-	if f := parse(t, cal(many...)); !f.TooMany || len(f.Series) != MaxEvents {
+	// Every series is still listed (their assignments stay); only the events stop at the cap.
+	if f := parse(t, cal(many...)); !f.TooMany || len(f.Series) != MaxEvents+10 || len(f.Series[MaxEvents].Events) != 0 {
 		t.Errorf("cap: too many %v, %d series", f.TooMany, len(f.Series))
+	}
+	// A feed whose rules together need more work than one feed may is refused, not cut short.
+	var heavy []string
+	for i := 0; i < 12; i++ {
+		heavy = append(heavy, ev(fmt.Sprintf("UID:heavy%d@example.test", i), "DTSTART:19000101T000000Z", "RRULE:FREQ=HOURLY"))
+	}
+	if _, err := Parse(t.Context(), cal(heavy...), ny(t), WindowAround(today)); !errors.Is(err, ErrTooComplex) {
+		t.Errorf("heavy feed: %v", err)
+	}
+	// So is one whose deadline has passed.
+	done, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := Parse(done, cal(heavy[0]), ny(t), WindowAround(today)); !errors.Is(err, ErrTooComplex) {
+		t.Errorf("cancelled: %v", err)
 	}
 	// Rules that would never end within the budget, or step by the second, are cut off or skipped.
 	start := time.Now()
@@ -162,7 +179,7 @@ func TestCapsAndHostileInput(t *testing.T) {
 	}
 	// Not a calendar, or broken.
 	for _, body := range []string{"", "<html>nope</html>", "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nX;=\"\r\n", "BEGIN:VCALENDAR\r\n;;;\r\n"} {
-		if _, err := Parse([]byte(body), ny(t), WindowAround(today)); err == nil {
+		if _, err := Parse(t.Context(), []byte(body), ny(t), WindowAround(today)); err == nil {
 			t.Errorf("%q: parsed", body)
 		}
 	}

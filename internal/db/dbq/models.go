@@ -91,6 +91,7 @@ type CalendarSeries struct {
 	SourceID    uuid.UUID
 	Uid         string
 	Recurring   bool
+	LastSeenAt  time.Time
 }
 
 type CalendarSource struct {

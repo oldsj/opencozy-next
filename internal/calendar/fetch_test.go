@@ -1,9 +1,16 @@
 package calendar
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/oldsj/opencozy-next/internal/egress"
 )
 
 func TestNormalizeURL(t *testing.T) {
@@ -63,5 +70,23 @@ func TestFetchStatuses(t *testing.T) {
 		if _, err := f.Fetch(t.Context(), srv.URL+path, "", ""); CodeOf(err) != code {
 			t.Errorf("%s: %v, want %s", path, err, code)
 		}
+	}
+}
+
+// Go's client errors carry the request or redirect URL; a SyncError never does.
+func TestSyncErrorHasNoURL(t *testing.T) {
+	secret := "https://calendar.example.test/feed.ics?token=s3cr3t"
+	for _, cause := range []error{
+		fmt.Errorf("%w (ics): more than 5", egress.ErrRedirect),
+		context.DeadlineExceeded,
+		errors.New("connection reset by peer"),
+	} {
+		err := transportError(&url.Error{Op: "Get", URL: secret, Err: cause})
+		if strings.Contains(err.Error(), "s3cr3t") {
+			t.Errorf("%v", err)
+		}
+	}
+	if got := Scrub("lookup calendar.example.test: no such host; GET /feed.ics?token=s3cr3t", secret); strings.Contains(got, "s3cr3t") || strings.Contains(got, "calendar.example.test") {
+		t.Errorf("scrub: %s", got)
 	}
 }
