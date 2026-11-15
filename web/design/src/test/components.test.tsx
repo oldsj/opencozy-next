@@ -7,6 +7,8 @@ import {
   AppFrame,
   Button,
   ButtonLink,
+  Checkbox,
+  CheckboxGroup,
   ChoiceGroup,
   CodeInput,
   DashboardGrid,
@@ -561,5 +563,23 @@ describe('dashboard', () => {
     expect(a).toHaveClass('oc-dash-x4', 'oc-dash-y2', 'oc-dash-w2', 'oc-dash-h1', 'oc-dash__item--selected');
     expect(a).not.toHaveAttribute('style');
     expect(screen.getByTestId('b')).toHaveClass('oc-dash-x5', 'oc-dash-y0', 'oc-dash-w1', 'oc-dash-h6');
+  });
+});
+
+describe('checkbox', () => {
+  it('ticks from anywhere on its row and reads its legend', async () => {
+    const user = userEvent.setup();
+    const changed = vi.fn();
+    render(
+      <CheckboxGroup legend="Shows">
+        <Checkbox label="Meals" hint="After the board." onChange={changed} />
+        <Checkbox label="Dashboard" disabled />
+      </CheckboxGroup>,
+    );
+    expect(screen.getByRole('group', { name: 'Shows' })).toBeInTheDocument();
+    await user.click(screen.getByText('After the board.'));
+    expect(screen.getByRole('checkbox', { name: /Meals/ })).toBeChecked();
+    expect(changed).toHaveBeenCalledOnce();
+    expect(screen.getByRole('checkbox', { name: 'Dashboard' })).toBeDisabled();
   });
 });

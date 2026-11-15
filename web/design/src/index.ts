@@ -87,3 +87,5 @@ export { Reading } from './components/Reading';
 export type { ReadingProps, ReadingStatus } from './components/Reading';
 export { DashboardGrid, DashboardItem } from './components/DashboardGrid';
 export type { DashboardGridProps, DashboardItemProps } from './components/DashboardGrid';
+export { Checkbox, CheckboxGroup } from './components/Checkbox';
+export type { CheckboxGroupProps, CheckboxProps } from './components/Checkbox';
