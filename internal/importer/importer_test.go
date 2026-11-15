@@ -3,24 +3,22 @@ package importer
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	_ "embed"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/auth"
-	"github.com/oldsj/opencozy-next/internal/config"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/keyring"
 	"github.com/oldsj/opencozy-next/internal/testdb"
 )
 
@@ -29,6 +27,9 @@ var (
 	oldSchemaSQL string
 	//go:embed testdata/old_seed.sql
 	oldSeedSQL string
+	// complete removes what later slices will map, so a real import can commit.
+	//go:embed testdata/complete.sql
+	complete string
 )
 
 // The fixture's secrets, made for it (testdata/old_seed.sql stores only their hashes).
@@ -44,58 +45,13 @@ const (
 // ends, and returns its URL.
 func oldDB(t *testing.T, arrange ...string) string {
 	t.Helper()
-	admin := config.TestDatabaseURL()
-	if admin == "" {
-		if config.InCI() {
-			t.Fatal("TEST_DATABASE_URL is not set")
-		}
-		t.Skip("TEST_DATABASE_URL is not set; run `make test` for integration tests")
-	}
-	ctx := context.Background()
-	b := make([]byte, 6)
-	_, _ = rand.Read(b)
-	name := "old_" + hex.EncodeToString(b)
-	conn, err := pgx.Connect(ctx, admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = conn.Close(ctx) }()
-	if _, err := conn.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		c, err := pgx.Connect(context.Background(), admin)
-		if err != nil {
-			t.Errorf("cleanup: %v", err)
-			return
-		}
-		defer func() { _ = c.Close(context.Background()) }()
-		if _, err := c.Exec(context.Background(), "DROP DATABASE "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)"); err != nil {
-			t.Errorf("cleanup: %v", err)
-		}
-	})
-	u, err := url.Parse(admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	u.Path = "/" + name
-	old, err := pgx.Connect(ctx, u.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = old.Close(ctx) }()
-	for _, sql := range append([]string{oldSchemaSQL, oldSeedSQL}, arrange...) {
-		if _, err := old.Exec(ctx, sql); err != nil {
-			t.Fatalf("old database: %v", err)
-		}
-	}
-	return u.String()
+	return testdb.Scratch(t, append([]string{oldSchemaSQL, oldSeedSQL}, arrange...)...)
 }
 
 func importOnce(t *testing.T, source string, target testdb.DB, dryRun bool) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, DryRun: dryRun, Out: &out})
+	err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, DryRun: dryRun, Out: &out, Keys: testKeys(t)})
 	return out.String(), err
 }
 
@@ -152,12 +108,17 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"award_rule":                    "ok",
 		"external_identity_link":        "ok",
 		"service_credential_award_rule": "ok",
+		"calendar_source":               "ok",
+		"calendar_series":               "ok",
+		"calendar_assignment":           "ok",
+		"calendar_assignment_person":    "ok",
+		"calendar_occurrence":           "not carried",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -175,14 +136,6 @@ func TestRealImportRefusesWhilePending(t *testing.T) {
 	empty(t, target)
 }
 
-// complete removes what later slices will map, so a real import can commit.
-const complete = `SET search_path TO opencozy;
-DELETE FROM service_credential_child WHERE credential_id = '0190a000-0000-7000-8000-0000000000d2';
-DELETE FROM service_credential WHERE id = '0190a000-0000-7000-8000-0000000000d2';
-DELETE FROM assistant_credential;
-ALTER TABLE household DROP COLUMN lock_message, DROP COLUMN game_portal_domains, DROP COLUMN game_domains;
-ALTER TABLE child DROP COLUMN color, DROP COLUMN school_night_start, DROP COLUMN school_night_end, DROP COLUMN weekend_start, DROP COLUMN weekend_end;`
-
 func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	target := testdb.Open(t)
 	out, err := importOnce(t, oldDB(t, complete), target, false)
@@ -191,6 +144,7 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	}
 	ctx := context.Background()
 	q := dbq.New(target.Runtime)
+	keys := testKeys(t)
 
 	// The owner signs in with the old password, and is told to rehash.
 	var hash, scheme string
@@ -251,6 +205,33 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		t.Fatalf("old ocz_ secret: %+v ok=%v err=%v", a, ok, err)
 	}
 
+	// The calendar link is sealed (normalized to https); series keep their IDs, the removed one
+	// its removal time; the series is for Avery, one occurrence for nobody, the cleared one gone.
+	var sealed, name, color string
+	var show bool
+	if err := target.Owner.QueryRow(ctx, `SELECT feed_url, name, color, show_on_display FROM calendar_source WHERE id = '0190a000-0000-7000-8000-0000000000b1'`).Scan(&sealed, &name, &color, &show); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(sealed, "example.test") || name != "School" || color != "sky" || show {
+		t.Errorf("calendar: %q %q %q %v", sealed, name, color, show)
+	}
+	h := uuid.MustParse("0190a000-0000-7000-8000-00000000000a")
+	if got, err := keys.Decrypt(keyring.AAD{HouseholdID: h.String(), Table: "calendar_source", RowID: "0190a000-0000-7000-8000-0000000000b1", Purpose: "feed_url"}, sealed); err != nil ||
+		string(got) != "https://calendar.example.test/school.ics?token=fixture-feed-token" {
+		t.Errorf("feed URL does not decrypt to the normalized link: %v", err)
+	}
+	var assignments string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(a.recurrence_key || '=' || COALESCE(c.child_id::text, 'nobody'), ' ' ORDER BY a.recurrence_key)
+		FROM calendar_assignment a LEFT JOIN calendar_assignment_child c ON c.assignment_id = a.id`).Scan(&assignments); err != nil ||
+		assignments != "*=0190a000-0000-7000-8000-0000000000c1 20260114T163000Z=nobody" {
+		t.Errorf("assignments: %q %v", assignments, err)
+	}
+	var removedSeen time.Time
+	if err := target.Owner.QueryRow(ctx, `SELECT last_seen_at FROM calendar_series WHERE id = '0190a000-0000-7000-8000-0000000000b3'`).Scan(&removedSeen); err != nil ||
+		!removedSeen.Equal(time.Date(2026, 1, 9, 8, 0, 0, 0, time.UTC)) {
+		t.Errorf("removed series: %v %v", removedSeen, err)
+	}
+
 	// The learning credential's old secret authenticates too, with its scope renamed.
 	r, _ = http.NewRequest(http.MethodPost, "/api/learning/awards", nil)
 	r.Header.Set("Authorization", "Bearer "+fixtureLearnToken)
@@ -264,6 +245,64 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		t.Fatalf("second import: %v", err)
 	}
 	_ = time.Second
+}
+
+// testKeys is one fixed keyring per test binary, so a test can decrypt what an import sealed.
+func testKeys(t *testing.T) *keyring.Keyring {
+	t.Helper()
+	kr, err := keyring.Parse("k1:" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return kr
+}
+
+func TestDuplicateCalendarLinks(t *testing.T) {
+	// The same link spelled with https: carried once; the copy, its series and its assignment
+	// are reported, and the import still commits.
+	const dup = `SET search_path TO opencozy;
+INSERT INTO calendar_source (household_id, id, provider, name, feed_url, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b8', 'ics', 'School again', 'https://calendar.example.test/school.ics?token=fixture-feed-token', '2026-01-08T08:00:00Z');
+INSERT INTO calendar_series (household_id, id, source_id, provider_uid, summary, all_day, recurring, status, content_hash) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b9', '0190a000-0000-7000-8000-0000000000b8', 'swim@example.test', 'Swimming lesson', false, true, 'confirmed', repeat('e', 64));
+INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, version, active) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000ba', '0190a000-0000-7000-8000-0000000000b9', NULL, 1, true);`
+	target := testdb.Open(t)
+	out, err := importOnce(t, oldDB(t, complete, dup), target, false)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	st := statuses(out)
+	for _, table := range []string{"calendar_source", "calendar_series", "calendar_assignment"} {
+		if st[table] != "ok" {
+			t.Errorf("%s: %q", table, st[table])
+		}
+	}
+	for _, note := range []string{"1 left out: the same link as another calendar", "1 left out with their duplicate links", "colours assigned in turn"} {
+		if !strings.Contains(out, note) {
+			t.Errorf("the report does not say %q", note)
+		}
+	}
+	if strings.Contains(out, "fixture-feed-token") {
+		t.Error("the report shows a link")
+	}
+	var names string
+	if err := target.Owner.QueryRow(context.Background(), `SELECT string_agg(name, ',') FROM calendar_source`).Scan(&names); err != nil || names != "School" {
+		t.Errorf("calendars: %q %v", names, err)
+	}
+}
+
+func TestCalendarLinksNeedKeys(t *testing.T) {
+	target := testdb.Open(t)
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{SourceURL: oldDB(t), Target: target.Owner, DryRun: true, Out: &out})
+	if !errors.Is(err, ErrNoKeys) {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(out.String()+err.Error(), "example.test") {
+		t.Fatal("the link was printed")
+	}
+	empty(t, target)
 }
 
 func TestRefusesAnotherVersion(t *testing.T) {
