@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // Middleware wraps a handler.
@@ -82,6 +84,23 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
+// LogSafe makes a request path fit for one log line: line breaks and other control characters
+// are dropped and it is cut to 256 bytes, so a crafted path can't forge or flood log entries.
+func LogSafe(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+	if len(s) > 256 {
+		s = strings.ToValidUTF8(s[:256], "")
+	}
+	return s
+}
+
 // AccessLog logs one line per request. It never logs headers, cookies or bodies.
 func AccessLog(log *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
@@ -98,7 +117,7 @@ func AccessLog(log *slog.Logger) Middleware {
 			}
 			log.LogAttrs(r.Context(), level, "request",
 				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
+				slog.String("path", LogSafe(r.URL.Path)),
 				slog.Int("status", rec.status),
 				slog.Int("bytes", rec.bytes),
 				slog.Duration("duration", time.Since(start)),

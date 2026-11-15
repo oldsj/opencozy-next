@@ -129,11 +129,11 @@ func (s *Server) apiHandler() (http.Handler, error) {
 			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The request body could not be read.")
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			s.log.ErrorContext(r.Context(), "handler failed", "path", r.URL.Path, "err", err)
+			s.log.ErrorContext(r.Context(), "handler failed", "path", httpx.LogSafe(r.URL.Path), "err", err)
 			httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
 		},
 	})
-	handler := api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseRouter: http.NewServeMux()})
+	handler := api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseRouter: http.NewServeMux(), Middlewares: []api.MiddlewareFunc{sameRoute}})
 
 	// Sign-in and pairing have separate buckets: a display polling its pairing every few seconds
 	// must not use up the sign-in attempts of an adult at the same address.

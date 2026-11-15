@@ -1,6 +1,7 @@
 package authz
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -59,5 +60,51 @@ func TestNewAcceptsDeclared(t *testing.T) {
 	}
 	if got := strings.Join(tab.Scopes(), ","); got != "things:read" {
 		t.Errorf("Scopes() = %q", got)
+	}
+}
+
+// A command whose answer carries a secret must not be recorded for retries unless it says so.
+func TestSecretInCommandResponse(t *testing.T) {
+	key := "parameters: [{name: Idempotency-Key, in: header, required: true, schema: {type: string}}]"
+	resp := func(schema string) string {
+		return "responses: {'201': {description: ok, content: {application/json: {schema: " + schema + "}}}}"
+	}
+	refused := map[string]string{
+		"top level": "{type: object, properties: {secret: {type: string}}}",
+		"suffix":    "{type: object, properties: {accessToken: {type: string}}}",
+		"nested":    "{type: object, properties: {credential: {type: object, properties: {token: {type: string}}}}}",
+		"in a list": "{type: array, items: {type: object, properties: {password: {type: string}}}}",
+		"allOf":     "{allOf: [{type: object, properties: {clientSecret: {type: string}}}]}",
+	}
+	for name, schema := range refused {
+		ops := "    post: {operationId: a, x-actors: [adult], x-command: true, " + key + ", " + resp(schema) + "}\n"
+		if _, err := New(load(t, ops)); err == nil || !strings.Contains(err.Error(), "x-record-response: false") {
+			t.Errorf("%s: %v", name, err)
+		}
+		ops = "    post: {operationId: a, x-actors: [adult], x-command: true, x-record-response: false, " + key + ", " + resp(schema) + "}\n"
+		if _, err := New(load(t, ops)); err != nil {
+			t.Errorf("%s with x-record-response: false: %v", name, err)
+		}
+	}
+	// Not a command (nothing is recorded), or no secret: fine.
+	for _, ops := range []string{
+		"    post: {operationId: a, x-actors: [adult], " + resp("{type: object, properties: {token: {type: string}}}") + "}\n",
+		"    post: {operationId: a, x-actors: [adult], x-command: true, " + key + ", " + resp("{type: object, properties: {name: {type: string}, tokenCount: {type: integer}}}") + "}\n",
+	} {
+		if _, err := New(load(t, ops)); err != nil {
+			t.Errorf("refused: %v\n%s", err, ops)
+		}
+	}
+}
+
+func TestFindReportsThePattern(t *testing.T) {
+	tab, err := New(load(t, "    get: {operationId: a, x-actors: [adult], responses: {'200': {description: ok}}}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _ := http.NewRequest(http.MethodGet, "/things/x", nil)
+	p, params, err := tab.Find(r)
+	if err != nil || p.Pattern != "GET /things/{thingId}" || params["thingId"] != "x" {
+		t.Fatalf("%+v %v %v", p, params, err)
 	}
 }

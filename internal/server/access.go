@@ -20,6 +20,10 @@ type routeInfo struct {
 	params map[string]string
 }
 
+func withRoute(ctx context.Context, ri routeInfo) context.Context {
+	return context.WithValue(ctx, routeKey{}, ri)
+}
+
 func routeFrom(ctx context.Context) routeInfo {
 	ri, _ := ctx.Value(routeKey{}).(routeInfo)
 	return ri
@@ -41,7 +45,26 @@ func (s *Server) route(next http.Handler) http.Handler {
 			writeForbidden(w)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), routeKey{}, routeInfo{policy: p, params: params})))
+		next.ServeHTTP(w, r.WithContext(withRoute(r.Context(), routeInfo{policy: p, params: params})))
+	})
+}
+
+// sameRoute runs after the ServeMux has matched (a per-route middleware of the generated
+// handler). The policy and validation came from kin-openapi's router; dispatch comes from the
+// mux. A request the two route differently (pattern or path values) is refused, so one router
+// can't authorize what the other then serves.
+func sameRoute(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ri := routeFrom(r.Context())
+		agree := r.Pattern == ri.policy.Pattern
+		for name, v := range ri.params {
+			agree = agree && r.PathValue(name) == v
+		}
+		if !agree {
+			httpx.WriteError(w, http.StatusNotFound, "not_found", "No such endpoint.")
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 
