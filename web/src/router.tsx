@@ -24,6 +24,13 @@ interface RouterContext {
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
+  component: Outlet,
+});
+
+// Every page except the wall display sits in one reading column.
+const pageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'page',
   component: () => (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <Outlet />
@@ -34,7 +41,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 // Signed-in pages: redirect to /login when there is no session. The server enforces this
 // independently; this only spares the user a page of errors.
 const homeRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -48,14 +55,14 @@ const homeRoute = createRoute({
 });
 
 const loginRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/login',
   component: LoginPage,
 });
 
 // Manage: the household's wall displays.
 const displaysRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/displays',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -67,7 +74,7 @@ const displaysRoute = createRoute({
 
 // Manage: children and their chores.
 const choresRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/chores',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -79,7 +86,7 @@ const choresRoute = createRoute({
 
 // Manage: approve what the children finished.
 const inboxRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/inbox',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -91,7 +98,7 @@ const inboxRoute = createRoute({
 
 // Manage: one child's points history.
 const pointsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/children/$childId/points',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -105,7 +112,7 @@ const pointsRoute = createRoute({
 
 // Manage: the week's meals, and the recipes they use.
 const mealsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/meals',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -116,7 +123,7 @@ const mealsRoute = createRoute({
 });
 
 const recipesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/recipes',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -127,7 +134,7 @@ const recipesRoute = createRoute({
 });
 
 const recipeRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/recipes/$recipeId',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -142,7 +149,7 @@ const recipeRoute = createRoute({
 
 // Manage: rewards.
 const rewardsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => pageRoute,
   path: '/rewards',
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
@@ -159,7 +166,10 @@ const displayRoute = createRoute({
   component: DisplayPage,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, displayRoute]);
+const routeTree = rootRoute.addChildren([
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute]),
+  displayRoute,
+]);
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent' });
