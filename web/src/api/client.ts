@@ -44,8 +44,14 @@ export function idempotencyKey(): { header: { 'Idempotency-Key': string } } {
   return { header: { 'Idempotency-Key': crypto.randomUUID() } };
 }
 
+export type MealWeek = components['schemas']['MealWeek'];
+export type Meal = components['schemas']['Meal'];
+export type MealSlot = components['schemas']['MealSlot'];
+export type Recipe = components['schemas']['Recipe'];
+export type RecipeSummary = components['schemas']['RecipeSummary'];
 export type Today = components['schemas']['Today'];
 export type TodayGroup = components['schemas']['TodayGroup'];
 export type TodayItem = components['schemas']['TodayItem'];
 export type Household = components['schemas']['Household'];
 export type InboxItem = components['schemas']['InboxItem'];
+export type HistoryEntry = components['schemas']['HistoryEntry'];

@@ -13,7 +13,10 @@ import { HomePage } from './routes/home';
 import { DisplayPage } from './routes/display';
 import { ChoresPage } from './routes/chores';
 import { InboxPage } from './routes/inbox';
+import { PointsPage } from './routes/points';
 import { DisplaysPage } from './routes/displays';
+import { MealsPage } from './routes/meals';
+import { RecipePage, RecipesPage } from './routes/recipes';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -85,6 +88,57 @@ const inboxRoute = createRoute({
   component: InboxPage,
 });
 
+// Manage: one child's points history.
+const pointsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/children/$childId/points',
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: function Points() {
+    return <PointsPage childId={pointsRoute.useParams().childId} />;
+  },
+});
+
+// Manage: the week's meals, and the recipes they use.
+const mealsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/meals',
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: MealsPage,
+});
+
+const recipesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/recipes',
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: RecipesPage,
+});
+
+const recipeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/recipes/$recipeId',
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: function Recipe() {
+    const { recipeId } = recipeRoute.useParams();
+    return <RecipePage key={recipeId} recipeId={recipeId} />;
+  },
+});
+
 // The wall display itself: pairs, then shows the household's day. No adult sign-in.
 const displayRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -92,7 +146,7 @@ const displayRoute = createRoute({
   component: DisplayPage,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, displayRoute]);
+const routeTree = rootRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, displayRoute]);
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent' });

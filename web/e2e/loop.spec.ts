@@ -58,8 +58,10 @@ test('pair the wall display, a child marks a chore done, an adult approves it', 
   await wall.reload();
   const check = wall.getByRole('checkbox', { name: chore });
   await expect(check).toHaveAttribute('aria-checked', 'false');
+  const saved = wall.waitForResponse((r) => r.url().endsWith('/complete') && r.request().method() === 'POST');
   await check.click();
   await expect(check).toHaveAttribute('aria-checked', 'true');
+  expect((await saved).status()).toBe(200);
   await wall.reload();
   await expect(wall.getByRole('checkbox', { name: chore })).toHaveAttribute('aria-checked', 'true');
 
@@ -71,6 +73,12 @@ test('pair the wall display, a child marks a chore done, an adult approves it', 
   await expect(adult.getByRole('button', { name: `Approve: ${chore} (${child})` })).toHaveCount(0);
   await wall.reload();
   await expect(card.locator('.oc-points-badge')).toHaveText('4 points');
+
+  // The adult sees it in the child's points history.
+  await adult.goto('/chores');
+  await adult.getByRole('list', { name: 'Children' }).getByRole('listitem').filter({ hasText: child }).getByRole('link', { name: 'Points' }).click();
+  await expect(adult.getByRole('list', { name: 'Points history' })).toContainText(chore);
+  await expect(adult.getByRole('button', { name: new RegExp(`^Reverse: ${chore}`) })).toBeVisible();
 
   expect(problems).toEqual([]);
 });
