@@ -38,3 +38,11 @@ export function QrCode({ className, label, modules, quietZone = 4, ...props }: Q
     </svg>
   );
 }
+
+/**
+ * The server's QR rows ("0" light, "1" dark, one string per row) as QrCode's `modules`. Anything but
+ * "1" is light, so a malformed row can't add dark modules.
+ */
+export function qrModulesFromRows(rows: readonly string[]): boolean[][] {
+  return rows.map((row) => Array.from(row, (c) => c === '1'));
+}

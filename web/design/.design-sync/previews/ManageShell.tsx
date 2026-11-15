@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, qrModulesFromRows, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -31,9 +31,9 @@ import {
   STEP_MAX,
   week,
 } from './fixtures-meals';
-import { pairingModules } from './fixtures';
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
+import { me, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
 import { manageGroups } from './fixtures-manage';
 import { durationLabels, tvs, type Tv } from './fixtures-tv';
 
@@ -758,13 +758,13 @@ export function DevicePair() {
       >
         <div className="grid justify-items-center gap-5 text-center">
           <div className="w-60 max-w-full">
-            <QrCode modules={pairingModules} label="Pairing code for Ada’s iPad" />
+            <QrCode modules={qrModulesFromRows(offer.qrModules)} label="Pairing code for Ada’s iPad" />
           </div>
           <p className="m-0 text-page font-semibold tabular-nums tracking-widest" aria-label={`Code ${offer.code.split('').join(' ')}`}>
             {offer.code}
           </p>
           <p className="m-0 text-muted-foreground">
-            Waiting for the iPad · <Countdown seconds={262} lowAt={60} />
+            Waiting for the iPad · <Countdown seconds={562} lowAt={60} />
           </p>
         </div>
       </Sheet>
@@ -1334,6 +1334,191 @@ export function TvOpen() {
           <Notice tone="info">Ezra is watching Living room TV. Opening it ends Ezra’s session now; the rest of Ezra’s TV time stays.</Notice>
         </div>
       </Sheet>
+    </>
+  );
+}
+
+/**
+ * Account (slices 10 and 11): how you sign in, and where you're signed in. Passkeys are named so you
+ * can tell them apart; phones are listed so a lost one can be signed out from here.
+ */
+export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
+  return (
+    <ManageShell nav={settingsNav('/manage/account')}>
+      <PageHeader title="Account" description={`Signed in as ${me.email}.`} />
+      <Section
+        title="Passkeys"
+        count={passkeys.length}
+        description="Sign in with your face, fingerprint or a security key instead of your password."
+        actions={<Button variant="primary">Add a passkey</Button>}
+      >
+        <List>
+          {passkeys.map((pk) => (
+            <ListRow
+              key={pk.id}
+              stackOnNarrow
+              title={pk.name}
+              meta={
+                <>
+                  <Tag tone={pk.backedUp ? 'positive' : 'neutral'}>{pk.backedUp ? 'Synced' : 'This device only'}</Tag>{' '}
+                  {[`added ${pk.createdAt}`, pk.lastUsedAt === undefined ? 'not used yet' : `last used ${pk.lastUsedAt}`].join(' · ')}
+                </>
+              }
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Rename ${pk.name}`}>
+                    Rename
+                  </Button>
+                  <Button variant="quiet" aria-label={`Remove ${pk.name}`}>
+                    Remove…
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Single sign-on" description="Your password and passkeys keep working either way.">
+        {link ? (
+          <List>
+            <ListRow
+              stackOnNarrow
+              title={`Linked to ${link.providerName}`}
+              meta={`${link.email} · since ${link.linkedAt}`}
+              trailing={
+                <Button variant="quiet" aria-label={`Unlink ${link.providerName}`}>
+                  Unlink…
+                </Button>
+              }
+            />
+          </List>
+        ) : (
+          <p className="m-0 text-muted-foreground">
+            Not linked. Choose “Sign in with Pocket ID” on the sign-in page once; it links when Pocket ID confirms {me.email}.
+          </p>
+        )}
+      </Section>
+      <Section title="Phones" count={phoneSessions.length} description="The OpenCozy app on your phone. Each stays signed in for 90 days.">
+        <List>
+          {phoneSessions.map((ps) => (
+            <ListRow
+              key={ps.id}
+              stackOnNarrow
+              title={ps.deviceName}
+              meta={[
+                `signed in ${ps.createdAt}`,
+                `last used ${ps.lastUsedAt}`,
+                ps.pushEnabled ? 'notifications on' : 'notifications off',
+                `until ${ps.expiresAt}`,
+              ].join(' · ')}
+              trailing={
+                <Button variant="quiet" aria-label={`Sign out ${ps.deviceName}`}>
+                  Sign out…
+                </Button>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+export function AccountNotLinked() {
+  return <Account link={null} />;
+}
+
+/** Naming a new passkey; then the browser asks for a face, fingerprint or key. */
+export function PasskeyAdd() {
+  return (
+    <>
+      <Account />
+      <Sheet
+        open
+        onClose={noop}
+        title="Add a passkey"
+        description="Next, your browser asks you to use your face, fingerprint or a security key."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Continue</Button>
+          </>
+        }
+      >
+        <Input label="Name" defaultValue="Laptop" maxLength={80} hint="So you can tell your passkeys apart, such as Laptop." required />
+      </Sheet>
+    </>
+  );
+}
+
+export function PasskeyRename() {
+  return (
+    <>
+      <Account />
+      <Sheet
+        open
+        onClose={noop}
+        title="Rename Security key"
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <Input label="Name" defaultValue="Security key" maxLength={80} required />
+      </Sheet>
+    </>
+  );
+}
+
+export function PasskeyRemove() {
+  return (
+    <>
+      <Account />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Remove Security key?"
+        description="It won’t sign you in here any more. Also delete it from the key or password manager that holds it."
+        confirmLabel="Remove Security key"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+export function SsoUnlink() {
+  return (
+    <>
+      <Account />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Unlink Pocket ID?"
+        description="“Sign in with Pocket ID” stops working for you until you use it again. Your password and passkeys keep working."
+        confirmLabel="Unlink Pocket ID"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+export function PhoneSignOut() {
+  return (
+    <>
+      <Account />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Sign out Old iPhone?"
+        description="The app on it is signed out at once and stops getting notifications. Sign in on that phone to use it again."
+        confirmLabel="Sign out Old iPhone"
+        tone="danger"
+      />
     </>
   );
 }

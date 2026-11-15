@@ -30,6 +30,7 @@ import {
   PersonTab,
   ProfileAvatar,
   QrCode,
+  qrModulesFromRows,
   RewardTile,
   Section,
   SegmentedControl,
@@ -496,5 +497,14 @@ describe('slice two: inbox', () => {
     expect(chosen).toEqual(['ada']);
     rerender(<ChoiceGroup label="Who’s watching?" choices={choices} onChoose={(v) => chosen.push(v)} busy />);
     for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled();
+  });
+});
+
+describe('qrModulesFromRows', () => {
+  it('reads the server’s rows: only "1" is dark', () => {
+    expect(qrModulesFromRows(['101', '0x1'])).toEqual([
+      [true, false, true],
+      [false, false, true],
+    ]);
   });
 });

@@ -1,3 +1,5 @@
+import { qrModulesFromRows } from '../../src';
+
 // Fictional data shared by the previews. The QR matrix encodes https://cozy.example/pair/MAPLE-7Q4K
 // (a made-up pairing link), generated once with the qrcode package; '1' is a dark module.
 
@@ -33,4 +35,7 @@ const rows = [
   '11111110110100000101000010100',
 ];
 
-export const pairingModules: boolean[][] = rows.map((row) => Array.from({ length: row.length }, (_, i) => row[i] === '1'));
+/** As the server sends them (the pairing offer's qrModules). */
+export const pairingRows: readonly string[] = rows;
+
+export const pairingModules: boolean[][] = qrModulesFromRows(rows);
