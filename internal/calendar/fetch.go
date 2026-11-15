@@ -121,7 +121,7 @@ type Fetcher struct{ client doer }
 // up to 5 redirects (each through the same checks).
 func NewFetcher() (Fetcher, error) {
 	c, err := egress.New(egress.Options{
-		Name: "ics", Ports: egress.FeedPorts, Timeout: fetchTimeout,
+		Name: egress.CalendarClient, Ports: egress.FeedPorts, Timeout: fetchTimeout,
 		MaxResponseBytes: MaxFeedBytes, MaxRedirects: maxRedirects,
 	})
 	return Fetcher{client: c}, err
