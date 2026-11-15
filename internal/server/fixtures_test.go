@@ -141,6 +141,7 @@ type house struct {
 	recipe                            uuid.UUID
 	entry                             uuid.UUID // an award of 5 points to child1
 	reward                            uuid.UUID // costs 3
+	passkey                           uuid.UUID // the adult's only passkey
 	actors                            map[string]cred
 }
 
@@ -217,6 +218,7 @@ func (e *env) house(label string, scopes []string) house {
 	e.exec(`INSERT INTO active_award (source_kind, source_id, household_id, ledger_id)
 		SELECT source_kind, source_id, household_id, id FROM point_ledger WHERE id = $1`, h.entry)
 	h.reward = e.id(`INSERT INTO reward (household_id, title, cost, kind) VALUES ($1, 'Choose a game', 3, 'item') RETURNING id`, h.id)
+	h.passkey = e.id(`INSERT INTO passkey (household_id, adult_id, credential_id, public_key, backup_eligible, backed_up, name) VALUES ($1, $2, decode(md5(random()::text) || md5(random()::text), 'hex'), '\\x00', true, true, 'Laptop') RETURNING id`, h.id, h.adult)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)
 
 	credential := func(kind string, scopes []string, all bool, children []uuid.UUID, extra string) (cred, uuid.UUID) {

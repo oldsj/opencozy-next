@@ -44,6 +44,20 @@ paths:
     $ref: auth.yaml#/me
   /auth/confirm:
     $ref: auth.yaml#/confirm
+  /auth/passkey/options:
+    $ref: passkeys.yaml#/signInOptions
+  /auth/passkey:
+    $ref: passkeys.yaml#/signIn
+  /auth/passkey/confirm/options:
+    $ref: passkeys.yaml#/confirmOptions
+  /auth/passkey/confirm:
+    $ref: passkeys.yaml#/confirm
+  /auth/passkeys:
+    $ref: passkeys.yaml#/passkeys
+  /auth/passkeys/options:
+    $ref: passkeys.yaml#/registerOptions
+  /auth/passkeys/{passkeyId}:
+    $ref: passkeys.yaml#/passkey
   /household:
     $ref: household.yaml#/household
   /children:

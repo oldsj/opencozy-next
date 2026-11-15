@@ -1,0 +1,276 @@
+# Passkeys (design §6): adding and removing them, and signing in or confirming a sign-in with one.
+# Each ceremony is two calls: options (which starts a challenge that lasts 5 minutes and works
+# once), then the authenticator's response. `options` and `credential` are WebAuthn's own JSON
+# (PublicKeyCredential*OptionsJSON and PublicKeyCredential.toJSON()).
+signInOptions:
+  post:
+    operationId: passkeySignInOptions
+    summary: Start signing in with a passkey
+    tags: [auth]
+    x-actors: [public]
+    responses:
+      '200':
+        description: Options for navigator.credentials.get
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PasskeyOptions'
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+signIn:
+  post:
+    operationId: passkeySignIn
+    summary: Sign in with a passkey
+    tags: [auth]
+    x-actors: [public]
+    x-body-limit: 16384
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/PasskeyResponse'
+          example: { challengeId: 0195f2d4-0000-7000-8000-000000000000, credential: {} }
+    responses:
+      '200':
+        description: Signed in
+        headers:
+          Set-Cookie:
+            $ref: common.yaml#/headers/SetSession
+        content:
+          application/json:
+            schema:
+              $ref: auth.yaml#/schemas/Me
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+confirmOptions:
+  post:
+    operationId: passkeyConfirmOptions
+    summary: Start confirming this sign-in with one of your passkeys
+    tags: [auth]
+    x-actors: [adult]
+    responses:
+      '200':
+        description: Options for navigator.credentials.get
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PasskeyOptions'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+confirm:
+  post:
+    operationId: passkeyConfirm
+    summary: Confirm this sign-in with a passkey, for operations that need a recent sign-in
+    tags: [auth]
+    x-actors: [adult]
+    x-body-limit: 16384
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/PasskeyResponse'
+          example: { challengeId: 0195f2d4-0000-7000-8000-000000000000, credential: {} }
+    responses:
+      '204':
+        description: Confirmed
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+passkeys:
+  get:
+    operationId: listPasskeys
+    summary: Your passkeys
+    tags: [auth]
+    x-actors: [adult]
+    responses:
+      '200':
+        description: Your passkeys, oldest first
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Passkeys'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: addPasskey
+    summary: Add a passkey
+    tags: [auth]
+    x-actors: [adult]
+    x-recent-auth: true
+    x-body-limit: 16384
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewPasskey'
+          example: { challengeId: 0195f2d4-0000-7000-8000-000000000000, name: Laptop, credential: {} }
+    responses:
+      '201':
+        description: Added
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Passkey'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+registerOptions:
+  post:
+    operationId: passkeyRegistrationOptions
+    summary: Start adding a passkey
+    tags: [auth]
+    x-actors: [adult]
+    x-recent-auth: true
+    responses:
+      '200':
+        description: Options for navigator.credentials.create
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PasskeyOptions'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+passkey:
+  parameters:
+    - name: passkeyId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  delete:
+    operationId: removePasskey
+    summary: Remove a passkey; it stops working at once
+    tags: [auth]
+    x-actors: [adult]
+    x-recent-auth: true
+    responses:
+      '204':
+        description: Removed
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  PasskeyOptions:
+    type: object
+    additionalProperties: false
+    required: [challengeId, options]
+    properties:
+      challengeId:
+        $ref: common.yaml#/schemas/Id
+      options:
+        type: object
+        additionalProperties: true
+        description: PublicKeyCredentialCreationOptionsJSON or PublicKeyCredentialRequestOptionsJSON
+  PasskeyResponse:
+    type: object
+    additionalProperties: false
+    required: [challengeId, credential]
+    properties:
+      challengeId:
+        $ref: common.yaml#/schemas/Id
+      credential:
+        type: object
+        additionalProperties: true
+        description: PublicKeyCredential.toJSON()
+  NewPasskey:
+    type: object
+    additionalProperties: false
+    required: [challengeId, name, credential]
+    properties:
+      challengeId:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+        minLength: 1
+        maxLength: 80
+      credential:
+        type: object
+        additionalProperties: true
+        description: PublicKeyCredential.toJSON()
+  Passkeys:
+    type: object
+    additionalProperties: false
+    required: [passkeys]
+    properties:
+      passkeys:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/schemas/Passkey'
+  Passkey:
+    type: object
+    additionalProperties: false
+    required: [id, name, createdAt, backedUp]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      createdAt:
+        type: string
+        format: date-time
+      lastUsedAt:
+        type: string
+        format: date-time
+      backedUp:
+        type: boolean
+        description: Synced to a password manager or cloud keychain, so it survives losing the device.
