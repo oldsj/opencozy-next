@@ -295,6 +295,45 @@ func TestLedgerIsAppendOnly(t *testing.T) {
 	}
 }
 
+// The database refuses a row that takes a balance below zero, whoever writes it, and allows one
+// that lands exactly on zero.
+func TestDatabaseRefusesBelowZero(t *testing.T) {
+	f := setup(t)
+	chore := uuid.New()
+	if err := f.run(t, []uuid.UUID{f.child}, func(ctx context.Context, c *command.Cmd) error {
+		_, err := ledger.Award(ctx, c, entry(f.child, chore, 10))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	redeem := `INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id)
+		VALUES ($1, $2, $3, 'redemption', 'reward_redemption', $4)`
+	for who, pool := range map[string]*pgxpool.Pool{"runtime": f.db.Runtime, "owner": f.db.Owner} {
+		if _, err := pool.Exec(ctx, redeem, f.house, f.child, -11, uuid.New()); err == nil || !strings.Contains(err.Error(), "below zero") {
+			t.Errorf("%s: 11 from 10: %v", who, err)
+		}
+		if _, err := pool.Exec(ctx, redeem, f.house, f.other, -1, uuid.New()); err == nil || !strings.Contains(err.Error(), "below zero") {
+			t.Errorf("%s: 1 from the other child's 0: %v", who, err)
+		}
+	}
+	if _, err := f.db.Runtime.Exec(ctx, redeem, f.house, f.child, -10, uuid.New()); err != nil {
+		t.Fatalf("10 from 10: %v", err)
+	}
+	if b := f.balance(t, f.child); b != 0 {
+		t.Fatalf("balance %d", b)
+	}
+	// The award can't be reversed now: that would be -10.
+	var award uuid.UUID
+	if err := f.db.Owner.QueryRow(ctx, `SELECT id FROM point_ledger WHERE kind = 'award'`).Scan(&award); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.Runtime.Exec(ctx, `INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id, reverses_id)
+		VALUES ($1, $2, -10, 'reversal', 'chore_occurrence', $3, $4)`, f.house, f.child, chore, award); err == nil || !strings.Contains(err.Error(), "below zero") {
+		t.Errorf("reversal past zero: %v", err)
+	}
+}
+
 // Racing commands serialize on the child's lock: of eight 5-point redemptions against 10 points,
 // exactly two succeed, and of eight awards for one source, exactly one does.
 func TestConcurrentChangesSerialize(t *testing.T) {

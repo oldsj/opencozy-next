@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -52,6 +53,9 @@ type Policy struct {
 	Command       bool
 	// RecordResponse is false when the response must never be stored (it holds a secret).
 	RecordResponse bool
+	// Pattern is the route that matched, "METHOD /path/{param}", set by Find. The ServeMux that
+	// dispatches must have matched the same one (internal/server checks).
+	Pattern string
 }
 
 // Decision is the outcome of checking an actor against a policy.
@@ -164,6 +168,7 @@ func (t *Table) Find(r *http.Request) (Policy, map[string]string, error) {
 	if !ok {
 		return Policy{}, nil, errNoPolicy
 	}
+	p.Pattern = route.Method + " " + route.Path
 	return p, params, nil
 }
 
@@ -259,6 +264,13 @@ func parse(op *openapi3.Operation, item *openapi3.PathItem) (Policy, error) {
 		}
 		p.RecordResponse = b
 	}
+	// A command's answer is stored for idempotent retries, so one that returns a secret must say
+	// x-record-response: false.
+	if p.Command && p.RecordResponse {
+		if name := secretProperty(op); name != "" {
+			return p, fmt.Errorf("the response has a %q property: a command returning a secret needs x-record-response: false", name)
+		}
+	}
 	if v, present := op.Extensions["x-body-limit"]; present {
 		n, ok := v.(float64)
 		if !ok || n < 1 || n > MaxBodyLimit || n != float64(int64(n)) {
@@ -267,6 +279,67 @@ func parse(op *openapi3.Operation, item *openapi3.PathItem) (Policy, error) {
 		p.BodyLimit = int64(n)
 	}
 	return p, nil
+}
+
+// secretProperty names the first property of any response schema that looks like a secret or a
+// token, at any depth, or returns "".
+func secretProperty(op *openapi3.Operation) string {
+	if op.Responses == nil {
+		return ""
+	}
+	seen := map[*openapi3.Schema]bool{}
+	var walk func(*openapi3.SchemaRef) string
+	walk = func(ref *openapi3.SchemaRef) string {
+		if ref == nil || ref.Value == nil || seen[ref.Value] {
+			return ""
+		}
+		sc := ref.Value
+		seen[sc] = true
+		for name, prop := range sc.Properties {
+			if secretName(name) {
+				return name
+			}
+			if n := walk(prop); n != "" {
+				return n
+			}
+		}
+		for _, refs := range []openapi3.SchemaRefs{sc.AllOf, sc.OneOf, sc.AnyOf} {
+			for _, r := range refs {
+				if n := walk(r); n != "" {
+					return n
+				}
+			}
+		}
+		if n := walk(sc.Items); n != "" {
+			return n
+		}
+		if sc.AdditionalProperties.Schema != nil {
+			return walk(sc.AdditionalProperties.Schema)
+		}
+		return ""
+	}
+	for _, resp := range op.Responses.Map() {
+		if resp.Value == nil {
+			continue
+		}
+		for _, mt := range resp.Value.Content {
+			if n := walk(mt.Schema); n != "" {
+				return n
+			}
+		}
+	}
+	return ""
+}
+
+// secretName: secret, token, password, or a name ending in one (accessToken, clientSecret).
+func secretName(name string) bool {
+	n := strings.ToLower(name)
+	for _, w := range []string{"secret", "token", "password"} {
+		if strings.HasSuffix(n, w) {
+			return true
+		}
+	}
+	return false
 }
 
 func stringList(v any) ([]string, bool) {
