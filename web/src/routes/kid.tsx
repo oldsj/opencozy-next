@@ -1,7 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Lock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
-import { AppFrame, EmptyState, useSurface } from '@app/design';
+import { AppFrame, useSurface } from '@app/design';
 
 import { client } from '../api/client';
 import { TodayBoard } from './today';
@@ -10,9 +11,13 @@ const sessionKey = ['kid', 'session'] as const;
 
 // /kid: the kid view in the iPad app's web view, signed in as the device (its __Host-device
 // cookie, from /device/session). Only the device's own child: their day and their rewards.
+//
+// When the session has ended (any 401: expired, unpaired, reassigned), the page goes to
+// /device/expired. The app watches for that navigation and opens a fresh link; if the device
+// itself is no longer paired, the app shows its own "ask an adult" screen.
 export function KidPage() {
   useSurface('kiosk');
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const session = useQuery({
     queryKey: sessionKey,
     queryFn: async () => {
@@ -24,9 +29,13 @@ export function KidPage() {
     retry: 2,
     refetchInterval: 5 * 60_000,
   });
-  const ended = () => { queryClient.setQueryData(sessionKey, null); };
+  const ended = () => { void navigate({ to: '/device/expired', replace: true }); };
+  const gone = session.data === null;
+  useEffect(() => {
+    if (gone) void navigate({ to: '/device/expired', replace: true });
+  }, [gone, navigate]);
 
-  if (session.isPending) {
+  if (session.isPending || gone) {
     return (
       <AppFrame aria-busy="true" contentClassName="grid place-content-center">
         <p className="m-0 text-muted-foreground">Getting your day…</p>
@@ -34,10 +43,9 @@ export function KidPage() {
     );
   }
   if (!session.data) {
-    // Ended, unpaired, or given to another child: nothing to tap, a calm instruction.
     return (
       <AppFrame contentClassName="grid place-content-center">
-        <EmptyState icon={Lock} title="Ask an adult to check this iPad" description="It needs to be connected to OpenCozy again." />
+        <p className="m-0 text-muted-foreground">Couldn’t load your day. It will try again.</p>
       </AppFrame>
     );
   }

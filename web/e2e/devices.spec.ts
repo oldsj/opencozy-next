@@ -99,12 +99,28 @@ test('pair a child’s iPad, open the kid view, tick a chore, unpair it', async 
   await expect(again).toHaveURL(/\/device\/expired$/);
   await expect(again.getByText('One moment…')).toBeVisible();
 
+  // The kid view's session ends (a dead device cookie): the page goes to /device/expired, which
+  // the app takes as its cue to open a new link.
+  const before = await kidContext.cookies();
+  await kidContext.clearCookies();
+  await kidContext.addCookies(before.map((c) => (c.name === '__Host-device' ? { ...c, value: 'x'.repeat(c.value.length) } : c)));
+  await kid.reload();
+  await expect(kid).toHaveURL(/\/device\/expired$/);
+  await expect(kid.getByText('One moment…')).toBeVisible();
+
+  // A fresh link brings the kid view back.
+  const relink = await ipad.signed('POST', '/api/device/web-session', '{}');
+  expect(relink.status()).toBe(201);
+  await kid.goto(((await relink.json()) as { url: string }).url);
+  await expect(kid).toHaveURL(/\/kid$/);
+  await expect(kid.getByRole('heading', { name: new RegExp(`, ${child}$`) })).toBeVisible();
+
   // Unpairing ends it at once.
   await adult.getByRole('button', { name: `Unpair ${child}’s iPad` }).click();
   await adult.getByRole('alertdialog').getByRole('button', { name: `Unpair ${child}’s iPad` }).click();
   await expect(adult.getByText(`${child}’s iPad`, { exact: true })).toHaveCount(0);
   expect((await ipad.signed('GET', '/api/device')).status()).toBe(401);
   await kid.reload();
-  await expect(kid.getByText('Ask an adult to check this iPad')).toBeVisible();
+  await expect(kid).toHaveURL(/\/device\/expired$/);
   expect(problems).toEqual([]);
 });
