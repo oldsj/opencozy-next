@@ -1,5 +1,14 @@
 // @dsCard group="Layout"
-import { Button, ButtonLink, ChoiceGroup, Input, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { Button, ButtonLink, CheckCircle, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import {
+  calendarErrorText,
+  calendars,
+  clock,
+  eventDetail,
+  kids,
+  providerLabels,
+  type CalendarSource,
+} from './fixtures-calendar';
 import { inbox, kindLabels, REJECT_REASON_MAX, type InboxItem } from './fixtures-inbox';
 import {
   dayLabels,
@@ -257,5 +266,151 @@ export function RecipeEdit() {
         </div>
       </form>
     </ManageShell>
+  );
+}
+
+/** An event for adults, with its description, and who it's for. */
+export function EventDetail({ assigning = false }: { assigning?: boolean }) {
+  const e = eventDetail;
+  return (
+    <ManageShell nav={mealsNav('/manage/calendar')}>
+      <PageHeader
+        title={e.title ?? 'Busy'}
+        description={`Monday, Sep 14 · ${clock(e.start)} – ${clock(e.end)} · ${e.calendar.name}${e.recurring ? ' · repeats' : ''}`}
+      />
+      {e.location ? <p>{e.location}</p> : null}
+      {e.description ? <p className="whitespace-pre-line">{e.description}</p> : null}
+      <Section title="For" description="Shown on their cards and the wall display.">
+        <List>
+          {Object.entries(kids).map(([id, kid]) => (
+            <ListRow
+              key={id}
+              leading={<ProfileAvatar name={kid.name} color={kid.color} size="small" aria-hidden="true" />}
+              title={kid.name}
+              trailing={<CheckCircle checked={e.children.includes(id)} label={`${e.title ?? 'Busy'} is for ${kid.name}`} disabled={!assigning} />}
+            />
+          ))}
+        </List>
+        {assigning ? null : (
+          <div className="mt-4">
+            <Button>Change who it’s for</Button>
+          </div>
+        )}
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Saving who a repeating event is for: this time, or every time. */
+export function EventAssign() {
+  return (
+    <>
+      <EventDetail assigning />
+      <Sheet
+        open
+        onClose={noop}
+        title="Save who Swimming lesson is for?"
+        description="Swimming lesson repeats every Monday and Wednesday."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <SegmentedControl
+          label="Apply to"
+          value="series"
+          onChange={noop}
+          options={[
+            { value: 'occurrence', label: 'Just this one' },
+            { value: 'series', label: 'Every time' },
+          ]}
+        />
+      </Sheet>
+    </>
+  );
+}
+
+function CalendarRow({ source }: { source: CalendarSource }) {
+  const synced = source.lastSyncAt === undefined ? 'Not synced yet' : `Synced ${source.lastSyncAt}`;
+  const meta = [providerLabels[source.provider], source.showOnDisplay ? 'On the wall display' : 'Adults only', synced].join(' · ');
+  return (
+    <ListRow
+      stackOnNarrow
+      leading={<ProfileAvatar name={source.name} color={source.color} size="small" aria-hidden="true" />}
+      title={source.name}
+      meta={
+        <>
+          {meta}
+          {source.error ? <span className="mt-1 block">{calendarErrorText[source.error]}</span> : null}
+        </>
+      }
+      trailing={
+        <>
+          {source.status === 'error' ? <Tag tone="error">Not updating</Tag> : null}
+          {source.status === 'needs_reauth' ? (
+            <Button variant="primary" aria-label={`Sign in again: ${source.name}`}>
+              Sign in again
+            </Button>
+          ) : null}
+          <Button variant="quiet" aria-label={`Edit ${source.name}`}>
+            Edit
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
+/** Calendar settings: each source, its sync state and a sentence for any error; never the feed URL. */
+export function Calendars() {
+  return (
+    <ManageShell nav={mealsNav('/manage/calendars')}>
+      <PageHeader title="Calendars" description="Choose which ones show on the wall display." />
+      <Notice tone="attention" title="2 calendars need attention">
+        School hasn’t updated since yesterday, and Sports needs you to sign in again.
+      </Notice>
+      <Section title="Connected" count={calendars.length}>
+        <List>
+          {calendars.map((source) => (
+            <CalendarRow key={source.id} source={source} />
+          ))}
+        </List>
+      </Section>
+      <Section title="Add a calendar">
+        <div className="flex flex-wrap gap-3">
+          <Button>Add a calendar link</Button>
+          <Button>Connect Google</Button>
+          <Button>Connect iCloud</Button>
+        </div>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Adding an ICS link: the address is write-only and shows only as set afterwards. */
+export function CalendarAddLink() {
+  return (
+    <>
+      <Calendars />
+      <Sheet
+        open
+        onClose={noop}
+        title="Add a calendar link"
+        description="Paste the private address from the calendar’s sharing settings."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Add calendar</Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Input label="Name" maxLength={80} defaultValue="School" />
+          <Input label="Calendar address" type="url" inputMode="url" hint="Starts with https:// or webcal://. OpenCozy never shows it again." placeholder="https://calendar.example.test/family.ics" />
+        </div>
+      </Sheet>
+    </>
   );
 }
