@@ -33,6 +33,7 @@ import {
 } from './fixtures-meals';
 import { pairingModules } from './fixtures';
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
+import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
 import { manageGroups } from './fixtures-manage';
 
 export function Chores() {
@@ -976,5 +977,168 @@ export function LearnerUnlink() {
         tone="danger"
       />
     </>
+  );
+}
+
+/** Slice 8: a child's allowed hours. They limit when saved iPad time is used, never when it is earned. */
+export function ChildHours() {
+  return (
+    <>
+      <Children />
+      <Sheet
+        open
+        onClose={noop}
+        title="Ada’s screen time hours"
+        description="When Ada can use saved iPad time or start TV time. Earning and saving work at any hour; a parent can always give time."
+        footer={
+          <>
+            <Button variant="quiet">No limit</Button>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <div className="grid gap-6">
+          <Section title="School nights" description="Sunday to Thursday">
+            <div className="grid grid-cols-2 gap-4">
+              <Input type="time" label="From" defaultValue={adaHours.schoolNight.start} />
+              <Input type="time" label="Until" defaultValue={adaHours.schoolNight.end} />
+            </div>
+          </Section>
+          <Section title="Weekend" description="Friday and Saturday">
+            <div className="grid grid-cols-2 gap-4">
+              <Input type="time" label="From" defaultValue={adaHours.weekend.start} />
+              <Input type="time" label="Until" defaultValue="07:00" error="Weekend hours must end after they start, on the same day." />
+            </div>
+          </Section>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** A parent gives time for free: iPad time is saved (or started now), TV time adds to the balance. */
+export function GiveTime() {
+  return (
+    <>
+      <Children />
+      <Sheet
+        open
+        onClose={noop}
+        title="Give Ada time"
+        description="Free, from you. It doesn’t cost Ada any points."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Give 30 min of iPad time</Button>
+          </>
+        }
+      >
+        <div className="grid gap-6">
+          <SegmentedControl
+            label="Time for"
+            value="personal"
+            onChange={noop}
+            options={[
+              { value: 'personal', label: 'iPad' },
+              { value: 'tv', label: 'TV' },
+            ]}
+          />
+          <ChoiceGroup
+            label="How long"
+            onChoose={noop}
+            choices={[
+              { value: '15', label: '15 min' },
+              { value: '30', label: '30 min' },
+              { value: '60', label: '1 hour' },
+            ]}
+          />
+          <div className="flex items-center gap-3">
+            <CheckCircle checked label="Start it now on Ada’s iPad" />
+            <span>Start it now on Ada’s iPad (even outside Ada’s hours)</span>
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** A reward that is screen time: points buy minutes of iPad or TV time, with no adult step. */
+export function RewardScreenTime() {
+  return (
+    <ManageShell nav={settingsNav('/manage/rewards')}>
+      <PageHeader title="Edit reward" />
+      <form className="grid max-w-xl gap-6" onSubmit={(e) => { e.preventDefault(); }}>
+        <Input label="Name" defaultValue="30 min of iPad" maxLength={80} />
+        <Input label="Cost in points" type="number" inputMode="numeric" min={1} defaultValue={20} />
+        <SegmentedControl
+          label="What it gives"
+          value="personal"
+          onChange={noop}
+          options={[
+            { value: 'thing', label: 'Something else' },
+            { value: 'personal', label: 'iPad time' },
+            { value: 'tv', label: 'TV time' },
+          ]}
+        />
+        <Input
+          label="Minutes"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={240}
+          defaultValue={30}
+          hint="1 to 240. It’s saved on Ada’s iPad as soon as Ada chooses it; no need to approve."
+        />
+        <div className="flex gap-3">
+          <Button variant="primary" type="submit">
+            Save
+          </Button>
+          <ButtonLink href="#rewards">Cancel</ButtonLink>
+        </div>
+      </form>
+    </ManageShell>
+  );
+}
+
+/** Manage → Devices settings for every child's iPad: what the lock screen says, and blocked websites. */
+export function DeviceSettings() {
+  return (
+    <ManageShell nav={settingsNav('/manage/devices')}>
+      <PageHeader title="iPad settings" description="For every child’s iPad. They pick it up at their next sync, and keep it offline." />
+      <Section title="Lock screen message" description="Under it, the iPad adds when screen time opens and how much time is saved.">
+        <form className="grid max-w-xl gap-3" onSubmit={(e) => { e.preventDefault(); }}>
+          <Textarea label="Message" rows={3} maxLength={LOCK_MESSAGE_MAX} defaultValue={DEFAULT_LOCK_MESSAGE} hint={`Up to ${String(LOCK_MESSAGE_MAX)} characters.`} />
+          <div className="flex gap-3">
+            <Button variant="primary" type="submit">
+              Save message
+            </Button>
+            <Button variant="quiet">Use the default</Button>
+          </div>
+        </form>
+      </Section>
+      <Section title="Blocked websites" description="Browsers stay open; only these websites are blocked, in every browser on the iPad.">
+        <form className="grid max-w-xl gap-4" onSubmit={(e) => { e.preventDefault(); }}>
+          <Textarea
+            label="Always blocked"
+            rows={4}
+            defaultValue={webFilter.gamePortals.join('\n')}
+            hint="Game portals. One website per line, like games.example.test."
+          />
+          <Textarea
+            label="Blocked unless iPad time is running"
+            rows={5}
+            defaultValue={webFilter.games.join('\n')}
+            hint="Single games. One website per line."
+          />
+          <Notice tone="attention">An iPad applies up to 50 websites (always-blocked first). Parent setup on the iPad says if some didn’t fit.</Notice>
+          <div>
+            <Button variant="primary" type="submit">
+              Save websites
+            </Button>
+          </div>
+        </form>
+      </Section>
+    </ManageShell>
   );
 }

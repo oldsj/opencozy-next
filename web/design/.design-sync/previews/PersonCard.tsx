@@ -1,12 +1,13 @@
 // @dsCard group="Today"
-import { AlarmClock, BrushCleaning, ClipboardCheck, Gift, Hourglass, House, Lock, Sunrise } from 'lucide-react';
+import { AlarmClock, BrushCleaning, ClipboardCheck, Gift, House, Tablet, Lock, Sunrise } from 'lucide-react';
 
 import {
   AppFrame,
   Button,
-  ComingLaterTile,
   ConnectionBanner,
+  Countdown,
   EmptyState,
+  Notice,
   PageHeader,
   PersonCard,
   PointsBadge,
@@ -16,9 +17,12 @@ import {
   TaskGroup,
   TaskRow,
   TopBar,
+  Widget,
+  profileClass,
 } from '../../src';
 
 import { kid } from './fixtures-devices';
+import { SPEND_MINUTES, timeStates, type PersonalTime } from './fixtures-screentime';
 import { rewards } from './fixtures-points';
 import { today, type TodayItem } from './fixtures-today';
 
@@ -112,8 +116,7 @@ function KidDay({ failed = false }: { failed?: boolean }) {
         </TaskGroup>
       ))}
       </Section>
-      {/* Screen time (banked time, use 30 min, ask for more) arrives with the allowances slice. */}
-      <ComingLaterTile title="Screen time" icon={Hourglass} description="Your iPad time will show here." />
+      <KidTime time={timeStates.locked} />
     </>
   );
 }
@@ -183,5 +186,66 @@ export function DeviceExpired() {
     <AppFrame contentClassName="grid place-content-center">
       <p className="m-0 text-muted-foreground">One moment…</p>
     </AppFrame>
+  );
+}
+
+function minutes(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  return m >= 60 ? `${String(Math.floor(m / 60))} h ${String(m % 60)} min` : `${String(m)} min`;
+}
+
+/**
+ * The child's iPad time on /kid: the window running now, the time saved, one button to use some,
+ * and Ask for more time. Each refusal says why in words a child can act on.
+ */
+function KidTime({ time }: { time: PersonalTime }) {
+  const saved = time.secondsRemaining;
+  const useMinutes = Math.min(SPEND_MINUTES, Math.floor(saved / 60));
+  const closed = time.allowedHours !== null && !time.allowedHours.open;
+  const request = time.timeRequest;
+  const pending = request?.state === 'pending';
+  return (
+    <Widget title="iPad time" icon={Tablet} footer={time.allowedHours?.open ? `Screen time until ${time.allowedHours.closesAt ?? ''} today` : undefined}>
+      <div className="grid gap-4">
+        {time.unlockedUntil !== null && (
+          <div className="grid gap-1">
+            <Countdown size="large" seconds={time.secondsLeftNow} />
+            <p className="m-0 text-muted-foreground">Unlocked until {time.unlockedUntil}</p>
+          </div>
+        )}
+        <p className="m-0 text-section">{saved > 0 ? `${minutes(saved)} saved` : 'No iPad time saved'}</p>
+        {closed && <Notice tone="info">Screen time starts at {time.allowedHours?.opensAt}.</Notice>}
+        {request?.state === 'answered' && request.choice !== 'no' && (
+          <Notice tone="success" title="A parent said yes!">
+            iPad time until {request.grantedUntil}.
+          </Notice>
+        )}
+        {request?.state === 'answered' && request.choice === 'no' && <Notice tone="attention" title="Not right now">You can ask again in a few minutes.</Notice>}
+        <div className="flex flex-wrap gap-3">
+          {useMinutes > 0 && (
+            <Button variant="primary" disabled={closed}>
+              {time.unlockedUntil === null ? `Use ${String(useMinutes)} min` : `Add ${String(useMinutes)} min`}
+            </Button>
+          )}
+          <Button disabled={pending}>{pending ? `Asked at ${request.requestedAt} · waiting` : 'Ask for more time'}</Button>
+        </div>
+        {saved === 0 && !request && <p className="m-0 text-muted-foreground">Earn time with chores and rewards, or ask a parent.</p>}
+      </div>
+    </Widget>
+  );
+}
+
+/** Every state of the kid's iPad time, side by side. */
+export function KidTimeStates() {
+  return (
+    <div className={`${profileClass(kid.color)} grid gap-4 md:grid-cols-2`}>
+      <KidTime time={timeStates.locked} />
+      <KidTime time={timeStates.unlocked} />
+      <KidTime time={timeStates.outsideHours} />
+      <KidTime time={timeStates.nothingBanked} />
+      <KidTime time={timeStates.asked} />
+      <KidTime time={timeStates.yes} />
+      <KidTime time={timeStates.no} />
+    </div>
   );
 }
