@@ -1,6 +1,18 @@
 // @dsCard group="Layout"
-import { Button, ChoiceGroup, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { Button, ButtonLink, ChoiceGroup, Input, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import { inbox, kindLabels, REJECT_REASON_MAX, type InboxItem } from './fixtures-inbox';
+import {
+  dayLabels,
+  INGREDIENT_MAX,
+  MEAL_NOTE_MAX,
+  mealSlots,
+  recipe,
+  RECIPE_TITLE_MAX,
+  recipes,
+  slotLabels,
+  STEP_MAX,
+  week,
+} from './fixtures-meals';
 import { manageGroups } from './fixtures-manage';
 
 export function Chores() {
@@ -111,5 +123,139 @@ export function InboxSendBack() {
         />
       </Sheet>
     </>
+  );
+}
+
+const mealsNav = (current: string) => (
+  <ManageNav groups={manageGroups(current)} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />
+);
+
+/** The week's meal plan for adults: every day, every slot, empty slots ready to fill. */
+export function MealPlan() {
+  return (
+    <ManageShell nav={mealsNav('/manage/meals')}>
+      <PageHeader
+        title="Meals this week"
+        description="Week of Monday, Sep 14."
+        actions={
+          <>
+            <Button>Previous week</Button>
+            <Button>Next week</Button>
+          </>
+        }
+      />
+      {week.days.map((day) => (
+        <Section key={day.date} title={dayLabels[day.date] ?? day.date}>
+          <List>
+            {mealSlots.map((slot) => {
+              const meal = day.meals.find((m) => m.slot === slot);
+              const label = `${slotLabels[slot]}, ${dayLabels[day.date] ?? day.date}`;
+              return (
+                <ListRow
+                  key={slot}
+                  stackOnNarrow
+                  muted={meal === undefined}
+                  title={meal?.title ?? 'Nothing planned'}
+                  meta={[slotLabels[slot], meal?.note].filter(Boolean).join(' · ')}
+                  trailing={
+                    <Button variant="quiet" aria-label={meal ? `Change ${label}` : `Plan ${label}`}>
+                      {meal ? 'Change' : 'Plan'}
+                    </Button>
+                  }
+                />
+              );
+            })}
+          </List>
+        </Section>
+      ))}
+    </ManageShell>
+  );
+}
+
+/** Planning one slot: pick a recipe or write a plain entry such as "Leftovers". */
+export function MealPlanSlot() {
+  return (
+    <>
+      <MealPlan />
+      <Sheet
+        open
+        onClose={noop}
+        title="Plan Thursday’s dinner"
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Input label="Meal" hint="A recipe’s name, or anything else such as Leftovers." defaultValue="Lentil soup with crusty bread" maxLength={RECIPE_TITLE_MAX} />
+          <Textarea label="Note (optional)" hint={`Up to ${String(MEAL_NOTE_MAX)} characters.`} maxLength={MEAL_NOTE_MAX} defaultValue="Use the second batch from Monday." />
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** The recipe list; long titles wrap. */
+export function Recipes() {
+  return (
+    <ManageShell nav={mealsNav('/manage/recipes')}>
+      <PageHeader title="Recipes" description="What the family cooks." actions={<Button variant="primary">Add recipe</Button>} />
+      <Section title="All recipes" count={recipes.length}>
+        <List>
+          {recipes.map((r) => (
+            <ListRow
+              key={r.id}
+              stackOnNarrow
+              title={r.title}
+              meta={`Serves ${String(r.servings)}`}
+              trailing={
+                <ButtonLink variant="quiet" href={`#recipe-${r.id}`} aria-label={`Open ${r.title}`}>
+                  Open
+                </ButtonLink>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Editing a recipe: ingredients one per line, each step its own multi-line field. */
+export function RecipeEdit() {
+  return (
+    <ManageShell nav={mealsNav('/manage/recipes')}>
+      <PageHeader title="Edit recipe" actions={<Button variant="primary">Save recipe</Button>} />
+      <form className="grid max-w-3xl gap-6">
+        <Input label="Name" defaultValue={recipe.title} maxLength={RECIPE_TITLE_MAX} required />
+        <Input label="Serves" type="number" inputMode="numeric" min={1} max={100} defaultValue={recipe.servings} required />
+        <Textarea
+          label="Ingredients"
+          hint={`One per line, up to 40, each up to ${String(INGREDIENT_MAX)} characters.`}
+          rows={8}
+          defaultValue={recipe.ingredients.join('\n')}
+        />
+        <Section title="Steps" description="Up to 40. Each step can have several lines.">
+          <ol className="grid gap-4">
+            {recipe.steps.map((step, i) => (
+              // Steps have no ids: key by position, as the API returns them.
+              <li key={i} className="grid gap-2">
+                <Textarea label={`Step ${String(i + 1)}`} maxLength={STEP_MAX} rows={3} defaultValue={step} />
+                <div>
+                  <Button variant="quiet" aria-label={`Remove step ${String(i + 1)}`}>
+                    Remove
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Section>
+        <div>
+          <Button>Add a step</Button>
+        </div>
+      </form>
+    </ManageShell>
   );
 }
