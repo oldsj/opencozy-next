@@ -763,6 +763,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Events between two household days
+         * @description Events that overlap the days [from, to), at most 42 days. Timed events are RFC3339 in the
+         *     household's time zone; all-day events are dates with an exclusive end. Cancelled events are
+         *     never sent. A display sees only calendars shown on displays.
+         */
+        get: operations["getCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** One event, with its description */
+        get: operations["getCalendarEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/events/{eventId}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Say which children an event is for
+         * @description `series` sets every occurrence and clears per-occurrence choices; `occurrence` sets this one
+         *     only, and wins over the series. An empty list means nobody.
+         */
+        put: operations["assignEventChildren"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The calendars the household follows
+         * @description A feed's address is never returned.
+         */
+        get: operations["listCalendars"];
+        put?: never;
+        /**
+         * Follow a calendar by its link (ICS or webcal)
+         * @description The link is stored encrypted and never shown back. The first refresh runs within a minute;
+         *     until then the calendar has no `lastSyncAt`. 409 `calendar_exists` when the household
+         *     already follows that link; 422 `invalid_link`, or `not_configured` when the server has no
+         *     secret keys (OPENCOZY_SECRET_KEYS); 422 `too_many_calendars` past 50.
+         */
+        post: operations["addCalendarLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendars/{calendarId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendarId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop following a calendar, with its events and assignments */
+        delete: operations["removeCalendar"];
+        options?: never;
+        head?: never;
+        /** Rename a calendar, recolour it, or show or hide it on displays */
+        patch: operations["updateCalendar"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1097,6 +1208,84 @@ export interface components {
             ingredients: components["schemas"]["Ingredients"];
             steps: components["schemas"]["Steps"];
             archived: boolean;
+            expectedVersion: number;
+        };
+        CalendarRef: {
+            id: components["schemas"]["Id"];
+            name: string;
+            color: components["schemas"]["ProfileColor"];
+        };
+        CalendarEvent: {
+            id: components["schemas"]["Id"];
+            seriesId: components["schemas"]["Id"];
+            /** @description Up to 500 characters; missing means busy */
+            title?: string;
+            allDay: boolean;
+            /** @description RFC3339 in household time, or a date when allDay */
+            start: string;
+            /** @description RFC3339, or the exclusive end date when allDay */
+            end: string;
+            /** @enum {string} */
+            status: "confirmed" | "tentative";
+            calendar: components["schemas"]["CalendarRef"];
+            location?: string;
+            children: components["schemas"]["Id"][];
+        };
+        CalendarResponse: {
+            events: components["schemas"]["CalendarEvent"][];
+        };
+        CalendarEventDetail: {
+            id: components["schemas"]["Id"];
+            seriesId: components["schemas"]["Id"];
+            title?: string;
+            allDay: boolean;
+            start: string;
+            end: string;
+            /** @enum {string} */
+            status: "confirmed" | "tentative";
+            calendar: components["schemas"]["CalendarRef"];
+            location?: string;
+            children: components["schemas"]["Id"][];
+            /** @description Up to 4000 characters; never sent to displays */
+            description?: string;
+            recurring: boolean;
+        };
+        AssignChildren: {
+            children: components["schemas"]["Id"][];
+            /** @enum {string} */
+            scope: "series" | "occurrence";
+        };
+        /** @enum {string} */
+        CalendarErrorCode: "timeout" | "not_found" | "access_denied" | "too_large" | "invalid_calendar" | "too_many_events" | "rate_limited" | "token_expired";
+        CalendarSource: {
+            id: components["schemas"]["Id"];
+            name: string;
+            /** @enum {string} */
+            provider: "ics" | "google" | "icloud";
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
+            /** @enum {string} */
+            status: "ok" | "error" | "needs_reauth";
+            /** Format: date-time */
+            lastSyncAt?: string;
+            error?: components["schemas"]["CalendarErrorCode"];
+            version: number;
+        };
+        CalendarList: {
+            calendars: components["schemas"]["CalendarSource"][];
+        };
+        CalendarName: string;
+        NewCalendarLink: {
+            name: components["schemas"]["CalendarName"];
+            /** @description https, http or webcal */
+            url: string;
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
+        };
+        CalendarEdit: {
+            name: components["schemas"]["CalendarName"];
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
             expectedVersion: number;
         };
     };
@@ -2925,6 +3114,260 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getCalendar: {
+        parameters: {
+            query: {
+                from: string;
+                /** @description Exclusive */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The events, by start */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getCalendarEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    assignEventChildren: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                eventId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "children": [],
+                 *       "scope": "series"
+                 *     }
+                 */
+                "application/json": components["schemas"]["AssignChildren"];
+            };
+        };
+        responses: {
+            /** @description The event, with its children */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEvent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The calendars, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    addCalendarLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "School",
+                 *       "url": "https://calendar.example.test/school.ics",
+                 *       "color": "butter",
+                 *       "showOnDisplay": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewCalendarLink"];
+            };
+        };
+        responses: {
+            /** @description Following */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSource"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    removeCalendar: {
+        parameters: {
+            query: {
+                expectedVersion: number;
+            };
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                calendarId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateCalendar: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                calendarId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "School",
+                 *       "color": "butter",
+                 *       "showOnDisplay": false,
+                 *       "expectedVersion": 1
+                 *     }
+                 */
+                "application/json": components["schemas"]["CalendarEdit"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSource"];
                 };
             };
             400: components["responses"]["BadRequest"];

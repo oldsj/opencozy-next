@@ -1,0 +1,430 @@
+calendar:
+  get:
+    operationId: getCalendar
+    summary: Events between two household days
+    description: |
+      Events that overlap the days [from, to), at most 42 days. Timed events are RFC3339 in the
+      household's time zone; all-day events are dates with an exclusive end. Cancelled events are
+      never sent. A display sees only calendars shown on displays.
+    tags: [calendar]
+    x-actors: [adult, phone, display]
+    x-display-scopes: [calendar]
+    parameters:
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: true
+        description: Exclusive
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: The events, by start
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CalendarResponse'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+event:
+  parameters:
+    - name: eventId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  get:
+    operationId: getCalendarEvent
+    summary: One event, with its description
+    tags: [calendar]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The event
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CalendarEventDetail'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+eventChildren:
+  parameters:
+    - name: eventId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  put:
+    operationId: assignEventChildren
+    summary: Say which children an event is for
+    description: |
+      `series` sets every occurrence and clears per-occurrence choices; `occurrence` sets this one
+      only, and wins over the series. An empty list means nobody.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 4096
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/AssignChildren'
+          example: { children: [], scope: series }
+    responses:
+      '200':
+        description: The event, with its children
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CalendarEvent'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+calendars:
+  get:
+    operationId: listCalendars
+    summary: The calendars the household follows
+    description: A feed's address is never returned.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The calendars, by name
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CalendarList'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: addCalendarLink
+    summary: Follow a calendar by its link (ICS or webcal)
+    description: |
+      The link is stored encrypted and never shown back. The first refresh runs within a minute;
+      until then the calendar has no `lastSyncAt`. 409 `calendar_exists` when the household
+      already follows that link; 422 `invalid_link`, or `not_configured` when the server has no
+      secret keys (OPENCOZY_SECRET_KEYS); 422 `too_many_calendars` past 50.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 4096
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewCalendarLink'
+          example: { name: School, url: 'https://calendar.example.test/school.ics', color: butter, showOnDisplay: true }
+    responses:
+      '201':
+        description: Following
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CalendarSource'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+calendarSource:
+  parameters:
+    - name: calendarId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  patch:
+    operationId: updateCalendar
+    summary: Rename a calendar, recolour it, or show or hide it on displays
+    tags: [calendar]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 2048
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/CalendarEdit'
+          example: { name: School, color: butter, showOnDisplay: false, expectedVersion: 1 }
+    responses:
+      '200':
+        description: Updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CalendarSource'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+  delete:
+    operationId: removeCalendar
+    summary: Stop following a calendar, with its events and assignments
+    tags: [calendar]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+    responses:
+      '204':
+        description: Removed
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  CalendarRef:
+    type: object
+    required: [id, name, color]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+  CalendarEvent:
+    type: object
+    required: [id, seriesId, allDay, start, end, status, calendar, children]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      seriesId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        type: string
+        description: Up to 500 characters; missing means busy
+      allDay:
+        type: boolean
+      start:
+        type: string
+        description: RFC3339 in household time, or a date when allDay
+      end:
+        type: string
+        description: RFC3339, or the exclusive end date when allDay
+      status:
+        type: string
+        enum: [confirmed, tentative]
+      calendar:
+        $ref: '#/schemas/CalendarRef'
+      location:
+        type: string
+      children:
+        type: array
+        items:
+          $ref: common.yaml#/schemas/Id
+  CalendarEventDetail:
+    type: object
+    required: [id, seriesId, allDay, start, end, status, calendar, children, recurring]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      seriesId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        type: string
+      allDay:
+        type: boolean
+      start:
+        type: string
+      end:
+        type: string
+      status:
+        type: string
+        enum: [confirmed, tentative]
+      calendar:
+        $ref: '#/schemas/CalendarRef'
+      location:
+        type: string
+      children:
+        type: array
+        items:
+          $ref: common.yaml#/schemas/Id
+      description:
+        type: string
+        description: Up to 4000 characters; never sent to displays
+      recurring:
+        type: boolean
+  CalendarResponse:
+    type: object
+    required: [events]
+    properties:
+      events:
+        type: array
+        items:
+          $ref: '#/schemas/CalendarEvent'
+  AssignChildren:
+    type: object
+    additionalProperties: false
+    required: [children, scope]
+    properties:
+      children:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items:
+          $ref: common.yaml#/schemas/Id
+      scope:
+        type: string
+        enum: [series, occurrence]
+  CalendarErrorCode:
+    type: string
+    enum: [timeout, not_found, access_denied, too_large, invalid_calendar, too_many_events, rate_limited, token_expired]
+  CalendarSource:
+    type: object
+    required: [id, name, provider, color, showOnDisplay, status, version]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      provider:
+        type: string
+        enum: [ics, google, icloud]
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+      showOnDisplay:
+        type: boolean
+      status:
+        type: string
+        enum: [ok, error, needs_reauth]
+      lastSyncAt:
+        type: string
+        format: date-time
+      error:
+        $ref: '#/schemas/CalendarErrorCode'
+      version:
+        type: integer
+  CalendarList:
+    type: object
+    required: [calendars]
+    properties:
+      calendars:
+        type: array
+        maxItems: 50
+        items:
+          $ref: '#/schemas/CalendarSource'
+  CalendarName:
+    type: string
+    minLength: 1
+    maxLength: 80
+  NewCalendarLink:
+    type: object
+    additionalProperties: false
+    required: [name, url, color, showOnDisplay]
+    properties:
+      name:
+        $ref: '#/schemas/CalendarName'
+      url:
+        type: string
+        minLength: 1
+        maxLength: 2048
+        description: https, http or webcal
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+      showOnDisplay:
+        type: boolean
+  CalendarEdit:
+    type: object
+    additionalProperties: false
+    required: [name, color, showOnDisplay, expectedVersion]
+    properties:
+      name:
+        $ref: '#/schemas/CalendarName'
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+      showOnDisplay:
+        type: boolean
+      expectedVersion:
+        type: integer
+        minimum: 1
+        maximum: 2147483647

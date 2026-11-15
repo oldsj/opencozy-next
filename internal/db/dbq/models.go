@@ -55,6 +55,67 @@ type Approval struct {
 	RedemptionID *uuid.UUID
 }
 
+type CalendarAssignment struct {
+	ID            uuid.UUID
+	HouseholdID   uuid.UUID
+	SeriesID      uuid.UUID
+	RecurrenceKey string
+}
+
+type CalendarAssignmentChild struct {
+	HouseholdID  uuid.UUID
+	AssignmentID uuid.UUID
+	ChildID      uuid.UUID
+}
+
+type CalendarEvent struct {
+	ID            uuid.UUID
+	HouseholdID   uuid.UUID
+	SourceID      uuid.UUID
+	SeriesID      uuid.UUID
+	RecurrenceKey string
+	AllDay        bool
+	StartsAt      *time.Time
+	EndsAt        *time.Time
+	StartDate     pgtype.Date
+	EndDate       pgtype.Date
+	Title         *string
+	Location      *string
+	Description   *string
+	Status        string
+}
+
+type CalendarSeries struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	SourceID    uuid.UUID
+	Uid         string
+	Recurring   bool
+	LastSeenAt  time.Time
+}
+
+type CalendarSource struct {
+	ID                  uuid.UUID
+	HouseholdID         uuid.UUID
+	Provider            string
+	Name                string
+	Color               string
+	ShowOnDisplay       bool
+	FeedUrl             *string
+	FeedUrlMac          *string
+	Version             int32
+	CreatedAt           time.Time
+	NextSyncAt          time.Time
+	LastAttemptAt       *time.Time
+	LastSuccessAt       *time.Time
+	ErrorCode           *string
+	ConsecutiveFailures int32
+	HttpEtag            *string
+	HttpLastModified    *string
+	FeedHash            *string
+	WindowStart         pgtype.Date
+}
+
 type Child struct {
 	ID          uuid.UUID
 	HouseholdID uuid.UUID

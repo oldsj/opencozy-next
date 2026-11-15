@@ -141,13 +141,14 @@ type house struct {
 	recipe                            uuid.UUID
 	entry                             uuid.UUID // an award of 5 points to child1
 	reward                            uuid.UUID // costs 3
+	calendar, event                   uuid.UUID // an ICS calendar shown on displays, with one event
 	passkey                           uuid.UUID // the adult's only passkey
 	actors                            map[string]cred
 }
 
 // actorNames are the actors every house has. Kinds are what Policy.Check compares.
 var actorNames = []string{
-	"adult", "adult-stale", "phone", "display-today", "display-meals", "display-none",
+	"adult", "adult-stale", "phone", "display-today", "display-meals", "display-calendar", "display-none",
 	"service-all", "service-none", "service-child1", "assistant",
 	"revoked", "malformed", "expired", "none",
 }
@@ -158,7 +159,7 @@ func actorKind(name string) (actor.Kind, bool) {
 		return actor.Adult, true
 	case "phone":
 		return actor.Phone, true
-	case "display-today", "display-meals", "display-none":
+	case "display-today", "display-meals", "display-calendar", "display-none":
 		return actor.Display, true
 	case "service-all", "service-none", "service-child1":
 		return actor.Service, true
@@ -203,7 +204,13 @@ func (e *env) house(label string, scopes []string) house {
 	}
 	h.actors["display-today"] = display([]string{"today"})
 	h.actors["display-meals"] = display([]string{"meals"})
+	h.actors["display-calendar"] = display([]string{"calendar"})
 	h.actors["display-none"] = display([]string{})
+	h.calendar = e.id(`INSERT INTO calendar_source (household_id, provider, name, color, feed_url, feed_url_mac)
+		VALUES ($1, 'ics', 'School', 'butter', 'v1.k1.fixture.fixture', 'h1.k1.' || gen_random_uuid()::text) RETURNING id`, h.id)
+	series := e.id(`INSERT INTO calendar_series (household_id, source_id, uid, recurring) VALUES ($1, $2, 'picture-day@example.test', false) RETURNING id`, h.id, h.calendar)
+	h.event = e.id(`INSERT INTO calendar_event (household_id, source_id, series_id, recurrence_key, all_day, start_date, end_date, title, status)
+		VALUES ($1, $2, $3, 'single', true, '2026-09-16', '2026-09-17', 'Picture day', 'confirmed') RETURNING id`, h.id, h.calendar, series)
 	h.recipe = e.id(`INSERT INTO recipe (household_id, title, servings) VALUES ($1, 'Soup', 2) RETURNING id`, h.id)
 	h.screen = e.id(`INSERT INTO display (household_id, name, scopes, expires_at)
 		VALUES ($1, 'Spare', '{today}', now() + interval '1 day') RETURNING id`, h.id)

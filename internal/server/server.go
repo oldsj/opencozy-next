@@ -39,7 +39,9 @@ type Server struct {
 	runner   command.Runner
 	draining atomic.Bool
 	live     atomic.Pointer[live.Hub] // slice 0d: StartLive
-	wa       *webauthn.WebAuthn       // nil when passkeys are off
+	// calendarWake starts the calendar refresh early (slice 13a).
+	calendarWake chan struct{}
+	wa           *webauthn.WebAuthn // nil when passkeys are off
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -47,7 +49,7 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	q := dbq.New(pool)
-	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}}
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1)}
 }
 
 // Drain makes /readyz fail, so the load balancer stops sending traffic before shutdown.
