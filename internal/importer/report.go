@@ -37,6 +37,8 @@ type Line struct {
 type Report struct {
 	Lines  []Line
 	Checks []Line
+	// Remarks are whole-import notes, printed last.
+	Remarks []string
 	// columns are the old columns each mapped table reads or drops on purpose.
 	columns map[string][]string
 }
@@ -121,6 +123,9 @@ func (r *Report) Print(w io.Writer) {
 		_, _ = fmt.Fprintf(tw, "%s\t%d\t\t%d\t%s\t\n", c.Old, c.SourceRows, c.TargetRows, c.Status)
 	}
 	_ = tw.Flush()
+	for _, m := range r.Remarks {
+		_, _ = fmt.Fprintln(w, m)
+	}
 }
 
 // notCarried are old tables that are deliberately not imported: short-lived security state

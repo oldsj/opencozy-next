@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -18,6 +20,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/importer/oldsecret"
 	"github.com/oldsj/opencozy-next/internal/keyring"
 	"github.com/oldsj/opencozy-next/internal/testdb"
 )
@@ -289,6 +292,32 @@ INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, ve
 	var names string
 	if err := target.Owner.QueryRow(context.Background(), `SELECT string_agg(name, ',') FROM calendar_source`).Scan(&names); err != nil || names != "School" {
 		t.Errorf("calendars: %q %v", names, err)
+	}
+}
+
+func TestReportSaysWhetherOldSecretsOpen(t *testing.T) {
+	source := oldDB(t)
+	out, err := importOnce(t, source, testdb.Open(t), true)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, `no --old-auth-secret-file, so Google, iCloud and Home Assistant import as "reconnect needed"`) {
+		t.Errorf("without the old secret:\n%s", out)
+	}
+	path := filepath.Join(t.TempDir(), "old-secret")
+	if err := os.WriteFile(path, []byte("fixture-old-auth-secret-0123456789abcdefghij\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old, err := oldsecret.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := Run(context.Background(), Options{SourceURL: source, Target: testdb.Open(t).Owner, DryRun: true, Out: &buf, Keys: testKeys(t), OldSecret: old}); err != nil {
+		t.Fatalf("%v\n%s", err, buf.String())
+	}
+	if !strings.Contains(buf.String(), "opened with --old-auth-secret-file") || strings.Contains(buf.String(), "fixture-old-auth-secret") {
+		t.Errorf("with the old secret:\n%s", buf.String())
 	}
 }
 
