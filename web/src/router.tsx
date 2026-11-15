@@ -22,6 +22,8 @@ import { DisplaysPage } from './routes/displays';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
 import { CalendarEventPage, CalendarPage, CalendarsPage } from './routes/calendar';
+import { ConnectionsPage } from './routes/connections';
+import { LearningPage } from './routes/learning';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -50,6 +52,8 @@ const nav = [
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/displays', label: 'Displays' },
+  { to: '/learning', label: 'Learning' },
+  { to: '/connections', label: 'Connections' },
 ] as const;
 
 // The manage pages' column, with the main navigation once signed in.
@@ -257,6 +261,32 @@ const calendarsRoute = createRoute({
   component: CalendarsPage,
 });
 
+// Manage: services, assistants and learning apps, each with its own key.
+const connectionsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/connections',
+  staticData: { title: 'Connections' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: ConnectionsPage,
+});
+
+// Manage: learning award rules and players.
+const learningRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/learning',
+  staticData: { title: 'Learning' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: LearningPage,
+});
+
 // The wall display itself: pairs, then shows the household's day. No adult sign-in.
 const displayRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -266,7 +296,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute]),
   displayRoute,
 ]);
 
