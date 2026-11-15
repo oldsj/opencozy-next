@@ -249,7 +249,7 @@ struct UnassignedDeviceTests {
     @Test func deviceWithoutAChildIsLocked() async {
         let model = AppModel(preview: UnassignedAPI())
         await model.refresh()
-        #expect(model.accessProblem == AppModel.SetupError.noChild.localizedDescription)
+        #expect(model.accessProblem == AppModel.reconnectMessage)
         #expect(model.unlockedUntil == nil)
         #expect(model.childId == nil)
     }

@@ -55,6 +55,17 @@ type Approval struct {
 	RedemptionID *uuid.UUID
 }
 
+type AwardRule struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ActivityKey string
+	Points      int32
+	DailyLimit  int32
+	Version     int32
+	ArchivedAt  *time.Time
+	CreatedAt   time.Time
+}
+
 type CalendarAssignment struct {
 	ID            uuid.UUID
 	HouseholdID   uuid.UUID
@@ -161,6 +172,12 @@ type Credential struct {
 	RevokedAt   *time.Time
 }
 
+type CredentialAwardRule struct {
+	HouseholdID  uuid.UUID
+	CredentialID uuid.UUID
+	RuleID       uuid.UUID
+}
+
 type CredentialChild struct {
 	HouseholdID  uuid.UUID
 	CredentialID uuid.UUID
@@ -200,6 +217,33 @@ type JobLease struct {
 	Name      string
 	Holder    string
 	ExpiresAt time.Time
+}
+
+type LearningAward struct {
+	ID            uuid.UUID
+	HouseholdID   uuid.UUID
+	SourceEventID uuid.UUID
+	ChildID       uuid.UUID
+	RuleID        uuid.UUID
+	Rule          []byte
+	Points        int32
+	Day           pgtype.Date
+	Provider      string
+	ExternalID    string
+	ActivityKey   string
+	CredentialID  *uuid.UUID
+	LedgerID      uuid.UUID
+	CreatedAt     time.Time
+}
+
+type LearningLink struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	Provider    string
+	ExternalID  string
+	LinkedAt    time.Time
+	UnlinkedAt  *time.Time
 }
 
 type Meal struct {

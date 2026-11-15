@@ -23,3 +23,15 @@ WHERE household_id = $1 AND id = $2 AND revoked_at IS NULL;
 SELECT credential_id, child_id FROM credential_child
 WHERE household_id = $1
 ORDER BY credential_id, child_id;
+
+-- name: ListHouseholdCredentialRules :many
+SELECT credential_id, rule_id FROM credential_award_rule
+WHERE household_id = $1
+ORDER BY credential_id, rule_id;
+
+-- name: AddCredentialRules :exec
+INSERT INTO credential_award_rule (household_id, credential_id, rule_id)
+SELECT @household_id::uuid, @credential_id::uuid, unnest(@rule_ids::uuid[]);
+
+-- name: CredentialMayUseRule :one
+SELECT EXISTS (SELECT 1 FROM credential_award_rule WHERE credential_id = $1 AND rule_id = $2)::boolean;

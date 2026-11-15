@@ -9,6 +9,7 @@ import {
   ButtonLink,
   ChoiceGroup,
   CodeInput,
+  DayPicker,
   ManageNav,
   ConnectionBanner,
   CheckCircle,
@@ -30,6 +31,7 @@ import {
   PersonTab,
   ProfileAvatar,
   QrCode,
+  qrModulesFromRows,
   RewardTile,
   Section,
   SegmentedControl,
@@ -496,5 +498,30 @@ describe('slice two: inbox', () => {
     expect(chosen).toEqual(['ada']);
     rerender(<ChoiceGroup label="Who’s watching?" choices={choices} onChoose={(v) => chosen.push(v)} busy />);
     for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled();
+  });
+});
+
+describe('qrModulesFromRows', () => {
+  it('reads the server’s rows: only "1" is dark', () => {
+    expect(qrModulesFromRows(['101', '0x1'])).toEqual([
+      [true, false, true],
+      [false, false, true],
+    ]);
+  });
+});
+
+describe('DayPicker', () => {
+  it('shows an empty list as every day, sends every day as [] and keeps one day', async () => {
+    const user = userEvent.setup();
+    const sent: number[][] = [];
+    const { rerender } = render(<DayPicker label="Days" value={[]} onChange={(d) => sent.push(d)} />);
+    expect(screen.getByRole('button', { name: 'Monday' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Sunday' }));
+    expect(sent.at(-1)).toEqual([1, 2, 3, 4, 5, 6]);
+    rerender(<DayPicker label="Days" value={[0, 1, 2, 3, 4, 5]} onChange={(d) => sent.push(d)} />);
+    await user.click(screen.getByRole('button', { name: 'Saturday' }));
+    expect(sent.at(-1)).toEqual([]);
+    rerender(<DayPicker label="Days" value={[3]} onChange={(d) => sent.push(d)} />);
+    expect(screen.getByRole('button', { name: 'Wednesday' })).toBeDisabled();
   });
 });

@@ -118,6 +118,7 @@ var domains = []func(context.Context, *run) error{
 	importChildren,
 	importAdults,
 	importCredentials,
+	importLearning,
 	importRecipes,
 	importMeals,
 }
