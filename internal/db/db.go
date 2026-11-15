@@ -73,7 +73,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, runtimeR
 }
 
 // appendOnly lists tables the runtime role may only read and insert into.
-var appendOnly = []string{}
+var appendOnly = []string{"point_ledger"}
 
 // Grant gives role row access to the application's tables and nothing on goose's bookkeeping.
 // It runs after every migration, so new tables are covered.

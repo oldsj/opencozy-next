@@ -16,6 +16,9 @@
 //     recorded. Anything else rolls back the whole transaction and is not recorded. An operation
 //     whose response holds a secret records only that it succeeded (Spec.RecordResponse).
 //  7. Recorded answers expire after 30 days (DeleteExpired).
+//
+// A job that changes domain rows (settlement, day rollover) uses Lock: the same locks in the
+// same order, without a log row.
 package command
 
 import (
@@ -36,6 +39,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/oldsj/opencozy-next/internal/actor"
+	"github.com/oldsj/opencozy-next/internal/clock"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/httpx"
 )
@@ -48,8 +52,29 @@ type Cmd struct {
 	Q           *dbq.Queries
 	householdID uuid.UUID
 	locked      []uuid.UUID
+	clock       clock.Clock
 	now         time.Time
 }
+
+// Lock starts a command in tx for a job: it takes the household lock, so a job and a request
+// lock in the same order, and records nothing in command_log. Then lock children with
+// LockChildren and take the time from Now, as a handler does. A nil clk is the database clock.
+func Lock(ctx context.Context, tx pgx.Tx, householdID uuid.UUID, clk clock.Clock) (*Cmd, error) {
+	q := dbq.New(tx)
+	if _, err := q.LockHousehold(ctx, householdID); err != nil {
+		return nil, err
+	}
+	if clk == nil {
+		clk = clock.DB{}
+	}
+	return &Cmd{Q: q, householdID: householdID, clock: clk}, nil
+}
+
+// HouseholdID is the household the command holds locked.
+func (c *Cmd) HouseholdID() uuid.UUID { return c.householdID }
+
+// Holds reports whether the command holds the lock on child.
+func (c *Cmd) Holds(child uuid.UUID) bool { return slices.Contains(c.locked, child) }
 
 type key struct{}
 
@@ -85,7 +110,7 @@ func (c *Cmd) LockChildren(ctx context.Context, ids ...uuid.UUID) error {
 // Now is the command's time: the database clock, read once, after the locks are held.
 func (c *Cmd) Now(ctx context.Context) (time.Time, error) {
 	if c.now.IsZero() {
-		t, err := c.Q.Now(ctx)
+		t, err := c.clock.Now(ctx, c.Q)
 		if err != nil {
 			return time.Time{}, err
 		}
@@ -108,8 +133,10 @@ type Spec struct {
 
 // Runner runs commands.
 type Runner struct {
-	Pool *pgxpool.Pool
-	Log  *slog.Logger
+	// Clock is the commands' time; nil is the database clock.
+	Clock clock.Clock
+	Pool  *pgxpool.Pool
+	Log   *slog.Logger
 }
 
 // Wrap runs next as the command spec. The actor must already be on the context: this runs after
@@ -145,11 +172,12 @@ func (rn Runner) Wrap(spec Spec, next http.Handler, w http.ResponseWriter, r *ht
 		return
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after Commit
-	q := dbq.New(tx)
-	if _, err := q.LockHousehold(ctx, a.HouseholdID); err != nil {
+	cmd, err := Lock(ctx, tx, a.HouseholdID, rn.Clock)
+	if err != nil {
 		fail(err)
 		return
 	}
+	q := cmd.Q
 	if spec.Recheck != nil {
 		fresh, ok := spec.Recheck(ctx, q, w, a)
 		if !ok {
@@ -181,7 +209,7 @@ func (rn Runner) Wrap(spec Spec, next http.Handler, w http.ResponseWriter, r *ht
 	}
 
 	rec := &recorder{header: http.Header{}, status: http.StatusOK}
-	next.ServeHTTP(rec, r.WithContext(context.WithValue(ctx, key{}, &Cmd{Q: q, householdID: a.HouseholdID})))
+	next.ServeHTTP(rec, r.WithContext(context.WithValue(ctx, key{}, cmd)))
 
 	switch {
 	case rec.status >= 200 && rec.status < 300:
@@ -200,6 +228,10 @@ func (rn Runner) Wrap(spec Spec, next http.Handler, w http.ResponseWriter, r *ht
 	if !spec.RecordResponse && status >= 200 && status < 300 {
 		status, contentType = http.StatusConflict, "application/json"
 		body = []byte(`{"error":{"code":"already_done","message":"This was already done. Its secret is shown only once: revoke it and create another if it was lost."}}` + "\n")
+	}
+	if err := q.DeleteExpiredCommand(ctx, dbq.DeleteExpiredCommandParams{HouseholdID: a.HouseholdID, IdempotencyKey: idem}); err != nil {
+		fail(err)
+		return
 	}
 	if err := q.RecordCommand(ctx, dbq.RecordCommandParams{
 		HouseholdID: a.HouseholdID, IdempotencyKey: idem, RequestHash: hash,
