@@ -2,9 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type SyntheticEvent } from 'react';
 
-import { Button, ButtonPrimary, EmptyState, Field, Input, List, ListRow, Notice, PageHeader, pointsLabel } from '@app/design';
+import { Button, ButtonPrimary, ConfirmDialog, EmptyState, Field, Input, List, ListRow, Notice, PageHeader, pointsLabel } from '@app/design';
 
-import { $api, errorMessage, idempotencyKey } from '../api/client';
+import { $api, errorMessage, idempotencyKey, useAttempts } from '../api/client';
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -30,6 +30,8 @@ export function ChoresPage() {
   const [childId, setChildId] = useState('');
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('1');
+  const [removing, setRemoving] = useState<{ id: string; title: string } | null>(null);
+  const attempts = useAttempts();
 
   const live = children.data?.items.filter((c) => !c.archived) ?? [];
   const chosen = childId || live[0]?.id || '';
@@ -37,14 +39,15 @@ export function ChoresPage() {
 
   const submitChild = (e: SyntheticEvent) => {
     e.preventDefault();
-    addChild.mutate({ params: idempotencyKey(), body: { name: childName } }, { onSuccess: () => { setChildName(''); } });
+    const body = { name: childName };
+    const attempt = `child:${JSON.stringify(body)}`;
+    addChild.mutate({ params: attempts.params(attempt), body }, { onSettled: attempts.settleIfAnswered(attempt), onSuccess: () => { setChildName(''); } });
   };
   const submitChore = (e: SyntheticEvent) => {
     e.preventDefault();
-    addChore.mutate(
-      { params: idempotencyKey(), body: { childId: chosen, title, points: Number(points) } },
-      { onSuccess: () => { setTitle(''); } },
-    );
+    const body = { childId: chosen, title, points: Number(points) };
+    const attempt = `chore:${JSON.stringify(body)}`;
+    addChore.mutate({ params: attempts.params(attempt), body }, { onSettled: attempts.settleIfAnswered(attempt), onSuccess: () => { setTitle(''); } });
   };
 
   return (
@@ -97,10 +100,7 @@ export function ChoresPage() {
               title={c.title}
               meta={`${nameOf(c.childId)} · ${pointsLabel(c.points)} · ${schedule(c.days)}`}
               trailing={
-                <Button
-                  onClick={() => { archive.mutate({ params: { ...idempotencyKey(), path: { choreId: c.id } } }); }}
-                  disabled={archive.isPending}
-                >
+                <Button aria-label={`Remove ${c.title}`} onClick={() => { setRemoving(c); }}>
                   Remove
                 </Button>
               }
@@ -110,6 +110,20 @@ export function ChoresPage() {
       ) : (
         chores.isSuccess && <EmptyState title="No chores yet" description="Add a child, then give them a chore." variant="surface" />
       )}
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.title}?` : ''}
+        description="It leaves the wall display from today. Points already earned stay."
+        confirmLabel="Remove"
+        tone="danger"
+        pending={archive.isPending}
+        error={archive.error ? errorMessage(archive.error) : undefined}
+        onCancel={() => { setRemoving(null); archive.reset(); }}
+        onConfirm={() => {
+          if (!removing) return;
+          archive.mutate({ params: { ...idempotencyKey(), path: { choreId: removing.id } } }, { onSuccess: () => { setRemoving(null); } });
+        }}
+      />
     </section>
   );
 }

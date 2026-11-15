@@ -49,8 +49,10 @@ type Policy struct {
 	DisplayScopes []string
 	ChildParam    string
 	RecentAuth    bool
-	BodyLimit     int64
-	Command       bool
+	// RecentAuthWindow overrides RecentAuth's 10 minutes when set (config RECENT_AUTH_WINDOW).
+	RecentAuthWindow time.Duration
+	BodyLimit        int64
+	Command          bool
 	// RecordResponse is false when the response must never be stored (it holds a secret).
 	RecordResponse bool
 	// Pattern is the route that matched, "METHOD /path/{param}", set by Find. The ServeMux that
@@ -91,7 +93,11 @@ func (p Policy) Check(a actor.Actor, ok bool, params map[string]string, now time
 			return Forbidden
 		}
 	}
-	if p.RecentAuth && a.Kind == actor.Adult && now.Sub(a.AuthenticatedAt) > RecentAuth {
+	window := RecentAuth
+	if p.RecentAuthWindow > 0 {
+		window = p.RecentAuthWindow
+	}
+	if p.RecentAuth && a.Kind == actor.Adult && now.Sub(a.AuthenticatedAt) > window {
 		return Reauthenticate
 	}
 	if p.ChildParam != "" {

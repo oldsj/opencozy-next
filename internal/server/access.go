@@ -125,6 +125,7 @@ func (s *Server) authorize(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ri := routeFrom(r.Context())
 		a, ok := actor.From(r.Context())
+		ri.policy.RecentAuthWindow = s.cfg.RecentAuthWindow
 		if s.decide(w, ri.policy.Check(a, ok, ri.params, time.Now())) {
 			next.ServeHTTP(w, r)
 		}
@@ -152,6 +153,7 @@ func (s *Server) decide(w http.ResponseWriter, d authz.Decision) bool {
 func (s *Server) commands(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := routeFrom(r.Context()).policy
+		p.RecentAuthWindow = s.cfg.RecentAuthWindow
 		if !p.Command {
 			next.ServeHTTP(w, r)
 			return
