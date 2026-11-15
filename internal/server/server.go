@@ -133,15 +133,23 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	})
 	handler := api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseRouter: http.NewServeMux()})
 
-	limiter := httpx.NewRateLimiter(s.cfg.AuthRatePerMinute)
+	// Sign-in and pairing have separate buckets: a display polling its pairing every few seconds
+	// must not use up the sign-in attempts of an adult at the same address.
+	limited := httpx.NewRateLimiter(s.cfg.AuthRatePerMinute).Middleware
+	pairing := httpx.NewRateLimiter(pairingRatePerMinute).Middleware
 	limitAuth := func(next http.Handler) http.Handler {
-		limited := limiter.Middleware(next)
+		auth, pair := limited(next), pairing(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost && (r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/display/pairings")) {
-				limited.ServeHTTP(w, r)
-				return
+			switch {
+			case r.Method != http.MethodPost:
+				next.ServeHTTP(w, r)
+			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm":
+				auth.ServeHTTP(w, r)
+			case strings.HasPrefix(r.URL.Path, "/display/pairings"):
+				pair.ServeHTTP(w, r)
+			default:
+				next.ServeHTTP(w, r)
 			}
-			next.ServeHTTP(w, r)
 		})
 	}
 

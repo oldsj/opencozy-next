@@ -20,6 +20,10 @@ import (
 // PairingCookie holds the secret a display claims its session with.
 const PairingCookie = "__Host-display-pairing"
 
+// pairingRatePerMinute is per client address, for starting and claiming pairings: a display
+// polls every 3 seconds (20 a minute), with room for a few displays behind one address.
+const pairingRatePerMinute = 90
+
 // maxOpenPairings caps open pairings: starting one needs no sign-in.
 const maxOpenPairings = 500
 

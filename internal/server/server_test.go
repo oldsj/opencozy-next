@@ -512,3 +512,24 @@ func TestDisplayPairingExpires(t *testing.T) {
 		t.Fatalf("expired code: %d %s", r.status, r.raw)
 	}
 }
+
+// A display polling for its pairing does not use up sign-in attempts from the same address.
+func TestPairingDoesNotStarveSignIn(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.AuthRatePerMinute = 2 })
+	start := e.send(cred{}, "POST", "/api/display/pairings", nil)
+	var claim cred
+	for _, c := range (&http.Response{Header: start.header}).Cookies() {
+		if c.Name == PairingCookie {
+			claim = cred{cookie: c}
+		}
+	}
+	for i := range 40 { // two minutes of polling at once
+		if r := e.send(claim, "POST", "/api/display/pairings/claim", nil); r.status != 202 {
+			t.Fatalf("poll %d: %d %s", i, r.status, r.raw)
+		}
+	}
+	bad := map[string]string{"email": "x@example.test", "password": "wrong password!!"}
+	if r := e.send(cred{}, "POST", "/api/auth/login", bad); r.status != 401 {
+		t.Fatalf("sign-in after polling: %d %s", r.status, r.raw)
+	}
+}

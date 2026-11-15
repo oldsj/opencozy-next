@@ -33,6 +33,12 @@ export function DisplayPage() {
   return <Pairing />;
 }
 
+// How long to wait before asking again: the server's Retry-After when it sent one (429, 503).
+function retryAfter(response: Response, fallbackMs: number): number {
+  const seconds = Number(response.headers.get('Retry-After'));
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 300) * 1000 : fallbackMs;
+}
+
 function Pairing() {
   const queryClient = useQueryClient();
   const [code, setCode] = useState<string | null>(null);
@@ -54,14 +60,14 @@ function Pairing() {
         setAttempt((n) => n + 1); // expired: start over with a new code
         return;
       }
-      timer = setTimeout(() => void poll(), 3000);
+      timer = setTimeout(() => void poll(), retryAfter(response, 3000));
     };
     void (async () => {
       const { data, response } = await client.POST('/display/pairings');
       if (run.stopped) return;
       if (response.status !== 201 || !data) {
         setProblem('Pairing could not start. Trying again in a moment.');
-        timer = setTimeout(() => { setAttempt((n) => n + 1); }, 30000);
+        timer = setTimeout(() => { setAttempt((n) => n + 1); }, retryAfter(response, 30000));
         return;
       }
       setProblem(null);
