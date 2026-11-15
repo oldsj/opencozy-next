@@ -1,0 +1,117 @@
+history:
+  get:
+    operationId: getPointsHistory
+    summary: A child's balance and points history, newest first
+    tags: [points]
+    x-actors: [adult, phone]
+    x-child-param: childId
+    parameters:
+      - name: childId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    responses:
+      '200':
+        description: The history
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/History'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+reverse:
+  post:
+    operationId: reversePoints
+    summary: Take back the points of an award (a chore done by mistake)
+    description: Refused when the child has already spent them. The chore can then be done again.
+    tags: [points]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              reason:
+                type: string
+                minLength: 1
+                maxLength: 200
+                pattern: \S
+          example: { reason: Marked done by mistake. }
+    responses:
+      '200':
+        description: Reversed; the new entry
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/HistoryEntry'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  History:
+    type: object
+    required: [balance, entries]
+    properties:
+      balance:
+        type: integer
+        format: int64
+      entries:
+        type: array
+        description: The newest 200
+        items:
+          $ref: '#/schemas/HistoryEntry'
+  HistoryEntry:
+    type: object
+    required: [id, at, kind, title, points]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      at:
+        type: string
+        format: date-time
+      kind:
+        type: string
+        enum: [earned, reversed, redeemed, refunded]
+      title:
+        type: string
+      points:
+        type: integer
+        description: Signed; negative takes points away
+      reason:
+        type: string
+      reversedBy:
+        $ref: common.yaml#/schemas/Id
+      reverses:
+        $ref: common.yaml#/schemas/Id
+      by:
+        type: string
+        description: The adult who decided it, by name

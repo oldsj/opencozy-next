@@ -138,6 +138,7 @@ type house struct {
 	screen                            uuid.UUID // a display to unpair (not one of the actors)
 	chore, routine, step              uuid.UUID // child1's, on every day
 	approval                          uuid.UUID // child1's chore on an earlier day, waiting
+	entry                             uuid.UUID // an award of 5 points to child1
 	actors                            map[string]cred
 }
 
@@ -207,6 +208,10 @@ func (e *env) house(label string, scopes []string) house {
 		VALUES (gen_random_uuid(), $1, $2, 'chore', $3, '2000-01-03', 'pending', 4) RETURNING id`, h.id, h.child1, h.chore)
 	h.approval = e.id(`INSERT INTO approval (household_id, child_id, kind, occurrence_id, title, points)
 		VALUES ($1, $2, 'completion', $3, 'Feed the cat', 4) RETURNING id`, h.id, h.child1, occ)
+	h.entry = e.id(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id)
+		VALUES ($1, $2, 5, 'award', 'fixture', gen_random_uuid()) RETURNING id`, h.id, h.child1)
+	e.exec(`INSERT INTO active_award (source_kind, source_id, household_id, ledger_id)
+		SELECT source_kind, source_id, household_id, id FROM point_ledger WHERE id = $1`, h.entry)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)
 
 	credential := func(kind string, scopes []string, all bool, children []uuid.UUID, extra string) (cred, uuid.UUID) {

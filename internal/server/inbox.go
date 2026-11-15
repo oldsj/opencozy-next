@@ -16,7 +16,10 @@ import (
 // SourceOccurrence is the ledger source kind for points from a chore or routine done on a day.
 const SourceOccurrence = "occurrence"
 
-var errAlreadyDecided = apiError("already_decided", "Someone already decided this one.")
+var (
+	errAlreadyDecided = apiError("already_decided", "Someone already decided this one.")
+	errChildArchived  = apiError("child_archived", "That child is archived. Restore them first.")
+)
 
 // GetInbox lists what waits for an adult's decision.
 func (s *Server) GetInbox(ctx context.Context, _ api.GetInboxRequestObject) (api.GetInboxResponseObject, error) {
@@ -63,7 +66,9 @@ func lockPending(ctx context.Context, cmd *command.Cmd, id api.Id) (*decision, *
 	} else if err != nil {
 		return nil, nil, 0, err
 	}
-	if err := cmd.LockChildren(ctx, a.ChildID); err != nil && !errors.Is(err, command.ErrNoChild) {
+	if err := cmd.LockChildren(ctx, a.ChildID); errors.Is(err, command.ErrNoChild) {
+		return nil, &errChildArchived, 409, nil
+	} else if err != nil {
 		return nil, nil, 0, err
 	}
 	if a, err = cmd.Q.LockApproval(ctx, dbq.LockApprovalParams{HouseholdID: h, ID: id}); err != nil {

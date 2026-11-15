@@ -68,6 +68,10 @@ paths:
     $ref: today.yaml#/completeChore
   /today/routines/{routineId}/steps/{stepId}/check:
     $ref: today.yaml#/checkStep
+  /children/{childId}/history:
+    $ref: points.yaml#/history
+  /points/{entryId}/reverse:
+    $ref: points.yaml#/reverse
   /inbox:
     $ref: inbox.yaml#/inbox
   /inbox/{itemId}/approve:

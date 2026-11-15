@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState, type SyntheticEvent } from 'react';
 
 import { Button, ButtonPrimary, EmptyState, Field, Input, List, ListRow, Notice, PageHeader } from '@app/design';
@@ -57,6 +58,18 @@ export function ChoresPage() {
           <ButtonPrimary type="submit" disabled={addChild.isPending}>Add child</ButtonPrimary>
         </div>
       </form>
+
+      {live.length > 0 && (
+        <List aria-label="Children">
+          {live.map((c) => (
+            <ListRow
+              key={c.id}
+              title={c.name}
+              trailing={<Link to="/children/$childId/points" params={{ childId: c.id }}>Points</Link>}
+            />
+          ))}
+        </List>
+      )}
 
       {live.length > 0 && (
         <form onSubmit={submitChore} className="flex flex-col gap-4" aria-label="Add a chore">

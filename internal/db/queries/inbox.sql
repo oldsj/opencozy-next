@@ -1,7 +1,7 @@
 -- name: ListPendingApprovals :many
 SELECT a.id, a.kind, a.child_id, c.name AS child_name, c.color AS child_color, a.title, a.points, a.created_at
 FROM approval a JOIN child c ON c.household_id = a.household_id AND c.id = a.child_id
-WHERE a.household_id = $1 AND a.state = 'pending'
+WHERE a.household_id = $1 AND a.state = 'pending' AND c.archived_at IS NULL
 ORDER BY a.created_at, a.id
 LIMIT 200;
 
