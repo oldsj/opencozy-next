@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, House, Sunrise } from 'lucide-react';
+import { ClipboardCheck, Gift, House, Sunrise } from 'lucide-react';
 import { useState } from 'react';
 
 import { AppFrame, Button, ConnectionBanner, EmptyState, PeopleBoard, PersonCard, TabBar, TaskGroup, TaskRow, TopBar } from '@app/design';
 import type { TaskRowCheck } from '@app/design';
 
 import { client, idempotencyKey, type Household, type TodayGroup, type TodayItem } from '../api/client';
+import { DisplayRewards } from './display-rewards';
 
 export const todayKey = ['display', 'today'] as const;
 
@@ -31,6 +32,12 @@ function clock(at: Date, timeZone: string) {
 export function TodayBoard({ household }: { household: Household }) {
   const queryClient = useQueryClient();
   const [local, setLocal] = useState<Local>({});
+  const [tab, setTab] = useState<'today' | 'rewards'>(window.location.hash === '#rewards' ? 'rewards' : 'today');
+  const show = (t: 'today' | 'rewards') => (e: { preventDefault: () => void }) => {
+    e.preventDefault();
+    window.history.replaceState(null, '', t === 'rewards' ? '#rewards' : '#');
+    setTab(t);
+  };
   const today = useQuery({
     queryKey: todayKey,
     queryFn: async () => {
@@ -62,7 +69,14 @@ export function TodayBoard({ household }: { household: Household }) {
   return (
     <AppFrame
       topBar={<TopBar time={now.time} date={now.date} householdName={household.name} />}
-      tabBar={<TabBar items={[{ href: '/display', label: 'Today', icon: House, current: true }]} />}
+      tabBar={
+        <TabBar
+          items={[
+            { href: '#today', label: 'Today', icon: House, current: tab === 'today', onClick: show('today') },
+            { href: '#rewards', label: 'Rewards', icon: Gift, current: tab === 'rewards', onClick: show('rewards') },
+          ]}
+        />
+      }
     >
       {today.isError && (
         <ConnectionBanner
@@ -71,6 +85,9 @@ export function TodayBoard({ household }: { household: Household }) {
           actions={<Button variant="secondary" onClick={() => void today.refetch()}>Try again</Button>}
         />
       )}
+      {tab === 'rewards' ? (
+        <DisplayRewards today={today.data} todayKey={todayKey} />
+      ) : (
       <PeopleBoard>
         {today.data?.children.map(({ child, groups }) => (
           <PersonCard
@@ -112,6 +129,7 @@ export function TodayBoard({ household }: { household: Household }) {
           </PersonCard>
         ))}
       </PeopleBoard>
+      )}
     </AppFrame>
   );
 }

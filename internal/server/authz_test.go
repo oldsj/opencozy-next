@@ -72,6 +72,7 @@ func TestAuthzMatrix(t *testing.T) {
 					u += "?expectedVersion=1" // a required query parameter
 				}
 				u = strings.ReplaceAll(u, "{entryId}", h.entry.String())
+				u = strings.ReplaceAll(u, "{rewardId}", h.reward.String())
 				return "/api" + u
 			}
 			body := func() any {

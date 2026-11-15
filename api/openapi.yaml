@@ -897,6 +897,159 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
+  /rewards:
+    get:
+      operationId: listRewards
+      summary: The rewards children can spend points on
+      tags:
+        - rewards
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - today
+      responses:
+        '200':
+          description: The rewards, cheapest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rewards'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createReward
+      summary: Add a reward
+      tags:
+        - rewards
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewReward'
+            example:
+              title: 20 minutes of iPad
+              cost: 10
+              kind: screen_time
+              minutes: 20
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reward'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /rewards/{rewardId}:
+    delete:
+      operationId: archiveReward
+      summary: Remove a reward from now on (history stays)
+      tags:
+        - rewards
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: rewardId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      responses:
+        '204':
+          description: Removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/redemptions:
+    post:
+      operationId: redeemReward
+      summary: Spend points on a reward
+      description: The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once.
+      tags:
+        - rewards
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - today
+      x-child-param: childId
+      x-command: true
+      x-body-limit: 256
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: childId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - rewardId
+              properties:
+                rewardId:
+                  $ref: '#/components/schemas/Id'
+            example:
+              rewardId: 0190f0e0-0000-7000-8000-000000000002
+      responses:
+        '201':
+          description: Spent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Redemption'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
   /inbox:
     get:
       operationId: getInbox
@@ -1931,6 +2084,82 @@ components:
           description: The newest 200
           items:
             $ref: '#/components/schemas/HistoryEntry'
+    Reward:
+      type: object
+      required:
+        - id
+        - title
+        - cost
+        - kind
+        - available
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        cost:
+          type: integer
+        kind:
+          type: string
+          enum:
+            - item
+            - screen_time
+        minutes:
+          type: integer
+        available:
+          type: boolean
+    Rewards:
+      type: object
+      required:
+        - rewards
+      properties:
+        rewards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reward'
+    Title:
+      type: string
+      minLength: 1
+      maxLength: 80
+      pattern: \S
+    NewReward:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - cost
+        - kind
+      properties:
+        title:
+          $ref: '#/components/schemas/Title'
+        cost:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        kind:
+          type: string
+          enum:
+            - item
+            - screen_time
+        minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: Required for screen_time, refused otherwise
+    Redemption:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - rejected
     InboxItem:
       type: object
       required:
@@ -2023,11 +2252,6 @@ components:
           type: integer
         days:
           $ref: '#/components/schemas/Days'
-    Title:
-      type: string
-      minLength: 1
-      maxLength: 80
-      pattern: \S
     Points:
       type: integer
       minimum: 0

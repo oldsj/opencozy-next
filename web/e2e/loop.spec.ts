@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { owner } from './global-setup';
 
-// The core chore loop, grown slice by slice: pair the wall display, a child marks a chore done
-// (and, in later slices, an adult approves it, points land and the child redeems a reward).
-test('pair the wall display, a child marks a chore done, an adult approves it', async ({ browser }) => {
+// The core chore loop: pair the wall display, a child marks a chore done, an adult approves it,
+// the points land, and the child spends them on a reward (which an adult approves too).
+test('the chore loop: pair the display, do a chore, approve it, spend the points', async ({ browser }) => {
   const problems: string[] = [];
   const watch = (page: Page) => {
     page.on('console', (m) => {
@@ -79,6 +79,28 @@ test('pair the wall display, a child marks a chore done, an adult approves it', 
   await adult.getByRole('list', { name: 'Children' }).getByRole('listitem').filter({ hasText: child }).getByRole('link', { name: 'Points' }).click();
   await expect(adult.getByRole('list', { name: 'Points history' })).toContainText(chore);
   await expect(adult.getByRole('button', { name: new RegExp(`^Reverse: ${chore}`) })).toBeVisible();
+
+  // The adult adds a reward; the child asks for it on the wall display, which spends the points.
+  const reward = `Choose a game ${run}`;
+  await adult.goto('/rewards');
+  await adult.getByRole('textbox', { name: 'Reward', exact: true }).fill(reward);
+  await adult.getByLabel('Cost in points').fill('3');
+  await adult.getByRole('button', { name: 'Add reward' }).click();
+  await expect(adult.getByRole('list', { name: 'Rewards' })).toContainText(reward);
+
+  await wall.getByRole('link', { name: 'Rewards' }).click();
+  await wall.getByRole('button', { name: new RegExp(`^${child}`) }).click();
+  await expect(wall.getByRole('heading', { name: `${child}’s rewards` })).toBeVisible();
+  await wall.getByRole('button', { name: new RegExp(reward) }).click();
+  await wall.getByRole('button', { name: 'Ask for it' }).click();
+  await expect(wall.getByText(`Asked for ${reward}`)).toBeVisible();
+
+  // An adult approves it; the points stay spent.
+  await adult.goto('/inbox');
+  await adult.getByRole('button', { name: `Approve: ${reward} (${child})` }).click();
+  await expect(adult.getByRole('button', { name: `Approve: ${reward} (${child})` })).toHaveCount(0);
+  await wall.goto('/display');
+  await expect(card.locator('.oc-points-badge')).toHaveText('1 points');
 
   expect(problems).toEqual([]);
 });
