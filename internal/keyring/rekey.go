@@ -46,7 +46,7 @@ func RekeyAll(ctx context.Context, db *pgxpool.Pool, kr *Keyring, log *slog.Logg
 	mu.Lock()
 	cols := append([]column(nil), columns...)
 	mu.Unlock()
-	log.Info("rekey: start", "keyring", kr, "columns", len(cols))
+	log.Info("rekey: start", "columns", len(cols))
 	for _, c := range cols {
 		n, err := c.run(ctx, db, kr)
 		if err != nil {
