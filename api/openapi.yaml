@@ -29,6 +29,8 @@ tags:
     description: Children of the household
   - name: credentials
     description: Service and assistant credentials
+  - name: live
+    description: Live updates over a WebSocket
 paths:
   /auth/login:
     post:
@@ -694,6 +696,44 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /live:
+    get:
+      operationId: openLive
+      summary: Live updates (WebSocket)
+      description: |
+        A same-origin WebSocket that tells the client what to refetch. The server only sends; each
+        message is `{"topic": "...", "childId": "..."}` (childId when the change is about one
+        child), or `{"topic": "resync"}` when the server may have missed changes and the client
+        should refetch everything. Messages carry no names or values. Topics: resync, household,
+        children, credentials, today, tv, calendar, meals, dashboard.
+
+        A cookie-authenticated upgrade must carry an Origin equal to the app's own origin; the
+        library's own same-host check stays on as well. The credential is checked again every
+        60 seconds, and the socket closes when it is revoked or expires. A display receives only
+        topics its display scopes cover.
+      tags:
+        - live
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - today
+      responses:
+        '101':
+          description: Switched to the WebSocket protocol
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '426':
+          description: Not a WebSocket upgrade request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         default:
           $ref: '#/components/responses/Error'
 components:

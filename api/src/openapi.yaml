@@ -29,6 +29,8 @@ tags:
     description: Children of the household
   - name: credentials
     description: Service and assistant credentials
+  - name: live
+    description: Live updates over a WebSocket
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -60,6 +62,8 @@ paths:
     $ref: displays.yaml#/displays
   /displays/{displayId}:
     $ref: displays.yaml#/display
+  /live:
+    $ref: live.yaml#/live
 
 components:
   securitySchemes:
