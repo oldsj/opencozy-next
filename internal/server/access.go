@@ -45,7 +45,8 @@ func (s *Server) route(next http.Handler) http.Handler {
 			writeForbidden(w)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(withRoute(r.Context(), routeInfo{policy: p, params: params})))
+		ctx := context.WithValue(withRoute(r.Context(), routeInfo{policy: p, params: params}), originKey{}, requestOrigin(r))
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

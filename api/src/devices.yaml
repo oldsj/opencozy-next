@@ -11,7 +11,7 @@ pairings:
     operationId: createDevicePairing
     summary: Offer a pairing for one child's device
     description: >
-      The offer lasts 10 minutes and works once. Show `code` (and a QR code of `qrPayload`) to
+      The offer lasts 5 minutes and works once. Show `code` (and a QR code of `qrPayload`) to
       the device. The token and code are shown only in this answer.
     tags: [devices]
     x-actors: [adult]
@@ -205,7 +205,7 @@ pair:
             code: ABCD-EF23
             publicKey: BPd0ExampleOnlyBase64X963PointOf65BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
             proof: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-            platform: ipad
+            platform: ios
             name: Robin's iPad
     responses:
       '201':
@@ -313,7 +313,7 @@ schemas:
     description: Shown on a locked device's shield
   Platform:
     type: string
-    enum: [ipad, iphone]
+    enum: [ios, android]
   DevicePairingOffer:
     type: object
     additionalProperties: false

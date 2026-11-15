@@ -411,7 +411,7 @@ export interface paths {
         put?: never;
         /**
          * Offer a pairing for one child's device
-         * @description The offer lasts 10 minutes and works once. Show `code` (and a QR code of `qrPayload`) to the device. The token and code are shown only in this answer.
+         * @description The offer lasts 5 minutes and works once. Show `code` (and a QR code of `qrPayload`) to the device. The token and code are shown only in this answer.
          */
         post: operations["createDevicePairing"];
         delete?: never;
@@ -1151,7 +1151,7 @@ export interface components {
         };
         DeviceName: string;
         /** @enum {string} */
-        Platform: "ipad" | "iphone";
+        Platform: "ios" | "android";
         DeviceChild: {
             id: components["schemas"]["Id"];
             name: string;
@@ -2643,7 +2643,7 @@ export interface operations {
                  *       "code": "ABCD-EF23",
                  *       "publicKey": "BPd0ExampleOnlyBase64X963PointOf65BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
                  *       "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-                 *       "platform": "ipad",
+                 *       "platform": "ios",
                  *       "name": "Robin's iPad"
                  *     }
                  */

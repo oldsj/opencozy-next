@@ -34,12 +34,17 @@ type Resolver struct {
 // all. A credential that is present but not live gives ErrUnauthenticated; other errors are
 // database failures.
 //
-// A request with an Authorization header is resolved from it alone. Otherwise cookies are tried
+// A signed device request (X-OpenCozy-Device) is resolved from its signature alone, and a
+// request with an Authorization header from it alone. Otherwise cookies are tried
 // in order: device web session, adult, display; the first live one wins (an iPad's web view can
 // hold several). A present but dead cookie is skipped, not an error, because browsers keep
 // stale cookies; only when no cookie is live and at least one was present is the result
 // ErrUnauthenticated.
 func (rv Resolver) Resolve(ctx context.Context, r *http.Request) (a Actor, ok bool, err error) {
+	if r.Header.Get(DeviceHeader) != "" {
+		a, err := rv.signed(ctx, r)
+		return a, err == nil, err
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		a, err := rv.bearer(ctx, h)
 		return a, err == nil, err
@@ -120,6 +125,14 @@ func (rv Resolver) byHash(ctx context.Context, kind Kind, hash []byte) (Actor, e
 			return Actor{}, notFound(err)
 		}
 		return Actor{Kind: Phone, HouseholdID: row.HouseholdID, AdultID: row.AdultID, CredentialID: row.ID, AllChildren: true, TokenHash: hash}, nil
+	case DeviceWeb:
+		row, err := rv.Q.GetDeviceWebSession(ctx, hash)
+		if err != nil {
+			return Actor{}, notFound(err)
+		}
+		a := deviceActor(row.HouseholdID, row.DeviceID, row.ChildID)
+		a.Kind, a.TokenHash = DeviceWeb, hash
+		return a, nil
 	case Service, Assistant:
 		row, err := rv.Q.GetCredentialByHash(ctx, hash)
 		if err != nil {
@@ -150,7 +163,13 @@ func (rv Resolver) byHash(ctx context.Context, kind Kind, hash []byte) (Actor, e
 // lock, so a revocation that committed while the command waited is seen (design rule 4).
 // ErrUnauthenticated if the credential is gone or no longer the same one.
 func (rv Resolver) Recheck(ctx context.Context, a Actor) (Actor, error) {
-	fresh, err := rv.byHash(ctx, a.Kind, a.TokenHash)
+	var fresh Actor
+	var err error
+	if a.Kind == Device {
+		fresh, err = rv.device(ctx, a.CredentialID)
+	} else {
+		fresh, err = rv.byHash(ctx, a.Kind, a.TokenHash)
+	}
 	if err != nil {
 		return Actor{}, err
 	}
@@ -160,10 +179,9 @@ func (rv Resolver) Recheck(ctx context.Context, a Actor) (Actor, error) {
 	return fresh, nil
 }
 
-// deviceWeb resolves a device web session. Devices arrive in slice 7; until then no such
-// session exists.
-func (rv Resolver) deviceWeb(context.Context, string) (Actor, error) {
-	return Actor{}, ErrUnauthenticated
+// deviceWeb resolves a device web session (the kid view in the app's web view).
+func (rv Resolver) deviceWeb(ctx context.Context, token string) (Actor, error) {
+	return rv.byHash(ctx, DeviceWeb, auth.HashToken(token))
 }
 
 func notFound(err error) error {

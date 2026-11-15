@@ -49,6 +49,9 @@ func (s *Server) SweepSessions(ctx context.Context) {
 		} else if n > 0 {
 			s.log.InfoContext(ctx, "expired sessions deleted", "count", n)
 		}
+		if err := s.q.DeleteExpiredDeviceState(ctx); err != nil && ctx.Err() == nil {
+			s.log.WarnContext(ctx, "device sweep", "err", err)
+		}
 		if _, err := s.q.DeleteExpiredChallenges(ctx); err != nil && ctx.Err() == nil {
 			s.log.WarnContext(ctx, "passkey challenge sweep", "err", err)
 		}

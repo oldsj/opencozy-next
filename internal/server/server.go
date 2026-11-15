@@ -71,6 +71,7 @@ func (s *Server) Handler() (http.Handler, error) {
 
 	app := http.NewServeMux()
 	app.Handle("/api/", http.StripPrefix("/api", apiHandler))
+	app.HandleFunc("GET /device/session", s.deviceSessionPage)
 	app.Handle("/", web.Handler(web.Dist()))
 
 	// Go's CSRF defence: refuses cross-origin unsafe requests using Sec-Fetch-Site and Origin.
@@ -151,8 +152,9 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	// must not use up the sign-in attempts of an adult at the same address.
 	limited := httpx.NewRateLimiter(s.cfg.AuthRatePerMinute).Middleware
 	pairing := httpx.NewRateLimiter(pairingRatePerMinute).Middleware
+	devicePairing := httpx.NewRateLimiter(devicePairRatePerMinute).Middleware
 	limitAuth := func(next http.Handler) http.Handler {
-		auth, pair := limited(next), pairing(next)
+		auth, pair, devicePair := limited(next), pairing(next), devicePairing(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.Method != http.MethodPost:
@@ -161,6 +163,8 @@ func (s *Server) apiHandler() (http.Handler, error) {
 				auth.ServeHTTP(w, r)
 			case strings.HasPrefix(r.URL.Path, "/display/pairings"):
 				pair.ServeHTTP(w, r)
+			case r.URL.Path == "/device/pair":
+				devicePair.ServeHTTP(w, r)
 			default:
 				next.ServeHTTP(w, r)
 			}
