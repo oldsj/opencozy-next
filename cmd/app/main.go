@@ -80,6 +80,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		defer pool.Close()
 		srv := server.New(cfg, log, pool)
+		var google *calendar.Google
+		if cfg.GoogleEnabled() {
+			if google, err = calendar.NewGoogle(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL()); err != nil {
+				return err
+			}
+			srv.UseGoogle(google)
+		}
 		h, err := srv.Handler()
 		if err != nil {
 			return err
@@ -92,7 +99,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 			if err != nil {
 				return err
 			}
-			go jobs.Runner{Pool: pool, Log: log}.Run(ctx, calendar.Job(cfg.SecretKeys, fetcher, log, srv.CalendarWake()))
+			go jobs.Runner{Pool: pool, Log: log}.Run(ctx, calendar.Job(cfg.SecretKeys, fetcher.WithGoogle(google), log, srv.CalendarWake()))
 		}
 		return server.Serve(ctx, log, cfg.ListenAddr, h, srv.Drain)
 	case "import": // copy the old app's data into this empty installation

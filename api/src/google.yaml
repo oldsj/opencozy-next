@@ -1,0 +1,293 @@
+# Google calendar (slice 13b). An adult connects a Google account through Google's consent page
+# (OAuth with PKCE), then follows any of its calendars; each becomes a calendar source.
+connect:
+  post:
+    operationId: connectGoogle
+    summary: Start connecting a Google account
+    description: |
+      Returns Google's consent page to open in this browser. Google sends the adult back to
+      `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
+      within ten minutes. 422 `not_configured` when this server has no Google client
+      (GOOGLE_CLIENT_ID); 422 `too_many_connections` past 10 accounts.
+    tags: [calendar]
+    x-actors: [adult]
+    x-command: true
+    x-record-response: false
+    x-body-limit: 1
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    responses:
+      '200':
+        description: Open authorizeUrl
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/GoogleConnectStart'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+callback:
+  get:
+    operationId: googleCallback
+    summary: Where Google sends the adult back after consent
+    description: |
+      Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
+      `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
+      calendar permission was unticked), `expired` (no such connect for this adult, or used or
+      older than ten minutes) or `failed`. Connecting an account that is already connected
+      replaces its token and clears "reconnect needed".
+    tags: [calendar]
+    x-actors: [adult]
+    parameters:
+      - name: state
+        in: query
+        schema:
+          type: string
+          maxLength: 128
+      - name: code
+        in: query
+        schema:
+          type: string
+          maxLength: 2048
+      - name: error
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+    responses:
+      '303':
+        description: Back to the calendars screen
+        headers:
+          Location:
+            required: true
+            schema:
+              type: string
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+connections:
+  get:
+    operationId: listGoogleConnections
+    summary: The Google accounts this household has connected
+    description: Tokens are never returned. `enabled` is false when this server has no Google client.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The accounts, by address
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/GoogleConnectionList'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+connection:
+  parameters:
+    - $ref: '#/parameters/ConnectionId'
+  delete:
+    operationId: disconnectGoogle
+    summary: Disconnect a Google account, with every calendar followed through it
+    description: |
+      Deletes the account's token (and asks Google to revoke it) and stops following its
+      calendars, with their events and who they were for.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+    responses:
+      '204':
+        description: Disconnected
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      default:
+        $ref: common.yaml#/responses/Error
+connectionCalendars:
+  parameters:
+    - $ref: '#/parameters/ConnectionId'
+  get:
+    operationId: listGoogleCalendars
+    summary: The calendars a connected Google account can read
+    description: |
+      Asks Google. 422 `reconnect_needed` when Google no longer accepts the account's token;
+      502 `google_unavailable` when Google could not be reached.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The account's calendars
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/GoogleCalendarList'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: followGoogleCalendar
+    summary: Follow one of a connected account's calendars
+    description: |
+      The first refresh runs within a minute. 409 `calendar_exists` when the household already
+      follows it; 422 `too_many_calendars` past 50, `reconnect_needed` when the account must be
+      connected again.
+    tags: [calendar]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 4096
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewGoogleCalendar'
+          example: { googleId: family@group.calendar.example.test, name: Family, color: sky, showOnDisplay: true }
+    responses:
+      '201':
+        description: Following
+        content:
+          application/json:
+            schema:
+              $ref: calendar.yaml#/schemas/CalendarSource
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+parameters:
+  ConnectionId:
+    name: connectionId
+    in: path
+    required: true
+    schema:
+      $ref: common.yaml#/schemas/Id
+
+schemas:
+  GoogleConnectStart:
+    type: object
+    required: [authorizeUrl]
+    properties:
+      authorizeUrl:
+        type: string
+        description: Google's consent page; open it in this browser tab.
+  GoogleConnection:
+    type: object
+    required: [id, email, needsReconnect, calendars, version]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      email:
+        type: string
+      needsReconnect:
+        type: boolean
+        description: Google no longer accepts the token; connect the account again.
+      calendars:
+        type: integer
+        description: How many of its calendars the household follows
+      version:
+        type: integer
+  GoogleConnectionList:
+    type: object
+    required: [enabled, connections]
+    properties:
+      enabled:
+        type: boolean
+      connections:
+        type: array
+        maxItems: 10
+        items:
+          $ref: '#/schemas/GoogleConnection'
+  GoogleCalendar:
+    type: object
+    required: [googleId, name, primary]
+    properties:
+      googleId:
+        type: string
+      name:
+        type: string
+      primary:
+        type: boolean
+      calendarId:
+        $ref: common.yaml#/schemas/Id
+        description: Set when the household follows it
+  GoogleCalendarList:
+    type: object
+    required: [calendars]
+    properties:
+      calendars:
+        type: array
+        maxItems: 500
+        items:
+          $ref: '#/schemas/GoogleCalendar'
+  NewGoogleCalendar:
+    type: object
+    additionalProperties: false
+    required: [googleId, name, color, showOnDisplay]
+    properties:
+      googleId:
+        type: string
+        minLength: 1
+        maxLength: 1024
+      name:
+        $ref: calendar.yaml#/schemas/CalendarName
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+      showOnDisplay:
+        type: boolean

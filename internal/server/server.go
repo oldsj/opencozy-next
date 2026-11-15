@@ -44,6 +44,7 @@ type Server struct {
 	// calendarWake starts the calendar refresh early (slice 13a).
 	calendarWake chan struct{}
 	wa           *webauthn.WebAuthn // nil when passkeys are off
+	google       googleAPI          // nil when Google calendar is off (slice 13b)
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)

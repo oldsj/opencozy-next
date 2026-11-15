@@ -608,15 +608,18 @@ type CalendarResponse struct {
 
 // CalendarSource defines model for CalendarSource.
 type CalendarSource struct {
-	Color         ProfileColor           `json:"color"`
-	Error         *CalendarErrorCode     `json:"error,omitempty"`
-	Id            Id                     `json:"id"`
-	LastSyncAt    *time.Time             `json:"lastSyncAt,omitempty"`
-	Name          string                 `json:"name"`
-	Provider      CalendarSourceProvider `json:"provider"`
-	ShowOnDisplay bool                   `json:"showOnDisplay"`
-	Status        CalendarSourceStatus   `json:"status"`
-	Version       int                    `json:"version"`
+	Color ProfileColor       `json:"color"`
+	Error *CalendarErrorCode `json:"error,omitempty"`
+
+	// GoogleConnectionId For a Google calendar, the account it is followed through
+	GoogleConnectionId *Id                    `json:"googleConnectionId,omitempty"`
+	Id                 Id                     `json:"id"`
+	LastSyncAt         *time.Time             `json:"lastSyncAt,omitempty"`
+	Name               string                 `json:"name"`
+	Provider           CalendarSourceProvider `json:"provider"`
+	ShowOnDisplay      bool                   `json:"showOnDisplay"`
+	Status             CalendarSourceStatus   `json:"status"`
+	Version            int                    `json:"version"`
 }
 
 // CalendarSourceProvider defines model for CalendarSource.Provider.
@@ -810,6 +813,44 @@ type ErrorDetail struct {
 // ExternalId defines model for ExternalId.
 type ExternalId = string
 
+// GoogleCalendar defines model for GoogleCalendar.
+type GoogleCalendar struct {
+	// CalendarId Set when the household follows it
+	CalendarId *Id    `json:"calendarId,omitempty"`
+	GoogleId   string `json:"googleId"`
+	Name       string `json:"name"`
+	Primary    bool   `json:"primary"`
+}
+
+// GoogleCalendarList defines model for GoogleCalendarList.
+type GoogleCalendarList struct {
+	Calendars []GoogleCalendar `json:"calendars"`
+}
+
+// GoogleConnectStart defines model for GoogleConnectStart.
+type GoogleConnectStart struct {
+	// AuthorizeUrl Google's consent page; open it in this browser tab.
+	AuthorizeUrl string `json:"authorizeUrl"`
+}
+
+// GoogleConnection defines model for GoogleConnection.
+type GoogleConnection struct {
+	// Calendars How many of its calendars the household follows
+	Calendars int    `json:"calendars"`
+	Email     string `json:"email"`
+	Id        Id     `json:"id"`
+
+	// NeedsReconnect Google no longer accepts the token; connect the account again.
+	NeedsReconnect bool `json:"needsReconnect"`
+	Version        int  `json:"version"`
+}
+
+// GoogleConnectionList defines model for GoogleConnectionList.
+type GoogleConnectionList struct {
+	Connections []GoogleConnection `json:"connections"`
+	Enabled     bool               `json:"enabled"`
+}
+
 // History defines model for History.
 type History struct {
 	Balance int64 `json:"balance"`
@@ -986,6 +1027,14 @@ type NewDisplay struct {
 	Code   string         `json:"code"`
 	Name   string         `json:"name"`
 	Scopes []DisplayScope `json:"scopes"`
+}
+
+// NewGoogleCalendar defines model for NewGoogleCalendar.
+type NewGoogleCalendar struct {
+	Color         ProfileColor `json:"color"`
+	GoogleId      string       `json:"googleId"`
+	Name          CalendarName `json:"name"`
+	ShowOnDisplay bool         `json:"showOnDisplay"`
 }
 
 // NewLearningLink defines model for NewLearningLink.
@@ -1317,6 +1366,9 @@ type TodayItemState string
 // Version Counts saves; send it back as expectedVersion to save over exactly this one
 type Version = int
 
+// ConnectionId defines model for ConnectionId.
+type ConnectionId = Id
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
@@ -1365,6 +1417,36 @@ type GetCalendarParams struct {
 
 // AssignEventChildrenParams defines parameters for AssignEventChildren.
 type AssignEventChildrenParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GoogleCallbackParams defines parameters for GoogleCallback.
+type GoogleCallbackParams struct {
+	State *string `form:"state,omitempty" json:"state,omitempty"`
+	Code  *string `form:"code,omitempty" json:"code,omitempty"`
+	Error *string `form:"error,omitempty" json:"error,omitempty"`
+}
+
+// ConnectGoogleParams defines parameters for ConnectGoogle.
+type ConnectGoogleParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DisconnectGoogleParams defines parameters for DisconnectGoogle.
+type DisconnectGoogleParams struct {
+	ExpectedVersion int `form:"expectedVersion" json:"expectedVersion"`
+
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// FollowGoogleCalendarParams defines parameters for FollowGoogleCalendar.
+type FollowGoogleCalendarParams struct {
 	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
 	// same body, gets the first answer (for 30 days) instead of doing it again.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -1792,6 +1874,9 @@ type AddPasskeyJSONRequestBody = NewPasskey
 // AssignEventChildrenJSONRequestBody defines body for AssignEventChildren for application/json ContentType.
 type AssignEventChildrenJSONRequestBody = AssignChildren
 
+// FollowGoogleCalendarJSONRequestBody defines body for FollowGoogleCalendar for application/json ContentType.
+type FollowGoogleCalendarJSONRequestBody = NewGoogleCalendar
+
 // AddCalendarLinkJSONRequestBody defines body for AddCalendarLink for application/json ContentType.
 type AddCalendarLinkJSONRequestBody = NewCalendarLink
 
@@ -1929,6 +2014,24 @@ type ServerInterface interface {
 	// AssignEventChildren Say which children an event is for
 	// (PUT /calendar/events/{eventId}/children)
 	AssignEventChildren(w http.ResponseWriter, r *http.Request, eventId Id, params AssignEventChildrenParams)
+	// GoogleCallback Where Google sends the adult back after consent
+	// (GET /calendar/google/callback)
+	GoogleCallback(w http.ResponseWriter, r *http.Request, params GoogleCallbackParams)
+	// ConnectGoogle Start connecting a Google account
+	// (POST /calendar/google/connect)
+	ConnectGoogle(w http.ResponseWriter, r *http.Request, params ConnectGoogleParams)
+	// ListGoogleConnections The Google accounts this household has connected
+	// (GET /calendar/google/connections)
+	ListGoogleConnections(w http.ResponseWriter, r *http.Request)
+	// DisconnectGoogle Disconnect a Google account, with every calendar followed through it
+	// (DELETE /calendar/google/connections/{connectionId})
+	DisconnectGoogle(w http.ResponseWriter, r *http.Request, connectionId ConnectionId, params DisconnectGoogleParams)
+	// ListGoogleCalendars The calendars a connected Google account can read
+	// (GET /calendar/google/connections/{connectionId}/calendars)
+	ListGoogleCalendars(w http.ResponseWriter, r *http.Request, connectionId ConnectionId)
+	// FollowGoogleCalendar Follow one of a connected account's calendars
+	// (POST /calendar/google/connections/{connectionId}/calendars)
+	FollowGoogleCalendar(w http.ResponseWriter, r *http.Request, connectionId ConnectionId, params FollowGoogleCalendarParams)
 	// ListCalendars The calendars the household follows
 	// (GET /calendars)
 	ListCalendars(w http.ResponseWriter, r *http.Request)
@@ -2438,6 +2541,271 @@ func (siw *ServerInterfaceWrapper) AssignEventChildren(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AssignEventChildren(w, r, eventId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GoogleCallback operation middleware
+func (siw *ServerInterfaceWrapper) GoogleCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GoogleCallbackParams
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error", r.URL.Query(), &params.Error, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GoogleCallback(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConnectGoogle operation middleware
+func (siw *ServerInterfaceWrapper) ConnectGoogle(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConnectGoogleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConnectGoogle(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListGoogleConnections operation middleware
+func (siw *ServerInterfaceWrapper) ListGoogleConnections(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGoogleConnections(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisconnectGoogle operation middleware
+func (siw *ServerInterfaceWrapper) DisconnectGoogle(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "connectionId" -------------
+	var connectionId ConnectionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "connectionId", r.PathValue("connectionId"), &connectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "connectionId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DisconnectGoogleParams
+
+	// ------------- Required query parameter "expectedVersion" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedVersion", r.URL.Query(), &params.ExpectedVersion, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedVersion"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedVersion", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisconnectGoogle(w, r, connectionId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListGoogleCalendars operation middleware
+func (siw *ServerInterfaceWrapper) ListGoogleCalendars(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "connectionId" -------------
+	var connectionId ConnectionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "connectionId", r.PathValue("connectionId"), &connectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "connectionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGoogleCalendars(w, r, connectionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FollowGoogleCalendar operation middleware
+func (siw *ServerInterfaceWrapper) FollowGoogleCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "connectionId" -------------
+	var connectionId ConnectionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "connectionId", r.PathValue("connectionId"), &connectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "connectionId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FollowGoogleCalendarParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FollowGoogleCalendar(w, r, connectionId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5259,6 +5627,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/calendars", wrapper.AddCalendarLink)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/calendars/{calendarId}", wrapper.RemoveCalendar)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/calendars/{calendarId}", wrapper.UpdateCalendar)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/calendar/google/connect", wrapper.ConnectGoogle)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/calendar/google/callback", wrapper.GoogleCallback)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/calendar/google/connections", wrapper.ListGoogleConnections)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/calendar/google/connections/{connectionId}", wrapper.DisconnectGoogle)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/calendar/google/connections/{connectionId}/calendars", wrapper.ListGoogleCalendars)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/calendar/google/connections/{connectionId}/calendars", wrapper.FollowGoogleCalendar)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/learning/rules", wrapper.ListAwardRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/learning/rules", wrapper.CreateAwardRule)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/learning/rules/{ruleId}", wrapper.UpdateAwardRule)
@@ -6652,6 +7026,634 @@ type AssignEventChildrendefaultJSONResponse struct {
 }
 
 func (response AssignEventChildrendefaultJSONResponse) VisitAssignEventChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GoogleCallbackRequestObject struct {
+	Params GoogleCallbackParams
+}
+
+type GoogleCallbackResponseObject interface {
+	VisitGoogleCallbackResponse(w http.ResponseWriter) error
+}
+
+type GoogleCallback303ResponseHeaders struct {
+	Location string
+}
+
+type GoogleCallback303Response struct {
+	Headers GoogleCallback303ResponseHeaders
+}
+
+func (response GoogleCallback303Response) VisitGoogleCallbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.WriteHeader(303)
+	return nil
+}
+
+type GoogleCallback400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GoogleCallback400JSONResponse) VisitGoogleCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GoogleCallback401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GoogleCallback401JSONResponse) VisitGoogleCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GoogleCallback403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GoogleCallback403JSONResponse) VisitGoogleCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GoogleCallbackdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GoogleCallbackdefaultJSONResponse) VisitGoogleCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogleRequestObject struct {
+	Params ConnectGoogleParams
+}
+
+type ConnectGoogleResponseObject interface {
+	VisitConnectGoogleResponse(w http.ResponseWriter) error
+}
+
+type ConnectGoogle200JSONResponse GoogleConnectStart
+
+func (response ConnectGoogle200JSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogle400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ConnectGoogle400JSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogle401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ConnectGoogle401JSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogle403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ConnectGoogle403JSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogle409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ConnectGoogle409JSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogle422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ConnectGoogle422JSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConnectGoogledefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ConnectGoogledefaultJSONResponse) VisitConnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleConnectionsRequestObject struct {
+}
+
+type ListGoogleConnectionsResponseObject interface {
+	VisitListGoogleConnectionsResponse(w http.ResponseWriter) error
+}
+
+type ListGoogleConnections200JSONResponse GoogleConnectionList
+
+func (response ListGoogleConnections200JSONResponse) VisitListGoogleConnectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleConnections400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListGoogleConnections400JSONResponse) VisitListGoogleConnectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleConnections401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListGoogleConnections401JSONResponse) VisitListGoogleConnectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleConnections403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListGoogleConnections403JSONResponse) VisitListGoogleConnectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleConnectionsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListGoogleConnectionsdefaultJSONResponse) VisitListGoogleConnectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisconnectGoogleRequestObject struct {
+	ConnectionId ConnectionId `json:"connectionId"`
+	Params       DisconnectGoogleParams
+}
+
+type DisconnectGoogleResponseObject interface {
+	VisitDisconnectGoogleResponse(w http.ResponseWriter) error
+}
+
+type DisconnectGoogle204Response struct {
+}
+
+func (response DisconnectGoogle204Response) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DisconnectGoogle400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DisconnectGoogle400JSONResponse) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisconnectGoogle401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DisconnectGoogle401JSONResponse) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisconnectGoogle403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DisconnectGoogle403JSONResponse) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisconnectGoogle404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DisconnectGoogle404JSONResponse) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisconnectGoogle409JSONResponse struct{ ConflictJSONResponse }
+
+func (response DisconnectGoogle409JSONResponse) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisconnectGoogledefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DisconnectGoogledefaultJSONResponse) VisitDisconnectGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendarsRequestObject struct {
+	ConnectionId ConnectionId `json:"connectionId"`
+}
+
+type ListGoogleCalendarsResponseObject interface {
+	VisitListGoogleCalendarsResponse(w http.ResponseWriter) error
+}
+
+type ListGoogleCalendars200JSONResponse GoogleCalendarList
+
+func (response ListGoogleCalendars200JSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendars400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListGoogleCalendars400JSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendars401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListGoogleCalendars401JSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendars403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListGoogleCalendars403JSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendars404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListGoogleCalendars404JSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendars422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ListGoogleCalendars422JSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoogleCalendarsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListGoogleCalendarsdefaultJSONResponse) VisitListGoogleCalendarsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendarRequestObject struct {
+	ConnectionId ConnectionId `json:"connectionId"`
+	Params       FollowGoogleCalendarParams
+	Body         *FollowGoogleCalendarJSONRequestBody
+}
+
+type FollowGoogleCalendarResponseObject interface {
+	VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error
+}
+
+type FollowGoogleCalendar201JSONResponse CalendarSource
+
+func (response FollowGoogleCalendar201JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response FollowGoogleCalendar400JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response FollowGoogleCalendar401JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response FollowGoogleCalendar403JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response FollowGoogleCalendar404JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar409JSONResponse struct{ ConflictJSONResponse }
+
+func (response FollowGoogleCalendar409JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response FollowGoogleCalendar413JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendar422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response FollowGoogleCalendar422JSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FollowGoogleCalendardefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response FollowGoogleCalendardefaultJSONResponse) VisitFollowGoogleCalendarResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -13288,6 +14290,24 @@ type StrictServerInterface interface {
 	// AssignEventChildren Say which children an event is for
 	// (PUT /calendar/events/{eventId}/children)
 	AssignEventChildren(ctx context.Context, request AssignEventChildrenRequestObject) (AssignEventChildrenResponseObject, error)
+	// GoogleCallback Where Google sends the adult back after consent
+	// (GET /calendar/google/callback)
+	GoogleCallback(ctx context.Context, request GoogleCallbackRequestObject) (GoogleCallbackResponseObject, error)
+	// ConnectGoogle Start connecting a Google account
+	// (POST /calendar/google/connect)
+	ConnectGoogle(ctx context.Context, request ConnectGoogleRequestObject) (ConnectGoogleResponseObject, error)
+	// ListGoogleConnections The Google accounts this household has connected
+	// (GET /calendar/google/connections)
+	ListGoogleConnections(ctx context.Context, request ListGoogleConnectionsRequestObject) (ListGoogleConnectionsResponseObject, error)
+	// DisconnectGoogle Disconnect a Google account, with every calendar followed through it
+	// (DELETE /calendar/google/connections/{connectionId})
+	DisconnectGoogle(ctx context.Context, request DisconnectGoogleRequestObject) (DisconnectGoogleResponseObject, error)
+	// ListGoogleCalendars The calendars a connected Google account can read
+	// (GET /calendar/google/connections/{connectionId}/calendars)
+	ListGoogleCalendars(ctx context.Context, request ListGoogleCalendarsRequestObject) (ListGoogleCalendarsResponseObject, error)
+	// FollowGoogleCalendar Follow one of a connected account's calendars
+	// (POST /calendar/google/connections/{connectionId}/calendars)
+	FollowGoogleCalendar(ctx context.Context, request FollowGoogleCalendarRequestObject) (FollowGoogleCalendarResponseObject, error)
 	// ListCalendars The calendars the household follows
 	// (GET /calendars)
 	ListCalendars(ctx context.Context, request ListCalendarsRequestObject) (ListCalendarsResponseObject, error)
@@ -13934,6 +14954,169 @@ func (sh *strictHandler) AssignEventChildren(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AssignEventChildrenResponseObject); ok {
 		if err := validResponse.VisitAssignEventChildrenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GoogleCallback operation middleware
+func (sh *strictHandler) GoogleCallback(w http.ResponseWriter, r *http.Request, params GoogleCallbackParams) {
+	var request GoogleCallbackRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GoogleCallback(ctx, request.(GoogleCallbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GoogleCallback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GoogleCallbackResponseObject); ok {
+		if err := validResponse.VisitGoogleCallbackResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConnectGoogle operation middleware
+func (sh *strictHandler) ConnectGoogle(w http.ResponseWriter, r *http.Request, params ConnectGoogleParams) {
+	var request ConnectGoogleRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConnectGoogle(ctx, request.(ConnectGoogleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConnectGoogle")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConnectGoogleResponseObject); ok {
+		if err := validResponse.VisitConnectGoogleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGoogleConnections operation middleware
+func (sh *strictHandler) ListGoogleConnections(w http.ResponseWriter, r *http.Request) {
+	var request ListGoogleConnectionsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGoogleConnections(ctx, request.(ListGoogleConnectionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGoogleConnections")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGoogleConnectionsResponseObject); ok {
+		if err := validResponse.VisitListGoogleConnectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisconnectGoogle operation middleware
+func (sh *strictHandler) DisconnectGoogle(w http.ResponseWriter, r *http.Request, connectionId ConnectionId, params DisconnectGoogleParams) {
+	var request DisconnectGoogleRequestObject
+
+	request.ConnectionId = connectionId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisconnectGoogle(ctx, request.(DisconnectGoogleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisconnectGoogle")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisconnectGoogleResponseObject); ok {
+		if err := validResponse.VisitDisconnectGoogleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGoogleCalendars operation middleware
+func (sh *strictHandler) ListGoogleCalendars(w http.ResponseWriter, r *http.Request, connectionId ConnectionId) {
+	var request ListGoogleCalendarsRequestObject
+
+	request.ConnectionId = connectionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGoogleCalendars(ctx, request.(ListGoogleCalendarsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGoogleCalendars")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGoogleCalendarsResponseObject); ok {
+		if err := validResponse.VisitListGoogleCalendarsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// FollowGoogleCalendar operation middleware
+func (sh *strictHandler) FollowGoogleCalendar(w http.ResponseWriter, r *http.Request, connectionId ConnectionId, params FollowGoogleCalendarParams) {
+	var request FollowGoogleCalendarRequestObject
+
+	request.ConnectionId = connectionId
+	request.Params = params
+
+	var body FollowGoogleCalendarJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FollowGoogleCalendar(ctx, request.(FollowGoogleCalendarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FollowGoogleCalendar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FollowGoogleCalendarResponseObject); ok {
+		if err := validResponse.VisitFollowGoogleCalendarResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -15891,259 +17074,280 @@ func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7L3rdts4ljD6Kjg8s1bsPrQtX+Kq2GvWHJfjdPlUUknbqa7qLuVYMAlZaFOACoDsqDP+1rzDvMP3YPMk",
-	"39obAAlKpETJki/p1I+KTIK47hv29UuUyP5ACiaMjg6+RD1GU6bw5zkz50xrLgX8lTKdKD4w+Ce800Qq",
-	"kmSMKk1Mj5GLix+lNhvafkISKa85i+JIJz3Wp9CFGQ1YdBBpo7i4iu7u7uJoQBXtM+NGPE1ZfyANE8no",
-	"JzaaHPWM/THkiqVECsJumBoRbahhJOlRccU2yRFRzKgRueWmh3PStM/INRvFpKtkv3iU0CxjKm/XFvj0",
-	"UqajmFzB0qBllyttCBX6limy1pWK7LZISkd6nXChDaMpkV2SSi6uCDeEXlEuNtsiiiMOk7U7GcWRoH1Y",
-	"drC4DVhdHCm3nOjAqCELd6pPP79l4sr0ooPtne/jqM9F/jdsmjFMwRj//+//18b/+vT//FsUT2xuHJ0a",
-	"1j9NoTucz4CaXjEbbl9Om8S/KdaNDqL/e6uAkC37Vm+dpvb8FNMDKTTD4/uBpnBCTBv4K5HCMIE/6WCQ",
-	"8YTCKW79Q1t4ajbOiVJS2aHKoPCxx4iyg5FUMk2ENKRPTWIPHgZXNDHRXRwdS9HNePJgk9JyqBIPlGkM",
-	"aEIzxWg6Iuwz10bDpGwfK5/RL4J9HrDEsJQw2yaO3kh1ydOUiYfYEK49svXpCA8plcT0uI4JF0k2TAF7",
-	"qBiRREmtN6TiV1yQodC0mx8wTPpnad7IoUhXP+efJdHDpFccJGC+KRYCszln6oYn7BdBbyjP6GXGHmJe",
-	"huTDAQXEOWmmbpgiQ2F4BlQIpilFl18NFUthqh+lfEvVFXtYlARSCnORMDlASDlgCkd7oUnG+9y4ub2j",
-	"YuSIhl79FM+AW+DwLD10zIJ2jZvjGfy9cYR/O+p9F0e/CDo0Pan4P9nDQF/GbxhJFEuZMJxmm+SjZ1ue",
-	"2iJIWgYIc4N2dhakS3k2VGzTTnygZMK0BoA5EYab0QNh/BirI7dU5yRwqFmK86ck5d0uU0yYAtHvPANC",
-	"YDhKDL/hxgsDIVfcb03hiu32+drmn9rt8/X/qGCNcXSkNb8Sxz2epcqSQZqmHFZAsw8KQNVwpqODLs00",
-	"i6NB8OhLlASfccP6ugmvjGHyp7b1y1Y+JaoUHUVxNBT8jyFz74EP4z7IAWItE8N+dPB7pJmCKcSRTJKh",
-	"UkwkLPpUxfgLlv57MVvfYfGFvPwHsxzy6Jaq9IPkTgbs08+8D2Nut/A/3Gn3JP+aC8OumMo/PxtaIlje",
-	"LFo+wYmToCrp8RuWBi8vpcwYFfA2pTwbvUVqMSELAlL0pTZkgPNGBFbDjJErfsM0kQI4MM9SwgWhpCeH",
-	"mvVkloIAF1UtgqfNznGQb9NkHzdMeXF5/OXYsfA0ikubk3dcWnXRZbBVtScIR3CScjMnQI+d0bQtCBFy",
-	"ztOb2m0Af3dx5EWWvxbbmYPkzvbed3vf7+7vfTcLKouDajz02CE1OZ98CyanXXVOxzRjIqVqgWNKZCbV",
-	"rOV8ULLLM3aMbZe2lfbOMH1kv7KfoS2Qr568fS9ecz3I6KgKQMY2G8eI3SrHP59zc4E5Hcu0RD0N7zM5",
-	"hCMT0lx0UZYEFEyY1hcpExzP0Eh5kaG4FEdc3NCMpxeJ69a97lMxumA3zAKDooZdOIkCG1wzccE+D3BZ",
-	"nyp4Tz7JG8eEx5Axy15X71cc5RNpeBRnrIufLcawSiwKQEmkk1T47M3x7u7uK7zkAAVmn5NsqEGAYQJo",
-	"rWHktscEccuq2I+mdDeTVlCpZCOWNZ427EobqkztWoBhFOwCwMZe4RqtRhtqhjqEO5TGVd9CBxOGGn7D",
-	"KiHDcJOxyWn9MiBGkpetFtwo4U7LlD4kfa41XJ36jApNLod6FM0SBZDn5DsVR/kq7H7YE86XEIBbAEJT",
-	"0Q4g+jUzlGfPCa5Lu129+Xutsd0XIHwTDaKrkSS1VEpXAYTDmtWAvWIgCMIflfu6IFasBqhXD5vhfkyD",
-	"07dcVxBe36NuDE6+v3NUE8yQ8Sfk8ny4aVP92THe4Obz/cTFp5bFAJ5MrnMRMaIptHpBocFhl/j9tD04",
-	"c5feyaU4JjzveVnOezfjgFzn02bmDn45W8yUmv3RpIQzDymh2pyPRHKE0N+Vqk9NdBABW9swHE9jApRq",
-	"DhRl0xueMhVSBZ7oKI6upLzKoDOeZHJYLQTNFA6riI68jvw2xZFgLNUXioH+o3KIOe9iDhzzZdVLojkN",
-	"upkmigJRquCCUy9Mj4Gai26U353g/jNzPyqo2d4UNU67fV4Fksc9qaqQDkZoyuvAijOr5WtosyTFQB0X",
-	"LO3+tCH8tafySPzS/Tilu+poNqhKtYjaYGUbXnFnbbQ1Ta/8haIhP5ZpzT9io0q92tQ9b3RjzbW8lRJz",
-	"qKGcJBfU63xOU31PGdit5t7dKEYNS+dhMPaqrOf5pClCXnORhvxDW6NNFEdUa64NFaaSc9RSSlSglvdo",
-	"os1UmQKxFaeV01HXZ1w67uBAxo453OPpAKXnRGfWd/e2/BDskzgk1zsv9yo2bEC1vpUqHaPtOy/3Z4iq",
-	"Y9vjB8z7q1rha0dJyve0Xxm7BrxzJjApYtIia+dDkdLROtzR9snaOTVDBX9vkpP+wIzgVl++RluTSkpH",
-	"m1FcnHGuMNsP9GStKj1ZIf9/10jF/5ol3JO48mnw5pc2U1Jz0QGIMMxa9v+BBGi2kYD7u1W1eeA1Q7yZ",
-	"BU/lE+kgCHfgNMQwy6ziBFREKfb2Qjv1PNqGnBCxSc7B8kpdG5JQ8cIQmhiyxo0mYLRhqTcWafDUIHut",
-	"7XVn/aSC0HSYGWcB4Hg3p0KaHlN2MOudUcHG4IcU7H03Ovh9BpPCmVnx7i7OCQAsMbr7NK80zphYRBqf",
-	"PUGvhR1QOON5xhhk1EDLmVzUt5sqTvtGjqJFwYzqIS0XnletHX+Ma61d4o9ewTjnMudQG12/Y1rTq5kA",
-	"8zZoOo37AcD8XYoKDeXp0c9H5J9gcYOPDxHLSwY30pVZJm8BJ5tpKd0u5kOWF1S/rYvpS+y3HyhXgfvS",
-	"XLCXsgn79HLQd25kxLlJq/cJ3MSONv5ON/7Z2nh1sfHpy/f7d5Vm8cHwMuNJpecdWFv3X25cjgwjQwEz",
-	"UExrlpIPGzsv960Nlqz99mpzf3c9JiBbpVSl5JJqtr9XliG2W62KsdFwMraJ+3uzgKWYsV93iebghtdD",
-	"C5w4F1fvwQthwSMv79IJv+qZQFFMqCa//fbbbxvwP+eDCFwqG/ToJTPofyiHhmRSXm/QjF8ze3Gg/UEG",
-	"4/weHf1w/Hrj5M3ObvTpYYXnP9Q7mQ4zpqth4S9nBLYAHCD/UB/oKJM0JWuonCGJVIol0Ji8W4+Jkrfk",
-	"cgT/HJJ2tN2OQCQAa4q6Jn0cY0zYygHlu+/Kvo6t7UpXx1Duwm/GryX5DCfXIgdMJPKfow1gSwc32/9h",
-	"HdD+vT1stXaToco24H3KUmJf4HMG/9/ZR5B1LfG3fRlNg+7y6Hu7AbDEDluGKmtGJBEGfd/hKsPTC4Gk",
-	"HhPOWdadEwPSXCicTc5goF7I8WZ/UjBIa8i4Yeoj77OmgD62X26y4SxKvdbvjJ57W7p0mJm3C/PftBi2",
-	"0U282OECC3ZarUksGBMJJnE635sXmshbQfq28aGV3+0NyQrwuMQobigylxc4ITJXHpUeY/lx1cZWnlqh",
-	"Ux6j2E9KNzGPjmHq6dvlnsNXzdQP43qHYl9mkopwrNCzQjqfqpuyYa7PaGb1Ybp3KamqNgXkjtDl42pk",
-	"DsFvncV5fLG2g6p1hF8dfGnE2M8N+FDGpE+THhdsQzGa2ida0Gt2kVDNxjh34WVStep+HSKeg9+zkQSs",
-	"DvAvINxQM+VtzokUhnKhCReGKWF3eIYLoOUT/SlYc/LZdnY6qcN5eQ8/yx+5NlJVIOMlzahIytScC7O/",
-	"V/QSqFWYMIrXSSKC3TJtyE6rFYoR06DGzepEGDWaiTN+psUsqvav1OXEaukcBOSyRvi2mo3bniQpSzgI",
-	"JNzEIFcJWt3RolpSRpVw6iOwGrifKWN997M7FGmNb1Ohfx8DalTcAAhfoacAMfSaae+5SW9rXDIVo7rW",
-	"88FO7odRs1W69k312nM4LVBT6HTHTAGVkBKKQYvd7Vd/Qw/p2MkQJrl11NeGqZT2ZxlbF7ZiTd75p1mt",
-	"TtMSTg2H2MfExE7FpfxcsdWeTjQzdkAnIFrN5rDYXeV88z6qLZfP2FEjzVnp0ogQNMyYsY7PSg4NF8zR",
-	"of7APQZAufCBA5U8louhYdrpdEpG90o34cl3enjZ52ZOqXEe4uHohteNevoRjlsNTFeKpXzC+yVk3K35",
-	"LevFBWKv4v7wFjgDF1feB/zBvMxZSTiZKg8WLcdcVGbgkG0HJ44uPegh1My0PXaq5e9Lcy/7+1cda77D",
-	"YPGbP5YiEKom5QcEsReauEZEyNsobiJ8zWXmX4avBARx/LXeJ+X+Z2StXWMHVdjza7z+w2kVez3tGN9y",
-	"cX1PP5Uy6C/uRMrF9ZxWoAB3mqii8t3LPxyD/XwKlTs2TTVx3gNlhIQoHtAIsLSwIOoeZ0g4pxO+idW9",
-	"q4pUAgF78nFuFl/2Vb9qG70BvFZv3ViJFqjPxgay6wy7qhroHatySWm8ZGlYncMyH7Cm0K8zOTN0CCZ6",
-	"Du3qHehtXCoM/EITbGON0X4yBMNoTXR/J0KccMHGp8mvMO/XVXqq1Bn0S3haya0Zzcrsf9Y+lXn87gxZ",
-	"1o1rh6lbwrk7Ii+4XSpGr7tUwzZkQ5H0ojhKuRBMVYpo0AW4blRtw2i+xb2mo/L6bFRTjT/GXRzdMnZ9",
-	"7n3eZ+z22NYUnzpvr6rt+ZndlgIjH0RWWjjm7iGi5Wp2qfDLF9dzbtRCd6SVRLPFEdhtJmhPz5iBjgn8",
-	"A+5Gt+wyoeM+Va297+fzk3I3MmsoqnZTrttq7zv7FPw8n4K3Zs0+BQd9fz+A4GineQXM57NwTztBEKkS",
-	"ksntBm5r1drlslmhZlvHJeNVQeHD3Rhr4axaDq7Zlw9U62s2N7j1aJYxcdVYnkpK3sbVI9kkQGUi9sF7",
-	"WRTepZtG/n/n739eW48qVrQIRE9sZLG2QgVVzL9mI89QpJtzH3lZmzJdE1g0dXZpLq4mkibMiqfWhg1m",
-	"jnWOjeaiexs7ExuZq5T8VOPSev1cavfTqyLmIoPajO9IgywS4zpAblgfKYpiTFyYspl+Qss3JVkYJBsJ",
-	"eokJ2DA0Swl6ht5yzSxDdnPb25s51XtwIn8euElu0XWb7/Sez5Rd50DeiEG53Sp7MUxjTSsL36hHCOcv",
-	"1thozD+TjBnrCAbR8PyKGx3nXl+tmLyPyXZMTkE0fDtmd/npu3e//WVnOW5f1Sx7urXfLfZXyiu0IpPB",
-	"ebeUm3Lgbc3g7tPqIRdhg5cUlEK/DCoOYCQSlqIXOPExBaRPBb1iyiYvlMMU0gMmPcpFTLQEp3E9VDfo",
-	"QJ5JDA0ofNY3o7hC7l/AsWQeH/Ff9Hx9L2DZCTxA8s2ccj7vcX/1qqUVOWuYhqLKMSyPS+GmDWILHH5F",
-	"S2cpChpOSjdT5RQ/5SmbF0YzP39Zb+puzBDX3IbMC0eD4LNGnMWNM+Yn2poVoJ+PUzn3wC87l1ckRmuJ",
-	"VEle7R5Rk2FrVlRRSX8RDKgkSi7OP05fjwB/h8bgpSPjGU2iOBowiko4w1DvoGmNQ9KH4OoT+tzSjX9+",
-	"+r1wHW/F372qdh4vRO95Qp6bUkJeY/GcEX9XFtGnCOLNO2wUyttEWVwhmQfB1FVC+nSNsj2ARfJ/TT2h",
-	"5WSQ+nbH0vMnC7MnWp2uxBovmlNB29f5sN+nDbzefO/1s/I9rQjfp6PtPC4W09Csenm5j8m9ojKHDY7E",
-	"j3Ru29eGZQ71jKkeP3MXomIlZ/J2UpCHvN6+AcTU5JGemmGg5ybxYa9gy3NXEZD7L206SHFIusOsy7OM",
-	"paRHNblkTNg3m5MBoVQkLMvmk7pzH65mB+7jR3NdySSM5xNexcWiVmlyjnoSzHpGLuXwqmdqPDOtF+iH",
-	"GodP+9zuMIE7BVmjxMYjwxFiOjW3zyibr9eM4jy35tmCRXFvGmcHbdG7JlsGDeEa2aWQMR7CvXTGE0a+",
-	"PyT0EtOF2VBl02M1a15aPpCA9DldU564JtzXibOcJWSM7Vsgjw6YgGzeURwGoedgHAakxwWSVQqjhdpx",
-	"jLeE2bar8ufUIdOifojz6yAfOvdLlT4xDjZq1nHCRi8iM4YnUcYHbE96PLUx+IgFQY62+mObU1+8eJqY",
-	"f11NcxkymsmgACG6SgDNXzQUQKF9A8nTdls5l0Ih/oxyP03eMRcTKucXeqv2cKHr7AozUzW62dpz/9fM",
-	"UZWDz1hEB0hRKVNQ9AaaFDVvOJalkQKDs7FGhHOgB4dJ6IxcM/g/NyCUGZ5cE4zgI9pAbZtD/NTbKLiG",
-	"AKtDrNCRsa4h8JAqRhTrA4cvJcpZQR6Le9O/Knh6dBPTGOw3ocPnzHifzDmS8Jx8ponJRh4aco9HMEfh",
-	"rCavP3Preyp1lt4D9J4RCfP5i95LidPoECZIeXl9yw65+OgXNNWTYuYgfslzlNCo6wkIRQ3/nScTM/aT",
-	"X4LHl527JjsH2ZmusPfODxDIp6XBZyYJCBay0rguFxBVF8Rkgzbz02kQ1nHvYMOCjzUYzUhDswUzjOZU",
-	"M1xkuCO++6rzuVJyOI8XAnT+Z/hmpqDqL9luhFrgsL1N+je7OM17mETmimHEuVTHME5eiIqIu6QnVUkP",
-	"HACAu+5PiCZvuOC6x9I418RhuR+ns3uhnbKOZpW3wUJ/M64D1D2pDAHOEtsKXVSTdrTrwojb0ZKC8Ty3",
-	"Tm0QaqHVqA/uLDZ3Yel+akSU05uc5fHQ42y1UgtWStIgB0yUVuPx595Z2/1+1ecPDESJ8pkeyyGoCTW9",
-	"YfqQaCZSkEpRX0g1GePImBWB3jBbU4w5yQYFXHtSc5ulkHMkQ8XN6BwOw/mTMKqsHRRPCMHTPsp76Bkz",
-	"KHK11MW7+yyGTt0GC2QooR99OCXhBzUFI3/beD9g4hiyE0GH1AxVwMnogHuffxzmV3aZl3rMa2+6nlxp",
-	"zjwLzmQXhb/z1A5cs4oedFEpdFoPvtlED3doJOzK6vCdW66Kmo5B9TO/QSTJOBNmk5zQpEdS2accCs3l",
-	"Ree0LarGMQMlV5jeBvhrW3BB6IBvaZVsHZJOn14zcsVEh1wORZoxTHjTJ1yAD9GAbwEW0QHfHNF+Flsp",
-	"usfIn6Uvw7fms3Js0QFfbwvf4uNowM5xTW6mZO2WXeKoODqSgs0rJjaNXsf71RUTMHeWWgWa6VGz2RZt",
-	"8ac//dqTWEsRqhGS2x41f/oTXNNSlmTU10aFXcgXX0zUtsGH8InBuFCWXLdFMPGh6f1z/YB0Pm/QxEil",
-	"OyTj2hXYwicECCUUdMvkLUvJWsdmYevguQhMMsBYytL1uC06nzesS3gHv7e/CSUuFy9aAnwy3qDmHfag",
-	"Y5iEg7mKbtqCklvYBNck+AiZ8wYWl7VfDKjpkbzYLGRBwLqTVjGJnyiWMGE2YPkdQkVbOAsTvxIbXOCF",
-	"mAuy3SJODWh3tfN5A0odbmAFIDsU/E0SOgBog3x5mqy53EVkf4/8xH9Y32yLI1GcT37ZDrac61x3CMNo",
-	"Iwf2BBygWduCoQr4KwJGkPn3wJ6VzRjCLokvyeuOvFPGxY4r1RuTse3EwridMur7xoewmQDHg54UsMSO",
-	"TAYXnfU4P9niMO3bf1501nEt+XnrtoAXFF4g7e8cuUKLuC0H5Acku51NcjKl1KFfFRZI3Gttb8JWQClR",
-	"zQ2z9YE3sBQrHHieOha1JXYp2ukz7G5fjsif5QtNOkDjN7Gn95j57YOSxpqvOg4RK6m8/tOfyBrusn3e",
-	"sTgTO0PQd+ugsLE5UMk1T0EWQhhzyYfbwvVT6HNshsVrNgLe2KcpI9RgD1xcxQBkXTn09Sr1QVt0Ar7x",
-	"2s1hrXBiJDxdj0nYCC432tD+oEPWfhH8M9EskSLViL9Bu5+lwL629//nv/57fy/Mcyi7pFPKMdmJQW8U",
-	"UGq3LASBcrc5b+uQtZPj1+dHbsXI5s9/PII/YqLoLVH/+Z9hlryYfL8fTGKdyC4cDCGEvP9w8vPx+7//",
-	"beP1yV9Pj082/rrdbtv0fMm7k48/vn/t8vj5h0geADj/GDI1ikH60EwYl7IRaPTYB8bv2dhzAXs09qzH",
-	"PhPdo7imbk4ixhrlh+Oei7Y4IvkopC8VyA5UkP2WPx8iu11AWhwzr6+pGRMFz8gP3eZezqg2bbHbyvsA",
-	"KkaG4lpgjDXUkXWwab+Li1zMtz2p85KKRcpmVxvrkqZtof1JAm/A7MwhYh4SbjTpvKaGdRy4kszX2gY0",
-	"cHkjsVkCod628qkdvy1oYkDSy0YIVdAI5mzzOpNTwGl2SW44uwUrbJnSeVS0CE/WHG5u3LLLTkx29tqi",
-	"J4cKNiPT0o6Bk4C+LcIqhtZbtxeuH5uJyQ7l0VYKP7UDG2XMTVuAFlWSTApwPMaicqVvsOL4Xms7djm+",
-	"CuotVU6N3ZiXTPOUYfInKtyeA2UDFtXjGXMJ0P2EAz6yttd6RTrXPL1w2wF86BilEe3ob4CV9sUBsdBJ",
-	"Bw7Qt+zfTltvn3UOgZFie2KkJJBSqOvqwTl2ZVe4s28TcLvbRZRLb0cfTgMTwEHU2tzebFkfYJS3ooNo",
-	"Fx+hiqqHYjoKKluuEBU8GDgzYs5XQW2Ixb+56gORORWF7fsHmTYphusc8r3fqU1yH1E8SsIEOEjknuXR",
-	"XVg8fU6P1mWkz5+SNr/c1GWfL9Vu32ntVd3PfJmvuzjaa7XqrrJ5T1tBCXj8ZHv2J6X6yvjR7uyPihrm",
-	"8MXOq9lfjNeavstTSs7+1lc7jiPt3d6iE+HLRuehBfQKwwgA9oObB5JhwUCSI1bI9EJlFEeGXmG0hy9j",
-	"5CXAIlMDPixkTFAUv9qHqVgEyOQVF/Xg/xZf3wPsXf4LO5n/173YNAxtynPixNSA60JcbAauraXVsn7H",
-	"qgpZO+kOd88JV9DROTMbx/ZuW9Ota7x1zsy5u+3e3T0o/rxafZnvozyhkGOJayFniUvsLaFKoZhdZp/r",
-	"h4gHwLlYptltjykMANvb3m2Ezbaq/WOh/7mbOorpiCQoP+aAPx217Y25AW7LoZmK3HJoXbhmUXIHzXDL",
-	"XEMhx5fjUAwrcAjpb4nry4P3een4/Q8E1gfHwJzCI1A3LXAa28VRWCPIFas4hT+DZTZ6cPoEorEtiALq",
-	"CcsrHo7l3uuoKqbuVVRckTBFdwP2WJzRoAgfrMYXFwl0f1mwFI0VtbZfvezupHsb4LW28R3873v4Xyv4",
-	"LxqLyLprzBjH48a+McdvzPFZMUdKPGIuSIX3d7/fm8Dy2Tc/hzjuDvNVo/szvro9C3h2m2mNjaFFoADu",
-	"lV/7pqPBVhAt3QQdfAz3CjnHWLR4BZ10r6zdiN7wK2qk2iwQR29esQcFxtbe7C9+luYNpvW/N5E0VBni",
-	"zs8mGhiHLue2NwIFfx6PvJhU1BhArHT03OBjzoN7HK6IBx4qbBdhjxMnq2tvJhA5+qEAm1WfZOUZ/i2E",
-	"3Rh0w0wb0uVKP5vryt8WQL+4BsmO0vRDftyPKZDkjhlv6cDIQXNFXZCurJFssr1sMKuUuNP0yUs6rQYk",
-	"B7hzxhOzoGi002QhAyUTpjXEAJ0Iw83o3ghylKaNydg06QYeBm4YRb7BMr1rzMrO2BXXRoXZX546Q7O5",
-	"eL5ymQdsY+h9MzfINIGOL+7XaXpnr0UZM2wSRs4wgCUkxrOuVPaL9CkfztxE5l6naTekOMdDTJ+Frkq3",
-	"Ul3jGYNFPGH3OeE4yv22NNaaQ/9CsAMX3oX5kUfjDKkpW8M6AcC3t/IKZoVYNRZUcwNf2gseOKlkdGC9",
-	"66D++O/gehETI9djWHxfakP2dvDdJgFPm5Qw+z1VjJy9Od7d3X3l3DPaItd9YqbyPsOaPYfgTrEBEVrB",
-	"lyk1zLkxUUHY5yQbanBxZCLdJMc+ujr4oi2sc4FGP8mj3K9AM+bcKvzCNdE+5b5rpK3dfkLvfVwUe6s6",
-	"I3SmKQ4Jdmbq+cxMwj1xEn7ZUVw5opH3Gu/TCpmF37qyomdSxW8PECt9obvf0xZy7mdRt7B6ycwtJlS4",
-	"leUaVaHsnSNpJSWJI3RLjArHZmxWdiUtd3MXov6W3fWtL8zWB7mbZvzxJ4nTjx4AZHCgvOphPdQ8dXn4",
-	"IQWP98Jtik2/iT5aZRf8+SDrUyO2xPLyMstiShOQuRXG3j3UjOJoMKxgjB3NFAcfbc2M82clMkmGSjH0",
-	"UBQpSTIGDGbA1EbwJulJnkAISKd46Hrx8R1tATzKOl3fcqGte6hzMeNMb5IjQVh/YEboru7K1QoJl4wq",
-	"7nWkQRGDqHRcBP+NbWDVThRNtk5T1h9Iw0Riyy98uteV3h/j759cGvXoILJra345t6vKF/TAtsIyJZxG",
-	"mgIszBf+dVGrr/i6f05H4Gua9PKzQxH0xvmbdqWan5xWOcLAs0T2+1SkwWXPd6hr5fMj0mUMJGiapopp",
-	"bZMYALlQzAyVsFkLJlWlx3nPD4AjMGAdiuRLLAq8fr1SX2nBY4VJXVHSxbiz0wxNbi+UIgOY0EYqlhIm",
-	"EjUaGBdp4y5JeAGCQETrg476avCkVkz3iBoK7QOCqIsHOmyLIrUXLsNPFRPOCUk6GdUGUlIfmc4mQWds",
-	"3+SCfeba6E7ulVXsQVt4x363GfbeCWs4JHs7O6TDBXqUX8CjDrrjd6D2NBqWroaKpUG3zh3bzqgtNEsU",
-	"MxBbosmaj5m4OD85Pjv5ePHTyd/O190YRsqLPhWji/ykOnDpN+Rlq5K5pmmpqM+jMlYbbl9kxnWS0HnS",
-	"kzKbKJzjpCEs5mOr9xxs5TRnM/R/BZSWMtvkiZ5Le17amQdWofuxz7H6YRX9eYNQ5sKAv/Hj58CP7ZFh",
-	"RkVHcS5t/AoSurXT4/Oi9NT6g7DmrS/+ZyMlbL0aaU46EVcrnsZTu0y7/MwfRP5pbt3xvzBSPZrMauTA",
-	"cVAX+OtgLriJeF2pi1G9En2XvnkBhCkjRxNdQYEx97+cU5P0JpHtl0FKzfKQbalMeRxFD7bzjalj1BhL",
-	"1Ty+xN9NU24e615cz3Xt0XwjD8+G554xgM4SHVEMoHqoMDZT2jsE/Nuz8ZqhOeX+TNgWjaxkwoE+sNYr",
-	"qF7lVcU/uUiyYcqOiuz1Bdznu+hCG8cT+tzbiDKWTmeupEc1GcbGs9jU5PWZRFO/bVV+TF/v5dwredyl",
-	"NmMK84+4TCwhLLuWTY0yLik/mofzrBB1phrMUWlfFg/9iAeK0XSK2xXWAGLHLmXX4/M9V7PF4deZvORi",
-	"4fDh1dXAhe2yBXCrCtAuFmW8xLusRe5/EWewx/XtyjPKz4Xpk15erZ296Vxr64tLmzrd5OqmszqJrQ62",
-	"coL4VVtKFzvuRoQ9yMwUHQQ5cu9D8mffrfJhVnmxenTuUpTecYxiyq3qfjznIUpGLYFFzVlx6YFvhXU0",
-	"5ttl0DyRu51NDieVz3YEPxVDuxEmBlwiR6wli0145VaPw6RG03imzSj/o2v4kFRzZRjkF1PDp/2mLI4U",
-	"D8l3i6DhS5pR7y9j08L6pWBSteLeWUCfbdZEL1kJZ3VgVVTdKjnbT261myZVjOgBE8b7/W6SI33tCqNA",
-	"6S6vAYlBIQLZgXUpN3AMWcZ8LS+sUAB6FHCrFZKs+SyWbrBEQo0qmlyvHxKaj3I5CnqzubDy2mB+UhP2",
-	"SqhqxPquQsmyjBCrQqYFhQNbWMUHDLW6LdaaEjC0s7BoUIzTYEFVtV9O00e/WgY1AKuSHwy+PufKr9ld",
-	"acAKQopESHlE9+QzKDrU7HpT5A+sUM2+3J+Do0+9+Ti6LBXTM9S52OSerLahSlXaTBRjKtWamzLOa1G4",
-	"v7fqMgynSPweFRKbT23fzJGoWqMIu/HofqNNqfq2rz1z8Pt2vBPvxnvxy09F7vm9IjXjG8ZSp/A183m3",
-	"WPh4aFVgPuijqwLnJbzPLMoTscYKbRVqogYYNY8lC7oDcVQqNsORxNmmloOPdRIcTmPZ16GVBBrOnQ7h",
-	"0a7aLoLQgZWSfSLAbCrImrvzuLJki4DZhBPG0NQr754D4Dwwj/hUocrbXSK7wE1/FIeMOn5xTr9aJ63V",
-	"pjzruOTNF4m7I3QO4PaNifdZSjQHhUZnDJo6h6TLTALeVzZ37vNiiAC5nnRBCmxIeG/zoxt6HRS/tdUV",
-	"12z5Kn8RAarWlKjNY0cLk3zU6gLf3wblIlZqRytGqbsiBC2eVcBCBn6EM8qYhOebP5w45FpbWX4f/DR2",
-	"tjNug0G7x3S+KZ3ssjxwirWVnXAOiQ1msErIMIqjoCzPBLjCWyuWLfJQVqqeQpLSMTeAs8ncROW9/Zmx",
-	"FGvzlEve+LoRQe0bGxTjoke4tukLsNSAXRvmE5hUs7o7c4gej2gszbLcC86JY7YMXoCPua10aL1Up1mh",
-	"F7OjhpOY7UwXRxQUVWfDjJ2mFTXy3khFMuAzXFwdYFOXbHSYWX6Eflvw3Ho9r0EkEaNYtgJSjuZlyrGM",
-	"U1jad3YBu6KS6XZrvJRpHA0F/2PIXAMn3jmxtDlFGR/oZbNxxqsb1tDbiSJ43gA9tfjqxFceRqqLxO7v",
-	"TS0Cu7szrR5x1fLGKKmrYeis324uD6FOH/NJK4khzbmEJSkV6ctdQpKkQSnXkLy4/ppwllOth8/EbWzV",
-	"2YsVMxC53wXhNt9NG3cIueJ9QCLHHbO1dwpeIKQJGe8hUexGXqMHNPAv/IhQgaRm81Hl91M7leUIcVOK",
-	"dVTq/CfyHLmHUqUbfto+xmFM+Nv6UvwxM74K9n7ZHHe2/gpGfdqJsh5P44XYEGJWo7RZzUBvgbCjAJSW",
-	"kKekqIhad/e0JelWeem0I5yzrFt96eQ+L/tjGabyCcRFBgwkjrnkf+iyp+iRSGzeJ016TIUAYXuYAAb7",
-	"2JkO7R9bA8pVvf/GOZhHfTldl3G4Y+Q1VEFdc4XkGPnLGUlkytYxvhx+QVHB0YClhyShmsVED2jCbPRc",
-	"SnWPaZJK8QJETmOYWt8knYGSstvx9Rrt3CD2/IXNemwrx81XAnAdJ5tX+/twdHoW1vrDVcCMYcJ5Vb/x",
-	"2n+YWPcn5irydWKipUscQxIqsNQi9DHUjAwH4F0iu12mfPZeKMxoemxEUom8D47PV6zE0ms0s6z0lmXZ",
-	"BqQcY2me/b9cu/IV6bi6jhdDQW8oz4DwdKoi7D9QrgJMWjgcIWXA8X84fr1x8mZndywk4YUm/ANFj5iM",
-	"Gph6dBBxqSO8xkiA+6OV/AcD+FOJDqIfPqStEzvr9yIb/YCn/9ur/V30aXvf3X/5w8gwPfcojRXVdqdh",
-	"z3OZ72ENnNNJ2gcs2bhJ3hTmk9iWjyjV3ixKil6z0ebCku7qHUUeITe39QDDVJaIgCGOm4Jgv9Co5S3n",
-	"LK2hxDNrPDnqHFTOns4zf2WXvmbKPbnnPNFFaONtGmfHPg+4YvrITKRX3DC8z6oq9Oc8rxkO/Jg3n7j4",
-	"OWt00WE4nyZXwI9BxahH81mBosBQxfSFrW/q5hNXSQlNpQHrpxTC3C273AjgrlowgPKcpDNUWceXj6WD",
-	"wYugzqpTEBYVaTfJn08+kjHA/g/kwv/+P//1v8ka4NcVIwoUajFU68Jiplgs3ad7Y6RUtDWv2bqzR7BI",
-	"63rs6iXbWl+jyUqpeblrYe+srod/QJAu7J9iKVcsgdEk2brmKaRDxRKpUhELManNnVFu6ZblWoCvKlPM",
-	"7wvpo83HWoGkYFVM2+o/ZyPz9qqQeQH0xEQ4EyIjyCsSy2LH9cc9U1UDfS+Coxlmzln0cvkY7OUIQAL3",
-	"2AIWwqUFY4CfHKO4ACE1YDjNBf5xNrO/FyD8dIPRa9dm5XeyyqTo7tWYb/sztdeUqmfr2Je1I1DOmvSZ",
-	"doG/M8503AkxOMgt6GnD93Twpdqp5ZyZtzK5fpcP+Hh2liyYx0EEGbCd99ilYvQaAwRyj33CsdiNLZvU",
-	"l4ptLuyGXhp2nH5t/89//fdOqxVWsKddLOereB9q8RwSMYQS5pJpDDEA+m8vrRZW4kgK9r5bu5ce7MND",
-	"AO8gR96g8+ju0zg9DOe8tBrO5+yp+6o/mmO4K1DvkMnejHiK3Bw02M5bHE4lR+mmuDuHy4ZHbHfzmBFp",
-	"Y+8lYI/V5KW3x9qsuFJdaxd1A/aSXE0DL6lX4KDC5A/1gY4ySdPOegHZMAtr2LVqE/gMv8CoHmeAyUZW",
-	"rOIwpr5lapac88Gu6un4SM8qlbO9eCIGP8zcgS/+y8eOeykd2XuAtDoRTNqXX5ej3D0I0csm0zu3hqZf",
-	"Ct3e/aP1kRwUagsbaMfGCpAul2otYr7yRO6L/dHIbJXrNx/AZPWLsJLbN5tVBZDZzclL1DayVzWTbBez",
-	"WXkYWm0+h2WC34KMq0oZ35w79bkIn27fg181y8ZgdyxPx/Co2RXc6dWwr9D+941/LS1hgrdqSkWuwHGR",
-	"GxAvnbPHRLjQ0gRoq/drIECfYf530NKhYAvMEmVf2wHMFeRce2tHdWTBWJ0S0RZ9AjHYKmnsl1C4KUtt",
-	"DQp7kWUCb5XQOw61Zgu7ueSV64flcXtMkCSjvK/RIOw0aW2xhg/dR04sW7cyOvZqrwGBX2aFMI4l18pd",
-	"RCst0sidrq8S8YrtTJnf76XVkF9Qs+dkt9V6VX2UkkAGdb8D1k9ZDpg4JOBthc5SqP8jXXbrD3QJisdb",
-	"mmU5pFF9jbrsS+Y0VSE62jaN7Vjblci3hSBbX5rxeBKiJ1nshAYjL3818SWKBxY5CwHBWxBs441B3rqU",
-	"53mKT+ZK05a4NUyz5H4MqIOjPBzogtlcFrLstHaWjfO/Ul6psv9ZGjJiBrN0jMO5Mxw9nyLOYwiVyCxD",
-	"A1FAt1EULnSaUGwB2QFLsRWQvmWh3Qy9vm/0EIkBcqhulhogX8CTSA7g1Pbh0eoGZ7TEiIo6JVqecuIx",
-	"k5ail9BP37377S87BZH9iZukx0QpLMLnrZgjYUCJGj6gqmsWES6LaAOeXGtw/wrx3B1niYZ9PbeJZxOH",
-	"CedlzaghZQbJEiRNlNMb0tx7O3GXaPPWF/ermbZrSZheHYOez+QB0hcsQZf27DRjIeg104/NBsHJm27J",
-	"V6rOWazwkFpl6r3ADas6+V7R4HmF9TL1Qle6WBXPHiy9eT5kmOx2isoyPPrHkxcmckbs5GQINvmM3zBF",
-	"y1vM++zvsHkH0VGfKZ5QkAwu/ibV9eL6zp0K76fxtLTTQNw3axoJOEBHdxEdRO32eZUrVbHKiYqFgpwe",
-	"/XyE1b6x3h9Z60DrC3hwMRTXQt6KThGeCYkDxi6wU6MSx8yNTy0T7lRi8ixScjzZDBvPsqpKuQikVG6R",
-	"KHvnVfHJWrkZ5NjwJRK5WW9OuOfQNHNxKT9P472n2GCFqGIHqOG5dnqPcqH+1QaHjid0RQt0wq0Hc6lm",
-	"SnE8dtYNPOCw4dYXblgfktO6tK71qsYj2wC3DEKmlyFaz/oC53Yv9tmc3z2yfc0ea2UEsd34J5547+su",
-	"0DyCcupg5wKwgnMBLZdNPZQBUZsP/yadi6cQyAJFFUPQrMXQM3z/zBA0UozqnOZeAu81PMvQaVVDGAAX",
-	"V5v3SJ9MdV4ywUt0O615pc27J0wezpkw6FX7jT48luOrAFMEnoGrf0kFkQMLosSCoLVdY9CRZqXEuYsQ",
-	"jHqZyuer2aI2B3Ot8f4Neo375i4WyeduKMLYrfEMoixYSmiSyKEwTn2bryjwy+c3Nj1O7gxAE8NvuBkV",
-	"8UiWbMag/XXOsvABiDaUZyOCKyQD7+BA1koy6fomOaFJj2is/Xhyw4Q5TckActpTQ/pSW81QDONDtOYB",
-	"0UyksECfFK8I28QwYb8kWEE+V+UcG3ABsI9kbafVWj/0hzsCRfUVYUBwINB4kyAM5J3+8svpaxt5wkhA",
-	"VDd+YhVpnI5ggLfuHB43h5Nbvw0TvhzyLL3A3cewIsOUwLQGB9EP8Iqpiz2wX5SOwiXFpNuXO/VOwZQ2",
-	"jxX2G3Pk5vbQlDcfH06pUjpz6VsQTlzVBFSSY/3bCG3D2w84HTuNR7jhr9jho5TcEDNvCWl81URnlkCC",
-	"AXStyMmFL4DABFxrtTN1+qULJK1MkTUhLV0EIooJH3yLnN7kTWCi6w+mA0GCe4EE90IxmvQgDBM38cIX",
-	"ekLnM4TkC8UwqHOtAG6bviiAe++a5okqPHJrXF+Ip9/PtwChwEnp3TF256YV8GH/ri6fZHNv7kLjXM4e",
-	"5y7e/uEWAMR0lwOP7m+x5VKzT+aDN3JHCCcynjWuNSMdpR2pSTTqW48mGuJqECPyQlDPxO7h8w++0F5o",
-	"8se9AYFQDjN0A7hrWjoBjuStpTVPqHTCdAmgtT1VpAB9B0+Zig6iPhcsUbQ7X9mEMrg+rCvE5NjjQC6u",
-	"v2XFXoRfAUJdsM9cw/XBXi4sn+E5shnpCyn4vHoPz3fggPNZ2CsOV5VkYH4qsMBFEOnp1hf4Z4bnxC8i",
-	"WzYtme3ckAXo8BXWf7ULRA2+PfNDtLvY2zmmLV8MCOYP87EAsISkdDlkYR7cqfLLkc+vq2d5JZ/aovi+",
-	"NGRqk+xGcWUFffoESufni28kP+UbMa/wZIdpIjzhNmPBvvyq/DxEJiun40LjsCLhhHbKLYwz6+1/K5Xp",
-	"zY89M2pQFSf1VFUxeG1768v9FAVEXs4jIQUA+bDi0djAz7XW/GolHUCGXNLxt+pCudrzWW1KqP68Sl8J",
-	"p6VRFtVWLwfBQHrri8Js7ygHzeaZtvH9A2OHFQp4W2MLVdOadLmg2QHuSsgAvZwAEAAt+1LZugUJhWSg",
-	"l8w7rFipYkC18Z9cMwbu1ZsEdxvzaGGPRtrQH6sNn1RHW9e3p08FJ6qzl8jiy+pq7fOTynwjHqOw0lRa",
-	"eWxP/ttFcn7yOu77Rda831efUXHb4xlbjxFdyorQgCw//LXSnndYPv3haCi/CZNQjye417TPNmz+OgKJ",
-	"+CDDj7GxvYZlmbMUZhxVxvhUQi5fZpKeL32iIDUxBgJrJlJ9SEAd3RY+lxDXpPOlHRk54Ek7OiDtaHNz",
-	"sx3FpO3VTsHTuw5Zc08hqaA3veLuAc+8lEOs0NEW2Godj3ase8X0SCTYV96FmyWYHnr0hpE+16AQtz3r",
-	"3AZqF9oWuieHWeoXanPHIhXfJC4rlSYJVQoMGeilqmEeNzQbYkUYmIs+IHYiceGZF7tpKybisGhNbAtj",
-	"xcTcxOB5zURKVQwADe9SqnuXkqp0sy3a4shFQWKoBXyfUMNSMhxcKZoy0h9q46ZGBXlvD5b9MaSZU2c4",
-	"eRxzGOFbjO5pi4xfKqpG7hWCRU9CXz2WXNvKg5gESmP2Znv2xRIImnAYpoeyplrcs7YoMmIWlmZtgSzJ",
-	"pGbanpEtT27rIwTJJyGOPA9jUSxhHIqhA6y1BZ64jTb0LazyniTypjobE6TxBD31uDZ+u7U9iRvntxjV",
-	"5dVAAXYMlDQykdmDZgbbXz1phehUGqzTw5QqWM89lWs3kDccZBRN1vJxQgdVpFYNgwo+zS4YjRg0hfrd",
-	"MnZN1FBo8k6K1OY9OB8KxEUXnRjGRuYet5vkV256QIs60EXH19dHTEqGSiG5ZAyS+uWuDQwRGt0jdCat",
-	"n0RKR1WA+mdm3jGa/crY9Szly5EYEdhRP99b+02V6sW9KqCklPc0etjQ73x9NQZjmGxMNBgrSZpHxz5V",
-	"Wene8TYWNDIqcu+bwncGoRQ2nXKrUSH+vBzWWDC/H9q4Pgq02foCo9xtfQFgnap7PgahBc5zaRF7Y4A7",
-	"fh2Ydqfr08+8P+xHBzvbe9/tfb+7v/cdOgzah0VACBeGXTFVCeUVym5c49cqsc/h2fdYegfcf0hCk1Eh",
-	"rLCfzYcBi2bYsqhWD3CziGh1FCog1cK6CcC1c+igXkMxEf4C7KkVCMTAgbgmrD8wIyuaFSXvoEG40S80",
-	"cdeumGjZFuZW2qAG7ZQZIHDdKm4Yyv62JzIUmjFRmYjHsrenFZrXiiMhDZZw5oJr52coh4PNqKju/JZ1",
-	"DSxWNzdp+8U+sP6hGHMspN+e6788IXs+Mf0gFFDEwziIAAtx1DL4eWlhqD/Yae19X60/sGq3rS9MGDWy",
-	"kQwA/2xaarEuepsF93ewpveCenl6AAKy6bG+u0hizfuEYnsButEU5OUaNeeZnQGWvNEryhLglvt4lerz",
-	"0Ip3VGHSZdiQyxFoLqCm9r98WMWPXBupRidwTpUmVQskLnkJqNCZbfot0OIxqNhHes1c/vjCSiy7hR50",
-	"zZWPHwf0UDtgP1uaalSxhA9meEGcuTZzu0Dk3zV2gli608M09LHrghXWXcD9Cr7ue3eo3nErjgH6rMC3",
-	"miv2dCcGezKPKhtzcaVYyhna236PtkkyHBAsBcSE4VhkfZtI4RImoJM1JhvdiyNt2AA/Opdd4/g/tgQ2",
-	"DuZMeOC6sclFeb8P5W8/hUI2vEbZey7PUbdzD+wUEY76/DwinpfjgUPRewq7u692d7b3p/KErS/2h/M2",
-	"qEtykOPqiun0dBr91Tpgvhd+iWAhQ8MXwTKsUhGWcrM6+jzbu8SBx2r8Sz4EyhfnDlJyL8HB6/w/ngAD",
-	"mXDwqHLomMllSrxlP+QtS+IZdqcewzukHq2fRZKfb/caT6IAeHK+FIceHlIRxbSBK828lGpOjgWIC9Az",
-	"6yZTtKumcGOXFG2oGeqoOTL5/s/th0v32i4vtJHvdjGpM3lbkZB3zGE7GKFpBcbwm6/3qnTGrGci1dc2",
-	"XrRco5Cs+Qh+iLUPgF3Z7+qyBY/B79aX4g9QNSZUJCybkkEd3xdnvCJdYDipx1MIVuUSzJWEzqGQyKFC",
-	"rbBeWD24eGrAesXi88rBN0YzKsp0SsG+uW4uI2/fIekIaS4sntsS/2RtYLN+xMTmTMLAdtvAuXJSLKki",
-	"CHCA9UPScVaFC7A6QJG/LAPNIprvEsWYsH47EPAOLR4hmt3SKRThXT4wYgkjLgcmOhRoMlFAUWXXrS+Y",
-	"vbXQwuNQf4qZg5oS23n0orUUuTvMunwKRX6D7/9lKfJDE91vlPQbJbWU1DpCAzH1JKZD1tApe5LqgN8H",
-	"UphHIIVgzayaEnVTWgk5y9NpTbkc2TYrRQY7RO09Al9DEhdGB8+y+rdbQp73Aw36Gth5bvBrfL5VOcRt",
-	"lbSNW3Y5y/d3loUFBn7kQiIaYTaOrjkAa2R5/QXw+ggt8VjzCmNEvYprJy+RAiLCZAXEmdaRIu/UQ1pH",
-	"arNdPbh15NnZOhyYzoUw8xPGrS/2x4wMEzbmcVnIUyfX2Yk8QGmOM9YvEvN+1ZU57EpzgLIWFCFvIZxn",
-	"rWfdaGyAz/pCwDbhUzs0dVUZngvwLGr2yItZu3EtmQciXmUAmU76dwPSv4ukf36yb/f7cQwcdXT/KzZw",
-	"PMWyB4fExjD6HKrP1LySa0t6PMVqukjFvKS5iluDHBouZnmH+UYPUVbQDda0rGC+gCdRVlAVO+VPCt39",
-	"9P0yvvg9eTrJ87ot1pqRPM9nMtgNTNrv6LVV7V2iV+APaggRCIyZXmjlfidtcPhccr8HmwcW/MNhH90v",
-	"6qut+OeuCnazwYk241aFjJAVF3oWCrdvtu6SqY4XIG+Ei+PE8/vtVzvTiefWF/er4d1iSdhcIx/6qXy7",
-	"XazkduFgsNn1ojHAzXO7eDbg81CcBgOnD37/VHH/2KvkQ18i3qz77VYQFVdiXrB9/kXIxu7uw8fc0T7K",
-	"TaaekX27yny7ysx9lXFkkgpbAx0x79D+QzTmjXBFLrgiPPW5wBqSzjl4tNWVT3Fu/ogNVohZdoCq64t9",
-	"8UwsH9LW21M25U1eVkVXF2LW5cMMip0u1wSSH/GWhZetL/gvulXZSlhT6sUduxbH8MmK+KmbzrKFsSWD",
-	"JxbjqrFcx1jmDzJyoFCNkjbNvuV7WAa1RDsxwu8LHQQGYkHpyuKK+fYvDbdKeqLKYhFNsK/qKrSF1H7r",
-	"C/wDf2LmrCnYCK+dGHJu2OBpC7jVndulPnFk/7PC8IEKhsSTJ57o/PlgNuwloSjwoJuew3EHfTZcO6Mu",
-	"YxZmFMRH+fVSqqeG63c2TsUj41Bl0UG0RQfc3nnsDCfydsHciOZXYoOLAk8AcBBBK0ooVZVkd58Vjya/",
-	"/YmnxK5XkzWwH8WEf+ihMshl5OOKDChXtoaZ69F9UdGfL5PinSwrphNUfplIq+fK1MHQeSn4MBli0Evw",
-	"cLKjUjY5Cdkdg9x1Yer8G1bxtYvr9jtQ5N8qvuyz6oHfYGllluaZGm3qc+6KLblEh7c9TBs4wnTnXamC",
-	"ZbnPqtZUKjThHIJs35gCGXtOJsrUBJVp/KpdR9Hdp7v/MwA=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

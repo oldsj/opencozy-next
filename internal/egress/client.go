@@ -30,6 +30,9 @@ var (
 // CalendarClient is the calendar feed client's name.
 const CalendarClient = "ics"
 
+// GoogleClient is the Google calendar client's name: Google's token and API hosts only.
+const GoogleClient = "google"
+
 // FeedPorts are the ports a calendar feed may use (design §10).
 var FeedPorts = []uint16{80, 443, 8080, 8443}
 

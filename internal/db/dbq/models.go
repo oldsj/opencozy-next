@@ -96,6 +96,18 @@ type CalendarEvent struct {
 	Status        string
 }
 
+type CalendarGoogleConnection struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	Subject        string
+	Email          string
+	Scope          string
+	RefreshToken   string
+	NeedsReconnect bool
+	Version        int32
+	CreatedAt      time.Time
+}
+
 type CalendarSeries struct {
 	ID          uuid.UUID
 	HouseholdID uuid.UUID
@@ -125,6 +137,9 @@ type CalendarSource struct {
 	HttpLastModified    *string
 	FeedHash            *string
 	WindowStart         pgtype.Date
+	GoogleConnectionID  *uuid.UUID
+	GoogleCalendarID    *string
+	GoogleSyncToken     *string
 }
 
 type Child struct {
@@ -243,6 +258,15 @@ type DisplayPairing struct {
 	HouseholdID *uuid.UUID
 	DisplayID   *uuid.UUID
 	CreatedAt   time.Time
+	ExpiresAt   time.Time
+}
+
+type GoogleOauthState struct {
+	ID          uuid.UUID
+	StateHash   string
+	HouseholdID uuid.UUID
+	AdultID     uuid.UUID
+	Verifier    string
 	ExpiresAt   time.Time
 }
 
