@@ -64,7 +64,7 @@ test('award rules, players and a learning connection', async ({ page }) => {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Connections' }).click();
   await page.getByRole('button', { name: 'Add a service' }).click();
   sheet = page.getByRole('dialog', { name: 'Add a connection' });
-  await sheet.getByLabel('Name').fill(app);
+  await sheet.getByRole('textbox', { name: 'Name', exact: true }).fill(app);
   await sheet.getByRole('checkbox', { name: 'Give points for learning, by your award rules' }).click();
   await sheet.getByRole('checkbox', { name: `Use ${key}` }).click();
   await sheet.getByRole('button', { name: 'Choose children' }).click();
