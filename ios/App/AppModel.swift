@@ -1,6 +1,7 @@
 import FamilyControls
 import Foundation
 import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -159,10 +160,16 @@ final class AppModel {
             device = info
             guard let childId = info.device.childId else { throw SetupError.noChild }
             if let previous, previous != childId { childChanged() }
-            try await uploadShieldEvents(api: api)
-            try await sendQueuedTimeRequest(api: api)
+            try await Self.untilServed { try await uploadShieldEvents(api: api) }
+            try await Self.untilServed { try await sendQueuedTimeRequest(api: api) }
             await registerPushTokenIfNeeded()
-            try await fetchScreenTime(api: api, childId: childId)
+            do {
+                try await fetchScreenTime(api: api, childId: childId)
+            } catch let error as APIError where error.isMissingEndpoint {
+                // Screen time (slice 8) isn't on this server yet: no window, so locked.
+                applyScreenTime(ScreenTimeResponse(serverTime: info.serverTime, children: [], webFilter: nil),
+                                receivedAt: Date(), childId: childId)
+            }
             lastSync = Date()
             syncFailed = false
             accessProblem = nil
@@ -174,6 +181,12 @@ final class AppModel {
             handleRejection(error)
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Runs a call this server may not serve yet (the slice 8 and 11 calls still on
+    /// `v1/` paths). A 404 or 405 skips it; whatever it would send stays queued.
+    static func untilServed(_ call: () async throws -> Void) async throws {
+        do { try await call() } catch let error as APIError where error.isMissingEndpoint {}
     }
 
     /// Sends "one more minute" uses recorded on the shield, then forgets the ones
@@ -316,7 +329,7 @@ final class AppModel {
     // MARK: Web session
 
     /// A one-time URL that signs the web view in as this device's child
-    /// (`POST /api/v1/device/web-session`, signed). Only an exchange URL on the
+    /// (`POST /api/device/web-session`, signed). Only an exchange URL on the
     /// paired origin is accepted. A revoked or unassigned device locks, as in sync.
     func webSessionURL() async throws -> URL {
         guard let api, let origin = config.baseURL else {
@@ -354,8 +367,9 @@ final class AppModel {
     func pair(_ input: PairingInput, deviceName: String, pairing: any DevicePairingAPI = HTTPDevicePairingAPI()) async throws -> DeviceInfo {
         let (key, blob) = try config.keys.generate()
         let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
-        var request = DevicePairRequest(publicKey: key.publicKeyX963.base64EncodedString(), platform: "ios",
-                                        deviceName: name.isEmpty ? "Child's device" : name)
+        var request = DevicePairRequest(publicKey: key.publicKeyX963.base64EncodedString(),
+                                        platform: DevicePlatform.current(idiom: UIDevice.current.userInterfaceIdiom),
+                                        name: name.isEmpty ? "Child's device" : name)
         switch input {
         case .token(_, let token): request.token = token
         case .code(_, let code): request.code = code

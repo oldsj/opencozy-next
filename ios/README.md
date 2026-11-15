@@ -7,11 +7,12 @@ A thin native shell around the OpenCozy web app, with two roles chosen on first 
 
 The OpenCozy server is the source of truth for the unlock window, the device's child and the inbox. Screen time uses Apple's **Family Controls** (authorization and the app picker), **ManagedSettings** (shields) and **DeviceActivity** (re-locking on schedule).
 
-> **Status.** This is the app as it was in the previous OpenCozy server's repository, brought over
-> unchanged apart from build fixes. It still calls that server's API (`/api/v1/...`, below), which
-> this server does not serve. It moves onto this server's API (`api/`) as each slice lands: the
-> child's device with slice 7 (devices), the parent's device with slices 10 and 11. Until then it
-> builds and its unit tests pass, but it can't pair or sign in against this server.
+> **Status.** The child's device pairs, signs its requests and opens the kid view on this
+> server's API (`api/src/devices.yaml`, slice 7). Its screen-time calls are still the previous
+> server's (`/api/v1/screen-time`, `/api/v1/device/...`) until slice 8: this server answers them
+> 404, so the device stays locked and keeps "One more minute" and "Ask for more time" queued
+> without reporting a failed sync. The parent's device still uses `/api/v1/parent/...` until
+> slices 10 and 11, so it can't sign in here yet.
 
 ## Layout
 
@@ -96,7 +97,7 @@ Prerequisites: the device is signed in with a **child Apple Account** that belon
 1. **Install** the app from Xcode and choose **A child's device**.
 2. **Authorize Screen Time.** Tap **Ask a parent to approve**. The app calls `AuthorizationCenter.shared.requestAuthorization(for: .child)`. A parent or guardian in the family approves with their Apple Account on the device. Apple's docs say that `.individual` authorization lifts the restrictions that stop a user bypassing parental controls, such as deleting the app. That implies `.child` keeps them. Confirm on a device.
 3. **Create a parent PIN.** Tap **Parent** (top right). The first time, you set a 4–8 digit PIN. It is stored as a salted hash in the Keychain and gates the setup screen. After five wrong attempts, entry locks for 30 seconds, doubling with each further miss up to an hour. The count lives in the Keychain, so closing the sheet or relaunching doesn't reset it.
-4. **Pair.** In OpenCozy on another screen, open **Manage → Devices → Pair a device** and choose the child. On the device, in **Parent setup**, tap **Scan pairing code** and point the camera at the QR code. You can also tap **Enter the code instead** and type the address and the 8-character code. The code works once, for 5 minutes.
+4. **Pair.** In OpenCozy on another screen, open **Manage → Devices → Pair a device** and choose the child. On the device, in **Parent setup**, tap **Scan pairing code** and point the camera at the QR code. You can also tap **Enter the code instead** and type the address and the 8-character code. The code works once, for 10 minutes.
    - The app creates a P-256 key in the Secure Enclave and sends only its public key, with a signature over the pairing code and that key to prove it holds the private half. The server returns the device and its child.
    - Every API request is then signed with that key. No password, API key or bearer token is ever stored on the device.
    - The server address must be `https`. Plain `http` is refused, except for `localhost` when testing on the simulator.
@@ -135,7 +136,7 @@ Adults can rename the device, reassign it to another child or revoke it in **Man
 
 ### Kid web session (child's device)
 
-- On launch, the app makes a signed `POST /api/v1/device/web-session` (body `{}`) and loads the one-time exchange URL it returns. That sets a child-device session cookie scoped to this device's current child. The URL is accepted only if it's `/device/session` on the paired origin.
+- On launch, the app makes a signed `POST /api/device/web-session` (body `{}`) and loads the one-time exchange URL it returns. That sets a child-device session cookie scoped to this device's current child. The URL is accepted only if it's `/device/session` on the paired origin.
 - The server answers `201 { url, expiresAt }`; the URL works once, within 60 seconds, then redirects to `/kid`. The session lasts 24 hours.
 - **Session ended:** when the web view reaches `/device/expired` (the server's signal, whether by a full load or a client-side route change), lands on `/login`, or a page answers 401, the app gets a new exchange URL instead of showing that page. The child never signs in by hand. More than 3 exchanges in 2 minutes stop with an explanation and **Try again**, so a server that keeps refusing the cookie can't loop.
 - A 401 or 403 from the exchange locks the device, as a sync does. A 404 means the server predates the web shell and says so.
@@ -147,7 +148,8 @@ Adults can rename the device, reassign it to another child or revoke it in **Man
 - The Secure Enclave key works after the first unlock since boot. It never leaves the chip and is never backed up or synced. Pairing again replaces it only once the server accepts the new key.
 - Before signing, any query-string character outside RFC 3986's unreserved set is percent-encoded, and that exact URL is sent. The server signs over WHATWG `url.search`, which would otherwise encode some characters (such as `'`) that Foundation leaves raw.
 - The server accepts timestamps within 60 seconds of its own time. The app tracks the offset from `serverTime` on every sync. After a 401, it also checks the response's `Date` header; if that's more than 30 seconds off, it corrects the offset and retries once.
-- Every sync starts with `GET /api/v1/device`, and the app renders for whichever child the server reports.
+- Every request also sends `X-OpenCozy-Client: OpenCozy-iOS/<version>`, so the server can refuse (426) an app too old for it.
+- Every sync starts with `GET /api/device`, and the app renders for whichever child the server reports. Pairing sends `platform` (`ipad` or `iphone`) and `name`.
 
 ### Screen time (child's device)
 

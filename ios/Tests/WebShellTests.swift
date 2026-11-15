@@ -108,7 +108,7 @@ struct WebSessionTests {
         #expect(model.accessProblem == nil)
     }
 
-    /// The exchange is a signed `POST /api/v1/device/web-session` with a `{}` body.
+    /// The exchange is a signed `POST /api/device/web-session` with a `{}` body.
     @Test func exchangeIsASignedPost() async throws {
         let key = SoftwareDeviceKey(key: P256.Signing.PrivateKey())
         let signer = DeviceRequestSigner(deviceId: "D1", key: key, clock: DeviceClock(defaultsSuite: "org.opencozy.tests.\(UUID().uuidString)"))
@@ -120,14 +120,15 @@ struct WebSessionTests {
 
         let request = try #require(CapturingProtocol.last)
         #expect(request.httpMethod == "POST")
-        #expect(request.url?.path() == "/api/v1/device/web-session")
+        #expect(request.url?.path() == "/api/device/web-session")
+        #expect(request.value(forHTTPHeaderField: "X-OpenCozy-Client")?.hasPrefix("OpenCozy-iOS/") == true)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(request.value(forHTTPHeaderField: "X-OpenCozy-Device") == "d1")
         let body = CapturingProtocol.lastBody ?? Data()
         #expect(String(decoding: body, as: UTF8.self) == "{}")
         let timestamp = try #require(request.value(forHTTPHeaderField: "X-OpenCozy-Timestamp").flatMap(Int.init))
         let nonce = try #require(request.value(forHTTPHeaderField: "X-OpenCozy-Nonce"))
-        let message = DeviceRequestSigner.canonical(method: "POST", pathAndQuery: "/api/v1/device/web-session", timestamp: timestamp,
+        let message = DeviceRequestSigner.canonical(method: "POST", pathAndQuery: "/api/device/web-session", timestamp: timestamp,
                                                     nonce: nonce, body: body, deviceId: "D1")
         let signature = try P256.Signing.ECDSASignature(rawRepresentation: try #require(
             request.value(forHTTPHeaderField: "X-OpenCozy-Signature").flatMap { Data(base64URL: $0) }))

@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// Signs `/api/v1` requests with the device key (contract "Signed requests").
+/// Signs `/api` requests with the device key (contract "Signed requests").
 /// No bearer secret exists: every request carries the device ID, a timestamp, a
 /// one-time nonce and an ECDSA P-256 signature over a canonical string.
 struct DeviceRequestSigner: Sendable {

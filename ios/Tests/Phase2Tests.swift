@@ -17,8 +17,8 @@ struct DeviceReassignmentTests {
         let unlockedMinutes: Int?
         func device() async throws -> DeviceInfo {
             var info = try await FixtureAPI().device()
-            info.device.childId = await owner.childId
-            info.device.childName = await owner.childId == FixtureAPI.childId ? "Robin" : "Sky"
+            let id = await owner.childId
+            info.device.child = DeviceChild(id: id, name: id == FixtureAPI.childId ? "Robin" : "Sky", color: nil)
             return info
         }
         func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
