@@ -8,6 +8,7 @@
 package oldsecret
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hkdf"
@@ -34,20 +35,31 @@ const (
 var ErrUnreadable = errors.New("oldsecret: the value does not decrypt with this old secret")
 
 // Secret is the old app's BETTER_AUTH_SECRET.
-type Secret struct{ ikm []byte }
+type Secret struct {
+	ikm  []byte // the secret: read without its trailing newline
+	read []byte // everything read, cleared by Forget
+}
 
 // Load reads the old secret from a file (its own line; a trailing newline is ignored). Like the
-// old app, it must be at least 32 characters.
+// old app, it must be at least 32 characters. The secret is kept only in the bytes read, so
+// Forget can clear it.
 func Load(path string) (*Secret, error) {
 	b, err := os.ReadFile(path) //nolint:gosec // an operator-given path, read once
 	if err != nil {
 		return nil, fmt.Errorf("oldsecret: read the old secret file: %w", err)
 	}
-	s := strings.TrimRight(string(b), "\r\n")
-	if len(s) < 32 {
+	ikm := bytes.TrimRight(b, "\r\n")
+	if len(ikm) < 32 {
+		clear(b)
 		return nil, errors.New("oldsecret: the old secret is shorter than 32 characters; is it the right file?")
 	}
-	return &Secret{ikm: []byte(s)}, nil
+	return &Secret{ikm: ikm, read: b}, nil
+}
+
+// Loose reports a file others can read: group or world permissions. The import warns.
+func Loose(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().Perm()&0o077 != 0
 }
 
 // Decrypt opens one stored value for one use (GoogleToken, ICloudPassword, HomeAssistantToken).
@@ -92,6 +104,6 @@ func (s *Secret) Forget() {
 	if s == nil {
 		return
 	}
-	clear(s.ikm)
-	s.ikm = nil
+	clear(s.read)
+	s.ikm, s.read = nil, nil
 }

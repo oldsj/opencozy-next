@@ -29,6 +29,9 @@ func runImport(ctx context.Context, cfg config.Config, log *slog.Logger, args []
 	var old *oldsecret.Secret
 	if *oldSecretFile != "" {
 		var err error
+		if oldsecret.Loose(*oldSecretFile) {
+			log.WarnContext(ctx, "the old auth secret file is readable by group or others; chmod 600 it", "file", *oldSecretFile)
+		}
 		if old, err = oldsecret.Load(*oldSecretFile); err != nil {
 			return err
 		}

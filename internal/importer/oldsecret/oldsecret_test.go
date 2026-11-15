@@ -79,12 +79,26 @@ func TestLoad(t *testing.T) {
 	if _, err := Load(filepath.Join(t.TempDir(), "missing")); err == nil {
 		t.Error("a missing file was accepted")
 	}
-	s, err := load(t, fixtureSecret)
+	s, err := load(t, fixtureSecret+"\n")
 	if err != nil {
 		t.Fatal(err)
 	}
+	read := s.read
 	s.Forget()
-	if s.ikm != nil {
+	if s.ikm != nil || s.read != nil || strings.Trim(string(read), "\x00") != "" {
 		t.Error("Forget kept the secret")
+	}
+	path := filepath.Join(t.TempDir(), "loose")
+	if err := os.WriteFile(path, []byte(fixtureSecret), 0o644); err != nil { //nolint:gosec // the case under test
+		t.Fatal(err)
+	}
+	if !Loose(path) {
+		t.Error("a world-readable file is not loose")
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if Loose(path) {
+		t.Error("a 0600 file is loose")
 	}
 }
