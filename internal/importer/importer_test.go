@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	_ "embed"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/config"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/keyring"
 	"github.com/oldsj/opencozy-next/internal/testdb"
 )
 
@@ -95,7 +98,7 @@ func oldDB(t *testing.T, arrange ...string) string {
 func importOnce(t *testing.T, source string, target testdb.DB, dryRun bool) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, DryRun: dryRun, Out: &out})
+	err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, DryRun: dryRun, Out: &out, Keys: testKeys(t)})
 	return out.String(), err
 }
 
@@ -152,12 +155,17 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"award_rule":                    "ok",
 		"external_identity_link":        "ok",
 		"service_credential_award_rule": "ok",
+		"calendar_source":               "ok",
+		"calendar_series":               "ok",
+		"calendar_assignment":           "ok",
+		"calendar_assignment_person":    "ok",
+		"calendar_occurrence":           "not carried",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -191,6 +199,7 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	}
 	ctx := context.Background()
 	q := dbq.New(target.Runtime)
+	keys := testKeys(t)
 
 	// The owner signs in with the old password, and is told to rehash.
 	var hash, scheme string
@@ -251,6 +260,33 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		t.Fatalf("old ocz_ secret: %+v ok=%v err=%v", a, ok, err)
 	}
 
+	// The calendar link is sealed (normalized to https); series keep their IDs, the removed one
+	// its removal time; the series is for Avery, one occurrence for nobody, the cleared one gone.
+	var sealed, name, color string
+	var show bool
+	if err := target.Owner.QueryRow(ctx, `SELECT feed_url, name, color, show_on_display FROM calendar_source WHERE id = '0190a000-0000-7000-8000-0000000000b1'`).Scan(&sealed, &name, &color, &show); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(sealed, "example.test") || name != "School" || color != "sky" || show {
+		t.Errorf("calendar: %q %q %q %v", sealed, name, color, show)
+	}
+	h := uuid.MustParse("0190a000-0000-7000-8000-00000000000a")
+	if got, err := keys.Decrypt(keyring.AAD{HouseholdID: h.String(), Table: "calendar_source", RowID: "0190a000-0000-7000-8000-0000000000b1", Purpose: "feed_url"}, sealed); err != nil ||
+		string(got) != "https://calendar.example.test/school.ics?token=fixture-feed-token" {
+		t.Errorf("feed URL does not decrypt to the normalized link: %v", err)
+	}
+	var assignments string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(a.recurrence_key || '=' || COALESCE(c.child_id::text, 'nobody'), ' ' ORDER BY a.recurrence_key)
+		FROM calendar_assignment a LEFT JOIN calendar_assignment_child c ON c.assignment_id = a.id`).Scan(&assignments); err != nil ||
+		assignments != "*=0190a000-0000-7000-8000-0000000000c1 20260114T163000Z=nobody" {
+		t.Errorf("assignments: %q %v", assignments, err)
+	}
+	var removedSeen time.Time
+	if err := target.Owner.QueryRow(ctx, `SELECT last_seen_at FROM calendar_series WHERE id = '0190a000-0000-7000-8000-0000000000b3'`).Scan(&removedSeen); err != nil ||
+		!removedSeen.Equal(time.Date(2026, 1, 9, 8, 0, 0, 0, time.UTC)) {
+		t.Errorf("removed series: %v %v", removedSeen, err)
+	}
+
 	// The learning credential's old secret authenticates too, with its scope renamed.
 	r, _ = http.NewRequest(http.MethodPost, "/api/learning/awards", nil)
 	r.Header.Set("Authorization", "Bearer "+fixtureLearnToken)
@@ -264,6 +300,29 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		t.Fatalf("second import: %v", err)
 	}
 	_ = time.Second
+}
+
+// testKeys is one fixed keyring per test binary, so a test can decrypt what an import sealed.
+func testKeys(t *testing.T) *keyring.Keyring {
+	t.Helper()
+	kr, err := keyring.Parse("k1:" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return kr
+}
+
+func TestCalendarLinksNeedKeys(t *testing.T) {
+	target := testdb.Open(t)
+	var out bytes.Buffer
+	err := Run(context.Background(), Options{SourceURL: oldDB(t), Target: target.Owner, DryRun: true, Out: &out})
+	if !errors.Is(err, ErrNoKeys) {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(out.String()+err.Error(), "example.test") {
+		t.Fatal("the link was printed")
+	}
+	empty(t, target)
 }
 
 func TestRefusesAnotherVersion(t *testing.T) {
