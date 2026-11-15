@@ -38,3 +38,11 @@
     padding: var(--space-xl) 2rem var(--space-section);
   }
 }
+
+/* One child's page: their wash behind everything, their colour along the top. */
+.oc-app-frame--person { border-top: 0.5rem solid var(--profile-base); background: var(--profile-wash); }
+
+/* The wall display: one screen, no page scroll; the board's columns scroll on their own. */
+:root[data-surface='kiosk'] .oc-app-frame { height: 100vh; height: 100dvh; overflow: hidden; }
+:root[data-surface='kiosk'] .oc-app-frame__content { display: flex; min-height: 0; flex-direction: column; gap: var(--space-lg); }
+:root[data-surface='kiosk'] .oc-app-frame__content > .oc-people-board { flex: 1 1 auto; }
