@@ -19,7 +19,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState<string | null>(null); // the sheet's own problem: try again
-  const attempts = useAttempts();
+  const attempts = useAttempts('redeem');
   const rewards = useQuery({
     queryKey: rewardsKey,
     queryFn: async () => {
@@ -48,9 +48,14 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
   // One request per choice: a retry after a lost answer reuses its key, so the points are spent once.
   const attemptFor = (reward: Reward) => `${child.id}:${reward.id}`;
   const close = () => {
-    if (choosing) attempts.settle(attemptFor(choosing));
     setChoosing(null);
     setRetry(null);
+  };
+  // Cancel: a choice that was never sent, or was answered, is dropped. One whose answer was
+  // lost keeps its key (in sessionStorage too), so choosing it again can't spend twice.
+  const cancel = () => {
+    if (choosing && !retry) attempts.settle(attemptFor(choosing));
+    close();
   };
   const ask = async () => {
     if (!choosing) return;
@@ -62,9 +67,11 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
         body: { rewardId: choosing.id },
       });
       if (response.status >= 500) {
+        // Maybe done, maybe not (a proxy's 502/504): keep the key and let them try again.
         setRetry('Couldn’t send that. Try again.');
         return;
       }
+      attempts.settle(attemptFor(choosing));
       if (response.status === 201 && data) {
         setSent(choosing);
         setProblem(null);
@@ -114,7 +121,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
       </div>
       <Sheet
         open={choosing !== null}
-        onClose={close}
+        onClose={cancel}
         title={choosing ? `Choose ${choosing.title}?` : ''}
         description={
           choosing &&
@@ -124,7 +131,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
         }
         footer={
           <>
-            <Button onClick={close}>Not now</Button>
+            <Button onClick={cancel}>Not now</Button>
             {short <= 0 && (
               <Button variant="primary" disabled={busy} onClick={() => void ask()}>Ask for it</Button>
             )}

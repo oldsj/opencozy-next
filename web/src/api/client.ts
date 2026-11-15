@@ -78,31 +78,75 @@ export function idempotencyKey(): { header: { 'Idempotency-Key': string } } {
  * its answer instead of making the change again. Name an attempt by what it changes (for a create,
  * its body), and settle it once answered or abandoned.
  */
-export function useAttempts() {
+const attemptTTL = 60 * 60_000; // a pending key older than this is a new change
+
+// Keys kept in sessionStorage (when `store` is given) outlive a reload or a closed sheet: a tap
+// whose answer was lost, then a reload, still sends the same key, so the server replays the
+// outcome instead of doing it twice. Storage can be missing or throw (private mode, a full
+// quota); then the keys live in memory only.
+function stored(store: string | undefined) {
+  const name = (attempt: string) => `opencozy:attempt:${store ?? ''}:${attempt}`;
+  return {
+    get(attempt: string): string | undefined {
+      if (!store) return undefined;
+      try {
+        const raw = sessionStorage.getItem(name(attempt));
+        if (!raw) return undefined;
+        const { key, at } = JSON.parse(raw) as { key?: unknown; at?: unknown };
+        if (typeof key === 'string' && typeof at === 'number' && Date.now() - at < attemptTTL) return key;
+        sessionStorage.removeItem(name(attempt));
+      } catch {
+        // unreadable: memory only
+      }
+      return undefined;
+    },
+    set(attempt: string, key: string) {
+      if (!store) return;
+      try {
+        sessionStorage.setItem(name(attempt), JSON.stringify({ key, at: Date.now() }));
+      } catch {
+        // full or blocked: memory only
+      }
+    },
+    delete(attempt: string) {
+      if (!store) return;
+      try {
+        sessionStorage.removeItem(name(attempt));
+      } catch {
+        // blocked: nothing to remove
+      }
+    },
+  };
+}
+
+export function useAttempts(store?: string) {
   const keys = useRef(new Map<string, string>());
-  return useMemo(
-    () => ({
+  return useMemo(() => {
+    const saved = stored(store);
+    const forget = (attempt: string) => {
+      keys.current.delete(attempt);
+      saved.delete(attempt);
+    };
+    return {
       params(attempt: string): { header: { 'Idempotency-Key': string } } {
-        let key = keys.current.get(attempt);
+        let key = keys.current.get(attempt) ?? saved.get(attempt);
         if (!key) {
           key = crypto.randomUUID();
-          keys.current.set(attempt, key);
+          saved.set(attempt, key);
         }
+        keys.current.set(attempt, key);
         return { header: { 'Idempotency-Key': key } };
       },
       /** The answer came (or the user gave up): a later try is a new change. */
-      settle(attempt: string) {
-        keys.current.delete(attempt);
-      },
+      settle: forget,
       /** For a mutation's onSettled: settle unless the request got no answer. */
       settleIfAnswered(attempt: string) {
         return (_data: unknown, error: unknown) => {
-          if (!error || isAnswer(error)) keys.current.delete(attempt);
+          if (!error || isAnswer(error)) forget(attempt);
         };
       },
-    }),
-    [],
-  );
+    };
+  }, [store]);
 }
 
 export type MealWeek = components['schemas']['MealWeek'];
