@@ -1,10 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState, type SyntheticEvent } from 'react';
+import { useState, type ReactNode, type SyntheticEvent } from 'react';
 
-import { Button, ButtonPrimary, ConfirmDialog, EmptyState, Field, Input, List, ListRow, Notice, PageHeader, pointsLabel } from '@app/design';
+import { Button, ButtonPrimary, ConfirmDialog, DayPicker, EmptyState, Field, Input, List, ListRow, Notice, PageHeader, pointsLabel, SegmentedControl, Sheet } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, useAttempts } from '../api/client';
+import type { components } from '../api/schema.gen';
+import { EditError } from './edit-error';
+
+type Chore = components['schemas']['Chore'];
+type Child = components['schemas']['Child'];
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -25,6 +30,9 @@ export function ChoresPage() {
   const addChild = $api.useMutation('post', '/children', { onSuccess: refresh });
   const addChore = $api.useMutation('post', '/chores', { onSuccess: refresh });
   const archive = $api.useMutation('delete', '/chores/{choreId}', { onSuccess: refresh });
+  // A stale save refetches, and the form below starts again from the newer version.
+  const edit = $api.useMutation('put', '/chores/{choreId}', { onSuccess: refresh, onError: refresh });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [childName, setChildName] = useState('');
   const [childId, setChildId] = useState('');
@@ -35,7 +43,16 @@ export function ChoresPage() {
 
   const live = children.data?.items.filter((c) => !c.archived) ?? [];
   const chosen = childId || live[0]?.id || '';
-  const nameOf = (id: string) => live.find((c) => c.id === id)?.name ?? '';
+  const nameOf = (id: string) => children.data?.items.find((c) => c.id === id)?.name ?? '';
+  const editing = chores.data?.find((c) => c.id === editingId);
+  const closeEdit = () => { setEditingId(null); edit.reset(); };
+  const save = (chore: Chore, body: ChoreBody) => {
+    const attempt = `edit:${chore.id}:${JSON.stringify(body)}`;
+    edit.mutate(
+      { params: { ...attempts.params(attempt), path: { choreId: chore.id } }, body: { ...body, expectedVersion: chore.version } },
+      { onSettled: attempts.settleIfAnswered(attempt), onSuccess: () => { setEditingId(null); } },
+    );
+  };
 
   const submitChild = (e: SyntheticEvent) => {
     e.preventDefault();
@@ -100,9 +117,14 @@ export function ChoresPage() {
               title={c.title}
               meta={`${nameOf(c.childId)} · ${pointsLabel(c.points)} · ${schedule(c.days)}`}
               trailing={
-                <Button aria-label={`Remove ${c.title}`} onClick={() => { setRemoving(c); }}>
-                  Remove
-                </Button>
+                <>
+                  <Button variant="quiet" aria-label={`Edit ${c.title}`} onClick={() => { edit.reset(); setEditingId(c.id); }}>
+                    Edit
+                  </Button>
+                  <Button aria-label={`Remove ${c.title}`} onClick={() => { setRemoving(c); }}>
+                    Remove
+                  </Button>
+                </>
               }
             />
           ))}
@@ -110,6 +132,24 @@ export function ChoresPage() {
       ) : (
         chores.isSuccess && <EmptyState title="No chores yet" description="Add a child, then give them a chore." variant="surface" />
       )}
+      <Sheet
+        open={editing !== undefined}
+        onClose={closeEdit}
+        title={editing ? `Edit ${editing.title}` : ''}
+        description="Changes apply from today. Points already earned stay."
+        footer={
+          <>
+            <Button onClick={closeEdit}>Cancel</Button>
+            <ButtonPrimary type="submit" form="chore-edit" disabled={edit.isPending}>Save</ButtonPrimary>
+          </>
+        }
+      >
+        {editing && (
+          <ChoreForm key={`${editing.id}:${String(editing.version)}`} chore={editing} kids={live} nameOf={nameOf} onSave={(body) => { save(editing, body); }}>
+            <EditError error={edit.error} />
+          </ChoreForm>
+        )}
+      </Sheet>
       <ConfirmDialog
         open={removing !== null}
         title={removing ? `Remove ${removing.title}?` : ''}
@@ -125,5 +165,47 @@ export function ChoresPage() {
         }}
       />
     </section>
+  );
+}
+
+type ChoreBody = { childId: string; title: string; points: number; days: number[] };
+
+/** The edit form, started from one version of the chore (keyed by it, so a newer one starts again). */
+function ChoreForm({ chore, children, kids, nameOf, onSave }: { chore: Chore; children: ReactNode; kids: Child[]; nameOf: (id: string) => string; onSave: (body: ChoreBody) => void }) {
+  const [title, setTitle] = useState(chore.title);
+  const [childId, setChildId] = useState(chore.childId);
+  const [points, setPoints] = useState(String(chore.points));
+  const [days, setDays] = useState<number[]>(chore.days);
+  const submit = (e: SyntheticEvent) => {
+    e.preventDefault();
+    onSave({ childId, title, points: Number(points), days });
+  };
+  return (
+    <form id="chore-edit" onSubmit={submit} className="grid gap-5">
+      {children}
+      <Input label="Chore" value={title} onChange={(e) => { setTitle(e.target.value); }} maxLength={80} required />
+      <WhoseControl label="Whose chore" value={childId} kids={kids} onChange={setChildId} />
+      {childId !== chore.childId && (
+        <p className="m-0 text-muted-foreground">{`Moving it to ${nameOf(childId)}: it leaves ${nameOf(chore.childId)}’s list today and shows on ${nameOf(childId)}’s.`}</p>
+      )}
+      <Input label="Points" type="number" inputMode="numeric" min={0} max={1000} value={points} onChange={(e) => { setPoints(e.target.value); }} required />
+      <DayPicker label={`Days for ${chore.title}`} value={days} onChange={setDays} />
+    </form>
+  );
+}
+
+/** Which child: a segmented control for up to five children, a menu beyond that. */
+export function WhoseControl({ label, value, kids, onChange }: { label: string; value: string; kids: Child[]; onChange: (id: string) => void }) {
+  if (kids.length <= 5) {
+    return <SegmentedControl label={label} value={value} onChange={onChange} options={kids.map((k) => ({ value: k.id, label: k.name }))} />;
+  }
+  return (
+    <Field label={label} htmlFor="whose">
+      <select id="whose" value={value} onChange={(e) => { onChange(e.target.value); }}>
+        {kids.map((k) => (
+          <option key={k.id} value={k.id}>{k.name}</option>
+        ))}
+      </select>
+    </Field>
   );
 }
