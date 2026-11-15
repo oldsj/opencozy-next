@@ -24,7 +24,7 @@ What every project made from this template starts with, and where it lives.
 | Database | TLS required; on the cluster, certificate and hostname verified (`verify-full` against the CNPG CA); `sslmode=disable` refused for anything but localhost | `internal/config`, chart |
 | Secrets | Env only, no working defaults; Kubernetes Secrets from 1Password; `.env` is ignored by Git | `.env.example`, chart |
 | Container | Distroless static, uid 65532, read-only root, all capabilities dropped, no privilege escalation, seccomp RuntimeDefault, no service account token | `Dockerfile`, chart |
-| Network | NetworkPolicy: ingress only from the gateway's proxies, egress only to DNS and the database | chart |
+| Network | NetworkPolicy: ingress only from the gateway's proxies, egress to DNS and the database; `egress.internet` adds public addresses on 80, 443, 8080 and 8443, and each `egress.*.cidrs` list adds that private range on its ports. `internal/egress` also checks every outbound address in the app | chart, `internal/egress` |
 | Supply chain | Actions pinned by SHA with least `permissions`; images pinned by digest; pnpm refuses packages under 7 days old and runs no install scripts; Renovate waits 7 days too; govulncheck, gosec, pnpm audit, osv-scanner, CodeQL; image provenance and SBOM | `.github/`, `web/pnpm-workspace.yaml` |
 
 ## Known limits

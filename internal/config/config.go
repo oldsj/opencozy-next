@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+
+	"github.com/oldsj/opencozy-next/internal/egress"
+	"github.com/oldsj/opencozy-next/internal/keyring"
 )
 
 // Config is the server's configuration. Secrets have no defaults: a missing one stops startup.
@@ -38,6 +41,17 @@ type Config struct {
 	AuthRatePerMinute int `env:"AUTH_RATE_PER_MINUTE" envDefault:"10"`
 	// MigrateOnStart applies database migrations before serving.
 	MigrateOnStart bool `env:"MIGRATE_ON_START" envDefault:"true"`
+
+	// Slice 0c: secrets at rest and outbound requests (design §10, §11).
+
+	// SecretKeys encrypts integration secrets: "id:base64key,…", the first key encrypts.
+	// Secret. Unset means no integration can store a secret.
+	SecretKeys *keyring.Keyring `env:"OPENCOZY_SECRET_KEYS"`
+	// HomeAssistantAllowedPrivateCIDRs are the private ranges Home Assistant may be reached in
+	// (RFC 1918 or ULA only; anything else stops startup).
+	HomeAssistantAllowedPrivateCIDRs egress.PrivateCIDRs `env:"HOME_ASSISTANT_ALLOWED_PRIVATE_CIDRS"`
+	// OIDCAllowedPrivateCIDRs are the private ranges an OIDC issuer may be reached in.
+	OIDCAllowedPrivateCIDRs egress.PrivateCIDRs `env:"OIDC_ALLOWED_PRIVATE_CIDRS"`
 }
 
 // Load reads the environment and validates it.

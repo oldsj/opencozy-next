@@ -4,6 +4,7 @@
 //	app migrate          apply migrations as the schema owner and grant the runtime role
 //	app bootstrap-owner  create the first household and its first adult (once only)
 //	app add-adult        add an adult to a household
+//	app rekey            re-encrypt stored secrets under the first OPENCOZY_SECRET_KEYS key
 //
 // bootstrap-owner and add-adult read the password from stdin, so it stays out of the process
 // list and shell history.
@@ -31,6 +32,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/config"
 	"github.com/oldsj/opencozy-next/internal/db"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/keyring"
 	"github.com/oldsj/opencozy-next/internal/server"
 )
 
@@ -77,18 +79,21 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		go srv.SweepSessions(ctx)
 		go command.DeleteExpired(ctx, dbq.New(pool), log)
 		return server.Serve(ctx, log, cfg.ListenAddr, h, srv.Drain)
-	case "bootstrap-owner", "add-adult":
+	case "bootstrap-owner", "add-adult", "rekey":
 		pool, err := db.Open(ctx, cfg.DatabaseURL)
 		if err != nil {
 			return err
 		}
 		defer pool.Close()
-		if cmd == "bootstrap-owner" {
+		switch cmd {
+		case "rekey": // re-encrypt stored secrets under the first OPENCOZY_SECRET_KEYS key
+			return keyring.RekeyAll(ctx, pool, cfg.SecretKeys, log)
+		case "bootstrap-owner":
 			return bootstrapOwner(ctx, pool, args, stdin, stdout)
 		}
 		return addAdult(ctx, pool, args, stdin, stdout)
 	default:
-		return fmt.Errorf("unknown command %q (want serve, migrate, bootstrap-owner or add-adult)", cmd)
+		return fmt.Errorf("unknown command %q (want serve, migrate, bootstrap-owner, add-adult or rekey)", cmd)
 	}
 }
 

@@ -93,6 +93,7 @@ spec:
             - name: MIGRATE_ON_START
               value: "false"
             {{- include "app.dbEnv" (dict "root" . "ca" $ca "serve" true) | nindent 12 }}
+            {{- with include "app.egressEnv" . | trim }}{{ . | nindent 12 }}{{ end }}
             {{- range .Values.secrets.env }}
             - name: {{ .name | quote }}
               valueFrom:
