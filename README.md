@@ -59,8 +59,8 @@ Deliberate choices, inherited from the template this repository started from:
   Renovate still updates them.
 - **No CORS, no Host/Origin guard of its own**: the SPA and API share an origin, and Go's
   `CrossOriginProtection` covers CSRF.
-- **Docker Compose for Postgres in CI too**, not service containers: `make ci` and CI are the
-  same commands.
+- **Postgres from Docker Compose locally and a service container in CI**, with the same image
+  and credentials (`compose.yaml`); both run the same `make` targets against it.
 - **Helm chart** rather than devspace/kustomize: a deployment consumes a versioned artifact.
 - **pnpm `minimumReleaseAge`** (7 days) so a hand-added dependency gets the same cooldown as
   Renovate's.
