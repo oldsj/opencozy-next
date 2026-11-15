@@ -29,6 +29,10 @@ config:
   # CIDRs of the gateway pods whose X-Forwarded-For is trusted (usually the cluster's pod
   # network). Empty: use the TCP peer as the client address.
   trustedProxies: ""
+  # Passkeys: the site's hostname, which must never change once passkeys exist, and the
+  # comma-separated origins they are used from. Empty turns passkeys off.
+  webauthnRPID: ""
+  webauthnOrigins: ""
 
 database:
   # cnpg.enabled: the chart makes a CloudNativePG Cluster named <fullname>-db, and the app

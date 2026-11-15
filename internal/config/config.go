@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -52,6 +53,14 @@ type Config struct {
 	HomeAssistantAllowedPrivateCIDRs egress.PrivateCIDRs `env:"HOME_ASSISTANT_ALLOWED_PRIVATE_CIDRS"`
 	// OIDCAllowedPrivateCIDRs are the private ranges an OIDC issuer may be reached in.
 	OIDCAllowedPrivateCIDRs egress.PrivateCIDRs `env:"OIDC_ALLOWED_PRIVATE_CIDRS"`
+
+	// Slice 10: passkeys (design §6).
+	// WebAuthnRPID is the relying party ID: the site's hostname, which must never change once
+	// passkeys exist. Empty turns passkeys off.
+	WebAuthnRPID string `env:"WEBAUTHN_RP_ID"`
+	// WebAuthnOrigins are the origins passkeys are used from, e.g. https://cozy.example.test.
+	// Required with WEBAUTHN_RP_ID.
+	WebAuthnOrigins []string `env:"WEBAUTHN_ORIGINS" envSeparator:","`
 }
 
 // Load reads the environment and validates it.
@@ -77,6 +86,7 @@ func (c Config) validate() error {
 	if strings.Contains(c.MigrationDatabaseURL, "sslmode=disable") && !isLocalDatabase(c.MigrationDatabaseURL) {
 		errs = append(errs, errors.New("MIGRATION_DATABASE_URL: sslmode=disable is only allowed for localhost"))
 	}
+	errs = append(errs, c.validateWebAuthn()...)
 	if c.MigrationDatabaseURL != "" && c.DatabaseRuntimeRole == "" {
 		errs = append(errs, errors.New("DATABASE_RUNTIME_ROLE is required with MIGRATION_DATABASE_URL"))
 	}
@@ -84,6 +94,37 @@ func (c Config) validate() error {
 		return fmt.Errorf("config: %w", errors.Join(errs...))
 	}
 	return nil
+}
+
+func (c Config) validateWebAuthn() []error {
+	if c.WebAuthnRPID == "" {
+		if len(c.WebAuthnOrigins) > 0 {
+			return []error{errors.New("WEBAUTHN_ORIGINS needs WEBAUTHN_RP_ID")}
+		}
+		return nil
+	}
+	if strings.ContainsAny(c.WebAuthnRPID, ":/ ") || c.WebAuthnRPID != strings.ToLower(c.WebAuthnRPID) {
+		return []error{errors.New("WEBAUTHN_RP_ID must be a lower-case hostname, with no scheme or port")}
+	}
+	if len(c.WebAuthnOrigins) == 0 {
+		return []error{errors.New("WEBAUTHN_ORIGINS is required with WEBAUTHN_RP_ID")}
+	}
+	var errs []error
+	for _, o := range c.WebAuthnOrigins {
+		u, err := url.Parse(o)
+		host := ""
+		if err == nil {
+			host = u.Hostname()
+		}
+		local := u != nil && u.Scheme == "http" && host == "localhost"
+		switch {
+		case err != nil || u.Path != "" || u.RawQuery != "" || u.User != nil || (u.Scheme != "https" && !local):
+			errs = append(errs, fmt.Errorf("WEBAUTHN_ORIGINS: %q must be https://host[:port] (http only for localhost)", o))
+		case host != c.WebAuthnRPID && !strings.HasSuffix(host, "."+c.WebAuthnRPID):
+			errs = append(errs, fmt.Errorf("WEBAUTHN_ORIGINS: %q is not on %s", o, c.WebAuthnRPID))
+		}
+	}
+	return errs
 }
 
 func isLocalDatabase(url string) bool {
