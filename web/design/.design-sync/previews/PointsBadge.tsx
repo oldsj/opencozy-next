@@ -1,5 +1,5 @@
 // @dsCard group="People"
-import { Button, List, ListRow, ManageNav, ManageShell, PageHeader, PointsBadge, ProfileAvatar, Section, Tag } from '../../src';
+import { pointsLabel, Button, List, ListRow, ManageNav, ManageShell, PageHeader, PointsBadge, ProfileAvatar, Section, Tag } from '../../src';
 import type { TagTone } from '../../src';
 
 import { history, historyChild, type LedgerEntry, type LedgerKind } from './fixtures-points';
@@ -8,6 +8,7 @@ import { manageGroups } from './fixtures-manage';
 export function Values() {
   return (
     <div className="flex items-center gap-3">
+      <PointsBadge points={1} />
       <PointsBadge points={4} />
       <PointsBadge points={24} />
       <PointsBadge points={150} />
@@ -38,7 +39,7 @@ function signed(points: number): string {
 function LedgerRow({ entry }: { entry: LedgerEntry }) {
   const undone = entry.reversedBy !== undefined;
   const tag = kindTags[entry.kind];
-  const meta = [signed(entry.points) + ' points', entry.at, entry.by === undefined ? null : `by ${entry.by}`]
+  const meta = [pointsLabel(entry.points, signed(entry.points)), entry.at, entry.by === undefined ? null : `by ${entry.by}`]
     .filter(Boolean)
     .join(' · ');
   return (

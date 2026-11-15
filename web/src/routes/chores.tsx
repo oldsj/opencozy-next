@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type SyntheticEvent } from 'react';
 
-import { Button, ButtonPrimary, EmptyState, Field, Input, List, ListRow, Notice, PageHeader } from '@app/design';
+import { Button, ButtonPrimary, EmptyState, Field, Input, List, ListRow, Notice, PageHeader, pointsLabel } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey } from '../api/client';
 
@@ -95,7 +95,7 @@ export function ChoresPage() {
             <ListRow
               key={c.id}
               title={c.title}
-              meta={`${nameOf(c.childId)} · ${String(c.points)} points · ${schedule(c.days)}`}
+              meta={`${nameOf(c.childId)} · ${pointsLabel(c.points)} · ${schedule(c.days)}`}
               trailing={
                 <Button
                   onClick={() => { archive.mutate({ params: { ...idempotencyKey(), path: { choreId: c.id } } }); }}

@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { Button, ButtonLink, CheckCircle, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -43,7 +43,7 @@ export function Chores() {
 const noop = () => undefined;
 
 function InboxRow({ item, saving = false }: { item: InboxItem; saving?: boolean }) {
-  const meta = [item.child.name, item.points === undefined ? null : `${String(item.points)} points`, kindLabels[item.kind], item.submittedAt]
+  const meta = [item.child.name, item.points === undefined ? null : pointsLabel(item.points), kindLabels[item.kind], item.submittedAt]
     .filter(Boolean)
     .join(' · ');
   const leading = <ProfileAvatar name={item.child.name} color={item.child.color} size="small" aria-hidden="true" />;

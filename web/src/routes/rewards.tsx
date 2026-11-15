@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
 
-import { Button, ButtonPrimary, EmptyState, Field, Input, List, ListRow, Notice, PageHeader } from '@app/design';
+import { Button, ButtonPrimary, EmptyState, Field, Input, List, ListRow, Notice, PageHeader, pointsLabel } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey } from '../api/client';
 
@@ -54,7 +54,7 @@ export function RewardsPage() {
             <ListRow
               key={r.id}
               title={r.title}
-              meta={[`${String(r.cost)} points`, r.minutes === undefined ? null : `${String(r.minutes)} minutes`].filter(Boolean).join(' · ')}
+              meta={[pointsLabel(r.cost), r.minutes === undefined ? null : `${String(r.minutes)} minutes`].filter(Boolean).join(' · ')}
               trailing={
                 <Button
                   onClick={() => { archive.mutate({ params: { ...idempotencyKey(), path: { rewardId: r.id } } }); }}
