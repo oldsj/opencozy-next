@@ -9,9 +9,12 @@ export interface PairingOffer {
   /** 8 characters shown as XXXX-XXXX; single use. */
   code: string;
   token: string;
-  /** Encode into the QR on the client (QrCode takes the module matrix). */
+  /**
+   * Encode into the QR on the client (QrCode takes the module matrix). The app's scanner accepts only
+   * `opencozy-pair:v1?origin=<url-encoded origin>&token=<token>` (#36).
+   */
   qrPayload: string;
-  /** About five minutes after the offer. */
+  /** Ten minutes after the offer; single use. */
   expiresAt: string;
 }
 
@@ -53,7 +56,7 @@ export const offer: PairingOffer = {
   id: 'p1',
   code: 'K7QM-2XHT',
   token: 'opaque-token',
-  qrPayload: 'https://cozy.example.test/pair#K7QM2XHT',
+  qrPayload: 'opencozy-pair:v1?origin=https%3A%2F%2Fcozy.example.test&token=opaque-token',
   expiresAt: '2026-09-14T16:10:00-04:00',
 };
 
