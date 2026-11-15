@@ -81,6 +81,12 @@ func (s *Server) UpdateAwardRule(ctx context.Context, req api.UpdateAwardRuleReq
 	if err != nil {
 		return nil, err
 	}
+	notFound := api.UpdateAwardRule404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}
+	if _, err := cmd.Q.GetAwardRule(ctx, dbq.GetAwardRuleParams{HouseholdID: h, ID: req.RuleId}); errors.Is(err, pgx.ErrNoRows) {
+		return notFound, nil
+	} else if err != nil {
+		return nil, err
+	}
 	if !b.Archived {
 		if taken, err := cmd.Q.ActivityTaken(ctx, dbq.ActivityTakenParams{HouseholdID: h, ActivityKey: b.ActivityKey, ExceptID: req.RuleId}); err != nil {
 			return nil, err
@@ -93,11 +99,6 @@ func (s *Server) UpdateAwardRule(ctx context.Context, req api.UpdateAwardRuleReq
 		Archive: b.Archived, Now: now, ExpectedVersion: int32(b.ExpectedVersion), //nolint:gosec // capped by the spec
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		if _, err := cmd.Q.GetAwardRule(ctx, dbq.GetAwardRuleParams{HouseholdID: h, ID: req.RuleId}); errors.Is(err, pgx.ErrNoRows) {
-			return api.UpdateAwardRule404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
-		} else if err != nil {
-			return nil, err
-		}
 		return api.UpdateAwardRule409JSONResponse(conflict("rule")), nil // stale, or archived
 	} else if err != nil {
 		return nil, err

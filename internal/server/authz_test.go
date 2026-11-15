@@ -75,6 +75,8 @@ func TestAuthzMatrix(t *testing.T) {
 				u = strings.ReplaceAll(u, "{rewardId}", h.reward.String())
 				u = strings.ReplaceAll(u, "{eventId}", h.event.String())
 				u = strings.ReplaceAll(u, "{calendarId}", h.calendar.String())
+				u = strings.ReplaceAll(u, "{ruleId}", h.rule.String())
+				u = strings.ReplaceAll(u, "{linkId}", h.link.String())
 				switch op {
 				case "GET /calendar":
 					u += "?from=2026-09-14&to=2026-09-21"
