@@ -1,0 +1,35 @@
+household:
+  get:
+    operationId: getHousehold
+    summary: The caller's household
+    tags: [household]
+    x-actors: [adult, phone, display, service, assistant]
+    x-scopes: [household:read]
+    x-display-scopes: [today]
+    responses:
+      '200':
+        description: The household
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Household'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  Household:
+    type: object
+    required: [id, name, timeZone]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      timeZone:
+        type: string
+        description: IANA zone name; the household day follows it
+        examples: [Europe/Amsterdam]

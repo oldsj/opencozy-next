@@ -1,0 +1,78 @@
+# Shared schemas and responses, referenced from the domain files.
+schemas:
+  Error:
+    type: object
+    required: [error]
+    properties:
+      error:
+        $ref: '#/schemas/ErrorDetail'
+  ErrorDetail:
+    type: object
+    required: [code, message]
+    properties:
+      code:
+        type: string
+        description: Stable, machine-readable, snake_case
+        examples: [not_found]
+      message:
+        type: string
+        description: Safe to show to the user; never contains internals
+  Id:
+    type: string
+    format: uuid
+
+responses:
+  BadRequest:
+    description: The request does not match the contract
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  Unauthorized:
+    description: No live credential. The same response for every authentication failure.
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  Forbidden:
+    description: This caller may not do this, including any cross-origin unsafe request
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  NotFound:
+    description: No such resource for this caller
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  Conflict:
+    description: The resource changed, or already exists
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  TooLarge:
+    description: The request body is over the operation's limit
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  TooManyRequests:
+    description: Rate limited; retry after the Retry-After header
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+  Error:
+    description: Unexpected error
+    content:
+      application/json:
+        schema:
+          $ref: '#/schemas/Error'
+
+headers:
+  SetSession:
+    description: Sets or clears the __Host-session cookie
+    schema:
+      type: string

@@ -15,9 +15,15 @@ linters:
     - unused
   settings:
     forbidigo:
+      analyze-types: true
       forbid:
         - pattern: ^os\.(Getenv|LookupEnv|Environ)$
           msg: read the environment only in internal/config
+        # Outbound HTTP goes through internal/egress, which enforces the allowlist and refuses
+        # private addresses after DNS resolution.
+        - pattern: ^http\.(DefaultClient|DefaultTransport|Get|Head|Post|PostForm|Client|Transport)$
+          pkg: ^net/http$
+          msg: make outbound HTTP requests only through internal/egress
     govet:
       enable-all: true
       disable:
@@ -28,6 +34,10 @@ linters:
     rules:
       - path: ^internal/config/
         linters: [forbidigo]
+        text: read the environment
+      - path: (^internal/egress/|_test\.go$)
+        linters: [forbidigo]
+        text: internal/egress
       - path: _test\.go$
         linters: [gosec, noctx]
 

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -40,9 +41,9 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate applies every pending migration. A Postgres advisory lock lets several replicas start
-// at once.
-func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
+// Migrate applies every pending migration, as the schema owner, then grants runtimeRole (when
+// set) row access. A Postgres advisory lock lets several replicas start at once.
+func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, runtimeRole string) error {
 	sqlDB := stdlib.OpenDBFromPool(pool)
 	defer func() { _ = sqlDB.Close() }()
 
@@ -65,5 +66,36 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
 	for _, r := range results {
 		log.InfoContext(ctx, "migration applied", "version", r.Source.Version, "path", r.Source.Path, "duration", r.Duration)
 	}
+	if runtimeRole != "" {
+		return Grant(ctx, pool, runtimeRole)
+	}
 	return nil
+}
+
+// appendOnly lists tables the runtime role may only read and insert into.
+var appendOnly = []string{}
+
+// Grant gives role row access to the application's tables and nothing on goose's bookkeeping.
+// It runs after every migration, so new tables are covered.
+func Grant(ctx context.Context, pool *pgxpool.Pool, role string) error {
+	r := pgx.Identifier{role}.Sanitize()
+	stmts := []string{
+		"GRANT USAGE ON SCHEMA public TO " + r,
+		"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO " + r,
+		"REVOKE ALL ON TABLE goose_db_version FROM " + r,
+	}
+	for _, t := range appendOnly {
+		stmts = append(stmts, "REVOKE UPDATE, DELETE, TRUNCATE ON TABLE "+pgx.Identifier{t}.Sanitize()+" FROM "+r)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after Commit
+	for _, s := range stmts {
+		if _, err := tx.Exec(ctx, s); err != nil {
+			return fmt.Errorf("db: grant: %w", err)
+		}
+	}
+	return tx.Commit(ctx)
 }

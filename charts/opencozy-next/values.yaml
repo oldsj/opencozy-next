@@ -24,8 +24,6 @@ image:
 
 config:
   logLevel: info
-  # Anyone may create an account. Turn on to make the first account, then off.
-  allowSignup: false
   sessionTTL: 720h
   authRatePerMinute: 10
   # CIDRs of the gateway pods whose X-Forwarded-For is trusted (usually the cluster's pod
@@ -54,6 +52,13 @@ database:
   urlKey: uri
   # Optional Secret with ca.crt; then PGSSLMODE=verify-full.
   caSecret: ""
+  # The URL above is the schema owner's; an init container runs migrations with it. With
+  # runtime.role set, the app itself connects as that role, which migrations grant row access
+  # only, from runtime.existingSecret.
+  runtime:
+    role: ""
+    existingSecret: ""
+    urlKey: uri
 
 # App secrets beyond the database, as env vars from one Secret. The Secret comes from the
 # deployment, or the chart makes a OnePasswordItem for it when onepassword.itemPath is set. Secret values never go in values.

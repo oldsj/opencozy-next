@@ -20,7 +20,7 @@ func TestHandler(t *testing.T) {
 		wantCode                  int
 	}{
 		{"/", "<title>app</title>", "no-cache", 200},
-		{"/notes/123", "<title>app</title>", "no-cache", 200},
+		{"/children/123", "<title>app</title>", "no-cache", 200},
 		{"/assets/index-abc.js", "console.log", "immutable", 200},
 		{"/assets/missing.js", "", "", 404},
 		{"/favicon.svg", "<svg/>", "no-cache", 200},

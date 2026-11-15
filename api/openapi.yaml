@@ -1,72 +1,53 @@
 openapi: 3.1.0
 info:
-  title: Template Webapp API
+  title: OpenCozy API
   version: 0.1.0
   description: |
-    The wire contract. The Go server types and handlers interface (internal/api) and the
-    TypeScript client (web/src/api/schema.gen.ts) are generated from this file: change it
-    first, then run `make gen`.
+    The wire contract for every OpenCozy client. Each domain's operations live in their own file
+    in api/src/; `make gen` bundles them into api/openapi.yaml, and the Go server (internal/api)
+    and the TypeScript client (web/src/api/schema.gen.ts) are generated from that.
 
-    Authentication is a server-side session in the `__Host-session` cookie (HttpOnly, Secure,
-    SameSite=Lax). Cross-site state-changing requests are refused by Go's
-    `http.CrossOriginProtection`, so the client sends no CSRF token.
+    **Who may call what** is declared on each operation, and the declaration is the check
+    (internal/authz): `x-actors` lists the actor kinds allowed (`public` for none needed),
+    `x-scopes` the scopes a service or assistant credential needs, `x-display-scopes` the scopes
+    a wall display needs, `x-child-param` the path parameter naming a child, `x-recent-auth` an
+    adult sign-in within 10 minutes, and `x-body-limit` the body cap in bytes (default 64 KiB).
+    An operation without `x-actors` is refused and stops the server from starting.
+
+    Credentials: the adult web session is the `__Host-session` cookie, a wall display the
+    `__Host-display` cookie; parent phones (`ocp_`), service credentials (`ocz_`) and assistants
+    (`oca_`) send `Authorization: Bearer`. Every authentication failure is the same 401.
+    Cross-site state-changing requests with cookies are refused by Go's `http.CrossOriginProtection`.
 servers:
   - url: /api
-security:
-  - session: []
 tags:
   - name: auth
-    description: Sign up, sign in and out
-  - name: notes
-    description: The signed-in user's notes
-
+    description: Adult sign-in
+  - name: household
+    description: The caller's household
+  - name: children
+    description: Children of the household
+  - name: credentials
+    description: Service and assistant credentials
 paths:
-  /auth/signup:
-    post:
-      operationId: signup
-      summary: Create an account and sign in
-      description: Only when the server runs with ALLOW_SIGNUP=true; otherwise 403.
-      tags: [auth]
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Credentials'
-      responses:
-        '201':
-          description: Signed up and signed in
-          headers:
-            Set-Cookie:
-              $ref: '#/components/headers/SetSession'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        default:
-          $ref: '#/components/responses/Error'
-
   /auth/login:
     post:
       operationId: login
-      summary: Sign in
-      tags: [auth]
-      security: []
+      summary: Sign in with email and password
+      tags:
+        - auth
+      x-actors:
+        - public
+      x-body-limit: 4096
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Credentials'
+            example:
+              email: adult@example.test
+              password: a long enough password
       responses:
         '200':
           description: Signed in
@@ -76,22 +57,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Me'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/TooLarge'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
-
   /auth/logout:
     post:
       operationId: logout
       summary: Sign out and end the session
-      tags: [auth]
-      security: []
+      tags:
+        - auth
+      x-actors:
+        - public
+      x-body-limit: 1
       responses:
         '204':
           description: Signed out (also when there was no session)
@@ -102,135 +87,447 @@ paths:
           $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
-
   /auth/me:
     get:
       operationId: getMe
-      summary: The signed-in user
-      tags: [auth]
+      summary: The signed-in adult and their household
+      tags:
+        - auth
+      x-actors:
+        - adult
       responses:
         '200':
-          description: The signed-in user
+          description: The signed-in adult
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Me'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
-
-  /notes:
-    get:
-      operationId: listNotes
-      summary: List notes, newest first
-      tags: [notes]
-      responses:
-        '200':
-          description: Notes
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Note'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        default:
-          $ref: '#/components/responses/Error'
+  /auth/confirm:
     post:
-      operationId: createNote
-      summary: Create a note
-      tags: [notes]
+      operationId: confirmSignIn
+      summary: Enter the password again, for operations that need a recent sign-in
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-body-limit: 4096
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NoteInput'
+              type: object
+              additionalProperties: false
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+            example:
+              password: a long enough password
       responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Note'
+        '204':
+          description: Confirmed
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
-
-  /notes/{noteId}:
-    parameters:
-      - name: noteId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    put:
-      operationId: updateNote
-      summary: Replace a note's title and body
-      tags: [notes]
+  /household:
+    get:
+      operationId: getHousehold
+      summary: The caller's household
+      tags:
+        - household
+      x-actors:
+        - adult
+        - phone
+        - display
+        - service
+        - assistant
+      x-scopes:
+        - household:read
+      x-display-scopes:
+        - today
+      responses:
+        '200':
+          description: The household
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /children:
+    get:
+      operationId: listChildren
+      summary: The children the caller may act for
+      tags:
+        - children
+      x-actors:
+        - adult
+        - phone
+        - display
+        - service
+        - assistant
+      x-scopes:
+        - children:read
+      x-display-scopes:
+        - today
+      parameters:
+        - name: includeArchived
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Children, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Child'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createChild
+      summary: Add a child
+      tags:
+        - children
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 1024
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NoteInput'
+              type: object
+              additionalProperties: false
+              required:
+                - name
+              properties:
+                name:
+                  $ref: '#/components/schemas/ChildName'
+            example:
+              name: Robin
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Child'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}:
+    parameters:
+      - name: childId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Id'
+    get:
+      operationId: getChild
+      summary: One child
+      tags:
+        - children
+      x-actors:
+        - adult
+        - phone
+        - display
+        - service
+        - assistant
+      x-scopes:
+        - children:read
+      x-display-scopes:
+        - today
+      x-child-param: childId
+      responses:
+        '200':
+          description: The child
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Child'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateChild
+      summary: Rename a child, or archive or restore them
+      tags:
+        - children
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-child-param: childId
+      x-body-limit: 1024
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - name
+                - archived
+                - expectedVersion
+              properties:
+                name:
+                  $ref: '#/components/schemas/ChildName'
+                archived:
+                  type: boolean
+                expectedVersion:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+            example:
+              name: Robin
+              archived: false
+              expectedVersion: 1
       responses:
         '200':
           description: Updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Note'
+                $ref: '#/components/schemas/Child'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         default:
           $ref: '#/components/responses/Error'
-    delete:
-      operationId: deleteNote
-      summary: Delete a note
-      tags: [notes]
+  /credentials:
+    get:
+      operationId: listCredentials
+      summary: The household's live service and assistant credentials
+      tags:
+        - credentials
+      x-actors:
+        - adult
       responses:
-        '204':
-          description: Deleted
+        '200':
+          description: Credentials, oldest first; secrets are never shown again
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Credential'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createCredential
+      summary: Issue a service or assistant credential
+      description: Needs a sign-in within the last 10 minutes. The secret is in this response only.
+      tags:
+        - credentials
+      x-actors:
+        - adult
+      x-command: true
+      x-recent-auth: true
+      x-body-limit: 4096
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - kind
+                - name
+                - scopes
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - service
+                    - assistant
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                scopes:
+                  type: array
+                  minItems: 1
+                  maxItems: 32
+                  uniqueItems: true
+                  items:
+                    type: string
+                    maxLength: 64
+                allChildren:
+                  type: boolean
+                  default: false
+                childIds:
+                  type: array
+                  maxItems: 50
+                  uniqueItems: true
+                  items:
+                    $ref: '#/components/schemas/Id'
+            example:
+              kind: service
+              name: Router
+              scopes:
+                - children:read
+              allChildren: true
+      responses:
+        '201':
+          description: Issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - credential
+                  - secret
+                properties:
+                  credential:
+                    $ref: '#/components/schemas/Credential'
+                  secret:
+                    type: string
+                    description: Shown once
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /credentials/{credentialId}:
+    parameters:
+      - name: credentialId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Id'
+    delete:
+      operationId: revokeCredential
+      summary: Revoke a credential; it stops working at once
+      tags:
+        - credentials
+      x-actors:
+        - adult
+      x-command: true
+      responses:
+        '204':
+          description: Revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Error'
-
+  /credential:
+    get:
+      operationId: getOwnCredential
+      summary: The calling service or assistant credential
+      tags:
+        - credentials
+      x-actors:
+        - service
+        - assistant
+      x-scopes: []
+      responses:
+        '200':
+          description: The credential
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     session:
       type: apiKey
       in: cookie
       name: __Host-session
-
-  headers:
-    SetSession:
-      description: Sets or clears the __Host-session cookie
-      schema:
-        type: string
-
+    display:
+      type: apiKey
+      in: cookie
+      name: __Host-display
+    bearer:
+      type: http
+      scheme: bearer
   schemas:
     Credentials:
       type: object
       additionalProperties: false
-      required: [email, password]
+      required:
+        - email
+        - password
       properties:
         email:
           type: string
@@ -238,70 +535,133 @@ components:
           maxLength: 254
         password:
           type: string
-          minLength: 12
-          maxLength: 128
-
-    User:
-      type: object
-      required: [id, email]
-      properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type: string
-
-    NoteInput:
-      type: object
-      additionalProperties: false
-      required: [title, body]
-      properties:
-        title:
-          type: string
           minLength: 1
-          maxLength: 200
-        body:
-          type: string
-          maxLength: 20000
-
-    Note:
-      type: object
-      required: [id, title, body, createdAt, updatedAt]
-      properties:
-        id:
-          type: string
-          format: uuid
-        title:
-          type: string
-        body:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    Error:
-      type: object
-      required: [error]
-      properties:
-        error:
-          $ref: '#/components/schemas/ErrorDetail'
-
+          maxLength: 256
     ErrorDetail:
       type: object
-      required: [code, message]
+      required:
+        - code
+        - message
       properties:
         code:
           type: string
           description: Stable, machine-readable, snake_case
-          examples: [not_found]
+          examples:
+            - not_found
         message:
           type: string
           description: Safe to show to the user; never contains internals
-
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+    Id:
+      type: string
+      format: uuid
+    Household:
+      type: object
+      required:
+        - id
+        - name
+        - timeZone
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        timeZone:
+          type: string
+          description: IANA zone name; the household day follows it
+          examples:
+            - Europe/Amsterdam
+    Me:
+      type: object
+      required:
+        - adult
+        - household
+      properties:
+        adult:
+          type: object
+          required:
+            - id
+            - email
+            - name
+          properties:
+            id:
+              $ref: '#/components/schemas/Id'
+            email:
+              type: string
+            name:
+              type: string
+        household:
+          $ref: '#/components/schemas/Household'
+    Child:
+      type: object
+      required:
+        - id
+        - name
+        - archived
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        archived:
+          type: boolean
+        version:
+          type: integer
+    ChildName:
+      type: string
+      minLength: 1
+      maxLength: 40
+      pattern: \S
+    Credential:
+      type: object
+      required:
+        - id
+        - kind
+        - name
+        - scopes
+        - allChildren
+        - childIds
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        kind:
+          type: string
+          enum:
+            - service
+            - assistant
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        allChildren:
+          type: boolean
+        childIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Id'
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
   responses:
+    Error:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     BadRequest:
       description: The request does not match the contract
       content:
@@ -309,25 +669,13 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     Unauthorized:
-      description: Not signed in, or wrong credentials
+      description: No live credential. The same response for every authentication failure.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    Forbidden:
-      description: Not allowed, including any cross-origin unsafe request
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    NotFound:
-      description: No such resource for this user
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Conflict:
-      description: Already exists
+    TooLarge:
+      description: The request body is over the operation's limit
       content:
         application/json:
           schema:
@@ -338,9 +686,26 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    Error:
-      description: Unexpected error
+    Forbidden:
+      description: This caller may not do this, including any cross-origin unsafe request
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Conflict:
+      description: The resource changed, or already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: No such resource for this caller
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  headers:
+    SetSession:
+      description: Sets or clears the __Host-session cookie
+      schema:
+        type: string

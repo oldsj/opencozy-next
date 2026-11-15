@@ -6,8 +6,8 @@ import { queryOptions } from '@tanstack/react-query';
 
 import type { components, paths } from './schema.gen';
 
-export type Note = components['schemas']['Note'];
-export type User = components['schemas']['User'];
+export type Me = components['schemas']['Me'];
+export type Child = components['schemas']['Child'];
 export type ApiError = components['schemas']['Error'];
 
 // Same origin as the page. An absolute URL, because Node's Request (under Vitest) rejects relative
@@ -24,10 +24,10 @@ export function errorMessage(error: unknown): string {
   return e?.error?.message ?? 'Something went wrong. Try again.';
 }
 
-/** The signed-in user, or null when signed out. Shared by the router guard and the UI. */
+/** The signed-in adult and their household, or null when signed out. Shared by the router guard and the UI. */
 export const meQuery = queryOptions({
   queryKey: ['get', '/auth/me'],
-  queryFn: async (): Promise<User | null> => {
+  queryFn: async (): Promise<Me | null> => {
     const { data, response } = await client.GET('/auth/me');
     if (response.status === 401) return null;
     if (!data) throw new Error(`GET /auth/me: ${String(response.status)}`);

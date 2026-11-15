@@ -42,12 +42,6 @@ describe('LoginPage', () => {
     expect(new URL(request.url).pathname).toBe('/api/auth/login');
     expect(request.method).toBe('POST');
   });
-
-  it('switches to sign-up', async () => {
-    renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /sign up/i }));
-    expect(screen.getByRole('heading')).toHaveTextContent('Create an account');
-  });
 });
 
 describe('errorMessage', () => {

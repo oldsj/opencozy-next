@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: OpenCozy API
+  version: 0.1.0
+  description: |
+    The wire contract for every OpenCozy client. Each domain's operations live in their own file
+    in api/src/; `make gen` bundles them into api/openapi.yaml, and the Go server (internal/api)
+    and the TypeScript client (web/src/api/schema.gen.ts) are generated from that.
+
+    **Who may call what** is declared on each operation, and the declaration is the check
+    (internal/authz): `x-actors` lists the actor kinds allowed (`public` for none needed),
+    `x-scopes` the scopes a service or assistant credential needs, `x-display-scopes` the scopes
+    a wall display needs, `x-child-param` the path parameter naming a child, `x-recent-auth` an
+    adult sign-in within 10 minutes, and `x-body-limit` the body cap in bytes (default 64 KiB).
+    An operation without `x-actors` is refused and stops the server from starting.
+
+    Credentials: the adult web session is the `__Host-session` cookie, a wall display the
+    `__Host-display` cookie; parent phones (`ocp_`), service credentials (`ocz_`) and assistants
+    (`oca_`) send `Authorization: Bearer`. Every authentication failure is the same 401.
+    Cross-site state-changing requests with cookies are refused by Go's `http.CrossOriginProtection`.
+servers:
+  - url: /api
+tags:
+  - name: auth
+    description: Adult sign-in
+  - name: household
+    description: The caller's household
+  - name: children
+    description: Children of the household
+  - name: credentials
+    description: Service and assistant credentials
+
+# One line per path; the operations live in the domain files.
+paths:
+  /auth/login:
+    $ref: auth.yaml#/login
+  /auth/logout:
+    $ref: auth.yaml#/logout
+  /auth/me:
+    $ref: auth.yaml#/me
+  /auth/confirm:
+    $ref: auth.yaml#/confirm
+  /household:
+    $ref: household.yaml#/household
+  /children:
+    $ref: children.yaml#/children
+  /children/{childId}:
+    $ref: children.yaml#/child
+  /credentials:
+    $ref: credentials.yaml#/credentials
+  /credentials/{credentialId}:
+    $ref: credentials.yaml#/credential
+  /credential:
+    $ref: credentials.yaml#/self
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-session
+    display:
+      type: apiKey
+      in: cookie
+      name: __Host-display
+    bearer:
+      type: http
+      scheme: bearer

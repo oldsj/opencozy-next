@@ -1,0 +1,165 @@
+children:
+  get:
+    operationId: listChildren
+    summary: The children the caller may act for
+    tags: [children]
+    x-actors: [adult, phone, display, service, assistant]
+    x-scopes: [children:read]
+    x-display-scopes: [today]
+    parameters:
+      - name: includeArchived
+        in: query
+        schema:
+          type: boolean
+          default: false
+    responses:
+      '200':
+        description: Children, oldest first
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/schemas/Child'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: createChild
+    summary: Add a child
+    tags: [children]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name:
+                $ref: '#/schemas/ChildName'
+          example: { name: Robin }
+    responses:
+      '201':
+        description: Added
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Child'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      default:
+        $ref: common.yaml#/responses/Error
+child:
+  parameters:
+    - name: childId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  get:
+    operationId: getChild
+    summary: One child
+    tags: [children]
+    x-actors: [adult, phone, display, service, assistant]
+    x-scopes: [children:read]
+    x-display-scopes: [today]
+    x-child-param: childId
+    responses:
+      '200':
+        description: The child
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Child'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+  patch:
+    operationId: updateChild
+    summary: Rename a child, or archive or restore them
+    tags: [children]
+    x-actors: [adult, phone]
+    x-command: true
+    x-child-param: childId
+    x-body-limit: 1024
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [name, archived, expectedVersion]
+            properties:
+              name:
+                $ref: '#/schemas/ChildName'
+              archived:
+                type: boolean
+              expectedVersion:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+          example: { name: Robin, archived: false, expectedVersion: 1 }
+    responses:
+      '200':
+        description: Updated
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Child'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  ChildName:
+    type: string
+    minLength: 1
+    maxLength: 40
+    pattern: \S
+  Child:
+    type: object
+    required: [id, name, archived, version]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      archived:
+        type: boolean
+      version:
+        type: integer

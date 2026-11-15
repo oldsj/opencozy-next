@@ -54,7 +54,8 @@ db-down: ## Stop Postgres and delete its data
 	docker compose down -v
 
 .PHONY: gen
-gen: ## Regenerate Go server, sqlc queries and the TS client from api/ and internal/db/
+gen: ## Bundle api/src into api/openapi.yaml, then regenerate the Go server, sqlc queries and the TS client
+	$(PNPM) exec redocly bundle ../api/src/openapi.yaml -o ../api/openapi.yaml
 	go generate ./...
 	$(PNPM) gen
 

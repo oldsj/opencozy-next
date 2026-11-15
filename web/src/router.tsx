@@ -9,7 +9,7 @@ import {
 
 import { meQuery } from './api/client';
 import { LoginPage } from './routes/login';
-import { NotesPage } from './routes/notes';
+import { HomePage } from './routes/home';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -25,7 +25,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 
 // Signed-in pages: redirect to /login when there is no session. The server enforces this
 // independently; this only spares the user a page of errors.
-const notesRoute = createRoute({
+const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: async ({ context }) => {
@@ -34,7 +34,9 @@ const notesRoute = createRoute({
     if (!me) throw redirect({ to: '/login' });
     return { me };
   },
-  component: NotesPage,
+  component: function Home() {
+    return <HomePage me={homeRoute.useRouteContext().me} />;
+  },
 });
 
 const loginRoute = createRoute({
@@ -43,7 +45,7 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
-const routeTree = rootRoute.addChildren([notesRoute, loginRoute]);
+const routeTree = rootRoute.addChildren([homeRoute, loginRoute]);
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent' });

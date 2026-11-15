@@ -1,0 +1,131 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+
+	"github.com/google/uuid"
+
+	"github.com/oldsj/opencozy-next/internal/actor"
+	"github.com/oldsj/opencozy-next/internal/api"
+	"github.com/oldsj/opencozy-next/internal/auth"
+	"github.com/oldsj/opencozy-next/internal/command"
+	"github.com/oldsj/opencozy-next/internal/db/dbq"
+)
+
+func toCredential(c dbq.Credential, children []uuid.UUID) api.Credential {
+	if children == nil {
+		children = []uuid.UUID{}
+	}
+	return api.Credential{
+		Id: c.ID, Kind: api.CredentialKind(c.Kind), Name: c.Name, Scopes: c.Scopes,
+		AllChildren: c.AllChildren, ChildIds: children, CreatedAt: c.CreatedAt, ExpiresAt: c.ExpiresAt,
+	}
+}
+
+// ListCredentials lists the household's live credentials.
+func (s *Server) ListCredentials(ctx context.Context, _ api.ListCredentialsRequestObject) (api.ListCredentialsResponseObject, error) {
+	h := mustActor(ctx).HouseholdID
+	rows, err := s.q.ListCredentials(ctx, h)
+	if err != nil {
+		return nil, err
+	}
+	links, err := s.q.ListHouseholdCredentialChildren(ctx, h)
+	if err != nil {
+		return nil, err
+	}
+	children := map[uuid.UUID][]uuid.UUID{}
+	for _, l := range links {
+		children[l.CredentialID] = append(children[l.CredentialID], l.ChildID)
+	}
+	items := make([]api.Credential, 0, len(rows))
+	for _, c := range rows {
+		items = append(items, toCredential(c, children[c.ID]))
+	}
+	return api.ListCredentials200JSONResponse{Items: items}, nil
+}
+
+// CreateCredential issues a service or assistant credential. Scopes must be ones some operation
+// requires; children must be live children of this household.
+func (s *Server) CreateCredential(ctx context.Context, req api.CreateCredentialRequestObject) (api.CreateCredentialResponseObject, error) {
+	a := mustActor(ctx)
+	bad := func(code, msg string) (api.CreateCredentialResponseObject, error) {
+		return api.CreateCredential400JSONResponse{BadRequestJSONResponse: api.BadRequestJSONResponse(apiError(code, msg))}, nil
+	}
+	for _, sc := range req.Body.Scopes {
+		if !slices.Contains(s.table.Scopes(), sc) {
+			return bad("unknown_scope", fmt.Sprintf("Unknown scope %q.", sc))
+		}
+	}
+	all := req.Body.AllChildren != nil && *req.Body.AllChildren
+	var childIDs []uuid.UUID
+	if req.Body.ChildIds != nil {
+		childIDs = *req.Body.ChildIds
+	}
+	if all && len(childIDs) > 0 {
+		return bad("invalid_children", "Give either allChildren or childIds, not both.")
+	}
+	prefix := auth.PrefixService
+	if req.Body.Kind == api.CreateCredentialJSONBodyKindAssistant {
+		prefix = auth.PrefixAssistant
+	}
+	secret, hash, err := auth.NewToken(prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	q := mustCmd(ctx).Q
+	// Lock the children so none is archived while it is linked.
+	if err := mustCmd(ctx).LockChildren(ctx, childIDs...); errors.Is(err, command.ErrNoChild) {
+		return bad("invalid_children", "One of the children is not in this household.")
+	} else if err != nil {
+		return nil, err
+	}
+	adultID := a.AdultID
+	c, err := q.CreateCredential(ctx, dbq.CreateCredentialParams{
+		HouseholdID: a.HouseholdID, Kind: string(req.Body.Kind), Name: req.Body.Name, TokenHash: hash,
+		Scopes: req.Body.Scopes, AllChildren: all, AdultID: &adultID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range childIDs {
+		if err := q.AddCredentialChild(ctx, dbq.AddCredentialChildParams{HouseholdID: a.HouseholdID, CredentialID: c.ID, ChildID: id}); err != nil {
+			return nil, err
+		}
+	}
+	return api.CreateCredential201JSONResponse{Credential: toCredential(c, childIDs), Secret: secret}, nil
+}
+
+// RevokeCredential revokes one of the household's credentials.
+func (s *Server) RevokeCredential(ctx context.Context, req api.RevokeCredentialRequestObject) (api.RevokeCredentialResponseObject, error) {
+	cmd := mustCmd(ctx)
+	now, err := cmd.Now(ctx)
+	if err != nil {
+		return nil, err
+	}
+	n, err := cmd.Q.RevokeCredential(ctx, dbq.RevokeCredentialParams{HouseholdID: mustActor(ctx).HouseholdID, ID: req.CredentialId, Now: now})
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return api.RevokeCredential404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
+	}
+	return api.RevokeCredential204Response{}, nil
+}
+
+// GetOwnCredential describes the calling credential.
+func (s *Server) GetOwnCredential(ctx context.Context, _ api.GetOwnCredentialRequestObject) (api.GetOwnCredentialResponseObject, error) {
+	a := mustActor(ctx)
+	c, err := s.q.GetCredential(ctx, dbq.GetCredentialParams{HouseholdID: a.HouseholdID, ID: a.CredentialID})
+	if err != nil {
+		return nil, err
+	}
+	var children []uuid.UUID
+	if a.Kind == actor.Service || a.Kind == actor.Assistant {
+		children = a.Children
+	}
+	return api.GetOwnCredential200JSONResponse(toCredential(c, children)), nil
+}

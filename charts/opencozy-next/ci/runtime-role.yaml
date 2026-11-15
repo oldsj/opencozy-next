@@ -1,0 +1,7 @@
+# Two database roles: the owner migrates, the app serves as a rows-only role.
+image:
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+database:
+  runtime:
+    role: app_runtime
+    existingSecret: app-db-runtime

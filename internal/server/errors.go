@@ -7,6 +7,6 @@ func apiError(code, message string) api.Error {
 }
 
 var (
-	errUnauthorized = apiError("unauthorized", "Sign in to continue.")
-	errNotFound     = apiError("not_found", "Not found.")
+	errNotFound = apiError("not_found", "Not found.")
+	errWrong    = apiError("invalid_credentials", "Wrong email or password.")
 )

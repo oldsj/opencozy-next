@@ -1,0 +1,135 @@
+login:
+  post:
+    operationId: login
+    summary: Sign in with email and password
+    tags: [auth]
+    x-actors: [public]
+    x-body-limit: 4096
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/Credentials'
+          example: { email: adult@example.test, password: a long enough password }
+    responses:
+      '200':
+        description: Signed in
+        headers:
+          Set-Cookie:
+            $ref: common.yaml#/headers/SetSession
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Me'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+logout:
+  post:
+    operationId: logout
+    summary: Sign out and end the session
+    tags: [auth]
+    x-actors: [public]
+    x-body-limit: 1
+    responses:
+      '204':
+        description: Signed out (also when there was no session)
+        headers:
+          Set-Cookie:
+            $ref: common.yaml#/headers/SetSession
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+me:
+  get:
+    operationId: getMe
+    summary: The signed-in adult and their household
+    tags: [auth]
+    x-actors: [adult]
+    responses:
+      '200':
+        description: The signed-in adult
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Me'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+confirm:
+  post:
+    operationId: confirmSignIn
+    summary: Enter the password again, for operations that need a recent sign-in
+    tags: [auth]
+    x-actors: [adult]
+    x-body-limit: 4096
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [password]
+            properties:
+              password:
+                type: string
+                minLength: 1
+                maxLength: 256
+          example: { password: a long enough password }
+    responses:
+      '204':
+        description: Confirmed
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  Credentials:
+    type: object
+    additionalProperties: false
+    required: [email, password]
+    properties:
+      email:
+        type: string
+        format: email
+        maxLength: 254
+      password:
+        type: string
+        minLength: 1
+        maxLength: 256
+  Me:
+    type: object
+    required: [adult, household]
+    properties:
+      adult:
+        type: object
+        required: [id, email, name]
+        properties:
+          id:
+            $ref: common.yaml#/schemas/Id
+          email:
+            type: string
+          name:
+            type: string
+      household:
+        $ref: household.yaml#/schemas/Household

@@ -4,26 +4,6 @@
  */
 
 export interface paths {
-    "/auth/signup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create an account and sign in
-         * @description Only when the server runs with ALLOW_SIGNUP=true; otherwise 403.
-         */
-        post: operations["signup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -33,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign in */
+        /** Sign in with email and password */
         post: operations["login"];
         delete?: never;
         options?: never;
@@ -65,7 +45,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The signed-in user */
+        /** The signed-in adult and their household */
         get: operations["getMe"];
         put?: never;
         post?: never;
@@ -75,39 +55,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/notes": {
+    "/auth/confirm": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List notes, newest first */
-        get: operations["listNotes"];
+        get?: never;
         put?: never;
-        /** Create a note */
-        post: operations["createNote"];
+        /** Enter the password again, for operations that need a recent sign-in */
+        post: operations["confirmSignIn"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/notes/{noteId}": {
+    "/household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's household */
+        get: operations["getHousehold"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The children the caller may act for */
+        get: operations["listChildren"];
+        put?: never;
+        /** Add a child */
+        post: operations["createChild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                noteId: string;
+                childId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** One child */
+        get: operations["getChild"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename a child, or archive or restore them */
+        patch: operations["updateChild"];
+        trace?: never;
+    };
+    "/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's live service and assistant credentials */
+        get: operations["listCredentials"];
+        put?: never;
+        /**
+         * Issue a service or assistant credential
+         * @description Needs a sign-in within the last 10 minutes. The secret is in this response only.
+         */
+        post: operations["createCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/credentials/{credentialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credentialId: components["schemas"]["Id"];
             };
             cookie?: never;
         };
         get?: never;
-        /** Replace a note's title and body */
-        put: operations["updateNote"];
+        put?: never;
         post?: never;
-        /** Delete a note */
-        delete: operations["deleteNote"];
+        /** Revoke a credential; it stops working at once */
+        delete: operations["revokeCredential"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The calling service or assistant credential */
+        get: operations["getOwnCredential"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -122,28 +193,6 @@ export interface components {
             email: string;
             password: string;
         };
-        User: {
-            /** Format: uuid */
-            id: string;
-            email: string;
-        };
-        NoteInput: {
-            title: string;
-            body: string;
-        };
-        Note: {
-            /** Format: uuid */
-            id: string;
-            title: string;
-            body: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        Error: {
-            error: components["schemas"]["ErrorDetail"];
-        };
         ErrorDetail: {
             /**
              * @description Stable, machine-readable, snake_case
@@ -153,8 +202,59 @@ export interface components {
             /** @description Safe to show to the user; never contains internals */
             message: string;
         };
+        Error: {
+            error: components["schemas"]["ErrorDetail"];
+        };
+        /** Format: uuid */
+        Id: string;
+        Household: {
+            id: components["schemas"]["Id"];
+            name: string;
+            /**
+             * @description IANA zone name; the household day follows it
+             * @example Europe/Amsterdam
+             */
+            timeZone: string;
+        };
+        Me: {
+            adult: {
+                id: components["schemas"]["Id"];
+                email: string;
+                name: string;
+            };
+            household: components["schemas"]["Household"];
+        };
+        Child: {
+            id: components["schemas"]["Id"];
+            name: string;
+            archived: boolean;
+            version: number;
+        };
+        ChildName: string;
+        Credential: {
+            id: components["schemas"]["Id"];
+            /** @enum {string} */
+            kind: "service" | "assistant";
+            name: string;
+            scopes: string[];
+            allChildren: boolean;
+            childIds: components["schemas"]["Id"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
     };
     responses: {
+        /** @description Unexpected error */
+        Error: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description The request does not match the contract */
         BadRequest: {
             headers: {
@@ -164,7 +264,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Not signed in, or wrong credentials */
+        /** @description No live credential. The same response for every authentication failure. */
         Unauthorized: {
             headers: {
                 [name: string]: unknown;
@@ -173,26 +273,8 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Not allowed, including any cross-origin unsafe request */
-        Forbidden: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["Error"];
-            };
-        };
-        /** @description No such resource for this user */
-        NotFound: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["Error"];
-            };
-        };
-        /** @description Already exists */
-        Conflict: {
+        /** @description The request body is over the operation's limit */
+        TooLarge: {
             headers: {
                 [name: string]: unknown;
             };
@@ -209,8 +291,26 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Unexpected error */
-        Error: {
+        /** @description This caller may not do this, including any cross-origin unsafe request */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The resource changed, or already exists */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No such resource for this caller */
+        NotFound: {
             headers: {
                 [name: string]: unknown;
             };
@@ -229,36 +329,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    signup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Credentials"];
-            };
-        };
-        responses: {
-            /** @description Signed up and signed in */
-            201: {
-                headers: {
-                    "Set-Cookie": components["headers"]["SetSession"];
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["User"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-            429: components["responses"]["TooManyRequests"];
-            default: components["responses"]["Error"];
-        };
-    };
     login: {
         parameters: {
             query?: never;
@@ -268,6 +338,12 @@ export interface operations {
         };
         requestBody: {
             content: {
+                /**
+                 * @example {
+                 *       "email": "adult@example.test",
+                 *       "password": "a long enough password"
+                 *     }
+                 */
                 "application/json": components["schemas"]["Credentials"];
             };
         };
@@ -279,11 +355,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -318,20 +395,55 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The signed-in user */
+            /** @description The signed-in adult */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };
-    listNotes: {
+    confirmSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "password": "a long enough password"
+                 *     }
+                 */
+                "application/json": {
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Confirmed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getHousehold: {
         parameters: {
             query?: never;
             header?: never;
@@ -340,22 +452,49 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Notes */
+            /** @description The household */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Household"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listChildren: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Children, oldest first */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        items: components["schemas"]["Note"][];
+                        items: components["schemas"]["Child"][];
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };
-    createNote: {
+    createChild: {
         parameters: {
             query?: never;
             header?: never;
@@ -364,36 +503,82 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NoteInput"];
+                /**
+                 * @example {
+                 *       "name": "Robin"
+                 *     }
+                 */
+                "application/json": {
+                    name: components["schemas"]["ChildName"];
+                };
             };
         };
         responses: {
-            /** @description Created */
+            /** @description Added */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Note"];
+                    "application/json": components["schemas"]["Child"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             default: components["responses"]["Error"];
         };
     };
-    updateNote: {
+    getChild: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                noteId: string;
+                childId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The child */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Child"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateChild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                childId: components["schemas"]["Id"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NoteInput"];
+                /**
+                 * @example {
+                 *       "name": "Robin",
+                 *       "archived": false,
+                 *       "expectedVersion": 1
+                 *     }
+                 */
+                "application/json": {
+                    name: components["schemas"]["ChildName"];
+                    archived: boolean;
+                    expectedVersion: number;
+                };
             };
         };
         responses: {
@@ -403,27 +588,104 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Note"];
+                    "application/json": components["schemas"]["Child"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             default: components["responses"]["Error"];
         };
     };
-    deleteNote: {
+    listCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Credentials, oldest first; secrets are never shown again */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Credential"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "kind": "service",
+                 *       "name": "Router",
+                 *       "scopes": [
+                 *         "children:read"
+                 *       ],
+                 *       "allChildren": true
+                 *     }
+                 */
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "service" | "assistant";
+                    name: string;
+                    scopes: string[];
+                    /** @default false */
+                    allChildren?: boolean;
+                    childIds?: components["schemas"]["Id"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Issued */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        credential: components["schemas"]["Credential"];
+                        /** @description Shown once */
+                        secret: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    revokeCredential: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                noteId: string;
+                credentialId: components["schemas"]["Id"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Deleted */
+            /** @description Revoked */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -431,7 +693,31 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getOwnCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The credential */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Credential"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };

@@ -1,224 +1,332 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"log/slog"
+	"encoding/hex"
 	"net/http"
-	"net/http/cookiejar"
-	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
-	"time"
 
+	"golang.org/x/crypto/scrypt"
+
+	"github.com/oldsj/opencozy-next/internal/actor"
+	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/config"
-	"github.com/oldsj/opencozy-next/internal/testdb"
 )
 
-// These are integration tests: the real handler stack against a real, migrated PostgreSQL.
+const password = "a long enough password"
 
-type client struct {
-	t    *testing.T
-	base string
-	http *http.Client
+// withPassword gives household h's adult a password and returns their email.
+func (e *env) withPassword(h house, scheme, hash string) string {
+	e.t.Helper()
+	var email string
+	if err := e.owner.QueryRow(e.t.Context(), `UPDATE adult SET password_hash = $2, password_scheme = $3 WHERE id = $1 RETURNING email`,
+		h.adult, hash, scheme).Scan(&email); err != nil {
+		e.t.Fatal(err)
+	}
+	return email
 }
 
-func newTestServer(t *testing.T, mutate func(*config.Config)) *client {
+// scryptBA makes a hash in the old app's format: hex salt (used as text), scrypt N=16384 r=16 p=1.
+func scryptBA(t *testing.T, saltHex, pw string) string {
 	t.Helper()
-	pool := testdb.New(t)
-	cfg := config.Config{AllowSignup: true, SessionTTL: time.Hour, AuthRatePerMinute: 100}
-	if mutate != nil {
-		mutate(&cfg)
-	}
-	h, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), pool).Handler()
+	key, err := scrypt.Key([]byte(pw), []byte(saltHex), 16384, 16, 1, 64)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// TLS, because the session cookie is Secure.
-	ts := httptest.NewTLSServer(h)
-	t.Cleanup(ts.Close)
-	hc := ts.Client()
-	hc.Jar, _ = cookiejar.New(nil)
-	return &client{t: t, base: ts.URL, http: hc}
+	return saltHex + ":" + hex.EncodeToString(key)
 }
 
-func (c *client) do(method, path string, body any) (int, map[string]any, http.Header) {
-	c.t.Helper()
-	var r io.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		r = bytes.NewReader(b)
+func sessionFrom(t *testing.T, r resp) cred {
+	t.Helper()
+	for _, c := range (&http.Response{Header: r.header}).Cookies() {
+		if c.Name == actor.AdultCookie && c.Value != "" {
+			return cred{cookie: &http.Cookie{Name: c.Name, Value: c.Value}}
+		}
 	}
-	req, _ := http.NewRequestWithContext(c.t.Context(), method, c.base+path, r)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	resp, err := c.http.Do(req)
+	t.Fatalf("no session cookie in %v", r.header)
+	return cred{}
+}
+
+func TestSignInFlow(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	hash, err := auth.HashPassword(password)
 	if err != nil {
-		c.t.Fatal(err)
+		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-	var out map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&out)
-	return resp.StatusCode, out, resp.Header
-}
+	email := e.withPassword(h, auth.SchemeArgon2id, hash)
 
-func errCode(body map[string]any) string {
-	e, _ := body["error"].(map[string]any)
-	s, _ := e["code"].(string)
-	return s
-}
-
-var creds = map[string]string{"email": "Ada@Example.com", "password": "a long enough password"}
-
-func TestAuthAndNotesFlow(t *testing.T) {
-	c := newTestServer(t, nil)
-
-	if code, body, _ := c.do("GET", "/api/notes", nil); code != 401 || errCode(body) != "unauthorized" {
-		t.Fatalf("notes before sign-in: %d %v", code, body)
+	if r := e.send(cred{}, "POST", "/api/auth/login", map[string]string{"email": email, "password": "wrong password"}); r.status != 401 || r.code() != "invalid_credentials" {
+		t.Fatalf("wrong password: %d %s", r.status, r.raw)
 	}
-
-	code, body, hdr := c.do("POST", "/api/auth/signup", creds)
-	if code != 201 || body["email"] != "ada@example.com" {
-		t.Fatalf("signup: %d %v", code, body)
+	if r := e.send(cred{}, "POST", "/api/auth/login", map[string]string{"email": "nobody@example.test", "password": password}); r.status != 401 || r.code() != "invalid_credentials" {
+		t.Fatalf("unknown email: %d %s", r.status, r.raw)
 	}
-	setCookie := hdr.Get("Set-Cookie")
+	r := e.send(cred{}, "POST", "/api/auth/login", map[string]string{"email": strings.ToUpper(email), "password": password})
+	if r.status != 200 {
+		t.Fatalf("login: %d %s", r.status, r.raw)
+	}
+	setCookie := r.header.Get("Set-Cookie")
 	for _, want := range []string{"__Host-session=", "HttpOnly", "Secure", "SameSite=Lax", "Path=/"} {
 		if !strings.Contains(setCookie, want) {
 			t.Errorf("Set-Cookie %q lacks %s", setCookie, want)
 		}
 	}
-	if code, _, _ := c.do("POST", "/api/auth/signup", creds); code != 409 {
-		t.Errorf("duplicate signup: %d", code)
+	s := sessionFrom(t, r)
+	if r := e.send(s, "GET", "/api/auth/me", nil); r.status != 200 || r.body["household"].(map[string]any)["id"] != h.id.String() {
+		t.Fatalf("me: %d %s", r.status, r.raw)
 	}
-
-	code, note, _ := c.do("POST", "/api/notes", map[string]string{"title": "first", "body": "hello"})
-	if code != 201 {
-		t.Fatalf("create: %d %v", code, note)
+	if r := e.send(s, "POST", "/api/auth/confirm", map[string]string{"password": "wrong password"}); r.status != 403 || r.code() != "wrong_password" {
+		t.Fatalf("confirm, wrong password: %d %s", r.status, r.raw)
 	}
-	id := note["id"].(string)
-
-	code, list, _ := c.do("GET", "/api/notes", nil)
-	if code != 200 || len(list["items"].([]any)) != 1 {
-		t.Fatalf("list: %d %v", code, list)
+	if r := e.send(s, "POST", "/api/auth/confirm", map[string]string{"password": password}); r.status != 204 {
+		t.Fatalf("confirm: %d %s", r.status, r.raw)
 	}
-
-	if code, upd, _ := c.do("PUT", "/api/notes/"+id, map[string]string{"title": "renamed", "body": ""}); code != 200 || upd["title"] != "renamed" {
-		t.Fatalf("update: %d %v", code, upd)
+	if r := e.send(s, "POST", "/api/auth/logout", nil); r.status != 204 {
+		t.Fatalf("logout: %d %s", r.status, r.raw)
 	}
-
-	// Another user can't see or change it.
-	other := &client{t: t, base: c.base, http: &http.Client{Transport: c.http.Transport}}
-	other.http.Jar, _ = cookiejar.New(nil)
-	if code, _, _ := other.do("POST", "/api/auth/signup", map[string]string{"email": "eve@example.com", "password": "another long password"}); code != 201 {
-		t.Fatalf("second signup: %d", code)
+	if r := e.send(s, "GET", "/api/auth/me", nil); r.status != 401 {
+		t.Fatalf("me after logout: %d %s", r.status, r.raw)
 	}
-	if code, _, _ := other.do("DELETE", "/api/notes/"+id, nil); code != 404 {
-		t.Errorf("other user's delete: %d", code)
-	}
-	if _, l, _ := other.do("GET", "/api/notes", nil); len(l["items"].([]any)) != 0 {
-		t.Errorf("other user sees notes: %v", l)
-	}
-
-	if code, _, _ := c.do("DELETE", "/api/notes/"+id, nil); code != 204 {
-		t.Errorf("delete: %d", code)
-	}
-
-	if code, _, _ := c.do("POST", "/api/auth/logout", nil); code != 204 {
-		t.Errorf("logout: %d", code)
-	}
-	if code, _, _ := c.do("GET", "/api/auth/me", nil); code != 401 {
-		t.Errorf("me after logout: %d", code)
-	}
-
-	if code, _, _ := c.do("POST", "/api/auth/login", map[string]string{"email": "ada@example.com", "password": "wrong password!!"}); code != 401 {
-		t.Errorf("wrong password: %d", code)
-	}
-	if code, me, _ := c.do("POST", "/api/auth/login", creds); code != 200 || me["email"] != "ada@example.com" {
-		t.Errorf("login: %d %v", code, me)
-	}
-	if code, _, _ := c.do("GET", "/api/auth/me", nil); code != 200 {
-		t.Errorf("me after login: %d", code)
+	// A dead cookie does not stop a sign-in.
+	if r := e.send(s, "POST", "/api/auth/login", map[string]string{"email": email, "password": password}); r.status != 200 {
+		t.Fatalf("login with a stale cookie: %d %s", r.status, r.raw)
 	}
 }
 
-func TestValidation(t *testing.T) {
-	c := newTestServer(t, nil)
-	cases := []struct {
-		name string
-		body any
-	}{
-		{"short password", map[string]string{"email": "a@example.com", "password": "short"}},
-		{"bad email", map[string]string{"email": "nope", "password": "a long enough password"}},
-		{"unknown field", map[string]any{"email": "a@example.com", "password": "a long enough password", "admin": true}},
+func TestLoginRehashesOldScheme(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	// An scrypt hash in the old app's format, of `password`, made with a fixed fictional salt.
+	email := e.withPassword(h, auth.SchemeScryptBA, scryptBA(t, "00112233445566778899aabbccddeeff", password))
+	if r := e.send(cred{}, "POST", "/api/auth/login", map[string]string{"email": email, "password": password}); r.status != 200 {
+		t.Fatalf("login: %d %s", r.status, r.raw)
 	}
-	for _, tc := range cases {
-		if code, body, _ := c.do("POST", "/api/auth/signup", tc.body); code != 400 || errCode(body) != "invalid_request" {
-			t.Errorf("%s: %d %v", tc.name, code, body)
+	var scheme string
+	if err := e.owner.QueryRow(t.Context(), `SELECT password_scheme FROM adult WHERE id = $1`, h.adult).Scan(&scheme); err != nil {
+		t.Fatal(err)
+	}
+	if scheme != auth.SchemeArgon2id {
+		t.Fatalf("scheme after login = %q", scheme)
+	}
+	if r := e.send(cred{}, "POST", "/api/auth/login", map[string]string{"email": email, "password": password}); r.status != 200 {
+		t.Fatalf("login after rehash: %d %s", r.status, r.raw)
+	}
+}
+
+func TestChildrenFlow(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", e.srv.table.Scopes())
+	adult := h.actors["adult"]
+	r := e.send(adult, "POST", "/api/children", map[string]string{"name": "Ash"})
+	if r.status != 201 || r.body["version"] != float64(1) {
+		t.Fatalf("create: %d %s", r.status, r.raw)
+	}
+	id := r.body["id"].(string)
+	if r := e.send(adult, "PATCH", "/api/children/"+id, map[string]any{"name": "Ash", "archived": true, "expectedVersion": 1}); r.status != 200 || r.body["archived"] != true {
+		t.Fatalf("archive: %d %s", r.status, r.raw)
+	}
+	if r := e.send(adult, "PATCH", "/api/children/"+id, map[string]any{"name": "Ash", "archived": false, "expectedVersion": 1}); r.status != 409 || r.code() != "version_conflict" {
+		t.Fatalf("stale version: %d %s", r.status, r.raw)
+	}
+	if r := e.send(adult, "GET", "/api/children", nil); len(r.body["items"].([]any)) != 2 {
+		t.Fatalf("list hides archived: %s", r.raw)
+	}
+	if r := e.send(adult, "GET", "/api/children?includeArchived=true", nil); len(r.body["items"].([]any)) != 3 {
+		t.Fatalf("list with archived: %s", r.raw)
+	}
+	// A credential limited to one child sees only that child.
+	if r := e.send(h.actors["service-child1"], "GET", "/api/children", nil); len(r.body["items"].([]any)) != 1 || r.body["items"].([]any)[0].(map[string]any)["id"] != h.child1.String() {
+		t.Fatalf("limited list: %s", r.raw)
+	}
+}
+
+// Two adults adding the last allowed child at once: the household lock lets exactly one in.
+func TestChildLimitUnderConcurrency(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	for i := 2; i < maxChildren-1; i++ {
+		e.exec(`INSERT INTO child (household_id, name) VALUES ($1, 'Extra')`, h.id)
+	}
+	var wg sync.WaitGroup
+	codes := make([]int, 4)
+	for i := range codes {
+		wg.Go(func() {
+			codes[i] = e.send(h.actors["adult"], "POST", "/api/children", map[string]string{"name": "Last"}).status
+		})
+	}
+	wg.Wait()
+	created := 0
+	for _, c := range codes {
+		if c == 201 {
+			created++
+		} else if c != 409 {
+			t.Errorf("unexpected status %d", c)
 		}
 	}
-	if code, body, _ := c.do("GET", "/api/nope", nil); code != 404 || errCode(body) != "not_found" {
-		t.Errorf("unknown endpoint: %d %v", code, body)
+	if created != 1 {
+		t.Fatalf("created %d children past the limit (statuses %v)", created, codes)
 	}
 }
 
-func TestSignupDisabledByDefault(t *testing.T) {
-	c := newTestServer(t, func(cfg *config.Config) { cfg.AllowSignup = false })
-	if code, body, _ := c.do("POST", "/api/auth/signup", creds); code != 403 || errCode(body) != "signup_disabled" {
-		t.Fatalf("signup: %d %v", code, body)
+func TestIdempotency(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	key := []string{"Idempotency-Key", "add-ash-1"}
+	first := e.send(h.actors["adult"], "POST", "/api/children", map[string]string{"name": "Ash"}, key...)
+	if first.status != 201 {
+		t.Fatalf("first: %d %s", first.status, first.raw)
+	}
+	again := e.send(h.actors["adult"], "POST", "/api/children", map[string]string{"name": "Ash"}, key...)
+	if again.status != 201 || string(again.raw) != string(first.raw) || again.header.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("replay: %d %s", again.status, again.raw)
+	}
+	var n int
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM child WHERE household_id = $1 AND name = 'Ash'`, h.id).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("children named Ash: %d %v", n, err)
+	}
+	if r := e.send(h.actors["adult"], "POST", "/api/children", map[string]string{"name": "Other"}, key...); r.status != 422 || r.code() != "idempotency_key_reused" {
+		t.Fatalf("same key, other body: %d %s", r.status, r.raw)
+	}
+	// The actor is part of the hash: another credential in the household cannot replay it.
+	if r := e.send(h.actors["phone"], "POST", "/api/children", map[string]string{"name": "Ash"}, key...); r.status != 422 {
+		t.Fatalf("same key, other actor: %d %s", r.status, r.raw)
+	}
+	// A 404 or 409 is recorded too, and changes nothing.
+	conflict := []string{"Idempotency-Key", "stale-1"}
+	body := map[string]any{"name": "Robin", "archived": true, "expectedVersion": 7}
+	if r := e.send(h.actors["adult"], "PATCH", "/api/children/"+h.child1.String(), body, conflict...); r.status != 409 {
+		t.Fatalf("stale: %d %s", r.status, r.raw)
+	}
+	if r := e.send(h.actors["adult"], "PATCH", "/api/children/"+h.child1.String(), body, conflict...); r.status != 409 || r.header.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("stale replay: %d %s", r.status, r.raw)
+	}
+}
+
+func TestCredentials(t *testing.T) {
+	e := newEnv(t, nil)
+	scopes := e.srv.table.Scopes()
+	a, b := e.house("a", scopes), e.house("b", scopes)
+	adult := a.actors["adult"]
+	r := e.send(adult, "POST", "/api/credentials", map[string]any{"kind": "service", "name": "Router", "scopes": []string{"children:read"}, "childIds": []string{a.child2.String()}})
+	if r.status != 201 {
+		t.Fatalf("create: %d %s", r.status, r.raw)
+	}
+	secret := r.body["secret"].(string)
+	svc := cred{bearer: secret}
+	if !strings.HasPrefix(secret, auth.PrefixService) {
+		t.Errorf("secret %q", secret)
+	}
+	if r := e.send(svc, "GET", "/api/children", nil); r.status != 200 || len(r.body["items"].([]any)) != 1 {
+		t.Fatalf("new credential lists: %d %s", r.status, r.raw)
+	}
+	if r := e.send(svc, "GET", "/api/household", nil); r.status != 403 {
+		t.Fatalf("scope not granted: %d %s", r.status, r.raw)
+	}
+	for name, body := range map[string]map[string]any{
+		"unknown scope":       {"kind": "service", "name": "x", "scopes": []string{"everything"}},
+		"other household kid": {"kind": "service", "name": "x", "scopes": []string{"children:read"}, "childIds": []string{b.child1.String()}},
+		"both":                {"kind": "service", "name": "x", "scopes": []string{"children:read"}, "allChildren": true, "childIds": []string{a.child1.String()}},
+	} {
+		if r := e.send(adult, "POST", "/api/credentials", body); r.status != 400 {
+			t.Errorf("%s: %d %s", name, r.status, r.raw)
+		}
+	}
+	id := r.body["credential"].(map[string]any)["id"].(string)
+	if r := e.send(adult, "DELETE", "/api/credentials/"+id, nil); r.status != 204 {
+		t.Fatalf("revoke: %d %s", r.status, r.raw)
+	}
+	if r := e.send(svc, "GET", "/api/children", nil); r.status != 401 {
+		t.Fatalf("revoked credential: %d %s", r.status, r.raw)
+	}
+	// A service secret presented as an assistant's is refused, like any bad credential.
+	forged := cred{bearer: auth.PrefixAssistant + strings.TrimPrefix(secret, auth.PrefixService)}
+	if r := e.send(forged, "GET", "/api/credential", nil); r.status != 401 {
+		t.Fatalf("prefix swap: %d %s", r.status, r.raw)
+	}
+}
+
+func TestValidationAndRouting(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	for name, body := range map[string]any{
+		"bad email":     map[string]string{"email": "nope", "password": password},
+		"unknown field": map[string]any{"email": "a@example.test", "password": password, "admin": true},
+	} {
+		if r := e.send(cred{}, "POST", "/api/auth/login", body); r.status != 400 || r.code() != "invalid_request" {
+			t.Errorf("%s: %d %s", name, r.status, r.raw)
+		}
+	}
+	if r := e.send(h.actors["adult"], "POST", "/api/children", map[string]string{"name": "   "}); r.status != 400 {
+		t.Errorf("blank name: %d %s", r.status, r.raw)
+	}
+	if r := e.send(cred{}, "GET", "/api/nope", nil); r.status != 404 || r.code() != "not_found" {
+		t.Errorf("unknown endpoint: %d %s", r.status, r.raw)
+	}
+	if r := e.send(cred{}, "PUT", "/api/household", nil); r.status != 405 {
+		t.Errorf("unknown method: %d %s", r.status, r.raw)
+	}
+}
+
+// The body cap applies before authentication: an anonymous oversized body is a 413, never read.
+func TestBodyCapBeforeAuth(t *testing.T) {
+	e := newEnv(t, nil)
+	big := []byte(`{"name":"` + strings.Repeat("x", 2000) + `"}`)
+	if r := e.send(cred{}, "POST", "/api/children", big); r.status != 413 {
+		t.Fatalf("oversized, signed out: %d %s", r.status, r.raw)
+	}
+	if r := e.send(cred{bearer: "ocz_bad"}, "POST", "/api/children", big); r.status != 413 {
+		t.Fatalf("oversized, bad credential: %d %s", r.status, r.raw)
 	}
 }
 
 func TestLoginRateLimited(t *testing.T) {
-	c := newTestServer(t, func(cfg *config.Config) { cfg.AuthRatePerMinute = 2 })
-	bad := map[string]string{"email": "x@example.com", "password": "wrong password!!"}
-	c.do("POST", "/api/auth/login", bad)
-	c.do("POST", "/api/auth/login", bad)
-	code, body, hdr := c.do("POST", "/api/auth/login", bad)
-	if code != 429 || errCode(body) != "rate_limited" || hdr.Get("Retry-After") == "" {
-		t.Fatalf("third attempt: %d %v", code, body)
+	e := newEnv(t, func(c *config.Config) { c.AuthRatePerMinute = 2 })
+	bad := map[string]string{"email": "x@example.test", "password": "wrong password!!"}
+	e.send(cred{}, "POST", "/api/auth/login", bad)
+	e.send(cred{}, "POST", "/api/auth/login", bad)
+	if r := e.send(cred{}, "POST", "/api/auth/login", bad); r.status != 429 || r.code() != "rate_limited" || r.header.Get("Retry-After") == "" {
+		t.Fatalf("third attempt: %d %s", r.status, r.raw)
 	}
 }
 
 func TestCrossOriginRefused(t *testing.T) {
-	c := newTestServer(t, nil)
-	req, _ := http.NewRequestWithContext(t.Context(), "POST", c.base+"/api/auth/login", strings.NewReader(`{}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Sec-Fetch-Site", "cross-site")
-	resp, err := c.http.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != 403 {
-		t.Fatalf("cross-site POST: %d", resp.StatusCode)
+	e := newEnv(t, nil)
+	if r := e.send(cred{}, "POST", "/api/auth/login", []byte(`{}`), "Sec-Fetch-Site", "cross-site"); r.status != 403 {
+		t.Fatalf("cross-site POST: %d", r.status)
 	}
 }
 
 func TestProbesAndHeaders(t *testing.T) {
-	c := newTestServer(t, nil)
+	e := newEnv(t, nil)
 	for _, p := range []string{"/healthz", "/readyz"} {
-		resp, err := c.http.Get(c.base + p)
+		res, err := e.http.Get(e.base + p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_ = resp.Body.Close()
-		if resp.StatusCode != 204 {
-			t.Errorf("%s: %d", p, resp.StatusCode)
+		_ = res.Body.Close()
+		if res.StatusCode != 204 {
+			t.Errorf("%s: %d", p, res.StatusCode)
 		}
 	}
-	_, _, hdr := c.do("GET", "/api/auth/me", nil)
-	if hdr.Get("Content-Security-Policy") == "" || hdr.Get("Cache-Control") != "no-store" {
-		t.Errorf("API headers: CSP=%q Cache-Control=%q", hdr.Get("Content-Security-Policy"), hdr.Get("Cache-Control"))
+	r := e.send(cred{}, "GET", "/api/auth/me", nil)
+	if r.header.Get("Content-Security-Policy") == "" || r.header.Get("Cache-Control") != "no-store" {
+		t.Errorf("API headers: CSP=%q Cache-Control=%q", r.header.Get("Content-Security-Policy"), r.header.Get("Cache-Control"))
 	}
 }
 
-func TestBodyLimit(t *testing.T) {
-	c := newTestServer(t, nil)
-	big := map[string]string{"email": "a@example.com", "password": strings.Repeat("x", MaxBodyBytes)}
-	if code, _, _ := c.do("POST", "/api/auth/signup", big); code != 413 {
-		t.Fatalf("oversized body: %d", code)
+// The runtime role reads and writes rows; it cannot touch the schema or goose's bookkeeping.
+func TestRuntimeRoleIsRowsOnly(t *testing.T) {
+	e := newEnv(t, nil)
+	for _, sql := range []string{
+		`CREATE TABLE intruder (id int)`,
+		`DROP TABLE child`,
+		`DELETE FROM goose_db_version`,
+		`SELECT * FROM goose_db_version`,
+	} {
+		if _, err := e.srv.pool.Exec(t.Context(), sql); err == nil {
+			t.Errorf("runtime role ran %q", sql)
+		}
 	}
 }
