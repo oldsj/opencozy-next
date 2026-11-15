@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -8,6 +9,7 @@ struct ParentStore: Sendable {
     private static let tokenAccount = "parent-session.v1"
     private static let webHandoffOffKey = "parent.webHandoffOff.v1"
     private static let phoneNameKey = "parent.phoneName.v1"
+    private static let sessionIdKey = "parent.sessionId.v1"
 
     var keychain = Keychain()
     var defaultsSuite: String?
@@ -33,6 +35,14 @@ struct ParentStore: Sendable {
         nonmutating set { defaults.set(newValue, forKey: Self.webHandoffOffKey) }
     }
 
+    /// This phone session's id (not a secret): part of every decision's
+    /// idempotency key, so it must be known even on a cold launch from a
+    /// notification action, before the session is loaded.
+    var sessionId: String? {
+        get { defaults.string(forKey: Self.sessionIdKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.sessionIdKey) }
+    }
+
     var token: String? {
         get { keychain.string(for: Self.tokenAccount) }
         nonmutating set { keychain.set(newValue, for: Self.tokenAccount) }
@@ -49,8 +59,10 @@ final class ParentModel {
     /// The OpenCozy server the web view opens.
     private(set) var origin: URL?
     private(set) var household: HouseholdInfo?
-    private(set) var session: ParentSessionInfo?
-    private(set) var approvals: [Approval] = []
+    private(set) var session: ParentSessionInfo? {
+        didSet { store.sessionId = session?.id }
+    }
+    private(set) var approvals: [InboxItem] = []
     private(set) var pendingCount = 0
     private(set) var isLoading = false
     /// Approval IDs with a decision in flight.
@@ -265,8 +277,7 @@ final class ParentModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            let result = try await api.approvals()
-            apply(result)
+            apply(try await api.inbox())
             if household == nil, let info = try? await api.session() {
                 session = info.session
                 household = info.household
@@ -276,39 +287,67 @@ final class ParentModel {
         }
     }
 
-    private func apply(_ result: ApprovalsResponse) {
-        approvals = result.approvals
-            .filter { $0.state == .pending }
-            .sorted { ($0.requestedAt, $0.id) < ($1.requestedAt, $1.id) }
-        pendingCount = result.pendingCount
+    private func apply(_ result: InboxResponse) {
+        approvals = result.items.sorted { ($0.submittedAt, $0.id) < ($1.submittedAt, $1.id) }
+        pendingCount = approvals.count
         isUnreachable = false
         errorMessage = nil
-        let ids = Set(approvals.map(\.id))
-        Task { await notifier.sync(ids, result.pendingCount) }
+        let ids = Set(approvals.map(\.id)), count = pendingCount
+        Task { await notifier.sync(ids, count) }
     }
 
     enum Outcome: Equatable {
         /// The server recorded (or had already recorded) this decision.
         case done
-        /// 404/409: another parent acted, the child withdrew it, or the version moved.
+        /// 404/409: another parent acted (`already_decided`), the child withdrew it, or
+        /// the child was archived.
         case alreadyHandled
         case failed
     }
 
-    private func decide(_ id: String, version: Int, decision: ApprovalDecision, retries: Int) async -> Outcome {
+    /// The idempotency key is stable per phone session, item and decision, so a
+    /// retried request, or the same notification action delivered twice, replays the
+    /// first answer. Keys are per household and tied to the caller, so the session id
+    /// keeps a second parent's tap on the same item from reusing the first parent's
+    /// key (422 `idempotency_key_reused`); that parent gets 409 `already_decided`.
+    /// A reject with a reason adds a short hash of it (the body `RejectRequest` sends),
+    /// so a retry with an edited reason is a new key, not a reused one with a
+    /// different body (also 422).
+    nonisolated static func idempotencyKey(session: String, _ id: String, _ decision: ApprovalDecision, reason: String? = nil) -> String {
+        let base = "\(session.lowercased()):\(id.lowercased()):\(decision == .approve ? "approve" : "reject")"
+        guard decision == .reject, let sent = RejectRequest(reason: reason).sentReason else { return base }
+        let digest = SHA256.hash(data: Data(sent.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
+        return "\(base):\(digest)"
+    }
+
+    /// The session id for the key: in memory, else stored, else asked of the server.
+    private func sessionIdForKey(_ api: any ParentAPI) async throws -> String {
+        if let id = session?.id ?? store.sessionId { return id }
+        let info = try await api.session()
+        session = info.session
+        household = info.household
+        return info.session.id
+    }
+
+    private func decide(_ id: String, decision: ApprovalDecision, reason: String? = nil, retries: Int) async -> Outcome {
         guard let api, !busy.contains(id) else { return .failed }
         busy.insert(id)
         defer { busy.remove(id) }
-        // One request ID per tap, reused across retries of that tap.
-        let requestId = UUID().uuidString.lowercased()
+        let key: String
+        do {
+            key = Self.idempotencyKey(session: try await sessionIdForKey(api), id, decision, reason: reason)
+        } catch {
+            handle(error)
+            return .failed
+        }
         var attempt = 0
         while true {
             do {
                 switch decision {
                 case .approve:
-                    _ = try await api.approve(id: id, ApproveRequest(requestId: requestId, expectedVersion: version))
+                    _ = try await api.approve(id: id, idempotencyKey: key)
                 case .reject:
-                    _ = try await api.reject(id: id, RejectRequest(requestId: requestId, expectedVersion: version, reason: nil))
+                    _ = try await api.reject(id: id, RejectRequest(reason: reason), idempotencyKey: key)
                 }
                 removeLocally(id)
                 errorMessage = nil
@@ -346,12 +385,13 @@ final class ParentModel {
     /// The notification is removed once the item is settled either way.
     @discardableResult
     func handleAction(_ decision: ApprovalDecision, push: ApprovalPush) async -> Outcome {
-        guard case .pending(let version) = push.event else { return .failed }
+        // The push's version isn't needed: the server's 409 already_decided says when it's stale.
+        guard case .pending = push.event else { return .failed }
         guard isSignedIn else {
             await notifier.post(Self.notSentTitle, "Turn on notifications in OpenCozy on this phone first.")
             return .failed
         }
-        let outcome = await decide(push.approvalId, version: version, decision: decision, retries: 2)
+        let outcome = await decide(push.approvalId, decision: decision, retries: 2)
         switch outcome {
         case .done:
             await notifier.remove(push.approvalId)

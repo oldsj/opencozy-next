@@ -1,9 +1,17 @@
 import Foundation
 
-// Parent device API (contract "Phase 2 server API"). A parent session token
-// (`ocp_…`) only works on `/api/v1/parent/*`. These are still the previous server's
-// paths: they move to this server's API with slices 10 (passkeys) and 11 (phone
-// sessions, pushes).
+// Parent device API. The inbox is this server's (`/api/inbox`, which a phone
+// session's `ocp_` token may call). Sign-in, the phone session and push tokens are
+// still the previous server's `/api/v1/parent/*` paths until slices 10 (passkeys)
+// and 11 (phone sessions, pushes).
+
+/// An inbox id as a path segment: ids are UUIDs, anything else is refused rather
+/// than put in a URL.
+enum InboxPath {
+    static func id(_ id: String) -> String {
+        UUID(uuidString: id) != nil ? id.lowercased() : "invalid"
+    }
+}
 
 struct ParentSessionInfo: Decodable, Equatable, Sendable {
     var id: String
@@ -37,63 +45,58 @@ struct SessionResponse: Decodable, Sendable {
     var household: HouseholdInfo
 }
 
-struct Approval: Decodable, Equatable, Identifiable, Sendable {
-    enum State: String, Decodable, Sendable {
-        case pending, approved, rejected, withdrawn, unknown
-        init(from decoder: Decoder) throws {
-            self = State(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown
-        }
-    }
-
+/// One thing waiting for an adult (api/src/inbox.yaml `InboxItem`). The native app
+/// only needs the ids and the count, to keep notifications and the badge in step; the
+/// inbox itself is the web app's.
+struct InboxItem: Decodable, Equatable, Identifiable, Sendable {
     enum Kind: String, Decodable, Sendable {
-        case chore, routine, unknown
+        case completion, routine, redemption, timeRequest = "time_request", unknown
         init(from decoder: Decoder) throws {
             self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .unknown
         }
     }
 
+    struct Child: Decodable, Equatable, Sendable {
+        var id: String
+        var name: String
+    }
+
     var id: String
-    var version: Int
-    var state: State
     var kind: Kind
-    var childId: String
-    var childName: String
+    var child: Child
     var title: String
-    var points: Int
-    var localDay: String
-    var requestedAt: Date
-    var decidedAt: Date?
-    var reason: String?
+    var points: Int?
+    var submittedAt: Date
+    var minutesRequested: Int?
 }
 
-struct ApprovalsResponse: Decodable, Sendable {
-    var approvals: [Approval]
-    var pendingCount: Int
+/// `GET /api/inbox` → `{ items }`, oldest first; every item is pending.
+struct InboxResponse: Decodable, Sendable {
+    var items: [InboxItem]
 }
 
-struct ApproveRequest: Encodable, Equatable, Sendable {
-    var requestId: String
-    var expectedVersion: Int
-}
-
+/// `POST /api/inbox/{id}/reject` `{ reason? }`. An empty reason is omitted (the server refuses one).
 struct RejectRequest: Encodable, Equatable, Sendable {
-    var requestId: String
-    var expectedVersion: Int
-    /// Omitted when empty: the server rejects an empty reason.
     var reason: String?
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(requestId, forKey: .requestId)
-        try c.encode(expectedVersion, forKey: .expectedVersion)
-        try c.encodeIfPresent(reason, forKey: .reason)
+        try c.encodeIfPresent(sentReason, forKey: .reason)
     }
 
-    private enum CodingKeys: String, CodingKey { case requestId, expectedVersion, reason }
+    /// The reason as sent: nil when empty or only whitespace.
+    var sentReason: String? {
+        reason.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+    }
+
+    private enum CodingKeys: String, CodingKey { case reason }
 }
 
-struct DecisionResponse: Decodable, Sendable {
-    var approval: Approval
+/// `{ id, state }` after a decision.
+struct Decision: Decodable, Equatable, Sendable {
+    enum State: String, Decodable, Sendable { case approved, rejected }
+    var id: String
+    var state: State
 }
 
 enum PushEnvironment: String, Encodable, Sendable {
@@ -182,9 +185,10 @@ protocol ParentAPI: Sendable {
     func signIn(passkey request: PasskeySessionRequest) async throws -> SignInResponse
     func session() async throws -> SessionResponse
     func signOut() async throws
-    func approvals() async throws -> ApprovalsResponse
-    func approve(id: String, _ request: ApproveRequest) async throws -> Approval
-    func reject(id: String, _ request: RejectRequest) async throws -> Approval
+    func inbox() async throws -> InboxResponse
+    /// `idempotencyKey` makes a retry replay the first answer instead of deciding twice.
+    func approve(id: String, idempotencyKey: String) async throws -> Decision
+    func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision
     func registerPushToken(_ request: PushTokenRequest) async throws
     func unregisterPushToken() async throws
     /// Answers a child's "Ask for more time".
@@ -233,16 +237,16 @@ struct HTTPParentAPI: ParentAPI {
         try await http.delete("v1/parent/session")
     }
 
-    func approvals() async throws -> ApprovalsResponse {
-        try await http.get("v1/parent/approvals", as: ApprovalsResponse.self)
+    func inbox() async throws -> InboxResponse {
+        try await http.get("inbox", as: InboxResponse.self)
     }
 
-    func approve(id: String, _ request: ApproveRequest) async throws -> Approval {
-        try await http.post("v1/parent/approvals/\(id)/approve", body: request, as: DecisionResponse.self).approval
+    func approve(id: String, idempotencyKey: String) async throws -> Decision {
+        try await http.post("inbox/\(InboxPath.id(id))/approve", body: EmptyRequest(), headers: ["Idempotency-Key": idempotencyKey], as: Decision.self)
     }
 
-    func reject(id: String, _ request: RejectRequest) async throws -> Approval {
-        try await http.post("v1/parent/approvals/\(id)/reject", body: request, as: DecisionResponse.self).approval
+    func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision {
+        try await http.post("inbox/\(InboxPath.id(id))/reject", body: request, headers: ["Idempotency-Key": idempotencyKey], as: Decision.self)
     }
 
     func answerTimeRequest(id: String, _ request: TimeAnswerRequest) async throws {

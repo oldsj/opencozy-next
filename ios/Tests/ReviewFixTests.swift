@@ -82,7 +82,7 @@ final class NotificationLog {
 
 @MainActor
 struct ResolvedPushTests {
-    private func signedIn(_ approvals: [Approval], log: NotificationLog) async -> (ParentModel, FakeParentServer) {
+    private func signedIn(_ approvals: [InboxItem], log: NotificationLog) async -> (ParentModel, FakeParentServer) {
         let server = FakeParentServer(approvals: approvals)
         let unique = UUID().uuidString
         let store = ParentStore(keychain: Keychain(service: "org.opencozy.tests.\(unique)"), defaultsSuite: "org.opencozy.tests.\(unique)")
@@ -122,12 +122,12 @@ struct ResolvedPushTests {
     @Test func staleActionSaysAlreadyHandledAndClearsTheNotification() async {
         let log = NotificationLog()
         let (model, server) = await signedIn([ParentModelTests.approval("a", minutesAgo: 5)], log: log)
-        await server.fail([.server(status: 409, message: "Approval was already approved.")])
+        await server.fail([.server(status: 409, message: "Someone already decided this one.")])
         let outcome = await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1)))
         #expect(outcome == .alreadyHandled)
         #expect(log.removed == ["a"])
         #expect(log.posted.map(\.title) == [ParentModel.alreadyHandledTitle])
-        #expect(log.posted.first?.body == "Approval was already approved.")
+        #expect(log.posted.first?.body == "Someone already decided this one.")
     }
 
     @Test func successfulActionClearsTheNotificationQuietly() async {
