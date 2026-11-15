@@ -50,7 +50,7 @@ final class ParentModel {
     private(set) var origin: URL?
     private(set) var household: HouseholdInfo?
     private(set) var session: ParentSessionInfo?
-    private(set) var approvals: [Approval] = []
+    private(set) var approvals: [InboxItem] = []
     private(set) var pendingCount = 0
     private(set) var isLoading = false
     /// Approval IDs with a decision in flight.
@@ -265,8 +265,7 @@ final class ParentModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            let result = try await api.approvals()
-            apply(result)
+            apply(try await api.inbox())
             if household == nil, let info = try? await api.session() {
                 session = info.session
                 household = info.household
@@ -276,39 +275,43 @@ final class ParentModel {
         }
     }
 
-    private func apply(_ result: ApprovalsResponse) {
-        approvals = result.approvals
-            .filter { $0.state == .pending }
-            .sorted { ($0.requestedAt, $0.id) < ($1.requestedAt, $1.id) }
-        pendingCount = result.pendingCount
+    private func apply(_ result: InboxResponse) {
+        approvals = result.items.sorted { ($0.submittedAt, $0.id) < ($1.submittedAt, $1.id) }
+        pendingCount = approvals.count
         isUnreachable = false
         errorMessage = nil
-        let ids = Set(approvals.map(\.id))
-        Task { await notifier.sync(ids, result.pendingCount) }
+        let ids = Set(approvals.map(\.id)), count = pendingCount
+        Task { await notifier.sync(ids, count) }
     }
 
     enum Outcome: Equatable {
         /// The server recorded (or had already recorded) this decision.
         case done
-        /// 404/409: another parent acted, the child withdrew it, or the version moved.
+        /// 404/409: another parent acted (`already_decided`), the child withdrew it, or
+        /// the child was archived.
         case alreadyHandled
         case failed
     }
 
-    private func decide(_ id: String, version: Int, decision: ApprovalDecision, retries: Int) async -> Outcome {
+    /// The idempotency key is stable per item and decision, so a retried request, or
+    /// the same notification action delivered twice, replays the first answer.
+    nonisolated static func idempotencyKey(_ id: String, _ decision: ApprovalDecision) -> String {
+        "\(id.lowercased()):\(decision == .approve ? "approve" : "reject")"
+    }
+
+    private func decide(_ id: String, decision: ApprovalDecision, retries: Int) async -> Outcome {
         guard let api, !busy.contains(id) else { return .failed }
         busy.insert(id)
         defer { busy.remove(id) }
-        // One request ID per tap, reused across retries of that tap.
-        let requestId = UUID().uuidString.lowercased()
+        let key = Self.idempotencyKey(id, decision)
         var attempt = 0
         while true {
             do {
                 switch decision {
                 case .approve:
-                    _ = try await api.approve(id: id, ApproveRequest(requestId: requestId, expectedVersion: version))
+                    _ = try await api.approve(id: id, idempotencyKey: key)
                 case .reject:
-                    _ = try await api.reject(id: id, RejectRequest(requestId: requestId, expectedVersion: version, reason: nil))
+                    _ = try await api.reject(id: id, RejectRequest(reason: nil), idempotencyKey: key)
                 }
                 removeLocally(id)
                 errorMessage = nil
@@ -346,12 +349,13 @@ final class ParentModel {
     /// The notification is removed once the item is settled either way.
     @discardableResult
     func handleAction(_ decision: ApprovalDecision, push: ApprovalPush) async -> Outcome {
-        guard case .pending(let version) = push.event else { return .failed }
+        // The push's version isn't needed: the server's 409 already_decided says when it's stale.
+        guard case .pending = push.event else { return .failed }
         guard isSignedIn else {
             await notifier.post(Self.notSentTitle, "Turn on notifications in OpenCozy on this phone first.")
             return .failed
         }
-        let outcome = await decide(push.approvalId, version: version, decision: decision, retries: 2)
+        let outcome = await decide(push.approvalId, decision: decision, retries: 2)
         switch outcome {
         case .done:
             await notifier.remove(push.approvalId)

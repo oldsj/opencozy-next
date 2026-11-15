@@ -78,21 +78,46 @@ struct ApprovalPushTests {
 
 struct ParentWireTests {
     @Test func rejectOmitsEmptyReason() throws {
-        let without = try JSONSerialization.jsonObject(with: JSONEncoder().encode(RejectRequest(requestId: "r", expectedVersion: 1, reason: nil))) as? [String: Any]
-        #expect(without?.keys.sorted() == ["expectedVersion", "requestId"])
-        let with = try JSONSerialization.jsonObject(with: JSONEncoder().encode(RejectRequest(requestId: "r", expectedVersion: 1, reason: "Not yet"))) as? [String: Any]
+        let without = try JSONSerialization.jsonObject(with: JSONEncoder().encode(RejectRequest(reason: nil))) as? [String: Any]
+        #expect(without?.isEmpty == true)
+        let blank = try JSONSerialization.jsonObject(with: JSONEncoder().encode(RejectRequest(reason: "  "))) as? [String: Any]
+        #expect(blank?.isEmpty == true)
+        let with = try JSONSerialization.jsonObject(with: JSONEncoder().encode(RejectRequest(reason: "Not yet"))) as? [String: Any]
         #expect(with?["reason"] as? String == "Not yet")
     }
 
-    @Test func decodesApprovalList() throws {
+    @Test func decodesInbox() throws {
         let json = """
-        { "approvals": [ { "id": "a", "version": 1, "state": "pending", "kind": "routine", "childId": "k", "childName": "Ada",
-          "title": "Bedtime", "points": 8, "localDay": "2026-11-07", "requestedAt": "2026-11-07T10:00:00.000Z", "decidedAt": null,
-          "reason": null, "choreOccurrenceId": null, "routineOccurrenceId": "r" } ], "pendingCount": 1 }
+        { "items": [
+          { "id": "0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40", "kind": "routine", "child": { "id": "c1", "name": "Robin", "color": "sky" },
+            "title": "Bedtime", "points": 8, "submittedAt": "2026-11-07T10:00:00.000Z" },
+          { "id": "5e1c7a92-3b4d-4f60-8e21-9c0a6d3f7b18", "kind": "time_request", "child": { "id": "c1", "name": "Robin", "color": "sky" },
+            "title": "More time", "submittedAt": "2026-11-07T10:05:00Z", "minutesRequested": 30 },
+          { "id": "a3f0c6d8-1e2b-4c79-b5a4-7d8e9f0a1b2c", "kind": "something_new", "child": { "id": "c2", "name": "Sam" },
+            "title": "Later kind", "submittedAt": "2026-11-07T10:06:00Z" } ] }
         """
-        let result = try APIDates.decoder().decode(ApprovalsResponse.self, from: Data(json.utf8))
-        #expect(result.approvals.first?.kind == .routine)
-        #expect(result.pendingCount == 1)
+        let result = try APIDates.decoder().decode(InboxResponse.self, from: Data(json.utf8))
+        #expect(result.items.map(\.kind) == [.routine, .timeRequest, .unknown])
+        #expect(result.items[1].minutesRequested == 30)
+        #expect(result.items[1].points == nil)
+    }
+
+    @Test func decodesDecision() throws {
+        let decision = try APIDates.decoder().decode(Decision.self, from: Data(#"{"id":"x","state":"rejected"}"#.utf8))
+        #expect(decision == Decision(id: "x", state: .rejected))
+    }
+
+    @Test func idempotencyKeyIsStablePerItemAndDecision() {
+        let id = "0B9E2F4A-6C1D-4E8B-9A37-5F2D8C1E6B40"
+        #expect(ParentModel.idempotencyKey(id, .approve) == "0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40:approve")
+        #expect(ParentModel.idempotencyKey(id, .reject) == "0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40:reject")
+        // The contract allows 1-128 printable ASCII characters.
+        #expect(ParentModel.idempotencyKey(id, .approve).allSatisfy { $0.isASCII && !$0.isWhitespace })
+    }
+
+    @Test func inboxPathOnlyTakesUUIDs() {
+        #expect(InboxPath.id("0B9E2F4A-6C1D-4E8B-9A37-5F2D8C1E6B40") == "0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40")
+        #expect(InboxPath.id("../devices") == "invalid")
     }
 
     @Test func pushEnvironmentEncodesAsContractValue() throws {
@@ -102,41 +127,42 @@ struct ParentWireTests {
 }
 
 actor FakeParentServer {
-    var approvals: [Approval]
-    var approves: [(String, ApproveRequest)] = []
-    var rejects: [(String, RejectRequest)] = []
+    var approvals: [InboxItem]
+    var approves: [(id: String, key: String)] = []
+    var rejects: [(id: String, request: RejectRequest, key: String)] = []
     var pushTokens: [PushTokenRequest] = []
     var signedOut = false
     var failures: [APIError] = []
     var listFailure: APIError?
 
-    init(approvals: [Approval]) { self.approvals = approvals }
+    init(approvals: [InboxItem]) { self.approvals = approvals }
 
     func fail(_ errors: [APIError]) { failures = errors }
     func failList(_ error: APIError?) { listFailure = error }
 
-    func list() throws -> ApprovalsResponse {
+    func list() throws -> InboxResponse {
         if let listFailure { throw listFailure }
-        return ApprovalsResponse(approvals: approvals, pendingCount: approvals.filter { $0.state == .pending }.count)
+        return InboxResponse(items: approvals)
     }
 
-    func approve(_ id: String, _ r: ApproveRequest) throws -> Approval {
-        approves.append((id, r))
+    func approve(_ id: String, key: String) throws -> Decision {
+        approves.append((id, key))
         if !failures.isEmpty { throw failures.removeFirst() }
         return try decide(id, .approved)
     }
 
-    func reject(_ id: String, _ r: RejectRequest) throws -> Approval {
-        rejects.append((id, r))
+    func reject(_ id: String, _ r: RejectRequest, key: String) throws -> Decision {
+        rejects.append((id, r, key))
         if !failures.isEmpty { throw failures.removeFirst() }
         return try decide(id, .rejected)
     }
 
-    private func decide(_ id: String, _ state: Approval.State) throws -> Approval {
-        guard let index = approvals.firstIndex(where: { $0.id == id }) else { throw APIError.server(status: 404, message: "Approval not found.") }
-        approvals[index].state = state
-        approvals[index].version = 2
-        return approvals[index]
+    private func decide(_ id: String, _ state: Decision.State) throws -> Decision {
+        guard approvals.contains(where: { $0.id == id }) else {
+            throw APIError.server(status: 409, message: "Someone already decided this one.")
+        }
+        approvals.removeAll { $0.id == id }
+        return Decision(id: id, state: state)
     }
 
     var passkeyRequests: [PasskeySessionRequest] = []
@@ -165,9 +191,11 @@ struct FakeParentAPI: ParentAPI {
     }
     func session() async throws -> SessionResponse { SessionResponse(session: Self.session, household: HouseholdInfo(id: "h", name: "The Example House")) }
     func signOut() async throws { await server.signOut() }
-    func approvals() async throws -> ApprovalsResponse { try await server.list() }
-    func approve(id: String, _ request: ApproveRequest) async throws -> Approval { try await server.approve(id, request) }
-    func reject(id: String, _ request: RejectRequest) async throws -> Approval { try await server.reject(id, request) }
+    func inbox() async throws -> InboxResponse { try await server.list() }
+    func approve(id: String, idempotencyKey: String) async throws -> Decision { try await server.approve(id, key: idempotencyKey) }
+    func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision {
+        try await server.reject(id, request, key: idempotencyKey)
+    }
     func registerPushToken(_ request: PushTokenRequest) async throws { await server.register(request) }
     func unregisterPushToken() async throws {}
 
@@ -176,12 +204,12 @@ struct FakeParentAPI: ParentAPI {
 
 @MainActor
 struct ParentModelTests {
-    static func approval(_ id: String, minutesAgo: Double, state: Approval.State = .pending) -> Approval {
-        Approval(id: id, version: 1, state: state, kind: .chore, childId: "k", childName: "Ada", title: "Chore \(id)", points: 5,
-                 localDay: "2026-11-07", requestedAt: Date().addingTimeInterval(-minutesAgo * 60), decidedAt: nil, reason: nil)
+    static func approval(_ id: String, minutesAgo: Double) -> InboxItem {
+        InboxItem(id: id, kind: .completion, child: .init(id: "k", name: "Robin"), title: "Chore \(id)", points: 5,
+                  submittedAt: Date().addingTimeInterval(-minutesAgo * 60), minutesRequested: nil)
     }
 
-    private func signedIn(_ approvals: [Approval]) async -> (ParentModel, FakeParentServer) {
+    private func signedIn(_ approvals: [InboxItem]) async -> (ParentModel, FakeParentServer) {
         let server = FakeParentServer(approvals: approvals)
         let unique = UUID().uuidString
         let store = ParentStore(keychain: Keychain(service: "org.opencozy.tests.\(unique)"), defaultsSuite: "org.opencozy.tests.\(unique)")
@@ -192,8 +220,7 @@ struct ParentModelTests {
     }
 
     @Test func signInStoresTokenAndLoadsInboxOldestFirst() async {
-        let (model, _) = await signedIn([Self.approval("new", minutesAgo: 1), Self.approval("old", minutesAgo: 30),
-                                         Self.approval("done", minutesAgo: 60, state: .approved)])
+        let (model, _) = await signedIn([Self.approval("new", minutesAgo: 1), Self.approval("old", minutesAgo: 30)])
         #expect(model.store.token == "ocp_test")
         #expect(model.approvals.map(\.id) == ["old", "new"])
         #expect(model.household?.name == "The Example House")
@@ -210,29 +237,31 @@ struct ParentModelTests {
         #expect(store.token == nil)
     }
 
-    @Test func approveSendsVersionAndRemovesItem() async throws {
+    @Test func approveSendsAStableKeyAndRemovesItem() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         #expect(await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
-        let (id, request) = try #require(await server.approves.first)
+        let (id, key) = try #require(await server.approves.first)
         #expect(id == "a")
-        #expect(request.expectedVersion == 1)
+        #expect(key == "a:approve")
         #expect(model.approvals.isEmpty)
+        #expect(model.pendingCount == 0)
     }
+
 
     @Test func rejectFromANotificationHasNoReason() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
-        #expect(await server.rejects.map(\.1.reason) == [nil])
+        #expect(await server.rejects.map(\.request.reason) == [nil])
+        #expect(await server.rejects.map(\.key) == ["a:reject"])
     }
 
     @Test func conflictFromAnotherParentRemovesTheItem() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         // Meanwhile the other parent approved it, so the next list is empty.
-        _ = try await server.approve("a", ApproveRequest(requestId: "other", expectedVersion: 1))
-        await server.fail([.server(status: 409, message: "Approval was already approved.")])
+        _ = try await server.approve("a", key: "a:approve")
         #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .alreadyHandled)
         #expect(model.approvals.isEmpty)
-        #expect(model.errorMessage == "Approval was already approved.")
+        #expect(model.errorMessage == "Someone already decided this one.")
     }
 
     @Test func unauthorizedSignsOut() async {
@@ -278,15 +307,14 @@ struct ParentModelTests {
         #expect(model.approvals.count == 1)
     }
 
-    @Test func notificationActionRetriesWithTheSameRequestId() async throws {
+    @Test func notificationActionRetriesWithTheSameKey() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         await server.fail([.transport("offline")])
         let ok = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1)))
         #expect(ok == .done)
         let approves = await server.approves
         #expect(approves.count == 2)
-        #expect(approves[0].1 == approves[1].1)
-        #expect(approves[0].1.expectedVersion == 1)
+        #expect(approves.map(\.key) == ["a:approve", "a:approve"])
     }
 
     @Test func resolvedPushIsNotAnAction() async {
