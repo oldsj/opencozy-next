@@ -3661,7 +3661,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description version_conflict (changed meanwhile, or archived), or rule_exists */
+            /** @description version_conflict (changed meanwhile), rule_archived, or rule_exists */
             409: {
                 headers: {
                     [name: string]: unknown;

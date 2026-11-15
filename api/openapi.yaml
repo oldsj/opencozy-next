@@ -2356,7 +2356,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: version_conflict (changed meanwhile, or archived), or rule_exists
+          description: version_conflict (changed meanwhile), rule_archived, or rule_exists
           content:
             application/json:
               schema:

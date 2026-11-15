@@ -34,7 +34,7 @@ func TestAwardRulesAndLinks(t *testing.T) {
 		t.Fatalf("archive: %d %s", r.status, r.raw)
 	}
 	edit["archived"], edit["expectedVersion"] = false, 3
-	if r := e.send(adult, "PUT", "/api/learning/rules/"+id, edit); r.status != 409 {
+	if r := e.send(adult, "PUT", "/api/learning/rules/"+id, edit); r.status != 409 || r.code() != "rule_archived" {
 		t.Fatalf("unarchive: %d %s", r.status, r.raw)
 	}
 	if r := e.send(adult, "PUT", "/api/learning/rules/"+h.child1.String(), edit); r.status != 404 {
