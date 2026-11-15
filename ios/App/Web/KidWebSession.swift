@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Signs the kid device's web view in as its child: a signed
-/// `POST /api/v1/device/web-session` returns a one-time exchange URL, and opening
+/// `POST /api/device/web-session` returns a one-time exchange URL, and opening
 /// it sets the child-device session cookie. Done on launch and whenever the web
 /// view reports the session ended (sign-in page or 401). Exchanges are capped so a
 /// server that keeps refusing the cookie can't make the app loop.

@@ -1,7 +1,9 @@
 import Foundation
 
 // Parent device API (contract "Phase 2 server API"). A parent session token
-// (`ocp_…`) only works on `/api/v1/parent/*`.
+// (`ocp_…`) only works on `/api/v1/parent/*`. These are still the previous server's
+// paths: they move to this server's API with slices 10 (passkeys) and 11 (phone
+// sessions, pushes).
 
 struct ParentSessionInfo: Decodable, Equatable, Sendable {
     var id: String
@@ -210,48 +212,48 @@ struct HTTPParentAPI: ParentAPI {
 
     func signIn(_ request: SignInRequest) async throws -> SignInResponse {
         try await APITransport(baseURL: baseURL, token: nil, session: session)
-            .post("parent/sessions", body: request, as: SignInResponse.self)
+            .post("v1/parent/sessions", body: request, as: SignInResponse.self)
     }
 
     func passkeyOptions() async throws -> PasskeyOptionsResponse {
         try await APITransport(baseURL: baseURL, token: nil, session: session)
-            .post("parent/passkey/options", body: EmptyRequest(), as: PasskeyOptionsResponse.self)
+            .post("v1/parent/passkey/options", body: EmptyRequest(), as: PasskeyOptionsResponse.self)
     }
 
     func signIn(passkey request: PasskeySessionRequest) async throws -> SignInResponse {
         try await APITransport(baseURL: baseURL, token: nil, session: session)
-            .post("parent/passkey/sessions", body: request, as: SignInResponse.self)
+            .post("v1/parent/passkey/sessions", body: request, as: SignInResponse.self)
     }
 
     func session() async throws -> SessionResponse {
-        try await http.get("parent/session", as: SessionResponse.self)
+        try await http.get("v1/parent/session", as: SessionResponse.self)
     }
 
     func signOut() async throws {
-        try await http.delete("parent/session")
+        try await http.delete("v1/parent/session")
     }
 
     func approvals() async throws -> ApprovalsResponse {
-        try await http.get("parent/approvals", as: ApprovalsResponse.self)
+        try await http.get("v1/parent/approvals", as: ApprovalsResponse.self)
     }
 
     func approve(id: String, _ request: ApproveRequest) async throws -> Approval {
-        try await http.post("parent/approvals/\(id)/approve", body: request, as: DecisionResponse.self).approval
+        try await http.post("v1/parent/approvals/\(id)/approve", body: request, as: DecisionResponse.self).approval
     }
 
     func reject(id: String, _ request: RejectRequest) async throws -> Approval {
-        try await http.post("parent/approvals/\(id)/reject", body: request, as: DecisionResponse.self).approval
+        try await http.post("v1/parent/approvals/\(id)/reject", body: request, as: DecisionResponse.self).approval
     }
 
     func answerTimeRequest(id: String, _ request: TimeAnswerRequest) async throws {
-        _ = try await http.post("parent/time-requests/\(id)/answer", body: request, as: TimeAnswerResponse.self)
+        _ = try await http.post("v1/parent/time-requests/\(id)/answer", body: request, as: TimeAnswerResponse.self)
     }
 
     func registerPushToken(_ request: PushTokenRequest) async throws {
-        _ = try await http.put("parent/push-token", body: request, as: PushTokenResponse.self)
+        _ = try await http.put("v1/parent/push-token", body: request, as: PushTokenResponse.self)
     }
 
     func unregisterPushToken() async throws {
-        try await http.delete("parent/push-token")
+        try await http.delete("v1/parent/push-token")
     }
 }

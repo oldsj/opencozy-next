@@ -1,27 +1,52 @@
 import Foundation
 
-// Wire models for the OpenCozy v1 API (docs/api.md). Decoding is deliberately
+// Wire models for the OpenCozy API (api/openapi.yaml). Decoding is deliberately
 // tolerant of extra fields so the server can add fields without breaking the app.
 
-/// A paired child's device (contract "Devices"). The device is its own object;
-/// the server says which child it belongs to, and an adult can change that.
+/// The device's child: `{ id, name, color }`.
+struct DeviceChild: Decodable, Equatable, Sendable {
+    var id: String
+    var name: String
+    var color: String?
+}
+
+/// A paired child's device (api/src/devices.yaml `Device`). The device is its own
+/// object; the server says which child it belongs to, and an adult can change that.
+/// `child` is null while the device's child is archived.
 struct DeviceRecord: Decodable, Equatable, Sendable {
     var id: String
     var name: String
+    /// `ipad` or `iphone`.
     var platform: String
-    var childId: String?
-    var childName: String?
+    var child: DeviceChild?
     var pairedAt: Date
     var lastSeenAt: Date?
-    var revokedAt: Date?
+
+    var childId: String? { child?.id }
+    var childName: String? { child?.name }
 }
 
-/// `GET /api/v1/device` and the pairing response.
+/// `{ id, name, lockMessage }`. `lockMessage` is always a string: the household's
+/// own words, or the server's default.
+struct DeviceHousehold: Decodable, Equatable, Sendable {
+    var id: String
+    var name: String
+    /// IANA zone name; the household day follows it.
+    var timeZone: String
+    var lockMessage: String
+}
+
+/// `GET /api/device` and the pairing response (`DeviceSelf`).
 struct DeviceInfo: Decodable, Equatable, Sendable {
     var device: DeviceRecord
-    var household: HouseholdInfo
-    var scopes: [String]
+    var household: DeviceHousehold
     var serverTime: Date
+}
+
+/// The pairing request's `platform` (`ios` or `android`). An iPad and an iPhone
+/// are both `ios`; the name tells them apart.
+enum DevicePlatform {
+    static let current = "ios"
 }
 
 enum ScreenTimeTarget: String, Codable, Sendable {
@@ -63,7 +88,7 @@ struct AllowedHours: Decodable, Equatable, Sendable {
     var opensAt: Date?
 }
 
-/// `GET /api/v1/screen-time?target=personal` → `{ serverTime, children: [...] }`.
+/// `GET /api/v1/screen-time?target=personal` (slice 8: not on the new server yet) → `{ serverTime, children: [...] }`.
 struct ScreenTimeResponse: Decodable, Equatable, Sendable {
     var serverTime: Date
     var children: [ChildScreenTime]
@@ -71,7 +96,7 @@ struct ScreenTimeResponse: Decodable, Equatable, Sendable {
     var webFilter: WebFilterLists?
 }
 
-/// `POST /api/v1/device/web-session` → a one-time exchange URL (relative to the
+/// `POST /api/device/web-session` → a one-time exchange URL (relative to the
 /// origin, or absolute on it) that sets the child-device web session cookie.
 struct DeviceWebSession: Decodable, Equatable, Sendable {
     var url: String

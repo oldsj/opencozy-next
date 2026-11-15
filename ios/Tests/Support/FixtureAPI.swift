@@ -8,9 +8,10 @@ struct FixtureAPI: OpenCozyAPI {
 
     func device() async throws -> DeviceInfo {
         DeviceInfo(device: DeviceRecord(id: "00000000-0000-4000-8000-0000000000a1", name: "Robin's tablet", platform: "ios",
-                                        childId: Self.childId, childName: "Robin", pairedAt: Date(), lastSeenAt: Date(), revokedAt: nil),
-                   household: HouseholdInfo(id: "00000000-0000-4000-8000-0000000000a2", name: "The Example House"),
-                   scopes: ["screentime:read"], serverTime: Date())
+                                        child: DeviceChild(id: Self.childId, name: "Robin", color: "sky"), pairedAt: Date(), lastSeenAt: Date()),
+                   household: DeviceHousehold(id: "00000000-0000-4000-8000-0000000000a2", name: "The Example House", timeZone: "America/Chicago",
+                                              lockMessage: "Earn time on the chore board, then spend your points in OpenCozy."),
+                   serverTime: Date())
     }
 
     func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {

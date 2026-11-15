@@ -1,7 +1,8 @@
 import Foundation
 
 enum APIError: Error, Equatable, LocalizedError {
-    /// The server answered with a status and `{ "error": … }` body.
+    /// The server answered with a status and an `{ "error": { "code", "message" } }`
+    /// body (`message` is safe to show).
     case server(status: Int, message: String)
     /// No usable response (offline, timeout, TLS, …). Safe to retry.
     case transport(String)
@@ -25,6 +26,12 @@ enum APIError: Error, Equatable, LocalizedError {
         case .server(let status, _): status >= 500
         case .decoding, .notConfigured: false
         }
+    }
+
+    /// The server has no such route (404/405): a call this server doesn't serve yet.
+    var isMissingEndpoint: Bool {
+        if case .server(let status, _) = self { return status == 404 || status == 405 }
+        return false
     }
 }
 
@@ -53,6 +60,10 @@ extension OpenCozyAPI {
 }
 
 /// The kid device client: every request is signed by the device key.
+///
+/// Paths are relative to `/api`. Calls still on the previous server's `v1/` paths
+/// belong to later slices (8: iPad time, 11: pushes); this server answers them 404
+/// until then, and the sync treats that as "not here yet" (see `AppModel`).
 struct HTTPOpenCozyAPI: OpenCozyAPI {
     let baseURL: URL
     let signer: DeviceRequestSigner
@@ -68,7 +79,7 @@ struct HTTPOpenCozyAPI: OpenCozyAPI {
     }
 
     func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
-        let (data, receivedAt) = try await http.send("GET", "screen-time", query: [URLQueryItem(name: "target", value: target.rawValue)])
+        let (data, receivedAt) = try await http.send("GET", "v1/screen-time", query: [URLQueryItem(name: "target", value: target.rawValue)])
         return (try APITransport.decode(ScreenTimeResponse.self, from: data), receivedAt)
     }
 
@@ -77,15 +88,15 @@ struct HTTPOpenCozyAPI: OpenCozyAPI {
     }
 
     func screenTimeEvents(_ events: [ScreenTimeEventUpload]) async throws -> Set<String> {
-        Set(try await http.post("device/screen-time-events", body: ScreenTimeEventsRequest(events: events), as: ScreenTimeEventsResponse.self).recorded)
+        Set(try await http.post("v1/device/screen-time-events", body: ScreenTimeEventsRequest(events: events), as: ScreenTimeEventsResponse.self).recorded)
     }
 
     func askForTime(requestId: String) async throws -> TimeRequestStatus {
-        try await http.post("device/time-requests", body: TimeRequestAsk(requestId: requestId), as: TimeRequestReply.self).request
+        try await http.post("v1/device/time-requests", body: TimeRequestAsk(requestId: requestId), as: TimeRequestReply.self).request
     }
 
     func registerPushToken(_ request: PushTokenRequest) async throws {
-        _ = try await http.put("device/push-token", body: request, as: PushTokenResponse.self)
+        _ = try await http.put("v1/device/push-token", body: request, as: PushTokenResponse.self)
     }
 }
 
@@ -112,7 +123,7 @@ struct ScreenTimeEventsResponse: Decodable, Sendable { var recorded: [String] }
 /// `{}`: for POSTs whose meaning is all in the signed headers.
 struct EmptyRequest: Encodable, Sendable {}
 
-/// `POST /api/v1/devices/pair` (no auth): redeems a pairing token or code for a
+/// `POST /api/device/pair` (no auth): redeems a pairing token or code for a
 /// device bound to this public key.
 struct DevicePairRequest: Encodable, Equatable, Sendable {
     var token: String?
@@ -122,8 +133,10 @@ struct DevicePairRequest: Encodable, Equatable, Sendable {
     /// Proof of possession: base64url (no padding) raw r||s signature by the new key
     /// over `proofMessage`. Required by the server.
     var proof: String = ""
+    /// `ios` (see `DevicePlatform`).
     var platform: String
-    var deviceName: String
+    /// 1 to 80 characters.
+    var name: String
 
     /// `OPENCOZY-PAIR-V1`, the token or code exactly as sent, and the public key
     /// exactly as sent: 3 lines, no trailing newline.
@@ -144,10 +157,10 @@ struct DevicePairRequest: Encodable, Equatable, Sendable {
         try c.encode(publicKey, forKey: .publicKey)
         try c.encode(proof, forKey: .proof)
         try c.encode(platform, forKey: .platform)
-        try c.encode(deviceName, forKey: .deviceName)
+        try c.encode(name, forKey: .name)
     }
 
-    private enum CodingKeys: String, CodingKey { case token, code, publicKey, proof, platform, deviceName }
+    private enum CodingKeys: String, CodingKey { case token, code, publicKey, proof, platform, name }
 }
 
 protocol DevicePairingAPI: Sendable {
@@ -158,12 +171,13 @@ struct HTTPDevicePairingAPI: DevicePairingAPI {
     var session: URLSession = .shared
 
     func pair(origin: URL, _ request: DevicePairRequest) async throws -> (DeviceInfo, receivedAt: Date) {
-        let (data, receivedAt) = try await APITransport(baseURL: origin, auth: .none, session: session).send("POST", "devices/pair", body: request)
+        let (data, receivedAt) = try await APITransport(baseURL: origin, auth: .none, session: session).send("POST", "device/pair", body: request)
         return (try APITransport.decode(DeviceInfo.self, from: data), receivedAt)
     }
 }
 
-/// Small JSON-over-HTTP helper for `/api/v1`. Errors come back as `APIError`.
+/// Small JSON-over-HTTP helper for `/api`. Errors come back as `APIError`.
+/// `path` is relative to `/api`; the parent role's calls still use `v1/…` (slices 10, 11).
 struct APITransport: Sendable {
     enum Auth: Sendable {
         case none
@@ -205,11 +219,12 @@ struct APITransport: Sendable {
 
     /// Returns the body and the local time the response arrived.
     func send(_ method: String, _ path: String, query: [URLQueryItem] = [], body: (any Encodable)? = nil) async throws -> (Data, Date) {
-        var url = baseURL.appending(path: "api/v1/\(path)")
+        var url = baseURL.appending(path: "api/\(path)")
         if !query.isEmpty { url.append(queryItems: query) }
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue(Self.clientHeader, forHTTPHeaderField: "X-OpenCozy-Client")
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(body)
@@ -248,8 +263,7 @@ struct APITransport: Sendable {
 
         func checked() throws -> (Data, Date) {
             guard (200..<300).contains(status) else {
-                let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error
-                    ?? HTTPURLResponse.localizedString(forStatusCode: status)
+                let message = ErrorBody.message(in: data) ?? HTTPURLResponse.localizedString(forStatusCode: status)
                 throw APIError.server(status: status, message: message)
             }
             return (data, receivedAt)
@@ -278,7 +292,20 @@ struct APITransport: Sendable {
         }
     }
 
-    private struct ErrorBody: Decodable { var error: String }
+    /// `X-OpenCozy-Client: OpenCozy-iOS/<version>`; a server can answer 426 to an app too old for it.
+    static let clientHeader = "OpenCozy-iOS/\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0")"
+
+    /// `{ "error": { "code", "message" } }`; the previous server's `{ "error": "…" }` too,
+    /// while the parent role still talks to it.
+    enum ErrorBody {
+        private struct Current: Decodable { struct Detail: Decodable { var code: String; var message: String }; var error: Detail }
+        private struct Previous: Decodable { var error: String }
+
+        static func message(in data: Data) -> String? {
+            if let body = try? JSONDecoder().decode(Current.self, from: data) { return body.error.message }
+            return (try? JSONDecoder().decode(Previous.self, from: data))?.error
+        }
+    }
 }
 
 enum BaseURL {

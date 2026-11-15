@@ -166,7 +166,7 @@ struct PairingFlowTests {
         #expect(sentOrigin == origin)
         #expect(request.token == token && request.code == nil)
         #expect(request.platform == "ios")
-        #expect(request.deviceName == "Robin's tablet")
+        #expect(request.name == "Robin's tablet")
         let point = try #require(Data(base64Encoded: request.publicKey))
         #expect(point.count == 65 && point.first == 0x04)
         #expect(point.base64EncodedString() == request.publicKey) // standard, padded
@@ -218,9 +218,9 @@ struct PairingFlowTests {
     }
 
     @Test func codeRequestOmitsToken() throws {
-        let request = DevicePairRequest(token: nil, code: "ABCD-EFGH", publicKey: "BA==", platform: "ios", deviceName: "x")
+        let request = DevicePairRequest(token: nil, code: "ABCD-EFGH", publicKey: "BA==", platform: "ios", name: "x")
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any]
-        #expect(json?.keys.sorted() == ["code", "deviceName", "platform", "proof", "publicKey"])
+        #expect(json?.keys.sorted() == ["code", "name", "platform", "proof", "publicKey"])
     }
 
     @Test func unpairForgetsKeyAndDevice() async throws {
@@ -240,8 +240,7 @@ struct UnassignedDeviceTests {
     struct UnassignedAPI: OpenCozyAPI {
         func device() async throws -> DeviceInfo {
             var info = try await FixtureAPI().device()
-            info.device.childId = nil
-            info.device.childName = nil
+            info.device.child = nil
             return info
         }
         func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) { throw APIError.transport("unused") }
