@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import OpenCozy
 
-/// The relock path (missed-relock review) and "One more minute".
+/// The relock path and "One more minute".
 struct RelockDecisionTests {
     let synced = ClockReading(wall: Date(timeIntervalSince1970: 1_800_000_000), monotonic: 5_000, bootSession: "boot-a", timeZone: "UTC")
     func window(_ seconds: TimeInterval, from clock: ClockReading? = nil) -> UnlockState {
