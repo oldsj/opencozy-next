@@ -75,7 +75,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
       />
       {sent && (
         <Notice tone="info" title={`Asked for ${sent.title}`}>
-          An adult will see it in the inbox. If they say no, your {pointsLabel(sent.cost)} come back.
+          An adult will see it in the inbox. If they say no, you get {pointsLabel(sent.cost)} back.
         </Notice>
       )}
       {problem && <Notice tone="error">{problem}</Notice>}
@@ -95,7 +95,7 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
         open={choosing !== null}
         onClose={() => { setChoosing(null); }}
         title={choosing ? `Choose ${choosing.title}?` : ''}
-        description={choosing ? `This uses ${String(choosing.cost)} of ${child.name}’s ${pointsLabel(child.points)}. If an adult says no, they come back.` : undefined}
+        description={choosing ? `This uses ${String(choosing.cost)} of ${child.name}’s ${pointsLabel(child.points)}. If an adult says no, the points come back.` : undefined}
         footer={
           <>
             <Button onClick={() => { setChoosing(null); }}>Not now</Button>
