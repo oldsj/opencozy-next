@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -17,6 +17,7 @@ import {
   scopeLabels,
   type Credential,
 } from './fixtures-credentials';
+import { devices, offer, platformLabels, type Device } from './fixtures-devices';
 import { inbox, kindLabels, REJECT_REASON_MAX, type InboxItem } from './fixtures-inbox';
 import {
   dayLabels,
@@ -30,6 +31,7 @@ import {
   STEP_MAX,
   week,
 } from './fixtures-meals';
+import { pairingModules } from './fixtures';
 import { manageGroups } from './fixtures-manage';
 
 export function Chores() {
@@ -634,6 +636,135 @@ export function ChildArchive() {
         title="Archive Noor?"
         description="Noor leaves the wall display, the inbox and every list. Their points and history are kept, and you can restore them any time. Anything waiting for approval stays waiting until then."
         confirmLabel="Archive"
+      />
+    </>
+  );
+}
+
+function DeviceRow({ device }: { device: Device }) {
+  const meta = [
+    platformLabels[device.platform],
+    device.child ? `${device.child.name}’s` : 'Not assigned to a child',
+    `paired ${device.pairedAt}`,
+    device.lastSeenAt === undefined ? 'not seen yet' : `seen ${device.lastSeenAt}`,
+  ].join(' · ');
+  return (
+    <ListRow
+      stackOnNarrow
+      muted={device.child === null}
+      leading={device.child ? <ProfileAvatar name={device.child.name} color={device.child.color} size="small" aria-hidden="true" /> : undefined}
+      title={device.name}
+      meta={meta}
+      trailing={
+        <>
+          <Button variant="quiet" aria-label={`Rename ${device.name}`}>
+            Rename
+          </Button>
+          <Button variant="quiet" aria-label={`Change whose ${device.name} is`}>
+            Change child
+          </Button>
+          <Button variant="danger" aria-label={`Unpair ${device.name}`}>
+            Unpair…
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
+/** Children's devices: whose each is and when it was last seen. Pairing starts here, per child. */
+export function Devices() {
+  return (
+    <ManageShell nav={settingsNav('/manage/devices')}>
+      <PageHeader
+        title="Devices"
+        description="The children’s iPads and phones. Each shows only its own child’s day."
+        actions={<Button variant="primary">Pair a device</Button>}
+      />
+      <Section title="Paired" count={devices.devices.length}>
+        <List>
+          {devices.devices.map((d) => (
+            <DeviceRow key={d.id} device={d} />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/**
+ * Pairing a device for Ada: the code and QR stay up, with the time left, while the page waits for
+ * the device. On the iPad, the OpenCozy app scans the QR or takes the code.
+ */
+export function DevicePair() {
+  return (
+    <>
+      <Devices />
+      <Sheet
+        open
+        onClose={noop}
+        title="Pair a device for Ada"
+        description="On Ada’s iPad, open the OpenCozy app and scan this code, or type it in."
+        footer={<Button>Cancel</Button>}
+      >
+        <div className="grid justify-items-center gap-5 text-center">
+          <div className="w-60 max-w-full">
+            <QrCode modules={pairingModules} label="Pairing code for Ada’s iPad" />
+          </div>
+          <p className="m-0 text-page font-semibold tabular-nums tracking-widest" aria-label={`Code ${offer.code.split('').join(' ')}`}>
+            {offer.code}
+          </p>
+          <p className="m-0 text-muted-foreground">
+            Waiting for the iPad · <Countdown seconds={262} lowAt={60} />
+          </p>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function DeviceReassign() {
+  return (
+    <>
+      <Devices />
+      <Sheet
+        open
+        onClose={noop}
+        title="Whose is Old iPhone?"
+        description="It switches to that child’s day straight away; no need to pair again."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <ChoiceGroup
+          label="Child for Old iPhone"
+          onChoose={noop}
+          choices={[
+            { value: 'c1', label: 'Ada' },
+            { value: 'c2', label: 'Ezra' },
+            { value: 'c3', label: 'Noor' },
+          ]}
+        />
+      </Sheet>
+    </>
+  );
+}
+
+export function DeviceUnpair() {
+  return (
+    <>
+      <Devices />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Unpair Ezra’s iPad?"
+        description="It signs out at once and shows the pairing screen. Ezra’s points and history stay."
+        confirmLabel="Unpair Ezra’s iPad"
+        tone="danger"
       />
     </>
   );
