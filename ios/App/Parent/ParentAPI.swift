@@ -81,7 +81,12 @@ struct RejectRequest: Encodable, Equatable, Sendable {
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encodeIfPresent(reason.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }, forKey: .reason)
+        try c.encodeIfPresent(sentReason, forKey: .reason)
+    }
+
+    /// The reason as sent: nil when empty or only whitespace.
+    var sentReason: String? {
+        reason.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
     }
 
     private enum CodingKeys: String, CodingKey { case reason }

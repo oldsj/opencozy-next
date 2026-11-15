@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -309,8 +310,14 @@ final class ParentModel {
     /// first answer. Keys are per household and tied to the caller, so the session id
     /// keeps a second parent's tap on the same item from reusing the first parent's
     /// key (422 `idempotency_key_reused`); that parent gets 409 `already_decided`.
-    nonisolated static func idempotencyKey(session: String, _ id: String, _ decision: ApprovalDecision) -> String {
-        "\(session.lowercased()):\(id.lowercased()):\(decision == .approve ? "approve" : "reject")"
+    /// A reject with a reason adds a short hash of it (the body `RejectRequest` sends),
+    /// so a retry with an edited reason is a new key, not a reused one with a
+    /// different body (also 422).
+    nonisolated static func idempotencyKey(session: String, _ id: String, _ decision: ApprovalDecision, reason: String? = nil) -> String {
+        let base = "\(session.lowercased()):\(id.lowercased()):\(decision == .approve ? "approve" : "reject")"
+        guard decision == .reject, let sent = RejectRequest(reason: reason).sentReason else { return base }
+        let digest = SHA256.hash(data: Data(sent.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
+        return "\(base):\(digest)"
     }
 
     /// The session id for the key: in memory, else stored, else asked of the server.
@@ -322,13 +329,13 @@ final class ParentModel {
         return info.session.id
     }
 
-    private func decide(_ id: String, decision: ApprovalDecision, retries: Int) async -> Outcome {
+    private func decide(_ id: String, decision: ApprovalDecision, reason: String? = nil, retries: Int) async -> Outcome {
         guard let api, !busy.contains(id) else { return .failed }
         busy.insert(id)
         defer { busy.remove(id) }
         let key: String
         do {
-            key = Self.idempotencyKey(session: try await sessionIdForKey(api), id, decision)
+            key = Self.idempotencyKey(session: try await sessionIdForKey(api), id, decision, reason: reason)
         } catch {
             handle(error)
             return .failed
@@ -340,7 +347,7 @@ final class ParentModel {
                 case .approve:
                     _ = try await api.approve(id: id, idempotencyKey: key)
                 case .reject:
-                    _ = try await api.reject(id: id, RejectRequest(reason: nil), idempotencyKey: key)
+                    _ = try await api.reject(id: id, RejectRequest(reason: reason), idempotencyKey: key)
                 }
                 removeLocally(id)
                 errorMessage = nil

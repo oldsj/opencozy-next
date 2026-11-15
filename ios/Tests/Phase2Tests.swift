@@ -114,7 +114,16 @@ struct ParentWireTests {
         #expect(ParentModel.idempotencyKey(session: session, id, .reject).hasSuffix(":reject"))
         // Another parent's phone deciding the same item uses a different key.
         #expect(ParentModel.idempotencyKey(session: "0d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a", id, .approve) != approve)
+        // A reject's reason, as sent, is part of the key: an edited reason is a new key.
+        let plain = ParentModel.idempotencyKey(session: session, id, .reject)
+        #expect(ParentModel.idempotencyKey(session: session, id, .reject, reason: "  ") == plain)
+        let notYet = ParentModel.idempotencyKey(session: session, id, .reject, reason: "Not yet")
+        #expect(notYet.hasPrefix(plain + ":") && notYet.count == plain.count + 13)
+        #expect(ParentModel.idempotencyKey(session: session, id, .reject, reason: "Not yet") == notYet)
+        #expect(ParentModel.idempotencyKey(session: session, id, .reject, reason: "Not today") != notYet)
+        #expect(ParentModel.idempotencyKey(session: session, id, .approve, reason: "ignored") == approve)
         // The contract allows 1-128 printable ASCII characters.
+        #expect(notYet.count <= 128)
         #expect(approve.count <= 128)
         #expect(approve.allSatisfy { $0.isASCII && !$0.isWhitespace })
     }
