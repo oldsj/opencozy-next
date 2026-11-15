@@ -4,6 +4,8 @@ image:
   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 config:
   trustedProxies: 10.0.0.0/16
+  publicOrigin: https://opencozy.example.test
+  googleClientID: 000000000000-example.apps.googleusercontent.com
 database:
   cnpg:
     storage:
@@ -13,6 +15,8 @@ secrets:
   env:
     - name: EXAMPLE_API_KEY
       key: example-api-key
+    - name: GOOGLE_CLIENT_SECRET
+      key: google-client-secret
 onepassword:
   itemPath: vaults/example/items/opencozy
 route:

@@ -32,6 +32,11 @@ config:
   # The origin people reach OpenCozy at, e.g. https://cozy.example.test. Kid devices are told
   # it when they pair; empty means devices can't be paired.
   publicOrigin: ""
+  # Google calendar: the installation's own OAuth client ("Web application") in Google Cloud,
+  # with publicOrigin + /api/calendar/google/callback as its redirect URI. Empty turns Google off.
+  # It needs publicOrigin, egress.internet, OPENCOZY_SECRET_KEYS and the client's secret in
+  # secrets.env: `- name: GOOGLE_CLIENT_SECRET` / `key: google-client-secret`.
+  googleClientID: ""
   # Passkeys: the site's hostname, which must never change once passkeys exist, and the
   # comma-separated origins they are used from. Empty turns passkeys off.
   webauthnRPID: ""

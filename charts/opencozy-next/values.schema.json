@@ -105,6 +105,10 @@
         "publicOrigin": {
           "type": "string",
           "pattern": "^(https://[^/?#@]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)?$"
+        },
+        "googleClientID": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]*$"
         }
       }
     },
