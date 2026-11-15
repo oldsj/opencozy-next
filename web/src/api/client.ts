@@ -48,3 +48,4 @@ export type Today = components['schemas']['Today'];
 export type TodayGroup = components['schemas']['TodayGroup'];
 export type TodayItem = components['schemas']['TodayItem'];
 export type Household = components['schemas']['Household'];
+export type InboxItem = components['schemas']['InboxItem'];

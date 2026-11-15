@@ -25,6 +25,7 @@ export function HomePage({ me }: { me: Me }) {
         actions={
           <>
           <Link to="/displays">Displays</Link>
+          <Link to="/inbox">Inbox</Link>
           <Link to="/chores">Chores</Link>
           <Button onClick={() => { logout.mutate({}); }} disabled={logout.isPending}>
             Sign out

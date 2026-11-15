@@ -1,0 +1,160 @@
+inbox:
+  get:
+    operationId: getInbox
+    summary: What waits for an adult's decision, oldest first
+    tags: [inbox]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The inbox
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Inbox'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      default:
+        $ref: common.yaml#/responses/Error
+approve:
+  post:
+    operationId: approveInboxItem
+    summary: Say yes; a completion's points land
+    tags: [inbox]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 64
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ItemId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+          example: {}
+    responses:
+      '200':
+        description: Approved
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Decision'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+reject:
+  post:
+    operationId: rejectInboxItem
+    summary: Send it back, with an optional reason the child sees
+    tags: [inbox]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ItemId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              reason:
+                type: string
+                minLength: 1
+                maxLength: 200
+                pattern: \S
+          example: { reason: The bed still needs making. }
+    responses:
+      '200':
+        description: Sent back
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Decision'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+parameters:
+  ItemId:
+    name: itemId
+    in: path
+    required: true
+    schema:
+      $ref: common.yaml#/schemas/Id
+
+schemas:
+  Inbox:
+    type: object
+    required: [items]
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/schemas/InboxItem'
+  InboxItem:
+    type: object
+    required: [id, kind, child, title, submittedAt]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      kind:
+        type: string
+        enum: [completion, routine, redemption, time_request]
+      child:
+        type: object
+        required: [id, name, color]
+        properties:
+          id:
+            $ref: common.yaml#/schemas/Id
+          name:
+            type: string
+          color:
+            $ref: children.yaml#/schemas/ProfileColor
+      title:
+        type: string
+      detail:
+        type: string
+      points:
+        type: integer
+      submittedAt:
+        type: string
+        format: date-time
+      minutesRequested:
+        type: integer
+  Decision:
+    type: object
+    required: [id, state]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      state:
+        type: string
+        enum: [approved, rejected]
