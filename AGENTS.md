@@ -26,6 +26,7 @@ internal/testdb/        A fresh migrated Postgres database per integration test
 web/                    React + Vite app; web/src/api/schema.gen.ts is generated
 web/design/             OpenCozy's design system (@app/design): tokens, components, previews (its README; why: DESIGN.md)
 web/*.go                Go package that embeds web/dist (build tag embedweb) and serves it
+ios/                    iOS app (XcodeGen, Swift): its own README; CI in .github/workflows/ios.yml
 charts/<app>/           Helm chart, published to oci://ghcr.io/oldsj/charts
 tools/go.mod            Pinned Go tools (oapi-codegen, sqlc, golangci-lint, govulncheck, air)
 ```
