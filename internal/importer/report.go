@@ -133,6 +133,7 @@ var notCarried = map[string]string{
 	"command":            "the command log is dropped",
 	"tv_prompt":          "pending TV prompts",
 	"display_pairing":    "pairing offers",
+	"device_pairing":     "pairing offers",
 	"device_web_session": "device web sessions",
 }
 
