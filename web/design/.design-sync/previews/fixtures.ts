@@ -1,6 +1,6 @@
 import { qrModulesFromRows } from '../../src';
 
-// Fictional data shared by the previews. The QR matrix encodes https://cozy.example/pair/MAPLE-7Q4K
+// Fictional data shared by the previews. The QR matrix encodes https://cozy.example.test/pair/MAPLE-7Q4K
 // (a made-up pairing link), generated once with the qrcode package; '1' is a dark module.
 
 const rows = [
