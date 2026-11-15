@@ -321,6 +321,24 @@ func (e PairingWaitStatus) Valid() bool {
 	}
 }
 
+// Defines values for Platform.
+const (
+	Ipad   Platform = "ipad"
+	Iphone Platform = "iphone"
+)
+
+// Valid indicates whether the value is a known member of the Platform enum.
+func (e Platform) Valid() bool {
+	switch e {
+	case Ipad:
+		return true
+	case Iphone:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProfileColor.
 const (
 	Butter ProfileColor = "butter"
@@ -612,6 +630,78 @@ type Decision struct {
 // DecisionState defines model for Decision.State.
 type DecisionState string
 
+// Device defines model for Device.
+type Device struct {
+	Child      DeviceChild `json:"child"`
+	Id         Id          `json:"id"`
+	LastSeenAt *time.Time  `json:"lastSeenAt,omitempty"`
+	Name       DeviceName  `json:"name"`
+	PairedAt   time.Time   `json:"pairedAt"`
+	Platform   Platform    `json:"platform"`
+}
+
+// DeviceChild defines model for DeviceChild.
+type DeviceChild struct {
+	Color ProfileColor `json:"color"`
+	Id    Id           `json:"id"`
+	Name  string       `json:"name"`
+}
+
+// DeviceHousehold defines model for DeviceHousehold.
+type DeviceHousehold struct {
+	Id Id `json:"id"`
+
+	// LockMessage Empty means the app's own words.
+	LockMessage LockMessage `json:"lockMessage"`
+	Name        string      `json:"name"`
+}
+
+// DeviceName defines model for DeviceName.
+type DeviceName = string
+
+// DevicePairRequest defines model for DevicePairRequest.
+type DevicePairRequest struct {
+	Code     *string    `json:"code,omitempty"`
+	Name     DeviceName `json:"name"`
+	Platform Platform   `json:"platform"`
+	Proof    string     `json:"proof"`
+
+	// PublicKey The 65-byte uncompressed P-256 point (X9.63), standard base64
+	PublicKey string  `json:"publicKey"`
+	Token     *string `json:"token,omitempty"`
+}
+
+// DevicePairingOffer defines model for DevicePairingOffer.
+type DevicePairingOffer struct {
+	// Code Eight characters as XXXX-XXXX, from an alphabet without look-alikes
+	//
+	// Examples: ABCD-EF23
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	Id        Id        `json:"id"`
+
+	// QrPayload opencozy-pair:v1?origin=<url-encoded origin>&token=<token>
+	QrPayload string `json:"qrPayload"`
+
+	// Token 43 characters, base64url
+	Token string `json:"token"`
+}
+
+// DeviceSelf defines model for DeviceSelf.
+type DeviceSelf struct {
+	Device     Device          `json:"device"`
+	Household  DeviceHousehold `json:"household"`
+	ServerTime time.Time       `json:"serverTime"`
+}
+
+// Devices defines model for Devices.
+type Devices struct {
+	Devices []Device `json:"devices"`
+
+	// LockMessage Empty means the app's own words.
+	LockMessage LockMessage `json:"lockMessage"`
+}
+
 // Display defines model for Display.
 type Display struct {
 	CreatedAt time.Time      `json:"createdAt"`
@@ -708,6 +798,9 @@ type InboxItemKind string
 
 // Ingredients defines model for Ingredients.
 type Ingredients = []string
+
+// LockMessage Empty means the app's own words.
+type LockMessage = string
 
 // Me defines model for Me.
 type Me struct {
@@ -861,6 +954,9 @@ type PasskeyResponse struct {
 type Passkeys struct {
 	Passkeys []Passkey `json:"passkeys"`
 }
+
+// Platform defines model for Platform.
+type Platform string
 
 // Points defines model for Points.
 type Points = int
@@ -1169,6 +1265,51 @@ type RevokeCredentialParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// SetLockMessageJSONBody defines parameters for SetLockMessage.
+type SetLockMessageJSONBody struct {
+	// LockMessage Empty means the app's own words.
+	LockMessage LockMessage `json:"lockMessage"`
+}
+
+// SetLockMessageParams defines parameters for SetLockMessage.
+type SetLockMessageParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateDevicePairingJSONBody defines parameters for CreateDevicePairing.
+type CreateDevicePairingJSONBody struct {
+	ChildId Id `json:"childId"`
+}
+
+// CreateDevicePairingParams defines parameters for CreateDevicePairing.
+type CreateDevicePairingParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RevokeDeviceParams defines parameters for RevokeDevice.
+type RevokeDeviceParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateDeviceJSONBody defines parameters for UpdateDevice.
+type UpdateDeviceJSONBody struct {
+	ChildId *Id         `json:"childId,omitempty"`
+	Name    *DeviceName `json:"name,omitempty"`
+}
+
+// UpdateDeviceParams defines parameters for UpdateDevice.
+type UpdateDeviceParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ClaimDisplayPairingParams defines parameters for ClaimDisplayPairing.
 type ClaimDisplayPairingParams struct {
 	// UnderscoreUnderscoreHostDisplayPairing Set by startDisplayPairing
@@ -1346,6 +1487,18 @@ type CreateChoreJSONRequestBody = NewChore
 // CreateCredentialJSONRequestBody defines body for CreateCredential for application/json ContentType.
 type CreateCredentialJSONRequestBody CreateCredentialJSONBody
 
+// PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
+type PairDeviceJSONRequestBody = DevicePairRequest
+
+// SetLockMessageJSONRequestBody defines body for SetLockMessage for application/json ContentType.
+type SetLockMessageJSONRequestBody SetLockMessageJSONBody
+
+// CreateDevicePairingJSONRequestBody defines body for CreateDevicePairing for application/json ContentType.
+type CreateDevicePairingJSONRequestBody CreateDevicePairingJSONBody
+
+// UpdateDeviceJSONRequestBody defines body for UpdateDevice for application/json ContentType.
+type UpdateDeviceJSONRequestBody UpdateDeviceJSONBody
+
 // CreateDisplayJSONRequestBody defines body for CreateDisplay for application/json ContentType.
 type CreateDisplayJSONRequestBody = NewDisplay
 
@@ -1471,6 +1624,33 @@ type ServerInterface interface {
 	// RevokeCredential Revoke a credential; it stops working at once
 	// (DELETE /credentials/{credentialId})
 	RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id, params RevokeCredentialParams)
+	// GetDevice This device, its child and household; every sync starts here
+	// (GET /device)
+	GetDevice(w http.ResponseWriter, r *http.Request)
+	// PairDevice Redeem a pairing offer with this device's new key
+	// (POST /device/pair)
+	PairDevice(w http.ResponseWriter, r *http.Request)
+	// GetDeviceWebSession The kid view's own session, child and household
+	// (GET /device/session)
+	GetDeviceWebSession(w http.ResponseWriter, r *http.Request)
+	// CreateDeviceWebSession A one-time link that signs the web view in as this device
+	// (POST /device/web-session)
+	CreateDeviceWebSession(w http.ResponseWriter, r *http.Request)
+	// ListDevices The household's paired devices, and the lock message
+	// (GET /devices)
+	ListDevices(w http.ResponseWriter, r *http.Request)
+	// SetLockMessage Set the message the kid app shows on a locked device
+	// (PUT /devices/lock-message)
+	SetLockMessage(w http.ResponseWriter, r *http.Request, params SetLockMessageParams)
+	// CreateDevicePairing Offer a pairing for one child's device
+	// (POST /devices/pairings)
+	CreateDevicePairing(w http.ResponseWriter, r *http.Request, params CreateDevicePairingParams)
+	// RevokeDevice Unpair a device; it stops working at once
+	// (DELETE /devices/{deviceId})
+	RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId Id, params RevokeDeviceParams)
+	// UpdateDevice Rename a device, or give it to another child
+	// (PATCH /devices/{deviceId})
+	UpdateDevice(w http.ResponseWriter, r *http.Request, deviceId Id, params UpdateDeviceParams)
 	// StartDisplayPairing A wall display asks to be paired
 	// (POST /display/pairings)
 	StartDisplayPairing(w http.ResponseWriter, r *http.Request)
@@ -2518,6 +2698,274 @@ func (siw *ServerInterfaceWrapper) RevokeCredential(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeCredential(w, r, credentialId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDevice operation middleware
+func (siw *ServerInterfaceWrapper) GetDevice(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDevice(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PairDevice operation middleware
+func (siw *ServerInterfaceWrapper) PairDevice(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PairDevice(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDeviceWebSession operation middleware
+func (siw *ServerInterfaceWrapper) GetDeviceWebSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDeviceWebSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDeviceWebSession operation middleware
+func (siw *ServerInterfaceWrapper) CreateDeviceWebSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDeviceWebSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDevices operation middleware
+func (siw *ServerInterfaceWrapper) ListDevices(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDevices(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetLockMessage operation middleware
+func (siw *ServerInterfaceWrapper) SetLockMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetLockMessageParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetLockMessage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDevicePairing operation middleware
+func (siw *ServerInterfaceWrapper) CreateDevicePairing(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateDevicePairingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDevicePairing(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeDevice operation middleware
+func (siw *ServerInterfaceWrapper) RevokeDevice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deviceId" -------------
+	var deviceId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deviceId", r.PathValue("deviceId"), &deviceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deviceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeDeviceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeDevice(w, r, deviceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDevice operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDevice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "deviceId" -------------
+	var deviceId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deviceId", r.PathValue("deviceId"), &deviceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "deviceId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateDeviceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDevice(w, r, deviceId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3726,6 +4174,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/displays", wrapper.ListDisplays)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/displays", wrapper.CreateDisplay)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/displays/{displayId}", wrapper.RevokeDisplay)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/devices", wrapper.ListDevices)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/devices/pairings", wrapper.CreateDevicePairing)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/devices/lock-message", wrapper.SetLockMessage)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/devices/{deviceId}", wrapper.RevokeDevice)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/devices/{deviceId}", wrapper.UpdateDevice)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/device", wrapper.GetDevice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/device/pair", wrapper.PairDevice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/device/web-session", wrapper.CreateDeviceWebSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/device/session", wrapper.GetDeviceWebSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/today", wrapper.GetToday)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/today/chores/{choreId}/complete", wrapper.CompleteChore)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/today/routines/{routineId}/steps/{stepId}/check", wrapper.CheckRoutineStep)
@@ -6803,6 +7260,741 @@ func (response RevokeCredentialdefaultJSONResponse) VisitRevokeCredentialRespons
 	return err
 }
 
+type GetDeviceRequestObject struct {
+}
+
+type GetDeviceResponseObject interface {
+	VisitGetDeviceResponse(w http.ResponseWriter) error
+}
+
+type GetDevice200JSONResponse DeviceSelf
+
+func (response GetDevice200JSONResponse) VisitGetDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDevice401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetDevice401JSONResponse) VisitGetDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDevicedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDevicedefaultJSONResponse) VisitGetDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PairDeviceRequestObject struct {
+	Body *PairDeviceJSONRequestBody
+}
+
+type PairDeviceResponseObject interface {
+	VisitPairDeviceResponse(w http.ResponseWriter) error
+}
+
+type PairDevice201JSONResponse DeviceSelf
+
+func (response PairDevice201JSONResponse) VisitPairDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PairDevice400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response PairDevice400JSONResponse) VisitPairDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PairDevice409JSONResponse struct{ ConflictJSONResponse }
+
+func (response PairDevice409JSONResponse) VisitPairDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PairDevice413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response PairDevice413JSONResponse) VisitPairDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PairDevice429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response PairDevice429JSONResponse) VisitPairDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PairDevicedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PairDevicedefaultJSONResponse) VisitPairDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeviceWebSessionRequestObject struct {
+}
+
+type GetDeviceWebSessionResponseObject interface {
+	VisitGetDeviceWebSessionResponse(w http.ResponseWriter) error
+}
+
+type GetDeviceWebSession200JSONResponse struct {
+	Child     Child           `json:"child"`
+	ExpiresAt time.Time       `json:"expiresAt"`
+	Household DeviceHousehold `json:"household"`
+}
+
+func (response GetDeviceWebSession200JSONResponse) VisitGetDeviceWebSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeviceWebSession401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetDeviceWebSession401JSONResponse) VisitGetDeviceWebSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDeviceWebSessiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDeviceWebSessiondefaultJSONResponse) VisitGetDeviceWebSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeviceWebSessionRequestObject struct {
+}
+
+type CreateDeviceWebSessionResponseObject interface {
+	VisitCreateDeviceWebSessionResponse(w http.ResponseWriter) error
+}
+
+type CreateDeviceWebSession201JSONResponse struct {
+	ExpiresAt time.Time `json:"expiresAt"`
+
+	// Url Same origin, /device/session?token=…
+	Url string `json:"url"`
+}
+
+func (response CreateDeviceWebSession201JSONResponse) VisitCreateDeviceWebSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeviceWebSession401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateDeviceWebSession401JSONResponse) VisitCreateDeviceWebSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDeviceWebSessiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateDeviceWebSessiondefaultJSONResponse) VisitCreateDeviceWebSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDevicesRequestObject struct {
+}
+
+type ListDevicesResponseObject interface {
+	VisitListDevicesResponse(w http.ResponseWriter) error
+}
+
+type ListDevices200JSONResponse Devices
+
+func (response ListDevices200JSONResponse) VisitListDevicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDevices401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListDevices401JSONResponse) VisitListDevicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDevices403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListDevices403JSONResponse) VisitListDevicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDevicesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDevicesdefaultJSONResponse) VisitListDevicesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLockMessageRequestObject struct {
+	Params SetLockMessageParams
+	Body   *SetLockMessageJSONRequestBody
+}
+
+type SetLockMessageResponseObject interface {
+	VisitSetLockMessageResponse(w http.ResponseWriter) error
+}
+
+type SetLockMessage204Response struct {
+}
+
+func (response SetLockMessage204Response) VisitSetLockMessageResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetLockMessage400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetLockMessage400JSONResponse) VisitSetLockMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLockMessage401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SetLockMessage401JSONResponse) VisitSetLockMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLockMessage403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response SetLockMessage403JSONResponse) VisitSetLockMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLockMessage422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response SetLockMessage422JSONResponse) VisitSetLockMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLockMessagedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SetLockMessagedefaultJSONResponse) VisitSetLockMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairingRequestObject struct {
+	Params CreateDevicePairingParams
+	Body   *CreateDevicePairingJSONRequestBody
+}
+
+type CreateDevicePairingResponseObject interface {
+	VisitCreateDevicePairingResponse(w http.ResponseWriter) error
+}
+
+type CreateDevicePairing201JSONResponse DevicePairingOffer
+
+func (response CreateDevicePairing201JSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairing400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateDevicePairing400JSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairing401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateDevicePairing401JSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairing403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateDevicePairing403JSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairing404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateDevicePairing404JSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairing422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateDevicePairing422JSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDevicePairingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateDevicePairingdefaultJSONResponse) VisitCreateDevicePairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDeviceRequestObject struct {
+	DeviceId Id `json:"deviceId"`
+	Params   RevokeDeviceParams
+}
+
+type RevokeDeviceResponseObject interface {
+	VisitRevokeDeviceResponse(w http.ResponseWriter) error
+}
+
+type RevokeDevice204Response struct {
+}
+
+func (response RevokeDevice204Response) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeDevice401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RevokeDevice401JSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RevokeDevice403JSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RevokeDevice404JSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevice422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RevokeDevice422JSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDevicedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RevokeDevicedefaultJSONResponse) VisitRevokeDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDeviceRequestObject struct {
+	DeviceId Id `json:"deviceId"`
+	Params   UpdateDeviceParams
+	Body     *UpdateDeviceJSONRequestBody
+}
+
+type UpdateDeviceResponseObject interface {
+	VisitUpdateDeviceResponse(w http.ResponseWriter) error
+}
+
+type UpdateDevice200JSONResponse Device
+
+func (response UpdateDevice200JSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDevice400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateDevice400JSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDevice401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateDevice401JSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDevice403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateDevice403JSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDevice404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateDevice404JSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDevice422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response UpdateDevice422JSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDevicedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateDevicedefaultJSONResponse) VisitUpdateDeviceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StartDisplayPairingRequestObject struct {
 }
 
@@ -9431,6 +10623,33 @@ type StrictServerInterface interface {
 	// RevokeCredential Revoke a credential; it stops working at once
 	// (DELETE /credentials/{credentialId})
 	RevokeCredential(ctx context.Context, request RevokeCredentialRequestObject) (RevokeCredentialResponseObject, error)
+	// GetDevice This device, its child and household; every sync starts here
+	// (GET /device)
+	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
+	// PairDevice Redeem a pairing offer with this device's new key
+	// (POST /device/pair)
+	PairDevice(ctx context.Context, request PairDeviceRequestObject) (PairDeviceResponseObject, error)
+	// GetDeviceWebSession The kid view's own session, child and household
+	// (GET /device/session)
+	GetDeviceWebSession(ctx context.Context, request GetDeviceWebSessionRequestObject) (GetDeviceWebSessionResponseObject, error)
+	// CreateDeviceWebSession A one-time link that signs the web view in as this device
+	// (POST /device/web-session)
+	CreateDeviceWebSession(ctx context.Context, request CreateDeviceWebSessionRequestObject) (CreateDeviceWebSessionResponseObject, error)
+	// ListDevices The household's paired devices, and the lock message
+	// (GET /devices)
+	ListDevices(ctx context.Context, request ListDevicesRequestObject) (ListDevicesResponseObject, error)
+	// SetLockMessage Set the message the kid app shows on a locked device
+	// (PUT /devices/lock-message)
+	SetLockMessage(ctx context.Context, request SetLockMessageRequestObject) (SetLockMessageResponseObject, error)
+	// CreateDevicePairing Offer a pairing for one child's device
+	// (POST /devices/pairings)
+	CreateDevicePairing(ctx context.Context, request CreateDevicePairingRequestObject) (CreateDevicePairingResponseObject, error)
+	// RevokeDevice Unpair a device; it stops working at once
+	// (DELETE /devices/{deviceId})
+	RevokeDevice(ctx context.Context, request RevokeDeviceRequestObject) (RevokeDeviceResponseObject, error)
+	// UpdateDevice Rename a device, or give it to another child
+	// (PATCH /devices/{deviceId})
+	UpdateDevice(ctx context.Context, request UpdateDeviceRequestObject) (UpdateDeviceResponseObject, error)
 	// StartDisplayPairing A wall display asks to be paired
 	// (POST /display/pairings)
 	StartDisplayPairing(ctx context.Context, request StartDisplayPairingRequestObject) (StartDisplayPairingResponseObject, error)
@@ -10453,6 +11672,260 @@ func (sh *strictHandler) RevokeCredential(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetDevice operation middleware
+func (sh *strictHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
+	var request GetDeviceRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDevice(ctx, request.(GetDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeviceResponseObject); ok {
+		if err := validResponse.VisitGetDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PairDevice operation middleware
+func (sh *strictHandler) PairDevice(w http.ResponseWriter, r *http.Request) {
+	var request PairDeviceRequestObject
+
+	var body PairDeviceJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PairDevice(ctx, request.(PairDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PairDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PairDeviceResponseObject); ok {
+		if err := validResponse.VisitPairDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDeviceWebSession operation middleware
+func (sh *strictHandler) GetDeviceWebSession(w http.ResponseWriter, r *http.Request) {
+	var request GetDeviceWebSessionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDeviceWebSession(ctx, request.(GetDeviceWebSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDeviceWebSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDeviceWebSessionResponseObject); ok {
+		if err := validResponse.VisitGetDeviceWebSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDeviceWebSession operation middleware
+func (sh *strictHandler) CreateDeviceWebSession(w http.ResponseWriter, r *http.Request) {
+	var request CreateDeviceWebSessionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDeviceWebSession(ctx, request.(CreateDeviceWebSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDeviceWebSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDeviceWebSessionResponseObject); ok {
+		if err := validResponse.VisitCreateDeviceWebSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDevices operation middleware
+func (sh *strictHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
+	var request ListDevicesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDevices(ctx, request.(ListDevicesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDevices")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDevicesResponseObject); ok {
+		if err := validResponse.VisitListDevicesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetLockMessage operation middleware
+func (sh *strictHandler) SetLockMessage(w http.ResponseWriter, r *http.Request, params SetLockMessageParams) {
+	var request SetLockMessageRequestObject
+
+	request.Params = params
+
+	var body SetLockMessageJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetLockMessage(ctx, request.(SetLockMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetLockMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetLockMessageResponseObject); ok {
+		if err := validResponse.VisitSetLockMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDevicePairing operation middleware
+func (sh *strictHandler) CreateDevicePairing(w http.ResponseWriter, r *http.Request, params CreateDevicePairingParams) {
+	var request CreateDevicePairingRequestObject
+
+	request.Params = params
+
+	var body CreateDevicePairingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDevicePairing(ctx, request.(CreateDevicePairingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDevicePairing")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDevicePairingResponseObject); ok {
+		if err := validResponse.VisitCreateDevicePairingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeDevice operation middleware
+func (sh *strictHandler) RevokeDevice(w http.ResponseWriter, r *http.Request, deviceId Id, params RevokeDeviceParams) {
+	var request RevokeDeviceRequestObject
+
+	request.DeviceId = deviceId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeDevice(ctx, request.(RevokeDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeDeviceResponseObject); ok {
+		if err := validResponse.VisitRevokeDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDevice operation middleware
+func (sh *strictHandler) UpdateDevice(w http.ResponseWriter, r *http.Request, deviceId Id, params UpdateDeviceParams) {
+	var request UpdateDeviceRequestObject
+
+	request.DeviceId = deviceId
+	request.Params = params
+
+	var body UpdateDeviceJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDevice(ctx, request.(UpdateDeviceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDevice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDeviceResponseObject); ok {
+		if err := validResponse.VisitUpdateDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // StartDisplayPairing operation middleware
 func (sh *strictHandler) StartDisplayPairing(w http.ResponseWriter, r *http.Request) {
 	var request StartDisplayPairingRequestObject
@@ -11221,168 +12694,205 @@ func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"3Xy2Lf9acPfn3f8bAA==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

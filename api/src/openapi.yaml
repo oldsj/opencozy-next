@@ -18,6 +18,21 @@ info:
     `__Host-display` cookie; parent phones (`ocp_`), service credentials (`ocz_`) and assistants
     (`oca_`) send `Authorization: Bearer`. Every authentication failure is the same 401.
     Cross-site state-changing requests with cookies are refused by Go's `http.CrossOriginProtection`.
+
+    **Signed device requests** (the `device` actor, slice 7). A paired kid app signs every
+    request with the P-256 key it made at pairing, in four headers:
+    `X-OpenCozy-Device` (the device id), `X-OpenCozy-Timestamp` (Unix seconds),
+    `X-OpenCozy-Nonce` (16–64 characters of `[A-Za-z0-9_-]`, new for every request) and
+    `X-OpenCozy-Signature` (ECDSA P-256 over SHA-256, raw r||s, base64url, 86 characters) of
+
+        OPENCOZY-DEVICE-V1\n<METHOD>\n<path and query, as sent, from /api>\n<timestamp>\n<nonce>\n<hex sha256 of the body>\n<device id>
+
+    A timestamp more than 60 seconds off, a nonce already seen from that device in the last
+    120 seconds, an unknown or unpaired device, a device whose child is archived, or a bad
+    signature all get the same 401; its `Date` header lets the app correct its clock. The device
+    acts only for its own child. Its web view uses the `__Host-device` cookie (`device-web`, 24
+    hours, also only its child), which outranks an adult or display cookie in the same jar.
+    Clients send `X-OpenCozy-Client: <app>/<version>`; a client too old for the server gets 426.
 servers:
   - url: /api
 tags:
@@ -25,6 +40,8 @@ tags:
     description: Adult sign-in
   - name: household
     description: The caller's household
+  - name: devices
+    description: Kid devices (iPad, iPhone) and their pairing
   - name: children
     description: Children of the household
   - name: credentials
@@ -80,6 +97,22 @@ paths:
     $ref: displays.yaml#/displays
   /displays/{displayId}:
     $ref: displays.yaml#/display
+  /devices:
+    $ref: devices.yaml#/devices
+  /devices/pairings:
+    $ref: devices.yaml#/pairings
+  /devices/lock-message:
+    $ref: devices.yaml#/lockMessage
+  /devices/{deviceId}:
+    $ref: devices.yaml#/device
+  /device:
+    $ref: devices.yaml#/self
+  /device/pair:
+    $ref: devices.yaml#/pair
+  /device/web-session:
+    $ref: devices.yaml#/webSession
+  /device/session:
+    $ref: devices.yaml#/session
   /today:
     $ref: today.yaml#/today
   /today/chores/{choreId}/complete:
@@ -141,6 +174,15 @@ components:
       type: apiKey
       in: cookie
       name: __Host-display
+    device:
+      type: apiKey
+      in: header
+      name: X-OpenCozy-Signature
+      description: Signed device request; see the API description
+    deviceWeb:
+      type: apiKey
+      in: cookie
+      name: __Host-device
     bearer:
       type: http
       scheme: bearer
