@@ -8,7 +8,7 @@ A Go + React web app: one Go binary serves a JSON API under `/api` and the embed
 ```text
 api/src/*.yaml          The wire contract, one file per domain; bundled into api/openapi.yaml, from
                         which the Go server types and the TS client are generated.
-cmd/app/                main: `app serve` (default), `migrate`, `bootstrap-owner`, `add-adult`
+cmd/app/                main: `app serve` (default), `migrate`, `bootstrap-owner`, `add-adult`, `rekey`
 internal/config/        The only package that reads the environment (lint-enforced)
 internal/db/            Pool, goose migrations (migrations/*.sql), sqlc queries (queries/*.sql)
 internal/db/dbq/        sqlc output. Generated: never edit.
@@ -19,6 +19,9 @@ internal/auth/          Passwords (argon2id; old scrypt hashes rehashed on sign-
 internal/actor/         Who is calling: resolves cookies and bearer tokens to an Actor
 internal/authz/         The authorization table, read from the spec's x-actors declarations
 internal/command/       State changes: transaction, household lock, time after locks, idempotency
+internal/ledger/        Points: award once per source, reverse, redeem, refund; never below zero
+internal/clock/         The time: the database clock, or a Fake in tests
+internal/day/           The household day: dates, times of day, windows, DST rules
 internal/testdb/        A fresh migrated Postgres database per integration test
 web/                    React + Vite app; web/src/api/schema.gen.ts is generated
 web/design/             OpenCozy's design system (@app/design): tokens, components, previews (its README; why: DESIGN.md)
@@ -38,6 +41,8 @@ tools/go.mod            Pinned Go tools (oapi-codegen, sqlc, golangci-lint, govu
   `*.gen.go`, `internal/db/dbq/` or `web/src/api/schema.gen.ts`.
 - **SQL only in `internal/db/queries/*.sql`**, through sqlc. Never build SQL from strings. Every
   query on household data takes the actor's household id (`WHERE household_id = $1 AND ...`).
+- **Points only through `internal/ledger`**, under the child's lock; `point_ledger` is
+  append-only. **Household days and hours only through `internal/day`.**
 - **Schema changes are new goose migrations** (`internal/db/migrations/NNNNN_name.sql`); never edit
   one that has been merged.
 - **The web app calls the API only through `web/src/api/client.ts`** (`$api` hooks, or `client`).

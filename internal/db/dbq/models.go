@@ -10,6 +10,13 @@ import (
 	"github.com/google/uuid"
 )
 
+type ActiveAward struct {
+	SourceKind  string
+	SourceID    uuid.UUID
+	HouseholdID uuid.UUID
+	LedgerID    uuid.UUID
+}
+
 type Adult struct {
 	ID                 uuid.UUID
 	HouseholdID        uuid.UUID
@@ -97,4 +104,19 @@ type PhoneSession struct {
 	CreatedAt   time.Time
 	ExpiresAt   time.Time
 	RevokedAt   *time.Time
+}
+
+type PointLedger struct {
+	ID           uuid.UUID
+	HouseholdID  uuid.UUID
+	ChildID      uuid.UUID
+	Delta        int32
+	Kind         string
+	SourceKind   string
+	SourceID     uuid.UUID
+	ReversesID   *uuid.UUID
+	AdultID      *uuid.UUID
+	CredentialID *uuid.UUID
+	Note         *string
+	CreatedAt    time.Time
 }

@@ -12,6 +12,23 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteExpiredCommand = `-- name: DeleteExpiredCommand :exec
+DELETE FROM command_log
+WHERE household_id = $1 AND idempotency_key = $2 AND created_at < clock_timestamp() - interval '30 days'
+`
+
+type DeleteExpiredCommandParams struct {
+	HouseholdID    uuid.UUID
+	IdempotencyKey string
+}
+
+// An expired row for this key may not have been swept yet; command_log rows never change, so it
+// goes before the new answer is recorded.
+func (q *Queries) DeleteExpiredCommand(ctx context.Context, arg DeleteExpiredCommandParams) error {
+	_, err := q.db.Exec(ctx, deleteExpiredCommand, arg.HouseholdID, arg.IdempotencyKey)
+	return err
+}
+
 const deleteExpiredCommands = `-- name: DeleteExpiredCommands :execrows
 DELETE FROM command_log WHERE created_at < clock_timestamp() - interval '30 days'
 `
@@ -78,9 +95,6 @@ func (q *Queries) Now(ctx context.Context) (time.Time, error) {
 const recordCommand = `-- name: RecordCommand :exec
 INSERT INTO command_log (household_id, idempotency_key, request_hash, status, content_type, body)
 VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (household_id, idempotency_key) DO UPDATE
-SET request_hash = EXCLUDED.request_hash, status = EXCLUDED.status, content_type = EXCLUDED.content_type,
-    body = EXCLUDED.body, created_at = clock_timestamp()
 `
 
 type RecordCommandParams struct {
