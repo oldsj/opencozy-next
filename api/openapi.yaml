@@ -243,8 +243,11 @@ paths:
               properties:
                 name:
                   $ref: '#/components/schemas/ChildName'
+                color:
+                  $ref: '#/components/schemas/ProfileColor'
             example:
               name: Robin
+              color: sage
       responses:
         '201':
           description: Added
@@ -696,6 +699,307 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
+  /today:
+    get:
+      operationId: getToday
+      summary: Today for every child, as the wall display shows it
+      tags:
+        - today
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - today
+      responses:
+        '200':
+          description: Today
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Today'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /today/chores/{choreId}/complete:
+    post:
+      operationId: completeChore
+      summary: Mark today's chore done; it waits for an adult's approval
+      tags:
+        - today
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - today
+      x-command: true
+      x-body-limit: 1
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: choreId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      responses:
+        '200':
+          description: Done, waiting for approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodayItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /today/routines/{routineId}/steps/{stepId}/check:
+    post:
+      operationId: checkRoutineStep
+      summary: Tick a step of today's routine; the last one sends the routine for approval
+      tags:
+        - today
+      x-actors:
+        - adult
+        - phone
+        - display
+      x-display-scopes:
+        - today
+      x-command: true
+      x-body-limit: 1
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: routineId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      responses:
+        '200':
+          description: Ticked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodayGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /chores:
+    get:
+      operationId: listChores
+      summary: The household's chores
+      tags:
+        - chores
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: The chores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chore'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createChore
+      summary: Add a chore for a child
+      tags:
+        - chores
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 2048
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewChore'
+            example:
+              childId: 0190f0e0-0000-7000-8000-000000000001
+              title: Feed the cat
+              points: 4
+              days:
+                - 1
+                - 2
+                - 3
+                - 4
+                - 5
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chore'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /chores/{choreId}:
+    delete:
+      operationId: archiveChore
+      summary: Remove a chore from now on (history stays)
+      tags:
+        - chores
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: choreId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      responses:
+        '204':
+          description: Removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /routines:
+    get:
+      operationId: listRoutines
+      summary: The household's routines
+      tags:
+        - chores
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: The routines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Routine'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createRoutine
+      summary: Add a routine (a list of steps, approved as one) for a child
+      tags:
+        - chores
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 8192
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewRoutine'
+            example:
+              childId: 0190f0e0-0000-7000-8000-000000000001
+              title: Morning
+              points: 3
+              steps:
+                - Make the bed
+                - Brush teeth
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Routine'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /routines/{routineId}:
+    delete:
+      operationId: archiveRoutine
+      summary: Remove a routine from now on (history stays)
+      tags:
+        - chores
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: routineId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      responses:
+        '204':
+          description: Removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     session:
@@ -786,11 +1090,23 @@ components:
               type: string
         household:
           $ref: '#/components/schemas/Household'
+    ProfileColor:
+      type: string
+      enum:
+        - rose
+        - sage
+        - sky
+        - butter
+        - lilac
+        - peach
+        - teal
+        - sand
     Child:
       type: object
       required:
         - id
         - name
+        - color
         - archived
         - version
       properties:
@@ -798,6 +1114,8 @@ components:
           $ref: '#/components/schemas/Id'
         name:
           type: string
+        color:
+          $ref: '#/components/schemas/ProfileColor'
         archived:
           type: boolean
         version:
@@ -920,6 +1238,221 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/DisplayScope'
+    TodayItem:
+      type: object
+      required:
+        - id
+        - title
+        - state
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        points:
+          type: integer
+        state:
+          type: string
+          enum:
+            - open
+            - pending
+            - complete
+        rejectedReason:
+          type: string
+          maxLength: 200
+    TodayGroup:
+      type: object
+      required:
+        - id
+        - kind
+        - title
+        - done
+        - pending
+        - items
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        kind:
+          type: string
+          enum:
+            - routine
+            - chores
+        title:
+          type: string
+        status:
+          type: string
+          description: A short note, such as "3 points"
+        done:
+          type: boolean
+        pending:
+          type: boolean
+          description: Finished, waiting for an adult's approval
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodayItem'
+    TodayChild:
+      type: object
+      required:
+        - child
+        - groups
+      properties:
+        child:
+          type: object
+          required:
+            - id
+            - name
+            - color
+            - points
+            - earnedToday
+            - completed
+            - total
+          properties:
+            id:
+              $ref: '#/components/schemas/Id'
+            name:
+              type: string
+            color:
+              $ref: '#/components/schemas/ProfileColor'
+            points:
+              type: integer
+              format: int64
+            earnedToday:
+              type: integer
+              format: int64
+            completed:
+              type: integer
+            total:
+              type: integer
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodayGroup'
+    Today:
+      type: object
+      required:
+        - children
+        - householdDay
+        - serverTime
+      properties:
+        householdDay:
+          type: string
+          format: date
+        serverTime:
+          type: string
+          format: date-time
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodayChild'
+    Days:
+      type: array
+      description: Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+      maxItems: 7
+      uniqueItems: true
+      items:
+        type: integer
+        minimum: 0
+        maximum: 6
+    Chore:
+      type: object
+      required:
+        - id
+        - childId
+        - title
+        - points
+        - days
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        childId:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        points:
+          type: integer
+        days:
+          $ref: '#/components/schemas/Days'
+    Title:
+      type: string
+      minLength: 1
+      maxLength: 80
+      pattern: \S
+    Points:
+      type: integer
+      minimum: 0
+      maximum: 1000
+    NewChore:
+      type: object
+      additionalProperties: false
+      required:
+        - childId
+        - title
+        - points
+      properties:
+        childId:
+          $ref: '#/components/schemas/Id'
+        title:
+          $ref: '#/components/schemas/Title'
+        points:
+          $ref: '#/components/schemas/Points'
+        days:
+          $ref: '#/components/schemas/Days'
+    Routine:
+      type: object
+      required:
+        - id
+        - childId
+        - title
+        - points
+        - days
+        - steps
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        childId:
+          $ref: '#/components/schemas/Id'
+        title:
+          type: string
+        points:
+          type: integer
+        days:
+          $ref: '#/components/schemas/Days'
+        steps:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - title
+            properties:
+              id:
+                $ref: '#/components/schemas/Id'
+              title:
+                type: string
+    NewRoutine:
+      type: object
+      additionalProperties: false
+      required:
+        - childId
+        - title
+        - points
+        - steps
+      properties:
+        childId:
+          $ref: '#/components/schemas/Id'
+        title:
+          $ref: '#/components/schemas/Title'
+        points:
+          $ref: '#/components/schemas/Points'
+        days:
+          $ref: '#/components/schemas/Days'
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/Title'
   responses:
     Error:
       description: Unexpected error

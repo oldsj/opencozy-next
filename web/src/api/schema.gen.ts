@@ -261,6 +261,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today for every child, as the wall display shows it */
+        get: operations["getToday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/today/chores/{choreId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark today's chore done; it waits for an adult's approval */
+        post: operations["completeChore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/today/routines/{routineId}/steps/{stepId}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tick a step of today's routine; the last one sends the routine for approval */
+        post: operations["checkRoutineStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's chores */
+        get: operations["listChores"];
+        put?: never;
+        /** Add a chore for a child */
+        post: operations["createChore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chores/{choreId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a chore from now on (history stays) */
+        delete: operations["archiveChore"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's routines */
+        get: operations["listRoutines"];
+        put?: never;
+        /** Add a routine (a list of steps, approved as one) for a child */
+        post: operations["createRoutine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routines/{routineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a routine from now on (history stays) */
+        delete: operations["archiveRoutine"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -301,9 +422,12 @@ export interface components {
             };
             household: components["schemas"]["Household"];
         };
+        /** @enum {string} */
+        ProfileColor: "rose" | "sage" | "sky" | "butter" | "lilac" | "peach" | "teal" | "sand";
         Child: {
             id: components["schemas"]["Id"];
             name: string;
+            color: components["schemas"]["ProfileColor"];
             archived: boolean;
             version: number;
         };
@@ -349,6 +473,82 @@ export interface components {
             code: string;
             name: string;
             scopes: components["schemas"]["DisplayScope"][];
+        };
+        TodayItem: {
+            id: components["schemas"]["Id"];
+            title: string;
+            points?: number;
+            /** @enum {string} */
+            state: "open" | "pending" | "complete";
+            rejectedReason?: string;
+        };
+        TodayGroup: {
+            id: components["schemas"]["Id"];
+            /** @enum {string} */
+            kind: "routine" | "chores";
+            title: string;
+            /** @description A short note, such as "3 points" */
+            status?: string;
+            done: boolean;
+            /** @description Finished, waiting for an adult's approval */
+            pending: boolean;
+            items: components["schemas"]["TodayItem"][];
+        };
+        TodayChild: {
+            child: {
+                id: components["schemas"]["Id"];
+                name: string;
+                color: components["schemas"]["ProfileColor"];
+                /** Format: int64 */
+                points: number;
+                /** Format: int64 */
+                earnedToday: number;
+                completed: number;
+                total: number;
+            };
+            groups: components["schemas"]["TodayGroup"][];
+        };
+        Today: {
+            /** Format: date */
+            householdDay: string;
+            /** Format: date-time */
+            serverTime: string;
+            children: components["schemas"]["TodayChild"][];
+        };
+        /** @description Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day. */
+        Days: number[];
+        Chore: {
+            id: components["schemas"]["Id"];
+            childId: components["schemas"]["Id"];
+            title: string;
+            points: number;
+            days: components["schemas"]["Days"];
+        };
+        Title: string;
+        Points: number;
+        NewChore: {
+            childId: components["schemas"]["Id"];
+            title: components["schemas"]["Title"];
+            points: components["schemas"]["Points"];
+            days?: components["schemas"]["Days"];
+        };
+        Routine: {
+            id: components["schemas"]["Id"];
+            childId: components["schemas"]["Id"];
+            title: string;
+            points: number;
+            days: components["schemas"]["Days"];
+            steps: {
+                id: components["schemas"]["Id"];
+                title: string;
+            }[];
+        };
+        NewRoutine: {
+            childId: components["schemas"]["Id"];
+            title: components["schemas"]["Title"];
+            points: components["schemas"]["Points"];
+            days?: components["schemas"]["Days"];
+            steps: components["schemas"]["Title"][];
         };
     };
     responses: {
@@ -632,11 +832,13 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "name": "Robin"
+                 *       "name": "Robin",
+                 *       "color": "sage"
                  *     }
                  */
                 "application/json": {
                     name: components["schemas"]["ChildName"];
+                    color?: components["schemas"]["ProfileColor"];
                 };
             };
         };
@@ -1033,6 +1235,299 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Unpaired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getToday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Today */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Today"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    completeChore: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                choreId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done, waiting for approval */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayItem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    checkRoutineStep: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                routineId: components["schemas"]["Id"];
+                stepId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ticked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayGroup"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listChores: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chores */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Chore"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createChore: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "childId": "0190f0e0-0000-7000-8000-000000000001",
+                 *       "title": "Feed the cat",
+                 *       "points": 4,
+                 *       "days": [
+                 *         1,
+                 *         2,
+                 *         3,
+                 *         4,
+                 *         5
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewChore"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Chore"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    archiveChore: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                choreId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listRoutines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The routines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Routine"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createRoutine: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "childId": "0190f0e0-0000-7000-8000-000000000001",
+                 *       "title": "Morning",
+                 *       "points": 3,
+                 *       "steps": [
+                 *         "Make the bed",
+                 *         "Brush teeth"
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewRoutine"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Routine"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    archiveRoutine: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                routineId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
             204: {
                 headers: {
                     [name: string]: unknown;

@@ -11,7 +11,7 @@ SELECT * FROM child WHERE household_id = $1 AND id = $2;
 SELECT count(*) FROM child WHERE household_id = $1 AND archived_at IS NULL;
 
 -- name: CreateChild :one
-INSERT INTO child (household_id, name) VALUES ($1, $2) RETURNING *;
+INSERT INTO child (household_id, name, color) VALUES ($1, $2, $3) RETURNING *;
 
 -- name: UpdateChild :one
 UPDATE child

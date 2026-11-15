@@ -13,6 +13,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/config"
+	"github.com/oldsj/opencozy-next/internal/day"
 )
 
 const password = "a long enough password"
@@ -531,5 +532,100 @@ func TestPairingDoesNotStarveSignIn(t *testing.T) {
 	bad := map[string]string{"email": "x@example.test", "password": "wrong password!!"}
 	if r := e.send(cred{}, "POST", "/api/auth/login", bad); r.status != 401 {
 		t.Fatalf("sign-in after polling: %d %s", r.status, r.raw)
+	}
+}
+
+// The wall display shows today's chores and routines; a child marks them done, and each waits
+// for an adult's approval.
+func TestToday(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	adult, wall := h.actors["adult"], h.actors["display-today"]
+
+	var zone string
+	if err := e.owner.QueryRow(t.Context(), `SELECT time_zone FROM household WHERE id = $1`, h.id).Scan(&zone); err != nil {
+		t.Fatal(err)
+	}
+	loc, err := day.Zone(zone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	today := day.Of(time.Now(), loc).Weekday()
+	notToday := []int{}
+	for d := range 7 {
+		if d != int(today) {
+			notToday = append(notToday, d)
+		}
+	}
+	later := e.send(adult, "POST", "/api/chores", map[string]any{"childId": h.child2, "title": "Water plants", "points": 2, "days": notToday})
+	if later.status != 201 {
+		t.Fatalf("create chore: %d %s", later.status, later.raw)
+	}
+	routine := e.send(adult, "POST", "/api/routines", map[string]any{"childId": h.child2, "title": "Bedtime", "points": 5, "steps": []string{"Pyjamas", "Brush teeth"}})
+	if routine.status != 201 {
+		t.Fatalf("create routine: %d %s", routine.status, routine.raw)
+	}
+	rid := routine.body["id"].(string)
+	steps := routine.body["steps"].([]any)
+	step := func(i int) string { return steps[i].(map[string]any)["id"].(string) }
+
+	if r := e.send(h.actors["display-none"], "GET", "/api/today", nil); r.status != 403 {
+		t.Fatalf("display without today: %d", r.status)
+	}
+	if r := e.send(wall, "POST", "/api/today/chores/"+later.body["id"].(string)+"/complete", nil); r.status != 409 || r.code() != "not_today" {
+		t.Fatalf("a chore not on today: %d %s", r.status, r.raw)
+	}
+
+	done := e.send(wall, "POST", "/api/today/chores/"+h.chore.String()+"/complete", nil)
+	if done.status != 200 || done.body["state"] != "pending" {
+		t.Fatalf("complete: %d %s", done.status, done.raw)
+	}
+	if r := e.send(wall, "POST", "/api/today/chores/"+h.chore.String()+"/complete", nil); r.status != 409 || r.code() != "already_done" {
+		t.Fatalf("complete twice: %d %s", r.status, r.raw)
+	}
+
+	check := func(i int) resp {
+		return e.send(wall, "POST", "/api/today/routines/"+rid+"/steps/"+step(i)+"/check", nil)
+	}
+	if r := check(0); r.status != 200 || r.body["pending"] != false {
+		t.Fatalf("first step: %d %s", r.status, r.raw)
+	}
+	if r := check(0); r.status != 200 {
+		t.Fatalf("the same step again: %d %s", r.status, r.raw)
+	}
+	if r := check(1); r.status != 200 || r.body["pending"] != true {
+		t.Fatalf("last step: %d %s", r.status, r.raw)
+	}
+	if r := check(1); r.status != 409 || r.code() != "already_done" {
+		t.Fatalf("after the routine is done: %d %s", r.status, r.raw)
+	}
+
+	var approvals int
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM approval WHERE household_id = $1 AND state = 'pending'`, h.id).Scan(&approvals); err != nil {
+		t.Fatal(err)
+	}
+	if approvals != 2 {
+		t.Fatalf("pending approvals: %d", approvals)
+	}
+
+	got := e.send(wall, "GET", "/api/today", nil)
+	if got.status != 200 {
+		t.Fatalf("today: %d %s", got.status, got.raw)
+	}
+	byChild := map[string]map[string]any{}
+	for _, c := range got.body["children"].([]any) {
+		c := c.(map[string]any)["child"].(map[string]any)
+		byChild[c["id"].(string)] = c
+	}
+	c2 := byChild[h.child2.String()]
+	if c2 == nil || c2["completed"] != float64(2) || c2["total"] != float64(2) || c2["color"] == "" {
+		t.Fatalf("child 2 today: %v", c2)
+	}
+
+	if r := e.send(adult, "DELETE", "/api/chores/"+h.chore.String(), nil); r.status != 204 {
+		t.Fatalf("archive: %d %s", r.status, r.raw)
+	}
+	if r := e.send(wall, "POST", "/api/today/chores/"+h.chore.String()+"/complete", nil); r.status != 404 {
+		t.Fatalf("an archived chore: %d %s", r.status, r.raw)
 	}
 }

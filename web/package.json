@@ -23,6 +23,7 @@
     "@app/design": "workspace:*",
     "@tanstack/react-query": "^5.105.2",
     "@tanstack/react-router": "^1.170.46",
+    "lucide-react": "^1.63.0",
     "openapi-fetch": "^0.17.0",
     "openapi-react-query": "^0.5.4",
     "react": "^19.3.1",

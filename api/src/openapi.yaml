@@ -60,6 +60,20 @@ paths:
     $ref: displays.yaml#/displays
   /displays/{displayId}:
     $ref: displays.yaml#/display
+  /today:
+    $ref: today.yaml#/today
+  /today/chores/{choreId}/complete:
+    $ref: today.yaml#/completeChore
+  /today/routines/{routineId}/steps/{stepId}/check:
+    $ref: today.yaml#/checkStep
+  /chores:
+    $ref: chores.yaml#/chores
+  /chores/{choreId}:
+    $ref: chores.yaml#/chore
+  /routines:
+    $ref: chores.yaml#/routines
+  /routines/{routineId}:
+    $ref: chores.yaml#/routine
 
 components:
   securitySchemes:

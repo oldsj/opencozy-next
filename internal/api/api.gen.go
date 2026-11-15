@@ -44,25 +44,25 @@ func (e CredentialKind) Valid() bool {
 
 // Defines values for DisplayScope.
 const (
-	Calendar  DisplayScope = "calendar"
-	Dashboard DisplayScope = "dashboard"
-	Meals     DisplayScope = "meals"
-	Today     DisplayScope = "today"
-	Tv        DisplayScope = "tv"
+	DisplayScopeCalendar  DisplayScope = "calendar"
+	DisplayScopeDashboard DisplayScope = "dashboard"
+	DisplayScopeMeals     DisplayScope = "meals"
+	DisplayScopeToday     DisplayScope = "today"
+	DisplayScopeTv        DisplayScope = "tv"
 )
 
 // Valid indicates whether the value is a known member of the DisplayScope enum.
 func (e DisplayScope) Valid() bool {
 	switch e {
-	case Calendar:
+	case DisplayScopeCalendar:
 		return true
-	case Dashboard:
+	case DisplayScopeDashboard:
 		return true
-	case Meals:
+	case DisplayScopeMeals:
 		return true
-	case Today:
+	case DisplayScopeToday:
 		return true
-	case Tv:
+	case DisplayScopeTv:
 		return true
 	default:
 		return false
@@ -78,6 +78,81 @@ const (
 func (e PairingWaitStatus) Valid() bool {
 	switch e {
 	case Waiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProfileColor.
+const (
+	Butter ProfileColor = "butter"
+	Lilac  ProfileColor = "lilac"
+	Peach  ProfileColor = "peach"
+	Rose   ProfileColor = "rose"
+	Sage   ProfileColor = "sage"
+	Sand   ProfileColor = "sand"
+	Sky    ProfileColor = "sky"
+	Teal   ProfileColor = "teal"
+)
+
+// Valid indicates whether the value is a known member of the ProfileColor enum.
+func (e ProfileColor) Valid() bool {
+	switch e {
+	case Butter:
+		return true
+	case Lilac:
+		return true
+	case Peach:
+		return true
+	case Rose:
+		return true
+	case Sage:
+		return true
+	case Sand:
+		return true
+	case Sky:
+		return true
+	case Teal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TodayGroupKind.
+const (
+	TodayGroupKindChores  TodayGroupKind = "chores"
+	TodayGroupKindRoutine TodayGroupKind = "routine"
+)
+
+// Valid indicates whether the value is a known member of the TodayGroupKind enum.
+func (e TodayGroupKind) Valid() bool {
+	switch e {
+	case TodayGroupKindChores:
+		return true
+	case TodayGroupKindRoutine:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TodayItemState.
+const (
+	Complete TodayItemState = "complete"
+	Open     TodayItemState = "open"
+	Pending  TodayItemState = "pending"
+)
+
+// Valid indicates whether the value is a known member of the TodayItemState enum.
+func (e TodayItemState) Valid() bool {
+	switch e {
+	case Complete:
+		return true
+	case Open:
+		return true
+	case Pending:
 		return true
 	default:
 		return false
@@ -104,14 +179,26 @@ func (e CreateCredentialJSONBodyKind) Valid() bool {
 
 // Child defines model for Child.
 type Child struct {
-	Archived bool   `json:"archived"`
-	Id       Id     `json:"id"`
-	Name     string `json:"name"`
-	Version  int    `json:"version"`
+	Archived bool         `json:"archived"`
+	Color    ProfileColor `json:"color"`
+	Id       Id           `json:"id"`
+	Name     string       `json:"name"`
+	Version  int          `json:"version"`
 }
 
 // ChildName defines model for ChildName.
 type ChildName = string
+
+// Chore defines model for Chore.
+type Chore struct {
+	ChildId Id `json:"childId"`
+
+	// Days Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+	Days   Days   `json:"days"`
+	Id     Id     `json:"id"`
+	Points int    `json:"points"`
+	Title  string `json:"title"`
+}
 
 // Credential defines model for Credential.
 type Credential struct {
@@ -133,6 +220,9 @@ type Credentials struct {
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
 }
+
+// Days Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+type Days = []int
 
 // Display defines model for Display.
 type Display struct {
@@ -186,11 +276,32 @@ type Me struct {
 	Household Household `json:"household"`
 }
 
+// NewChore defines model for NewChore.
+type NewChore struct {
+	ChildId Id `json:"childId"`
+
+	// Days Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+	Days   *Days  `json:"days,omitempty"`
+	Points Points `json:"points"`
+	Title  Title  `json:"title"`
+}
+
 // NewDisplay defines model for NewDisplay.
 type NewDisplay struct {
 	Code   string         `json:"code"`
 	Name   string         `json:"name"`
 	Scopes []DisplayScope `json:"scopes"`
+}
+
+// NewRoutine defines model for NewRoutine.
+type NewRoutine struct {
+	ChildId Id `json:"childId"`
+
+	// Days Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+	Days   *Days   `json:"days,omitempty"`
+	Points Points  `json:"points"`
+	Steps  []Title `json:"steps"`
+	Title  Title   `json:"title"`
 }
 
 // Pairing defines model for Pairing.
@@ -209,6 +320,81 @@ type PairingWait struct {
 
 // PairingWaitStatus defines model for PairingWait.Status.
 type PairingWaitStatus string
+
+// Points defines model for Points.
+type Points = int
+
+// ProfileColor defines model for ProfileColor.
+type ProfileColor string
+
+// Routine defines model for Routine.
+type Routine struct {
+	ChildId Id `json:"childId"`
+
+	// Days Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+	Days   Days `json:"days"`
+	Id     Id   `json:"id"`
+	Points int  `json:"points"`
+	Steps  []struct {
+		Id    Id     `json:"id"`
+		Title string `json:"title"`
+	} `json:"steps"`
+	Title string `json:"title"`
+}
+
+// Title defines model for Title.
+type Title = string
+
+// Today defines model for Today.
+type Today struct {
+	Children     []TodayChild       `json:"children"`
+	HouseholdDay openapi_types.Date `json:"householdDay"`
+	ServerTime   time.Time          `json:"serverTime"`
+}
+
+// TodayChild defines model for TodayChild.
+type TodayChild struct {
+	Child struct {
+		Color       ProfileColor `json:"color"`
+		Completed   int          `json:"completed"`
+		EarnedToday int64        `json:"earnedToday"`
+		Id          Id           `json:"id"`
+		Name        string       `json:"name"`
+		Points      int64        `json:"points"`
+		Total       int          `json:"total"`
+	} `json:"child"`
+	Groups []TodayGroup `json:"groups"`
+}
+
+// TodayGroup defines model for TodayGroup.
+type TodayGroup struct {
+	Done  bool           `json:"done"`
+	Id    Id             `json:"id"`
+	Items []TodayItem    `json:"items"`
+	Kind  TodayGroupKind `json:"kind"`
+
+	// Pending Finished, waiting for an adult's approval
+	Pending bool `json:"pending"`
+
+	// Status A short note, such as "3 points"
+	Status *string `json:"status,omitempty"`
+	Title  string  `json:"title"`
+}
+
+// TodayGroupKind defines model for TodayGroup.Kind.
+type TodayGroupKind string
+
+// TodayItem defines model for TodayItem.
+type TodayItem struct {
+	Id             Id             `json:"id"`
+	Points         *int           `json:"points,omitempty"`
+	RejectedReason *string        `json:"rejectedReason,omitempty"`
+	State          TodayItemState `json:"state"`
+	Title          string         `json:"title"`
+}
+
+// TodayItemState defines model for TodayItem.State.
+type TodayItemState string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
@@ -249,7 +435,8 @@ type ListChildrenParams struct {
 
 // CreateChildJSONBody defines parameters for CreateChild.
 type CreateChildJSONBody struct {
-	Name ChildName `json:"name"`
+	Color *ProfileColor `json:"color,omitempty"`
+	Name  ChildName     `json:"name"`
 }
 
 // CreateChildParams defines parameters for CreateChild.
@@ -268,6 +455,20 @@ type UpdateChildJSONBody struct {
 
 // UpdateChildParams defines parameters for UpdateChild.
 type UpdateChildParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateChoreParams defines parameters for CreateChore.
+type CreateChoreParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ArchiveChoreParams defines parameters for ArchiveChore.
+type ArchiveChoreParams struct {
 	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
 	// same body, gets the first answer (for 30 days) instead of doing it again.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -319,6 +520,34 @@ type RevokeDisplayParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// CreateRoutineParams defines parameters for CreateRoutine.
+type CreateRoutineParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ArchiveRoutineParams defines parameters for ArchiveRoutine.
+type ArchiveRoutineParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CompleteChoreParams defines parameters for CompleteChore.
+type CompleteChoreParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CheckRoutineStepParams defines parameters for CheckRoutineStep.
+type CheckRoutineStepParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ConfirmSignInJSONRequestBody defines body for ConfirmSignIn for application/json ContentType.
 type ConfirmSignInJSONRequestBody ConfirmSignInJSONBody
 
@@ -331,11 +560,17 @@ type CreateChildJSONRequestBody CreateChildJSONBody
 // UpdateChildJSONRequestBody defines body for UpdateChild for application/json ContentType.
 type UpdateChildJSONRequestBody UpdateChildJSONBody
 
+// CreateChoreJSONRequestBody defines body for CreateChore for application/json ContentType.
+type CreateChoreJSONRequestBody = NewChore
+
 // CreateCredentialJSONRequestBody defines body for CreateCredential for application/json ContentType.
 type CreateCredentialJSONRequestBody CreateCredentialJSONBody
 
 // CreateDisplayJSONRequestBody defines body for CreateDisplay for application/json ContentType.
 type CreateDisplayJSONRequestBody = NewDisplay
+
+// CreateRoutineJSONRequestBody defines body for CreateRoutine for application/json ContentType.
+type CreateRoutineJSONRequestBody = NewRoutine
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -363,6 +598,15 @@ type ServerInterface interface {
 	// UpdateChild Rename a child, or archive or restore them
 	// (PATCH /children/{childId})
 	UpdateChild(w http.ResponseWriter, r *http.Request, childId Id, params UpdateChildParams)
+	// ListChores The household's chores
+	// (GET /chores)
+	ListChores(w http.ResponseWriter, r *http.Request)
+	// CreateChore Add a chore for a child
+	// (POST /chores)
+	CreateChore(w http.ResponseWriter, r *http.Request, params CreateChoreParams)
+	// ArchiveChore Remove a chore from now on (history stays)
+	// (DELETE /chores/{choreId})
+	ArchiveChore(w http.ResponseWriter, r *http.Request, choreId Id, params ArchiveChoreParams)
 	// GetOwnCredential The calling service or assistant credential
 	// (GET /credential)
 	GetOwnCredential(w http.ResponseWriter, r *http.Request)
@@ -393,6 +637,24 @@ type ServerInterface interface {
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(w http.ResponseWriter, r *http.Request)
+	// ListRoutines The household's routines
+	// (GET /routines)
+	ListRoutines(w http.ResponseWriter, r *http.Request)
+	// CreateRoutine Add a routine (a list of steps, approved as one) for a child
+	// (POST /routines)
+	CreateRoutine(w http.ResponseWriter, r *http.Request, params CreateRoutineParams)
+	// ArchiveRoutine Remove a routine from now on (history stays)
+	// (DELETE /routines/{routineId})
+	ArchiveRoutine(w http.ResponseWriter, r *http.Request, routineId Id, params ArchiveRoutineParams)
+	// GetToday Today for every child, as the wall display shows it
+	// (GET /today)
+	GetToday(w http.ResponseWriter, r *http.Request)
+	// CompleteChore Mark today's chore done; it waits for an adult's approval
+	// (POST /today/chores/{choreId}/complete)
+	CompleteChore(w http.ResponseWriter, r *http.Request, choreId Id, params CompleteChoreParams)
+	// CheckRoutineStep Tick a step of today's routine; the last one sends the routine for approval
+	// (POST /today/routines/{routineId}/steps/{stepId}/check)
+	CheckRoutineStep(w http.ResponseWriter, r *http.Request, routineId Id, stepId Id, params CheckRoutineStepParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -609,6 +871,119 @@ func (siw *ServerInterfaceWrapper) UpdateChild(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateChild(w, r, childId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListChores operation middleware
+func (siw *ServerInterfaceWrapper) ListChores(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChores(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateChore operation middleware
+func (siw *ServerInterfaceWrapper) CreateChore(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateChoreParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateChore(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArchiveChore operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveChore(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "choreId" -------------
+	var choreId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "choreId", r.PathValue("choreId"), &choreId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "choreId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ArchiveChoreParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveChore(w, r, choreId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -921,6 +1296,250 @@ func (siw *ServerInterfaceWrapper) GetHousehold(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListRoutines operation middleware
+func (siw *ServerInterfaceWrapper) ListRoutines(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRoutines(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRoutine operation middleware
+func (siw *ServerInterfaceWrapper) CreateRoutine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateRoutineParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRoutine(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArchiveRoutine operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveRoutine(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "routineId" -------------
+	var routineId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "routineId", r.PathValue("routineId"), &routineId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "routineId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ArchiveRoutineParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveRoutine(w, r, routineId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetToday operation middleware
+func (siw *ServerInterfaceWrapper) GetToday(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetToday(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteChore operation middleware
+func (siw *ServerInterfaceWrapper) CompleteChore(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "choreId" -------------
+	var choreId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "choreId", r.PathValue("choreId"), &choreId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "choreId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteChoreParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteChore(w, r, choreId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CheckRoutineStep operation middleware
+func (siw *ServerInterfaceWrapper) CheckRoutineStep(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "routineId" -------------
+	var routineId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "routineId", r.PathValue("routineId"), &routineId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "routineId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "stepId" -------------
+	var stepId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "stepId", r.PathValue("stepId"), &stepId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stepId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CheckRoutineStepParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CheckRoutineStep(w, r, routineId, stepId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1059,6 +1678,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/displays", wrapper.ListDisplays)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/displays", wrapper.CreateDisplay)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/displays/{displayId}", wrapper.RevokeDisplay)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/today", wrapper.GetToday)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/today/chores/{choreId}/complete", wrapper.CompleteChore)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/today/routines/{routineId}/steps/{stepId}/check", wrapper.CheckRoutineStep)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/chores", wrapper.ListChores)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/chores", wrapper.CreateChore)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/chores/{choreId}", wrapper.ArchiveChore)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/routines", wrapper.ListRoutines)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/routines", wrapper.CreateRoutine)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/routines/{routineId}", wrapper.ArchiveRoutine)
 
 	return m
 }
@@ -1787,6 +2415,248 @@ type UpdateChilddefaultJSONResponse struct {
 }
 
 func (response UpdateChilddefaultJSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChoresRequestObject struct {
+}
+
+type ListChoresResponseObject interface {
+	VisitListChoresResponse(w http.ResponseWriter) error
+}
+
+type ListChores200JSONResponse []Chore
+
+func (response ListChores200JSONResponse) VisitListChoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChores401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListChores401JSONResponse) VisitListChoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChoresdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListChoresdefaultJSONResponse) VisitListChoresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChoreRequestObject struct {
+	Params CreateChoreParams
+	Body   *CreateChoreJSONRequestBody
+}
+
+type CreateChoreResponseObject interface {
+	VisitCreateChoreResponse(w http.ResponseWriter) error
+}
+
+type CreateChore201JSONResponse Chore
+
+func (response CreateChore201JSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChore400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateChore400JSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChore401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateChore401JSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChore404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateChore404JSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChore413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response CreateChore413JSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChore422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateChore422JSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChoredefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateChoredefaultJSONResponse) VisitCreateChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveChoreRequestObject struct {
+	ChoreId Id `json:"choreId"`
+	Params  ArchiveChoreParams
+}
+
+type ArchiveChoreResponseObject interface {
+	VisitArchiveChoreResponse(w http.ResponseWriter) error
+}
+
+type ArchiveChore204Response struct {
+}
+
+func (response ArchiveChore204Response) VisitArchiveChoreResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ArchiveChore401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ArchiveChore401JSONResponse) VisitArchiveChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveChore404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ArchiveChore404JSONResponse) VisitArchiveChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveChore422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ArchiveChore422JSONResponse) VisitArchiveChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveChoredefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ArchiveChoredefaultJSONResponse) VisitArchiveChoreResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2630,6 +3500,539 @@ func (response GetHouseholddefaultJSONResponse) VisitGetHouseholdResponse(w http
 	return err
 }
 
+type ListRoutinesRequestObject struct {
+}
+
+type ListRoutinesResponseObject interface {
+	VisitListRoutinesResponse(w http.ResponseWriter) error
+}
+
+type ListRoutines200JSONResponse []Routine
+
+func (response ListRoutines200JSONResponse) VisitListRoutinesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRoutines401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListRoutines401JSONResponse) VisitListRoutinesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRoutinesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListRoutinesdefaultJSONResponse) VisitListRoutinesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutineRequestObject struct {
+	Params CreateRoutineParams
+	Body   *CreateRoutineJSONRequestBody
+}
+
+type CreateRoutineResponseObject interface {
+	VisitCreateRoutineResponse(w http.ResponseWriter) error
+}
+
+type CreateRoutine201JSONResponse Routine
+
+func (response CreateRoutine201JSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutine400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateRoutine400JSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutine401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateRoutine401JSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutine404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateRoutine404JSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutine413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response CreateRoutine413JSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutine422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateRoutine422JSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRoutinedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateRoutinedefaultJSONResponse) VisitCreateRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveRoutineRequestObject struct {
+	RoutineId Id `json:"routineId"`
+	Params    ArchiveRoutineParams
+}
+
+type ArchiveRoutineResponseObject interface {
+	VisitArchiveRoutineResponse(w http.ResponseWriter) error
+}
+
+type ArchiveRoutine204Response struct {
+}
+
+func (response ArchiveRoutine204Response) VisitArchiveRoutineResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ArchiveRoutine401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ArchiveRoutine401JSONResponse) VisitArchiveRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveRoutine404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ArchiveRoutine404JSONResponse) VisitArchiveRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveRoutine422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ArchiveRoutine422JSONResponse) VisitArchiveRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveRoutinedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ArchiveRoutinedefaultJSONResponse) VisitArchiveRoutineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTodayRequestObject struct {
+}
+
+type GetTodayResponseObject interface {
+	VisitGetTodayResponse(w http.ResponseWriter) error
+}
+
+type GetToday200JSONResponse Today
+
+func (response GetToday200JSONResponse) VisitGetTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetToday401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetToday401JSONResponse) VisitGetTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetToday403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetToday403JSONResponse) VisitGetTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTodaydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetTodaydefaultJSONResponse) VisitGetTodayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChoreRequestObject struct {
+	ChoreId Id `json:"choreId"`
+	Params  CompleteChoreParams
+}
+
+type CompleteChoreResponseObject interface {
+	VisitCompleteChoreResponse(w http.ResponseWriter) error
+}
+
+type CompleteChore200JSONResponse TodayItem
+
+func (response CompleteChore200JSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChore401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CompleteChore401JSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChore403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CompleteChore403JSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChore404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CompleteChore404JSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChore409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CompleteChore409JSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChore422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CompleteChore422JSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteChoredefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CompleteChoredefaultJSONResponse) VisitCompleteChoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStepRequestObject struct {
+	RoutineId Id `json:"routineId"`
+	StepId    Id `json:"stepId"`
+	Params    CheckRoutineStepParams
+}
+
+type CheckRoutineStepResponseObject interface {
+	VisitCheckRoutineStepResponse(w http.ResponseWriter) error
+}
+
+type CheckRoutineStep200JSONResponse TodayGroup
+
+func (response CheckRoutineStep200JSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStep401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CheckRoutineStep401JSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStep403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CheckRoutineStep403JSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStep404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CheckRoutineStep404JSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStep409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CheckRoutineStep409JSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStep422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CheckRoutineStep422JSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckRoutineStepdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CheckRoutineStepdefaultJSONResponse) VisitCheckRoutineStepResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ConfirmSignIn Enter the password again, for operations that need a recent sign-in
@@ -2656,6 +4059,15 @@ type StrictServerInterface interface {
 	// UpdateChild Rename a child, or archive or restore them
 	// (PATCH /children/{childId})
 	UpdateChild(ctx context.Context, request UpdateChildRequestObject) (UpdateChildResponseObject, error)
+	// ListChores The household's chores
+	// (GET /chores)
+	ListChores(ctx context.Context, request ListChoresRequestObject) (ListChoresResponseObject, error)
+	// CreateChore Add a chore for a child
+	// (POST /chores)
+	CreateChore(ctx context.Context, request CreateChoreRequestObject) (CreateChoreResponseObject, error)
+	// ArchiveChore Remove a chore from now on (history stays)
+	// (DELETE /chores/{choreId})
+	ArchiveChore(ctx context.Context, request ArchiveChoreRequestObject) (ArchiveChoreResponseObject, error)
 	// GetOwnCredential The calling service or assistant credential
 	// (GET /credential)
 	GetOwnCredential(ctx context.Context, request GetOwnCredentialRequestObject) (GetOwnCredentialResponseObject, error)
@@ -2686,6 +4098,24 @@ type StrictServerInterface interface {
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(ctx context.Context, request GetHouseholdRequestObject) (GetHouseholdResponseObject, error)
+	// ListRoutines The household's routines
+	// (GET /routines)
+	ListRoutines(ctx context.Context, request ListRoutinesRequestObject) (ListRoutinesResponseObject, error)
+	// CreateRoutine Add a routine (a list of steps, approved as one) for a child
+	// (POST /routines)
+	CreateRoutine(ctx context.Context, request CreateRoutineRequestObject) (CreateRoutineResponseObject, error)
+	// ArchiveRoutine Remove a routine from now on (history stays)
+	// (DELETE /routines/{routineId})
+	ArchiveRoutine(ctx context.Context, request ArchiveRoutineRequestObject) (ArchiveRoutineResponseObject, error)
+	// GetToday Today for every child, as the wall display shows it
+	// (GET /today)
+	GetToday(ctx context.Context, request GetTodayRequestObject) (GetTodayResponseObject, error)
+	// CompleteChore Mark today's chore done; it waits for an adult's approval
+	// (POST /today/chores/{choreId}/complete)
+	CompleteChore(ctx context.Context, request CompleteChoreRequestObject) (CompleteChoreResponseObject, error)
+	// CheckRoutineStep Tick a step of today's routine; the last one sends the routine for approval
+	// (POST /today/routines/{routineId}/steps/{stepId}/check)
+	CheckRoutineStep(ctx context.Context, request CheckRoutineStepRequestObject) (CheckRoutineStepResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2949,6 +4379,90 @@ func (sh *strictHandler) UpdateChild(w http.ResponseWriter, r *http.Request, chi
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateChildResponseObject); ok {
 		if err := validResponse.VisitUpdateChildResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListChores operation middleware
+func (sh *strictHandler) ListChores(w http.ResponseWriter, r *http.Request) {
+	var request ListChoresRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListChores(ctx, request.(ListChoresRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListChores")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListChoresResponseObject); ok {
+		if err := validResponse.VisitListChoresResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateChore operation middleware
+func (sh *strictHandler) CreateChore(w http.ResponseWriter, r *http.Request, params CreateChoreParams) {
+	var request CreateChoreRequestObject
+
+	request.Params = params
+
+	var body CreateChoreJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateChore(ctx, request.(CreateChoreRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateChore")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateChoreResponseObject); ok {
+		if err := validResponse.VisitCreateChoreResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ArchiveChore operation middleware
+func (sh *strictHandler) ArchiveChore(w http.ResponseWriter, r *http.Request, choreId Id, params ArchiveChoreParams) {
+	var request ArchiveChoreRequestObject
+
+	request.ChoreId = choreId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ArchiveChore(ctx, request.(ArchiveChoreRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ArchiveChore")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ArchiveChoreResponseObject); ok {
+		if err := validResponse.VisitArchiveChoreResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3222,76 +4736,257 @@ func (sh *strictHandler) GetHousehold(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListRoutines operation middleware
+func (sh *strictHandler) ListRoutines(w http.ResponseWriter, r *http.Request) {
+	var request ListRoutinesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRoutines(ctx, request.(ListRoutinesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRoutines")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRoutinesResponseObject); ok {
+		if err := validResponse.VisitListRoutinesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRoutine operation middleware
+func (sh *strictHandler) CreateRoutine(w http.ResponseWriter, r *http.Request, params CreateRoutineParams) {
+	var request CreateRoutineRequestObject
+
+	request.Params = params
+
+	var body CreateRoutineJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRoutine(ctx, request.(CreateRoutineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRoutine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRoutineResponseObject); ok {
+		if err := validResponse.VisitCreateRoutineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ArchiveRoutine operation middleware
+func (sh *strictHandler) ArchiveRoutine(w http.ResponseWriter, r *http.Request, routineId Id, params ArchiveRoutineParams) {
+	var request ArchiveRoutineRequestObject
+
+	request.RoutineId = routineId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ArchiveRoutine(ctx, request.(ArchiveRoutineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ArchiveRoutine")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ArchiveRoutineResponseObject); ok {
+		if err := validResponse.VisitArchiveRoutineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetToday operation middleware
+func (sh *strictHandler) GetToday(w http.ResponseWriter, r *http.Request) {
+	var request GetTodayRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetToday(ctx, request.(GetTodayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetToday")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTodayResponseObject); ok {
+		if err := validResponse.VisitGetTodayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteChore operation middleware
+func (sh *strictHandler) CompleteChore(w http.ResponseWriter, r *http.Request, choreId Id, params CompleteChoreParams) {
+	var request CompleteChoreRequestObject
+
+	request.ChoreId = choreId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteChore(ctx, request.(CompleteChoreRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteChore")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteChoreResponseObject); ok {
+		if err := validResponse.VisitCompleteChoreResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CheckRoutineStep operation middleware
+func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request, routineId Id, stepId Id, params CheckRoutineStepParams) {
+	var request CheckRoutineStepRequestObject
+
+	request.RoutineId = routineId
+	request.StepId = stepId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckRoutineStep(ctx, request.(CheckRoutineStepRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckRoutineStep")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CheckRoutineStepResponseObject); ok {
+		if err := validResponse.VisitCheckRoutineStepResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"+bv5/w0A",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

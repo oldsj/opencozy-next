@@ -61,6 +61,9 @@ func TestAuthzMatrix(t *testing.T) {
 				u := strings.ReplaceAll(path, "{childId}", child.String())
 				u = strings.ReplaceAll(u, "{credentialId}", h.target.String())
 				u = strings.ReplaceAll(u, "{displayId}", h.screen.String())
+				u = strings.ReplaceAll(u, "{choreId}", h.chore.String())
+				u = strings.ReplaceAll(u, "{routineId}", h.routine.String())
+				u = strings.ReplaceAll(u, "{stepId}", h.step.String())
 				return "/api" + u
 			}
 			body := func() any {
