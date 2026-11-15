@@ -67,6 +67,8 @@ export interface CalendarSource {
   status: 'ok' | 'error' | 'needs_reauth';
   lastSyncAt?: string | undefined;
   error?: CalendarErrorCode | undefined;
+  /** For PATCH and DELETE (the conflict check); never shown. */
+  version: number;
 }
 
 /** One sentence per sync error, safe to show adults. */
@@ -116,10 +118,10 @@ export const eventDetail: CalendarEventDetail = {
 };
 
 export const calendars: CalendarSource[] = [
-  { id: 'k1', name: 'Family', provider: 'google', color: 'teal', showOnDisplay: true, status: 'ok', lastSyncAt: '7:40 AM' },
-  { id: 'k2', name: 'School', provider: 'ics', color: 'butter', showOnDisplay: true, status: 'error', lastSyncAt: 'Yesterday, 6:00 PM', error: 'timeout' },
-  { id: 'k3', name: 'Sports', provider: 'icloud', color: 'peach', showOnDisplay: true, status: 'needs_reauth', lastSyncAt: 'Sep 10', error: 'token_expired' },
-  { id: 'k4', name: 'Work', provider: 'google', color: 'sand', showOnDisplay: false, status: 'ok', lastSyncAt: '7:40 AM' },
+  { id: 'k1', name: 'Family', provider: 'google', color: 'teal', showOnDisplay: true, status: 'ok', lastSyncAt: '7:40 AM', version: 1 },
+  { id: 'k2', name: 'School', provider: 'ics', color: 'butter', showOnDisplay: true, status: 'error', lastSyncAt: 'Yesterday, 6:00 PM', error: 'timeout', version: 1 },
+  { id: 'k3', name: 'Sports', provider: 'icloud', color: 'peach', showOnDisplay: true, status: 'needs_reauth', lastSyncAt: 'Sep 10', error: 'token_expired', version: 1 },
+  { id: 'k4', name: 'Work', provider: 'google', color: 'sand', showOnDisplay: false, status: 'ok', lastSyncAt: '7:40 AM', version: 1 },
 ];
 
 /** "3:30 PM" from an RFC3339 time already in household time. */

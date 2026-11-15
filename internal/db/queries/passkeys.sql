@@ -11,10 +11,20 @@ RETURNING *;
 DELETE FROM passkey WHERE id = $1 AND household_id = $2 AND adult_id = $3;
 
 -- name: UsePasskey :exec
-UPDATE passkey SET sign_count = $2, backed_up = $3, last_used_at = now() WHERE credential_id = $1;
+-- An imported passkey's unknown backup eligibility is recorded from its first sign-in.
+UPDATE passkey
+SET sign_count = $2, backed_up = $3, backup_eligible = COALESCE(backup_eligible, sqlc.arg(backup_eligible)::boolean), last_used_at = now()
+WHERE credential_id = $1;
 
 -- name: GetAdultByUserHandle :one
-SELECT * FROM adult WHERE webauthn_user_handle = $1 AND removed_at IS NULL;
+-- Like GetAdultByEmail: only a current adult in a live household can sign in.
+SELECT a.* FROM adult a
+JOIN household h ON h.id = a.household_id
+WHERE a.webauthn_user_handle = $1 AND a.removed_at IS NULL AND h.archived_at IS NULL;
+
+-- name: LockAdult :one
+-- Serializes changes to how an adult signs in (the last-sign-in guard).
+SELECT * FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL FOR UPDATE;
 
 -- name: CreateChallenge :one
 INSERT INTO webauthn_challenge (purpose, adult_id, session, expires_at)

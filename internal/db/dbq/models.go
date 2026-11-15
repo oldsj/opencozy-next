@@ -238,7 +238,7 @@ type Passkey struct {
 	Aaguid          []byte
 	SignCount       int64
 	Transports      []string
-	BackupEligible  bool
+	BackupEligible  pgtype.Bool
 	BackedUp        bool
 	Name            string
 	CreatedAt       time.Time

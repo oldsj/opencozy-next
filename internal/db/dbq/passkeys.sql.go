@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createChallenge = `-- name: CreateChallenge :one
@@ -46,7 +47,7 @@ type CreatePasskeyParams struct {
 	Aaguid          []byte
 	SignCount       int64
 	Transports      []string
-	BackupEligible  bool
+	BackupEligible  pgtype.Bool
 	BackedUp        bool
 	Name            string
 }
@@ -116,9 +117,12 @@ func (q *Queries) DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (i
 }
 
 const getAdultByUserHandle = `-- name: GetAdultByUserHandle :one
-SELECT id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at FROM adult WHERE webauthn_user_handle = $1 AND removed_at IS NULL
+SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at FROM adult a
+JOIN household h ON h.id = a.household_id
+WHERE a.webauthn_user_handle = $1 AND a.removed_at IS NULL AND h.archived_at IS NULL
 `
 
+// Like GetAdultByEmail: only a current adult in a live household can sign in.
 func (q *Queries) GetAdultByUserHandle(ctx context.Context, webauthnUserHandle []byte) (Adult, error) {
 	row := q.db.QueryRow(ctx, getAdultByUserHandle, webauthnUserHandle)
 	var i Adult
@@ -180,6 +184,33 @@ func (q *Queries) ListPasskeys(ctx context.Context, arg ListPasskeysParams) ([]P
 	return items, nil
 }
 
+const lockAdult = `-- name: LockAdult :one
+SELECT id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL FOR UPDATE
+`
+
+type LockAdultParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+}
+
+// Serializes changes to how an adult signs in (the last-sign-in guard).
+func (q *Queries) LockAdult(ctx context.Context, arg LockAdultParams) (Adult, error) {
+	row := q.db.QueryRow(ctx, lockAdult, arg.HouseholdID, arg.ID)
+	var i Adult
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.Email,
+		&i.Name,
+		&i.PasswordHash,
+		&i.PasswordScheme,
+		&i.WebauthnUserHandle,
+		&i.RemovedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const takeChallenge = `-- name: TakeChallenge :one
 DELETE FROM webauthn_challenge
 WHERE id = $1 AND purpose = $2 AND expires_at > now()
@@ -205,16 +236,25 @@ func (q *Queries) TakeChallenge(ctx context.Context, arg TakeChallengeParams) (T
 }
 
 const usePasskey = `-- name: UsePasskey :exec
-UPDATE passkey SET sign_count = $2, backed_up = $3, last_used_at = now() WHERE credential_id = $1
+UPDATE passkey
+SET sign_count = $2, backed_up = $3, backup_eligible = COALESCE(backup_eligible, $4::boolean), last_used_at = now()
+WHERE credential_id = $1
 `
 
 type UsePasskeyParams struct {
-	CredentialID []byte
-	SignCount    int64
-	BackedUp     bool
+	CredentialID   []byte
+	SignCount      int64
+	BackedUp       bool
+	BackupEligible bool
 }
 
+// An imported passkey's unknown backup eligibility is recorded from its first sign-in.
 func (q *Queries) UsePasskey(ctx context.Context, arg UsePasskeyParams) error {
-	_, err := q.db.Exec(ctx, usePasskey, arg.CredentialID, arg.SignCount, arg.BackedUp)
+	_, err := q.db.Exec(ctx, usePasskey,
+		arg.CredentialID,
+		arg.SignCount,
+		arg.BackedUp,
+		arg.BackupEligible,
+	)
 	return err
 }

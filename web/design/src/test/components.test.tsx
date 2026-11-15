@@ -26,6 +26,7 @@ import {
   PersonCard,
   PointsBadge,
   pointsLabel,
+  useSurface,
   PersonTab,
   ProfileAvatar,
   QrCode,
@@ -298,6 +299,17 @@ describe('screen time', () => {
     expect(countdownSpoken(1499)).toBe('25 minutes left');
     expect(countdownSpoken(3660)).toBe('1 hour 1 minute left');
     expect(countdownSpoken(0)).toBe('Time’s up');
+  });
+
+  it('useSurface marks the document while mounted and clears it after', () => {
+    function Kiosk() {
+      useSurface('kiosk');
+      return null;
+    }
+    const { unmount } = render(<Kiosk />);
+    expect(document.documentElement.dataset.surface).toBe('kiosk');
+    unmount();
+    expect(document.documentElement.dataset.surface).toBeUndefined();
   });
 
   it('says point for one and points otherwise, everywhere', () => {

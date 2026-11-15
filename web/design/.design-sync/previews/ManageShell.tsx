@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { pointsLabel, Button, ButtonLink, CheckCircle, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -9,6 +9,14 @@ import {
   providerLabels,
   type CalendarSource,
 } from './fixtures-calendar';
+import {
+  children as householdChildren,
+  credentials,
+  issued,
+  kindLabels as credentialKinds,
+  scopeLabels,
+  type Credential,
+} from './fixtures-credentials';
 import { inbox, kindLabels, REJECT_REASON_MAX, type InboxItem } from './fixtures-inbox';
 import {
   dayLabels,
@@ -426,6 +434,207 @@ export function CalendarAddLink() {
           <Input label="Calendar address" type="url" inputMode="url" hint="Starts with https:// or webcal://. OpenCozy never shows it again." placeholder="https://calendar.example.test/family.ics" />
         </div>
       </Sheet>
+    </>
+  );
+}
+
+const settingsNav = (current: string) => mealsNav(current);
+
+function whoFor(c: Credential): string {
+  if (c.allChildren) return 'All children';
+  return c.childIds.map((id) => householdChildren.find((k) => k.id === id)?.name ?? id).join(', ');
+}
+
+/** Service and assistant credentials: what each can see, for whom; revoking stops it at once. */
+export function Credentials() {
+  return (
+    <ManageShell nav={settingsNav('/manage/credentials')}>
+      <PageHeader
+        title="Connected services"
+        description="Home servers and assistants that can read the family’s day. Each has its own key."
+        actions={<Button variant="primary">Add a service</Button>}
+      />
+      <Section title="Connected" count={credentials.length}>
+        <List>
+          {credentials.map((c) => (
+            <ListRow
+              key={c.id}
+              stackOnNarrow
+              title={c.name}
+              meta={[
+                credentialKinds[c.kind].label,
+                c.scopes.map((s) => scopeLabels[s] ?? s).join('; '),
+                whoFor(c),
+                `added ${c.createdAt}`,
+                c.expiresAt === undefined ? null : `expires ${c.expiresAt}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              trailing={
+                <Button variant="danger" aria-label={`Revoke ${c.name}`}>
+                  Revoke…
+                </Button>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Issuing a credential: what kind, a name, what it may see and for which children. */
+export function CredentialIssue() {
+  return (
+    <>
+      <Credentials />
+      <Sheet
+        open
+        onClose={noop}
+        title="Add a service"
+        description="You’ll see its key once, on the next screen."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Create key</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <SegmentedControl
+            label="Kind"
+            value="service"
+            onChange={noop}
+            options={[
+              { value: 'service', label: credentialKinds.service.label },
+              { value: 'assistant', label: credentialKinds.assistant.label },
+            ]}
+          />
+          <p className="m-0 text-muted-foreground">{credentialKinds.service.detail}</p>
+          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue="Router" required />
+          <Section title="It can">
+            <List>
+              {Object.entries(scopeLabels).map(([scope, label]) => (
+                <ListRow key={scope} title={label} meta={scope} trailing={<CheckCircle checked={scope === 'children:read'} label={label} />} />
+              ))}
+            </List>
+          </Section>
+          <SegmentedControl
+            label="For"
+            value="all"
+            onChange={noop}
+            options={[
+              { value: 'all', label: 'All children' },
+              { value: 'some', label: 'Choose children' },
+            ]}
+          />
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** The key, shown once. A retry of the same request never shows it again. */
+export function CredentialSecret() {
+  return (
+    <>
+      <Credentials />
+      <Sheet
+        open
+        onClose={noop}
+        title={`Key for ${issued.credential.name}`}
+        description="Copy it into the service now. OpenCozy won’t show it again; if you lose it, revoke this one and add another."
+        footer={<Button variant="primary">Done</Button>}
+      >
+        <div className="grid gap-3">
+          <Input label="Key" readOnly value={issued.secret} className="font-mono" />
+          <div>
+            <Button>Copy key</Button>
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function CredentialRevoke() {
+  return (
+    <>
+      <Credentials />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Revoke Kitchen assistant?"
+        description="It stops working at once. To connect it again, add it as a new service."
+        confirmLabel="Revoke"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+/** Children, with archived ones kept apart; archiving keeps their history, restoring brings them back. */
+export function Children() {
+  const active = householdChildren.filter((c) => !c.archived);
+  const archived = householdChildren.filter((c) => c.archived);
+  return (
+    <ManageShell nav={settingsNav('/manage/children')}>
+      <PageHeader title="Children" actions={<Button variant="primary">Add a child</Button>} />
+      <Section title="Children" count={active.length}>
+        <List>
+          {active.map((c) => (
+            <ListRow
+              key={c.id}
+              leading={<ProfileAvatar name={c.name} color={c.color} size="small" aria-hidden="true" />}
+              title={c.name}
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Rename ${c.name}`}>
+                    Rename
+                  </Button>
+                  <Button variant="quiet" aria-label={`Archive ${c.name}`}>
+                    Archive…
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Archived" count={archived.length} description="Off every screen, with their points and history kept.">
+        <List>
+          {archived.map((c) => (
+            <ListRow
+              key={c.id}
+              muted
+              leading={<ProfileAvatar name={c.name} color={c.color} size="small" aria-hidden="true" />}
+              title={c.name}
+              trailing={
+                <Button aria-label={`Restore ${c.name}`}>
+                  Restore
+                </Button>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+export function ChildArchive() {
+  return (
+    <>
+      <Children />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Archive Noor?"
+        description="Noor leaves the wall display, the inbox and every list. Their points and history are kept, and you can restore them any time. Anything waiting for approval stays waiting until then."
+        confirmLabel="Archive"
+      />
     </>
   );
 }
