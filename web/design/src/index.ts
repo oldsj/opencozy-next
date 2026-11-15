@@ -35,6 +35,8 @@ export { PageHeader } from './components/PageHeader';
 export type { PageHeaderProps } from './components/PageHeader';
 export { Panel } from './components/Panel';
 export type { PanelProps, PanelTone } from './components/Panel';
+export { Widget } from './components/Widget';
+export type { WidgetProps } from './components/Widget';
 export { PeopleBoard } from './components/PeopleBoard';
 export type { PeopleBoardProps } from './components/PeopleBoard';
 export { PersonCard } from './components/PersonCard';

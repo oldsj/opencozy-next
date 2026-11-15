@@ -134,6 +134,12 @@ type Household struct {
 	CreatedAt  time.Time
 }
 
+type JobLease struct {
+	Name      string
+	Holder    string
+	ExpiresAt time.Time
+}
+
 type Occurrence struct {
 	ID             uuid.UUID
 	HouseholdID    uuid.UUID
@@ -172,6 +178,18 @@ type PointLedger struct {
 	CredentialID *uuid.UUID
 	Note         *string
 	CreatedAt    time.Time
+}
+
+type PushOutbox struct {
+	ID            uuid.UUID
+	HouseholdID   uuid.UUID
+	AdultID       *uuid.UUID
+	ChildID       *uuid.UUID
+	DedupeKey     string
+	Payload       []byte
+	Attempts      int32
+	NextAttemptAt time.Time
+	CreatedAt     time.Time
 }
 
 type Routine struct {

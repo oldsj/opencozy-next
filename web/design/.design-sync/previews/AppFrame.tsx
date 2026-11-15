@@ -1,7 +1,9 @@
 // @dsCard group="Layout"
 import { CalendarDays, Gift, House, Settings, Sunrise } from 'lucide-react';
 
-import { AppFrame, Button, PersonCard, StatusPill, TabBar, TaskGroup, TaskRow, TopBar } from '../../src';
+import { AppFrame, Button, PageHeader, PersonCard, Section, StatusPill, TabBar, TaskGroup, TaskRow, TopBar } from '../../src';
+
+import { recipe } from './fixtures-meals';
 
 export function Default() {
   return (
@@ -44,6 +46,33 @@ export function Kid() {
           <TaskRow title="Pack school bag" check={{ status: 'open', checked: false, label: 'Pack school bag' }} />
         </TaskGroup>
       </PersonCard>
+    </AppFrame>
+  );
+}
+
+/** A recipe to cook from (family route, kiosk-sized): ingredients, then every step in full. */
+export function RecipeView() {
+  return (
+    <AppFrame topBar={<TopBar time="5:32" date="Monday, September 14" householdName="Maple House" />}>
+      <PageHeader title={recipe.title} description={`Serves ${String(recipe.servings)}`} />
+      <div className="grid gap-8 md:grid-cols-[minmax(14rem,1fr)_2fr]">
+        <Section title="Ingredients">
+          <ul className="grid list-disc gap-2 pl-6">
+            {recipe.ingredients.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </Section>
+        <Section title="Steps">
+          <ol className="grid list-decimal gap-4 pl-6">
+            {recipe.steps.map((step, i) => (
+              <li key={i} className="whitespace-pre-line">
+                {step}
+              </li>
+            ))}
+          </ol>
+        </Section>
+      </div>
     </AppFrame>
   );
 }
