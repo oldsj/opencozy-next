@@ -31,6 +31,8 @@
 @import './components/page-header.css';
 @import './components/panel.css';
 @import './components/widget.css';
+@import './components/reading.css';
+@import './components/dashboard-grid.css';
 @import './components/people-board.css';
 @import './components/person-card.css';
 @import './components/person-tab.css';

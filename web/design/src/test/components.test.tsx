@@ -9,7 +9,10 @@ import {
   ButtonLink,
   ChoiceGroup,
   CodeInput,
+  DashboardGrid,
+  DashboardItem,
   DayPicker,
+  Reading,
   ManageNav,
   ConnectionBanner,
   CheckCircle,
@@ -523,5 +526,40 @@ describe('DayPicker', () => {
     expect(sent.at(-1)).toEqual([]);
     rerender(<DayPicker label="Days" value={[3]} onChange={(d) => sent.push(d)} />);
     expect(screen.getByRole('button', { name: 'Wednesday' })).toBeDisabled();
+  });
+});
+
+describe('dashboard', () => {
+  it('Reading says in words when there is no value, never a blank or a zero', () => {
+    const { rerender } = render(<Reading label="Kitchen" value="71" unit="°F" />);
+    expect(screen.getByText('71')).toBeInTheDocument();
+    expect(screen.getByText('°F')).toBeInTheDocument();
+    rerender(<Reading label="Kitchen" value="71" unit="°F" status="error" note="Home Assistant didn’t answer" />);
+    expect(screen.getByText('Can’t read')).toBeInTheDocument();
+    expect(screen.queryByText('71')).not.toBeInTheDocument();
+    expect(screen.queryByText('°F')).not.toBeInTheDocument();
+    rerender(<Reading label="Kitchen" status="pending" />);
+    expect(screen.getByText('Checking…')).toBeInTheDocument();
+  });
+
+  it('Reading keeps a stale value visible, and drops attention when it can’t read', () => {
+    const { container, rerender } = render(<Reading label="Washer" value="Running" status="stale" note="As of 3:52 PM" />);
+    expect(screen.getByText('Running')).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass('oc-reading--stale');
+    rerender(<Reading label="Back door" value="Open" tone="attention" status="error" />);
+    expect(container.firstElementChild).not.toHaveClass('oc-reading--attention');
+  });
+
+  it('DashboardItem places with static classes and clamps out-of-range values', () => {
+    render(
+      <DashboardGrid editing aria-label="Layout">
+        <DashboardItem x={4} y={2} w={2} h={1} selected data-testid="a" />
+        <DashboardItem x={9} y={-1} w={0} h={40} data-testid="b" />
+      </DashboardGrid>,
+    );
+    const a = screen.getByTestId('a');
+    expect(a).toHaveClass('oc-dash-x4', 'oc-dash-y2', 'oc-dash-w2', 'oc-dash-h1', 'oc-dash__item--selected');
+    expect(a).not.toHaveAttribute('style');
+    expect(screen.getByTestId('b')).toHaveClass('oc-dash-x5', 'oc-dash-y0', 'oc-dash-w1', 'oc-dash-h6');
   });
 });
