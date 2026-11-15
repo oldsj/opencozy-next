@@ -27,6 +27,22 @@ func (q *Queries) AddCredentialChild(ctx context.Context, arg AddCredentialChild
 	return err
 }
 
+const addCredentialRules = `-- name: AddCredentialRules :exec
+INSERT INTO credential_award_rule (household_id, credential_id, rule_id)
+SELECT $1::uuid, $2::uuid, unnest($3::uuid[])
+`
+
+type AddCredentialRulesParams struct {
+	HouseholdID  uuid.UUID
+	CredentialID uuid.UUID
+	RuleIds      []uuid.UUID
+}
+
+func (q *Queries) AddCredentialRules(ctx context.Context, arg AddCredentialRulesParams) error {
+	_, err := q.db.Exec(ctx, addCredentialRules, arg.HouseholdID, arg.CredentialID, arg.RuleIds)
+	return err
+}
+
 const createCredential = `-- name: CreateCredential :one
 INSERT INTO credential (household_id, kind, name, token_hash, scopes, all_children, adult_id, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -70,6 +86,22 @@ func (q *Queries) CreateCredential(ctx context.Context, arg CreateCredentialPara
 		&i.RevokedAt,
 	)
 	return i, err
+}
+
+const credentialMayUseRule = `-- name: CredentialMayUseRule :one
+SELECT EXISTS (SELECT 1 FROM credential_award_rule WHERE credential_id = $1 AND rule_id = $2)::boolean
+`
+
+type CredentialMayUseRuleParams struct {
+	CredentialID uuid.UUID
+	RuleID       uuid.UUID
+}
+
+func (q *Queries) CredentialMayUseRule(ctx context.Context, arg CredentialMayUseRuleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, credentialMayUseRule, arg.CredentialID, arg.RuleID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getCredential = `-- name: GetCredential :one
@@ -160,6 +192,37 @@ func (q *Queries) ListHouseholdCredentialChildren(ctx context.Context, household
 	for rows.Next() {
 		var i ListHouseholdCredentialChildrenRow
 		if err := rows.Scan(&i.CredentialID, &i.ChildID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHouseholdCredentialRules = `-- name: ListHouseholdCredentialRules :many
+SELECT credential_id, rule_id FROM credential_award_rule
+WHERE household_id = $1
+ORDER BY credential_id, rule_id
+`
+
+type ListHouseholdCredentialRulesRow struct {
+	CredentialID uuid.UUID
+	RuleID       uuid.UUID
+}
+
+func (q *Queries) ListHouseholdCredentialRules(ctx context.Context, householdID uuid.UUID) ([]ListHouseholdCredentialRulesRow, error) {
+	rows, err := q.db.Query(ctx, listHouseholdCredentialRules, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListHouseholdCredentialRulesRow{}
+	for rows.Next() {
+		var i ListHouseholdCredentialRulesRow
+		if err := rows.Scan(&i.CredentialID, &i.RuleID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

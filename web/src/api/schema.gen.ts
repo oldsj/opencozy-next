@@ -874,6 +874,103 @@ export interface paths {
         patch: operations["updateCalendar"];
         trace?: never;
     };
+    "/learning/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Award rules, the points a learning app's activities are worth */
+        get: operations["listAwardRules"];
+        put?: never;
+        /** Add an award rule */
+        post: operations["createAwardRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/learning/rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ruleId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change or archive an award rule
+         * @description Archiving is final: an archived rule awards nothing more and can't be changed; its past awards keep it. Add a new rule to start again.
+         */
+        put: operations["updateAwardRule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/learning/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Children's linked learning-app accounts */
+        get: operations["listLearningLinks"];
+        put?: never;
+        /** Link a child to their learning-app account */
+        post: operations["linkLearner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/learning/links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink an account; its awards stay */
+        delete: operations["unlinkLearner"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/learning/awards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Award points for a learning activity
+         * @description For a learning app's service credential. The linked account picks the child, and the live rule for the activity sets the points, up to the rule's daily limit per child (household day). Each sourceEventId pays at most once, forever: sending it again with the same account and activity returns the award (200); with anything else, 409. Send the same UUID as the Idempotency-Key.
+         */
+        post: operations["awardLearning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -967,6 +1064,7 @@ export interface components {
             scopes: string[];
             allChildren: boolean;
             childIds: components["schemas"]["Id"][];
+            awardRuleIds: components["schemas"]["Id"][];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1287,6 +1385,64 @@ export interface components {
             color: components["schemas"]["ProfileColor"];
             showOnDisplay: boolean;
             expectedVersion: number;
+        };
+        AwardRule: {
+            id: components["schemas"]["Id"];
+            activityKey: string;
+            points: number;
+            /** @description The most points the rule gives one child in a household day */
+            dailyLimit: number;
+            version: number;
+            archived: boolean;
+        };
+        ActivityKey: string;
+        AwardPoints: number;
+        NewAwardRule: {
+            activityKey: components["schemas"]["ActivityKey"];
+            points: components["schemas"]["AwardPoints"];
+            dailyLimit: components["schemas"]["AwardPoints"];
+        };
+        AwardRuleEdit: {
+            activityKey: components["schemas"]["ActivityKey"];
+            points: components["schemas"]["AwardPoints"];
+            dailyLimit: components["schemas"]["AwardPoints"];
+            archived: boolean;
+            expectedVersion: number;
+        };
+        LearningLink: {
+            id: components["schemas"]["Id"];
+            childId: components["schemas"]["Id"];
+            provider: string;
+            externalId: string;
+            /** Format: date-time */
+            linkedAt: string;
+        };
+        Provider: string;
+        ExternalId: string;
+        NewLearningLink: {
+            childId: components["schemas"]["Id"];
+            provider: components["schemas"]["Provider"];
+            externalId: components["schemas"]["ExternalId"];
+        };
+        LearningActivity: {
+            sourceEventId: components["schemas"]["Id"];
+            /** @description The learning app; minecraft when left out */
+            provider?: components["schemas"]["Provider"];
+            externalId: components["schemas"]["ExternalId"];
+            activityKey: components["schemas"]["ActivityKey"];
+        };
+        LearningAward: {
+            id: components["schemas"]["Id"];
+            sourceEventId: components["schemas"]["Id"];
+            childId: components["schemas"]["Id"];
+            activityKey: string;
+            points: number;
+            ruleVersion: number;
+            /**
+             * Format: int64
+             * @description The child's balance now
+             */
+            balance: number;
         };
     };
     responses: {
@@ -1960,6 +2116,8 @@ export interface operations {
                     /** @default false */
                     allChildren?: boolean;
                     childIds?: components["schemas"]["Id"][];
+                    /** @description For learning:award, the rules it may award with (at least one); otherwise none */
+                    awardRuleIds?: components["schemas"]["Id"][];
                 };
             };
         };
@@ -3377,6 +3535,326 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listAwardRules: {
+        parameters: {
+            query?: {
+                /** @description Include archived rules */
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rules by activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rules: components["schemas"]["AwardRule"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createAwardRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "activityKey": "build_house",
+                 *       "points": 5,
+                 *       "dailyLimit": 20
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewAwardRule"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwardRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description rule_exists, another live rule has this activity */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateAwardRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ruleId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "activityKey": "build_house",
+                 *       "points": 5,
+                 *       "dailyLimit": 25,
+                 *       "archived": false,
+                 *       "expectedVersion": 1
+                 *     }
+                 */
+                "application/json": components["schemas"]["AwardRuleEdit"];
+            };
+        };
+        responses: {
+            /** @description Changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwardRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description version_conflict (changed meanwhile, or archived), or rule_exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listLearningLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live links of live children */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        links: components["schemas"]["LearningLink"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    linkLearner: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "childId": "0190a1b2-0000-7000-8000-000000000001",
+                 *       "provider": "minecraft",
+                 *       "externalId": "Builder_42"
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewLearningLink"];
+            };
+        };
+        responses: {
+            /** @description Linked */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningLink"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description link_exists, the account is linked to a child already */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unlinkLearner: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                linkId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlinked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    awardLearning: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "sourceEventId": "0190a1b2-0000-7000-8000-0000000000aa",
+                 *       "externalId": "Builder_42",
+                 *       "activityKey": "build_house"
+                 *     }
+                 */
+                "application/json": components["schemas"]["LearningActivity"];
+            };
+        };
+        responses: {
+            /** @description Already awarded for this event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAward"];
+                };
+            };
+            /** @description Awarded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAward"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description The credential may not act for this child or award with this rule */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description unknown_learner (no live link) or unknown_activity (no live rule) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description daily_limit_reached, child_archived, or event_reused (this event was awarded for another account or activity) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Error"];
         };
     };

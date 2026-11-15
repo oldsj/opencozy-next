@@ -15,14 +15,30 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 )
 
-func toCredential(c dbq.Credential, children []uuid.UUID) api.Credential {
+func toCredential(c dbq.Credential, children, rules []uuid.UUID) api.Credential {
 	if children == nil {
 		children = []uuid.UUID{}
 	}
+	if rules == nil {
+		rules = []uuid.UUID{}
+	}
 	return api.Credential{
 		Id: c.ID, Kind: api.CredentialKind(c.Kind), Name: c.Name, Scopes: c.Scopes,
-		AllChildren: c.AllChildren, ChildIds: children, CreatedAt: c.CreatedAt, ExpiresAt: c.ExpiresAt,
+		AllChildren: c.AllChildren, ChildIds: children, AwardRuleIds: rules, CreatedAt: c.CreatedAt, ExpiresAt: c.ExpiresAt,
 	}
+}
+
+// credentialRules maps the household's credentials to the award rules each may use.
+func credentialRules(ctx context.Context, q *dbq.Queries, h uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+	rows, err := q.ListHouseholdCredentialRules(ctx, h)
+	if err != nil {
+		return nil, err
+	}
+	out := map[uuid.UUID][]uuid.UUID{}
+	for _, r := range rows {
+		out[r.CredentialID] = append(out[r.CredentialID], r.RuleID)
+	}
+	return out, nil
 }
 
 // ListCredentials lists the household's live credentials.
@@ -40,9 +56,13 @@ func (s *Server) ListCredentials(ctx context.Context, _ api.ListCredentialsReque
 	for _, l := range links {
 		children[l.CredentialID] = append(children[l.CredentialID], l.ChildID)
 	}
+	rules, err := credentialRules(ctx, s.q, h)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]api.Credential, 0, len(rows))
 	for _, c := range rows {
-		items = append(items, toCredential(c, children[c.ID]))
+		items = append(items, toCredential(c, children[c.ID], rules[c.ID]))
 	}
 	return api.ListCredentials200JSONResponse{Items: items}, nil
 }
@@ -67,6 +87,20 @@ func (s *Server) CreateCredential(ctx context.Context, req api.CreateCredentialR
 	if all && len(childIDs) > 0 {
 		return bad("invalid_children", "Give either allChildren or childIds, not both.")
 	}
+	var ruleIDs []uuid.UUID
+	if req.Body.AwardRuleIds != nil {
+		ruleIDs = *req.Body.AwardRuleIds
+	}
+	if slices.Contains(req.Body.Scopes, ScopeLearningAward) {
+		if req.Body.Kind != api.CreateCredentialJSONBodyKindService {
+			return bad("unknown_scope", "Only a service credential can award learning points.")
+		}
+		if len(ruleIDs) == 0 || (!all && len(childIDs) == 0) {
+			return bad("invalid_rules", "A learning credential needs at least one child and one award rule.")
+		}
+	} else if len(ruleIDs) > 0 {
+		return bad("invalid_rules", "Award rules apply only to learning:award.")
+	}
 	prefix := auth.PrefixService
 	if req.Body.Kind == api.CreateCredentialJSONBodyKindAssistant {
 		prefix = auth.PrefixAssistant
@@ -83,6 +117,16 @@ func (s *Server) CreateCredential(ctx context.Context, req api.CreateCredentialR
 	} else if err != nil {
 		return nil, err
 	}
+	// Lock the rules so none is archived while it is given.
+	if len(ruleIDs) > 0 {
+		live, err := q.LiveAwardRuleIDs(ctx, dbq.LiveAwardRuleIDsParams{HouseholdID: a.HouseholdID, Ids: ruleIDs})
+		if err != nil {
+			return nil, err
+		}
+		if len(live) != len(ruleIDs) {
+			return bad("invalid_rules", "One of the award rules is archived or not in this household.")
+		}
+	}
 	adultID := a.AdultID
 	c, err := q.CreateCredential(ctx, dbq.CreateCredentialParams{
 		HouseholdID: a.HouseholdID, Kind: string(req.Body.Kind), Name: req.Body.Name, TokenHash: hash,
@@ -96,7 +140,12 @@ func (s *Server) CreateCredential(ctx context.Context, req api.CreateCredentialR
 			return nil, err
 		}
 	}
-	return api.CreateCredential201JSONResponse{Credential: toCredential(c, childIDs), Secret: secret}, nil
+	if len(ruleIDs) > 0 {
+		if err := q.AddCredentialRules(ctx, dbq.AddCredentialRulesParams{HouseholdID: a.HouseholdID, CredentialID: c.ID, RuleIds: ruleIDs}); err != nil {
+			return nil, err
+		}
+	}
+	return api.CreateCredential201JSONResponse{Credential: toCredential(c, childIDs, ruleIDs), Secret: secret}, nil
 }
 
 // RevokeCredential revokes one of the household's credentials.
@@ -127,5 +176,9 @@ func (s *Server) GetOwnCredential(ctx context.Context, _ api.GetOwnCredentialReq
 	if a.Kind == actor.Service || a.Kind == actor.Assistant {
 		children = a.Children
 	}
-	return api.GetOwnCredential200JSONResponse(toCredential(c, children)), nil
+	rules, err := credentialRules(ctx, s.q, a.HouseholdID)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetOwnCredential200JSONResponse(toCredential(c, children, rules[c.ID])), nil
 }
