@@ -198,7 +198,21 @@ export function MealPlanSlot() {
         }
       >
         <div className="grid gap-4">
-          <Input label="Meal" hint="A recipe’s name, or anything else such as Leftovers." defaultValue="Lentil soup with crusty bread" maxLength={RECIPE_TITLE_MAX} />
+          <Input
+            label="Meal"
+            hint="Type a recipe’s name to use it, or anything else such as Leftovers."
+            defaultValue="Lentil soup with crusty bread"
+            maxLength={RECIPE_TITLE_MAX}
+            list="recipe-suggestions"
+            autoComplete="off"
+          />
+          <datalist id="recipe-suggestions">
+            {recipes
+              .filter((r) => !r.archived)
+              .map((r) => (
+                <option key={r.id} value={r.title} />
+              ))}
+          </datalist>
           <Textarea label="Note (optional)" hint={`Up to ${String(MEAL_NOTE_MAX)} characters.`} maxLength={MEAL_NOTE_MAX} defaultValue="Use the second batch from Monday." />
         </div>
       </Sheet>
@@ -211,14 +225,15 @@ export function Recipes() {
   return (
     <ManageShell nav={mealsNav('/manage/recipes')}>
       <PageHeader title="Recipes" description="What the family cooks." actions={<Button variant="primary">Add recipe</Button>} />
-      <Section title="All recipes" count={recipes.length}>
+      <Section title="All recipes" count={recipes.filter((r) => !r.archived).length}>
         <List>
           {recipes.map((r) => (
             <ListRow
               key={r.id}
               stackOnNarrow
+              muted={r.archived}
               title={r.title}
-              meta={`Serves ${String(r.servings)}`}
+              meta={r.archived ? `Serves ${String(r.servings)} · archived, kept on past meals` : `Serves ${String(r.servings)}`}
               trailing={
                 <ButtonLink variant="quiet" href={`#recipe-${r.id}`} aria-label={`Open ${r.title}`}>
                   Open
