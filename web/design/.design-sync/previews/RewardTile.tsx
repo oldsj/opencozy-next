@@ -44,7 +44,7 @@ export function KioskRedeem() {
         open
         onClose={noop}
         title="Choose 20 minutes of iPad?"
-        description="This uses 10 of Ada’s 24 points. If an adult says no, they come back."
+        description="This uses 10 of Ada’s 24 points. If an adult says no, the points come back."
         footer={
           <>
             <Button>Not now</Button>
@@ -64,7 +64,7 @@ export function KioskRedeemSent() {
     <KioskRewardsPage>
       {sent.status === 'pending' ? (
         <Notice tone="info" title="Asked for 20 minutes of iPad">
-          An adult will see it in the inbox. If they say no, your 10 points come back.
+          An adult will see it in the inbox. If they say no, you get 10 points back.
         </Notice>
       ) : null}
     </KioskRewardsPage>
