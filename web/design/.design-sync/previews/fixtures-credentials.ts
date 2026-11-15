@@ -15,6 +15,8 @@ export interface Credential {
   childIds: string[];
   createdAt: string;
   expiresAt?: string | undefined;
+  /** Award rules a `learning:award` credential may use; empty otherwise. */
+  awardRuleIds: string[];
 }
 
 /** POST /api/credentials: needs a sign-in within 10 minutes; the secret is in this response only. */
@@ -27,6 +29,7 @@ export interface CreateCredentialResponse {
 export const scopeLabels: Record<string, string> = {
   'household:read': 'See the household’s name and settings',
   'children:read': 'See the children, their points and their day',
+  'learning:award': 'Give points for learning, by your award rules',
 };
 
 export const kindLabels: Record<CredentialKind, { label: string; detail: string }> = {
@@ -50,11 +53,12 @@ export const children: ChildRow[] = [
 ];
 
 export const credentials: Credential[] = [
-  { id: 'k1', kind: 'service', name: 'Home server', scopes: ['household:read', 'children:read'], allChildren: true, childIds: [], createdAt: 'Sep 2' },
-  { id: 'k2', kind: 'assistant', name: 'Kitchen assistant', scopes: ['children:read'], allChildren: false, childIds: ['c1', 'c2'], createdAt: 'Sep 9', expiresAt: 'Dec 9' },
+  { id: 'k1', kind: 'service', name: 'Home server', scopes: ['household:read', 'children:read'], allChildren: true, childIds: [], createdAt: 'Sep 2', awardRuleIds: [] },
+  { id: 'k2', kind: 'assistant', name: 'Kitchen assistant', scopes: ['children:read'], allChildren: false, childIds: ['c1', 'c2'], createdAt: 'Sep 9', expiresAt: 'Dec 9', awardRuleIds: [] },
+  { id: 'k4', kind: 'service', name: 'Minecraft server', scopes: ['learning:award'], allChildren: false, childIds: ['c1', 'c2'], createdAt: 'Sep 12', awardRuleIds: ['r1', 'r2'] },
 ];
 
 export const issued: CreateCredentialResponse = {
-  credential: { id: 'k3', kind: 'service', name: 'Router', scopes: ['children:read'], allChildren: true, childIds: [], createdAt: 'Today' },
+  credential: { id: 'k3', kind: 'service', name: 'Router', scopes: ['children:read'], allChildren: true, childIds: [], createdAt: 'Today', awardRuleIds: [] },
   secret: 'ocs_7Kq2XmP4vN8rT3wY6zB9cD5fH1jL0aE',
 };
