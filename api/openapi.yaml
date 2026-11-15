@@ -152,6 +152,234 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
+  /auth/passkey/options:
+    post:
+      operationId: passkeySignInOptions
+      summary: Start signing in with a passkey
+      tags:
+        - auth
+      x-actors:
+        - public
+      responses:
+        '200':
+          description: Options for navigator.credentials.get
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasskeyOptions'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/passkey:
+    post:
+      operationId: passkeySignIn
+      summary: Sign in with a passkey
+      tags:
+        - auth
+      x-actors:
+        - public
+      x-body-limit: 16384
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasskeyResponse'
+            example:
+              challengeId: 0195f2d4-0000-7000-8000-000000000000
+              credential: {}
+      responses:
+        '200':
+          description: Signed in
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/passkey/confirm/options:
+    post:
+      operationId: passkeyConfirmOptions
+      summary: Start confirming this sign-in with one of your passkeys
+      tags:
+        - auth
+      x-actors:
+        - adult
+      responses:
+        '200':
+          description: Options for navigator.credentials.get
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasskeyOptions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/passkey/confirm:
+    post:
+      operationId: passkeyConfirm
+      summary: Confirm this sign-in with a passkey, for operations that need a recent sign-in
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-body-limit: 16384
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasskeyResponse'
+            example:
+              challengeId: 0195f2d4-0000-7000-8000-000000000000
+              credential: {}
+      responses:
+        '204':
+          description: Confirmed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/passkeys:
+    get:
+      operationId: listPasskeys
+      summary: Your passkeys
+      tags:
+        - auth
+      x-actors:
+        - adult
+      responses:
+        '200':
+          description: Your passkeys, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Passkeys'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: addPasskey
+      summary: Add a passkey
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-recent-auth: true
+      x-body-limit: 16384
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPasskey'
+            example:
+              challengeId: 0195f2d4-0000-7000-8000-000000000000
+              name: Laptop
+              credential: {}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Passkey'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/passkeys/options:
+    post:
+      operationId: passkeyRegistrationOptions
+      summary: Start adding a passkey
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-recent-auth: true
+      responses:
+        '200':
+          description: Options for navigator.credentials.create
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasskeyOptions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/passkeys/{passkeyId}:
+    parameters:
+      - name: passkeyId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Id'
+    delete:
+      operationId: removePasskey
+      summary: Remove a passkey; it stops working at once
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-recent-auth: true
+      responses:
+        '204':
+          description: Removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default:
+          $ref: '#/components/responses/Error'
   /household:
     get:
       operationId: getHousehold
@@ -2077,6 +2305,83 @@ components:
               type: string
         household:
           $ref: '#/components/schemas/Household'
+    PasskeyOptions:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - options
+      properties:
+        challengeId:
+          $ref: '#/components/schemas/Id'
+        options:
+          type: object
+          additionalProperties: true
+          description: PublicKeyCredentialCreationOptionsJSON or PublicKeyCredentialRequestOptionsJSON
+    PasskeyResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - credential
+      properties:
+        challengeId:
+          $ref: '#/components/schemas/Id'
+        credential:
+          type: object
+          additionalProperties: true
+          description: PublicKeyCredential.toJSON()
+    Passkey:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - createdAt
+        - backedUp
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+        backedUp:
+          type: boolean
+          description: Synced to a password manager or cloud keychain, so it survives losing the device.
+    Passkeys:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeys
+      properties:
+        passkeys:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Passkey'
+    NewPasskey:
+      type: object
+      additionalProperties: false
+      required:
+        - challengeId
+        - name
+        - credential
+      properties:
+        challengeId:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        credential:
+          type: object
+          additionalProperties: true
+          description: PublicKeyCredential.toJSON()
     ProfileColor:
       type: string
       enum:
@@ -3083,6 +3388,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    NotFound:
+      description: No such resource for this caller
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     Conflict:
       description: The resource changed, or already exists
       content:
@@ -3091,12 +3402,6 @@ components:
             $ref: '#/components/schemas/Error'
     UnprocessableEntity:
       description: This Idempotency-Key was already used for a different request
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    NotFound:
-      description: No such resource for this caller
       content:
         application/json:
           schema:

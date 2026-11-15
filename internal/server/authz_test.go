@@ -81,6 +81,7 @@ func TestAuthzMatrix(t *testing.T) {
 				case "DELETE /calendars/{calendarId}":
 					u += "?expectedVersion=1"
 				}
+				u = strings.ReplaceAll(u, "{passkeyId}", h.passkey.String())
 				return "/api" + u
 			}
 			body := func() any {

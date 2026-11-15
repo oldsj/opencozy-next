@@ -227,6 +227,23 @@ type Occurrence struct {
 	UpdatedAt      time.Time
 }
 
+type Passkey struct {
+	ID              uuid.UUID
+	HouseholdID     uuid.UUID
+	AdultID         uuid.UUID
+	CredentialID    []byte
+	PublicKey       []byte
+	AttestationType string
+	Aaguid          []byte
+	SignCount       int64
+	Transports      []string
+	BackupEligible  bool
+	BackedUp        bool
+	Name            string
+	CreatedAt       time.Time
+	LastUsedAt      *time.Time
+}
+
 type PhoneSession struct {
 	ID          uuid.UUID
 	HouseholdID uuid.UUID
@@ -319,4 +336,12 @@ type RoutineStep struct {
 	RoutineID   uuid.UUID
 	Title       string
 	Position    int16
+}
+
+type WebauthnChallenge struct {
+	ID        uuid.UUID
+	Purpose   string
+	AdultID   *uuid.UUID
+	Session   []byte
+	ExpiresAt time.Time
 }

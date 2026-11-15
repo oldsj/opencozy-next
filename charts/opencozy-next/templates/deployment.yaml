@@ -89,6 +89,12 @@ spec:
             - name: TRUSTED_PROXIES
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.config.webauthnRPID }}
+            - name: WEBAUTHN_RP_ID
+              value: {{ . | quote }}
+            - name: WEBAUTHN_ORIGINS
+              value: {{ required "config.webauthnOrigins is required with config.webauthnRPID" $.Values.config.webauthnOrigins | quote }}
+            {{- end }}
             # Migrations run in the init container.
             - name: MIGRATE_ON_START
               value: "false"

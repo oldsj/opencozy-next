@@ -94,6 +94,13 @@
         },
         "trustedProxies": {
           "type": "string"
+        },
+        "webauthnRPID": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]*$"
+        },
+        "webauthnOrigins": {
+          "type": "string"
         }
       }
     },

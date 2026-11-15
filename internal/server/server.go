@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	nethttpmiddleware "github.com/oapi-codegen/nethttp-middleware"
 
@@ -39,6 +41,7 @@ type Server struct {
 	live     atomic.Pointer[live.Hub] // slice 0d: StartLive
 	// calendarWake starts the calendar refresh early (slice 13a).
 	calendarWake chan struct{}
+	wa           *webauthn.WebAuthn // nil when passkeys are off
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -54,6 +57,13 @@ func (s *Server) Drain() { s.draining.Store(true) }
 
 // Handler is the whole application: probes, the API under /api and the SPA.
 func (s *Server) Handler() (http.Handler, error) {
+	if s.cfg.WebAuthnRPID != "" {
+		wa, err := newWebAuthn(s.cfg.WebAuthnRPID, s.cfg.WebAuthnOrigins)
+		if err != nil {
+			return nil, fmt.Errorf("passkeys: %w", err)
+		}
+		s.wa = wa
+	}
 	apiHandler, err := s.apiHandler()
 	if err != nil {
 		return nil, err
@@ -147,7 +157,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 			switch {
 			case r.Method != http.MethodPost:
 				next.ServeHTTP(w, r)
-			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm":
+			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/auth/passkey"):
 				auth.ServeHTTP(w, r)
 			case strings.HasPrefix(r.URL.Path, "/display/pairings"):
 				pair.ServeHTTP(w, r)
