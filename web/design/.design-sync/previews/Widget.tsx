@@ -1,7 +1,9 @@
 // @dsCard group="Dashboard"
 import { CalendarDays, UtensilsCrossed } from 'lucide-react';
 
-import { ButtonLink, EmptyState, List, ListRow, Widget } from '../../src';
+import { AppFrame, ButtonLink, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
+
+import { calendar, dayHeadings, dayOf, kids, todayDate, when, type CalendarEvent } from './fixtures-calendar';
 
 import { mealSlots, slotLabels, today, week, type MealDay } from './fixtures-meals';
 
@@ -49,5 +51,75 @@ export function Frame() {
     <Widget title="Calendar" icon={CalendarDays} footer="Updated 7:40 AM">
       <p>A widget holds one glanceable block; the full view sits behind its action.</p>
     </Widget>
+  );
+}
+
+/** One event: when, then what; whose it is as avatars; tentative events quieter. Never a description. */
+function EventRow({ event }: { event: CalendarEvent }) {
+  const tentative = event.status === 'tentative';
+  return (
+    <ListRow
+      stackOnNarrow
+      muted={tentative}
+      title={event.title ?? 'Busy'}
+      meta={[when(event), event.calendar.name, event.location].filter(Boolean).join(' · ')}
+      trailing={
+        <>
+          {tentative ? <Tag>Maybe</Tag> : null}
+          {event.children.map((id) => {
+            const kid = kids[id];
+            return kid ? <ProfileAvatar key={id} name={kid.name} color={kid.color} size="small" /> : null;
+          })}
+        </>
+      }
+    />
+  );
+}
+
+/** Today's events on the wall display: all-day first, then by time. */
+export function CalendarToday() {
+  const events = calendar.events.filter((e) => dayOf(e) === todayDate).sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
+  return (
+    <Widget
+      title="Today"
+      icon={CalendarDays}
+      action={
+        <ButtonLink variant="quiet" href="#agenda">
+          Agenda
+        </ButtonLink>
+      }
+      footer="Updated 7:40 AM"
+    >
+      {events.length === 0 ? (
+        <EmptyState title="Nothing on the calendar" description="Enjoy the quiet day." />
+      ) : (
+        <List>
+          {events.map((event) => (
+            <EventRow key={event.id} event={event} />
+          ))}
+        </List>
+      )}
+    </Widget>
+  );
+}
+
+/** The family agenda (view with ?surface=kiosk): the next days, one section each. */
+export function Agenda() {
+  const days = [...new Set(calendar.events.map(dayOf))].sort();
+  return (
+    <AppFrame topBar={<TopBar time="7:42" date="Monday, September 14" householdName="Maple House" />}>
+      <PageHeader title="Agenda" description="The family calendars, the next few days." />
+      {days.map((day) => (
+        <Section key={day} title={dayHeadings[day] ?? day}>
+          <List>
+            {calendar.events
+              .filter((e) => dayOf(e) === day)
+              .map((event) => (
+                <EventRow key={event.id} event={event} />
+              ))}
+          </List>
+        </Section>
+      ))}
+    </AppFrame>
   );
 }
