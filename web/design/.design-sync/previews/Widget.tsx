@@ -1,9 +1,11 @@
 // @dsCard group="Dashboard"
 import { CalendarDays, Tv, UtensilsCrossed } from 'lucide-react';
 
-import { AppFrame, ButtonLink, Countdown, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
+import { AppFrame, Button, ButtonLink, Countdown, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
 
 import { calendar, dayHeadings, dayOf, kids, todayDate, when, type CalendarEvent } from './fixtures-calendar';
+
+import { tvs } from './fixtures-tv';
 
 import { mealSlots, slotLabels, today, week, type MealDay } from './fixtures-meals';
 
@@ -155,6 +157,54 @@ export function WatchingNow() {
         />
         <ListRow title="Basement TV" meta="Parents" trailing={<Tag>No limit</Tag>} />
         <ListRow muted title="Bedroom TV" meta="Off" />
+      </List>
+    </Widget>
+  );
+}
+
+/**
+ * The display's TVs card: who is watching and how long is left. An off TV offers "Turn on…" (asks a
+ * parent; the display never starts a session itself); a running session offers "Done watching".
+ */
+export function TvsOnDisplay() {
+  return (
+    <Widget title="TVs" icon={Tv}>
+      <List>
+        {tvs.map((tv) => {
+          const s = tv.session;
+          if (s) {
+            return (
+              <ListRow
+                key={tv.id}
+                title={tv.name}
+                meta={s.watcher === 'parents' ? 'Parents' : (s.childName ?? 'A child')}
+                trailing={
+                  <>
+                    {s.secondsRemaining !== null && (
+                      <Tag tone="attention">
+                        <Countdown seconds={s.secondsRemaining} />
+                      </Tag>
+                    )}
+                    <Button aria-label={`Done watching ${tv.name}`}>Done watching</Button>
+                  </>
+                }
+              />
+            );
+          }
+          if (tv.prompt) {
+            return <ListRow key={tv.id} title={tv.name} meta="Asking a parent…" trailing={<Tag tone="attention">Waiting</Tag>} />;
+          }
+          if (tv.openUntil !== null) return <ListRow key={tv.id} title={tv.name} meta={`Open until ${tv.openUntil}`} />;
+          return (
+            <ListRow
+              key={tv.id}
+              muted
+              title={tv.name}
+              meta="Off"
+              trailing={<Button aria-label={`Turn on ${tv.name}`}>Turn on…</Button>}
+            />
+          );
+        })}
       </List>
     </Widget>
   );
