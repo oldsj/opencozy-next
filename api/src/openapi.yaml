@@ -133,6 +133,12 @@ paths:
     $ref: rewards.yaml#/reward
   /children/{childId}/redemptions:
     $ref: rewards.yaml#/redemptions
+  /redemptions:
+    $ref: rewards.yaml#/adultRedemptions
+  /redemptions/{redemptionId}/fulfil:
+    $ref: rewards.yaml#/fulfil
+  /redemptions/{redemptionId}/cancel:
+    $ref: rewards.yaml#/cancel
   /inbox:
     $ref: inbox.yaml#/inbox
   /inbox/{itemId}/approve:

@@ -128,7 +128,7 @@ func (s *Server) me(ctx context.Context, a dbq.Adult) (api.Me, error) {
 }
 
 func toHousehold(h dbq.Household) api.Household {
-	return api.Household{Id: h.ID, Name: h.Name, TimeZone: h.TimeZone}
+	return api.Household{Id: h.ID, Name: h.Name, TimeZone: h.TimeZone, Version: int(h.Version)}
 }
 
 // GetHousehold returns the caller's household.

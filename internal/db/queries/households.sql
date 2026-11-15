@@ -28,3 +28,8 @@ SELECT * FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL;
 -- name: SetAdultPassword :exec
 UPDATE adult SET password_hash = $3, password_scheme = $4
 WHERE household_id = $1 AND id = $2;
+
+-- name: UpdateHousehold :one
+UPDATE household SET name = $2, time_zone = $3, version = version + 1
+WHERE id = $1 AND version = sqlc.arg(expected_version)
+RETURNING *;

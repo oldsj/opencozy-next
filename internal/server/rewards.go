@@ -22,7 +22,7 @@ var (
 )
 
 func toReward(r dbq.Reward) api.Reward {
-	out := api.Reward{Id: r.ID, Title: r.Title, Cost: int(r.Cost), Kind: api.RewardKind(r.Kind), Available: r.Available}
+	out := api.Reward{Id: r.ID, Title: r.Title, Cost: int(r.Cost), Kind: api.RewardKind(r.Kind), Available: r.Available, Version: int(r.Version)}
 	if r.Minutes.Valid {
 		out.Minutes = ptr(int(r.Minutes.Int32))
 	}

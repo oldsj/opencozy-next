@@ -53,6 +53,54 @@ chores:
       default:
         $ref: common.yaml#/responses/Error
 chore:
+  put:
+    operationId: updateChore
+    summary: Edit a chore; a new child takes it from today (earned points stay)
+    tags: [chores]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: choreId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/ChoreEdit'
+          example: { childId: 0190f0e0-0000-7000-8000-000000000001, title: Feed the cat, points: 4, days: [], expectedVersion: 3 }
+    responses:
+      '200':
+        description: Saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Chore'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: '`version_conflict`: it changed since `expectedVersion`; fetch it again'
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
   delete:
     operationId: archiveChore
     summary: Remove a chore from now on (history stays)
@@ -132,6 +180,54 @@ routines:
       default:
         $ref: common.yaml#/responses/Error
 routine:
+  put:
+    operationId: updateRoutine
+    summary: Edit a routine and its steps; steps sent with their id keep it
+    tags: [chores]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 8192
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: routineId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/RoutineEdit'
+          example: { childId: 0190f0e0-0000-7000-8000-000000000001, title: Morning, points: 3, days: [], steps: [{ id: 0190f0e0-0000-7000-8000-000000000010, title: Make the bed }, { title: Brush teeth }], expectedVersion: 4 }
+    responses:
+      '200':
+        description: Saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Routine'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: '`version_conflict`: it changed since `expectedVersion`; fetch it again'
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
   delete:
     operationId: archiveRoutine
     summary: Remove a routine from now on (history stays)
@@ -189,9 +285,53 @@ schemas:
         $ref: '#/schemas/Points'
       days:
         $ref: '#/schemas/Days'
+  ChoreEdit:
+    type: object
+    additionalProperties: false
+    required: [childId, title, points, days, expectedVersion]
+    properties:
+      childId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        $ref: '#/schemas/Title'
+      points:
+        $ref: '#/schemas/Points'
+      days:
+        $ref: '#/schemas/Days'
+      expectedVersion:
+        $ref: common.yaml#/schemas/Version
+  RoutineEdit:
+    type: object
+    additionalProperties: false
+    required: [childId, title, points, days, steps, expectedVersion]
+    properties:
+      childId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        $ref: '#/schemas/Title'
+      points:
+        $ref: '#/schemas/Points'
+      days:
+        $ref: '#/schemas/Days'
+      steps:
+        type: array
+        minItems: 1
+        maxItems: 20
+        description: In order. A step with the id of one of this routine's steps keeps it (a tick today stays); one without is new; any left out are removed.
+        items:
+          type: object
+          additionalProperties: false
+          required: [title]
+          properties:
+            id:
+              $ref: common.yaml#/schemas/Id
+            title:
+              $ref: '#/schemas/Title'
+      expectedVersion:
+        $ref: common.yaml#/schemas/Version
   Chore:
     type: object
-    required: [id, childId, title, points, days]
+    required: [id, childId, title, points, days, version]
     properties:
       id:
         $ref: common.yaml#/schemas/Id
@@ -203,6 +343,8 @@ schemas:
         type: integer
       days:
         $ref: '#/schemas/Days'
+      version:
+        $ref: common.yaml#/schemas/Version
   NewRoutine:
     type: object
     additionalProperties: false
@@ -224,7 +366,7 @@ schemas:
           $ref: '#/schemas/Title'
   Routine:
     type: object
-    required: [id, childId, title, points, days, steps]
+    required: [id, childId, title, points, days, steps, version]
     properties:
       id:
         $ref: common.yaml#/schemas/Id
@@ -246,3 +388,5 @@ schemas:
               $ref: common.yaml#/schemas/Id
             title:
               type: string
+      version:
+        $ref: common.yaml#/schemas/Version

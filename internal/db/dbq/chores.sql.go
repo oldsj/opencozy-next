@@ -124,7 +124,7 @@ func (q *Queries) CreateApproval(ctx context.Context, arg CreateApprovalParams) 
 }
 
 const createChore = `-- name: CreateChore :one
-INSERT INTO chore (household_id, child_id, title, points, days) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, child_id, title, points, days, archived_at, created_at
+INSERT INTO chore (household_id, child_id, title, points, days) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, child_id, title, points, days, archived_at, created_at, version
 `
 
 type CreateChoreParams struct {
@@ -153,12 +153,13 @@ func (q *Queries) CreateChore(ctx context.Context, arg CreateChoreParams) (Chore
 		&i.Days,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const createRoutine = `-- name: CreateRoutine :one
-INSERT INTO routine (household_id, child_id, title, points, days) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, child_id, title, points, days, archived_at, created_at
+INSERT INTO routine (household_id, child_id, title, points, days) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, child_id, title, points, days, archived_at, created_at, version
 `
 
 type CreateRoutineParams struct {
@@ -187,6 +188,7 @@ func (q *Queries) CreateRoutine(ctx context.Context, arg CreateRoutineParams) (R
 		&i.Days,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
@@ -218,6 +220,51 @@ func (q *Queries) CreateRoutineStep(ctx context.Context, arg CreateRoutineStepPa
 		&i.Position,
 	)
 	return i, err
+}
+
+const createRoutineStepWithID = `-- name: CreateRoutineStepWithID :one
+INSERT INTO routine_step (id, household_id, routine_id, title, position) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, routine_id, title, position
+`
+
+type CreateRoutineStepWithIDParams struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	RoutineID   uuid.UUID
+	Title       string
+	Position    int16
+}
+
+func (q *Queries) CreateRoutineStepWithID(ctx context.Context, arg CreateRoutineStepWithIDParams) (RoutineStep, error) {
+	row := q.db.QueryRow(ctx, createRoutineStepWithID,
+		arg.ID,
+		arg.HouseholdID,
+		arg.RoutineID,
+		arg.Title,
+		arg.Position,
+	)
+	var i RoutineStep
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.RoutineID,
+		&i.Title,
+		&i.Position,
+	)
+	return i, err
+}
+
+const deleteRoutineSteps = `-- name: DeleteRoutineSteps :exec
+DELETE FROM routine_step WHERE household_id = $1 AND routine_id = $2
+`
+
+type DeleteRoutineStepsParams struct {
+	HouseholdID uuid.UUID
+	RoutineID   uuid.UUID
+}
+
+func (q *Queries) DeleteRoutineSteps(ctx context.Context, arg DeleteRoutineStepsParams) error {
+	_, err := q.db.Exec(ctx, deleteRoutineSteps, arg.HouseholdID, arg.RoutineID)
+	return err
 }
 
 const earnedSince = `-- name: EarnedSince :many
@@ -286,7 +333,7 @@ func (q *Queries) EnsureOccurrence(ctx context.Context, arg EnsureOccurrencePara
 }
 
 const getLiveChore = `-- name: GetLiveChore :one
-SELECT id, household_id, child_id, title, points, days, archived_at, created_at FROM chore WHERE household_id = $1 AND id = $2 AND archived_at IS NULL
+SELECT id, household_id, child_id, title, points, days, archived_at, created_at, version FROM chore WHERE household_id = $1 AND id = $2 AND archived_at IS NULL
 `
 
 type GetLiveChoreParams struct {
@@ -306,12 +353,13 @@ func (q *Queries) GetLiveChore(ctx context.Context, arg GetLiveChoreParams) (Cho
 		&i.Days,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getLiveRoutine = `-- name: GetLiveRoutine :one
-SELECT id, household_id, child_id, title, points, days, archived_at, created_at FROM routine WHERE household_id = $1 AND id = $2 AND archived_at IS NULL
+SELECT id, household_id, child_id, title, points, days, archived_at, created_at, version FROM routine WHERE household_id = $1 AND id = $2 AND archived_at IS NULL
 `
 
 type GetLiveRoutineParams struct {
@@ -331,12 +379,13 @@ func (q *Queries) GetLiveRoutine(ctx context.Context, arg GetLiveRoutineParams) 
 		&i.Days,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listChores = `-- name: ListChores :many
-SELECT id, household_id, child_id, title, points, days, archived_at, created_at FROM chore WHERE household_id = $1 AND archived_at IS NULL ORDER BY created_at LIMIT 500
+SELECT id, household_id, child_id, title, points, days, archived_at, created_at, version FROM chore WHERE household_id = $1 AND archived_at IS NULL ORDER BY created_at LIMIT 500
 `
 
 func (q *Queries) ListChores(ctx context.Context, householdID uuid.UUID) ([]Chore, error) {
@@ -357,6 +406,7 @@ func (q *Queries) ListChores(ctx context.Context, householdID uuid.UUID) ([]Chor
 			&i.Days,
 			&i.ArchivedAt,
 			&i.CreatedAt,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -442,7 +492,7 @@ func (q *Queries) ListRoutineSteps(ctx context.Context, householdID uuid.UUID) (
 }
 
 const listRoutines = `-- name: ListRoutines :many
-SELECT id, household_id, child_id, title, points, days, archived_at, created_at FROM routine WHERE household_id = $1 AND archived_at IS NULL ORDER BY created_at LIMIT 200
+SELECT id, household_id, child_id, title, points, days, archived_at, created_at, version FROM routine WHERE household_id = $1 AND archived_at IS NULL ORDER BY created_at LIMIT 200
 `
 
 func (q *Queries) ListRoutines(ctx context.Context, householdID uuid.UUID) ([]Routine, error) {
@@ -463,6 +513,7 @@ func (q *Queries) ListRoutines(ctx context.Context, householdID uuid.UUID) ([]Ro
 			&i.Days,
 			&i.ArchivedAt,
 			&i.CreatedAt,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -537,6 +588,141 @@ func (q *Queries) LockOccurrence(ctx context.Context, arg LockOccurrenceParams) 
 	return i, err
 }
 
+const lockOpenOccurrence = `-- name: LockOpenOccurrence :one
+SELECT id, household_id, child_id, kind, definition_id, day, state, points, checked_steps, rejected_reason, updated_at FROM occurrence
+WHERE household_id = $1 AND definition_id = $2 AND day = $3 AND state = 'open'
+FOR UPDATE
+`
+
+type LockOpenOccurrenceParams struct {
+	HouseholdID  uuid.UUID
+	DefinitionID uuid.UUID
+	Day          pgtype.Date
+}
+
+// Today's occurrence of a definition, if it is still open: an edit moves it with the definition.
+func (q *Queries) LockOpenOccurrence(ctx context.Context, arg LockOpenOccurrenceParams) (Occurrence, error) {
+	row := q.db.QueryRow(ctx, lockOpenOccurrence, arg.HouseholdID, arg.DefinitionID, arg.Day)
+	var i Occurrence
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.ChildID,
+		&i.Kind,
+		&i.DefinitionID,
+		&i.Day,
+		&i.State,
+		&i.Points,
+		&i.CheckedSteps,
+		&i.RejectedReason,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const moveOccurrence = `-- name: MoveOccurrence :exec
+UPDATE occurrence SET child_id = $3, points = $4, checked_steps = $5, rejected_reason = $6, updated_at = clock_timestamp()
+WHERE household_id = $1 AND id = $2
+`
+
+type MoveOccurrenceParams struct {
+	HouseholdID    uuid.UUID
+	ID             uuid.UUID
+	ChildID        uuid.UUID
+	Points         int32
+	CheckedSteps   []uuid.UUID
+	RejectedReason *string
+}
+
+func (q *Queries) MoveOccurrence(ctx context.Context, arg MoveOccurrenceParams) error {
+	_, err := q.db.Exec(ctx, moveOccurrence,
+		arg.HouseholdID,
+		arg.ID,
+		arg.ChildID,
+		arg.Points,
+		arg.CheckedSteps,
+		arg.RejectedReason,
+	)
+	return err
+}
+
+const stepsOfRoutine = `-- name: StepsOfRoutine :many
+SELECT id, household_id, routine_id, title, position FROM routine_step WHERE household_id = $1 AND routine_id = $2 ORDER BY position
+`
+
+type StepsOfRoutineParams struct {
+	HouseholdID uuid.UUID
+	RoutineID   uuid.UUID
+}
+
+func (q *Queries) StepsOfRoutine(ctx context.Context, arg StepsOfRoutineParams) ([]RoutineStep, error) {
+	rows, err := q.db.Query(ctx, stepsOfRoutine, arg.HouseholdID, arg.RoutineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RoutineStep{}
+	for rows.Next() {
+		var i RoutineStep
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.RoutineID,
+			&i.Title,
+			&i.Position,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateChore = `-- name: UpdateChore :one
+UPDATE chore SET child_id = $3, title = $4, points = $5, days = $6, version = version + 1
+WHERE household_id = $1 AND id = $2 AND archived_at IS NULL AND version = $7
+RETURNING id, household_id, child_id, title, points, days, archived_at, created_at, version
+`
+
+type UpdateChoreParams struct {
+	HouseholdID     uuid.UUID
+	ID              uuid.UUID
+	ChildID         uuid.UUID
+	Title           string
+	Points          int32
+	Days            int16
+	ExpectedVersion int32
+}
+
+// Only when expectedVersion is still the current one; no row means it changed (or is gone).
+func (q *Queries) UpdateChore(ctx context.Context, arg UpdateChoreParams) (Chore, error) {
+	row := q.db.QueryRow(ctx, updateChore,
+		arg.HouseholdID,
+		arg.ID,
+		arg.ChildID,
+		arg.Title,
+		arg.Points,
+		arg.Days,
+		arg.ExpectedVersion,
+	)
+	var i Chore
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.ChildID,
+		&i.Title,
+		&i.Points,
+		&i.Days,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const updateOccurrence = `-- name: UpdateOccurrence :one
 UPDATE occurrence
 SET state = $3, checked_steps = $4, points = $5, rejected_reason = $6, updated_at = clock_timestamp()
@@ -575,6 +761,47 @@ func (q *Queries) UpdateOccurrence(ctx context.Context, arg UpdateOccurrencePara
 		&i.CheckedSteps,
 		&i.RejectedReason,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateRoutine = `-- name: UpdateRoutine :one
+UPDATE routine SET child_id = $3, title = $4, points = $5, days = $6, version = version + 1
+WHERE household_id = $1 AND id = $2 AND archived_at IS NULL AND version = $7
+RETURNING id, household_id, child_id, title, points, days, archived_at, created_at, version
+`
+
+type UpdateRoutineParams struct {
+	HouseholdID     uuid.UUID
+	ID              uuid.UUID
+	ChildID         uuid.UUID
+	Title           string
+	Points          int32
+	Days            int16
+	ExpectedVersion int32
+}
+
+func (q *Queries) UpdateRoutine(ctx context.Context, arg UpdateRoutineParams) (Routine, error) {
+	row := q.db.QueryRow(ctx, updateRoutine,
+		arg.HouseholdID,
+		arg.ID,
+		arg.ChildID,
+		arg.Title,
+		arg.Points,
+		arg.Days,
+		arg.ExpectedVersion,
+	)
+	var i Routine
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.ChildID,
+		&i.Title,
+		&i.Points,
+		&i.Days,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }

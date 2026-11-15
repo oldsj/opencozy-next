@@ -146,6 +146,7 @@ type Chore struct {
 	Days        int16
 	ArchivedAt  *time.Time
 	CreatedAt   time.Time
+	Version     int32
 }
 
 type CommandLog struct {
@@ -252,6 +253,7 @@ type Household struct {
 	ArchivedAt  *time.Time
 	CreatedAt   time.Time
 	LockMessage *string
+	Version     int32
 }
 
 type JobLease struct {
@@ -391,6 +393,9 @@ type Redemption struct {
 	State       string
 	LedgerID    *uuid.UUID
 	CreatedAt   time.Time
+	Version     int32
+	FulfilledAt *time.Time
+	CancelledAt *time.Time
 }
 
 type Reward struct {
@@ -403,6 +408,7 @@ type Reward struct {
 	Available   bool
 	ArchivedAt  *time.Time
 	CreatedAt   time.Time
+	Version     int32
 }
 
 type Routine struct {
@@ -414,6 +420,7 @@ type Routine struct {
 	Days        int16
 	ArchivedAt  *time.Time
 	CreatedAt   time.Time
+	Version     int32
 }
 
 type RoutineStep struct {

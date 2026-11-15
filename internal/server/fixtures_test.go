@@ -210,6 +210,7 @@ type house struct {
 	recipe                            uuid.UUID
 	entry                             uuid.UUID // an award of 5 points to child1
 	reward                            uuid.UUID // costs 3
+	redemption                        uuid.UUID // child1 bought the reward; approved, waiting to be given
 	calendar, event                   uuid.UUID // an ICS calendar shown on displays, with one event
 	passkey                           uuid.UUID // the adult's only passkey
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
@@ -302,6 +303,14 @@ func (e *env) house(label string, scopes []string) house {
 	e.exec(`INSERT INTO active_award (source_kind, source_id, household_id, ledger_id)
 		SELECT source_kind, source_id, household_id, id FROM point_ledger WHERE id = $1`, h.entry)
 	h.reward = e.id(`INSERT INTO reward (household_id, title, cost, kind) VALUES ($1, 'Choose a game', 3, 'item') RETURNING id`, h.id)
+	// Paid for by an award of its own, days ago, so child1's balance and today's earnings stay as
+	// the other tests expect.
+	e.exec(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id, created_at)
+		VALUES ($1, $2, 3, 'award', 'fixture', gen_random_uuid(), clock_timestamp() - interval '2 days')`, h.id, h.child1)
+	h.redemption = e.id(`INSERT INTO redemption (household_id, child_id, reward_id, title, cost, state) VALUES ($1, $2, $3, 'Choose a game', 3, 'approved') RETURNING id`, h.id, h.child1, h.reward)
+	spent := e.id(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id)
+		VALUES ($1, $2, -3, 'redemption', 'redemption', $3) RETURNING id`, h.id, h.child1, h.redemption)
+	e.exec(`UPDATE redemption SET ledger_id = $2 WHERE id = $1`, h.redemption, spent)
 	h.passkey = e.id(`INSERT INTO passkey (household_id, adult_id, credential_id, public_key, backup_eligible, backed_up, name) VALUES ($1, $2, decode(md5(random()::text) || md5(random()::text), 'hex'), '\\x00', true, true, 'Laptop') RETURNING id`, h.id, h.adult)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)
 

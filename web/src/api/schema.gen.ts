@@ -208,7 +208,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename the household or change its time zone (the household day follows it) */
+        patch: operations["updateHousehold"];
         trace?: never;
     };
     "/children": {
@@ -645,7 +646,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Edit a reward, or hide it from children */
+        put: operations["updateReward"];
         post?: never;
         /** Remove a reward from now on (history stays) */
         delete: operations["archiveReward"];
@@ -668,6 +670,57 @@ export interface paths {
          * @description The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once.
          */
         post: operations["redeemReward"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/redemptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rewards asked for, newest first (at most 200) */
+        get: operations["listRedemptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/redemptions/{redemptionId}/fulfil": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark an approved reward as given */
+        post: operations["fulfilRedemption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/redemptions/{redemptionId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel an approved reward, or the unused rest of given screen time, and give the points back */
+        post: operations["cancelRedemption"];
         delete?: never;
         options?: never;
         head?: never;
@@ -751,7 +804,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Edit a chore; a new child takes it from today (earned points stay) */
+        put: operations["updateChore"];
         post?: never;
         /** Remove a chore from now on (history stays) */
         delete: operations["archiveChore"];
@@ -786,7 +840,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Edit a routine and its steps; steps sent with their id keep it */
+        put: operations["updateRoutine"];
         post?: never;
         /** Remove a routine from now on (history stays) */
         delete: operations["archiveRoutine"];
@@ -1142,6 +1197,8 @@ export interface components {
         };
         /** Format: uuid */
         Id: string;
+        /** @description Counts saves; send it back as expectedVersion to save over exactly this one */
+        Version: number;
         Household: {
             id: components["schemas"]["Id"];
             name: string;
@@ -1150,6 +1207,7 @@ export interface components {
              * @example Europe/Amsterdam
              */
             timeZone: string;
+            version: components["schemas"]["Version"];
         };
         Me: {
             adult: {
@@ -1383,6 +1441,7 @@ export interface components {
             kind: "item" | "screen_time";
             minutes?: number;
             available: boolean;
+            version: components["schemas"]["Version"];
         };
         Rewards: {
             rewards: components["schemas"]["Reward"][];
@@ -1396,10 +1455,48 @@ export interface components {
             /** @description Required for screen_time, refused otherwise */
             minutes?: number;
         };
+        RewardEdit: {
+            title: components["schemas"]["Title"];
+            cost: number;
+            /** @enum {string} */
+            kind: "item" | "screen_time";
+            /** @description Required for screen_time, refused otherwise */
+            minutes?: number;
+            /** @description false hides it from children */
+            available: boolean;
+            expectedVersion: components["schemas"]["Version"];
+        };
+        /** @enum {string} */
+        RedemptionStatus: "pending" | "approved" | "fulfilled" | "rejected" | "cancelled";
         Redemption: {
             id: components["schemas"]["Id"];
-            /** @enum {string} */
-            status: "pending" | "approved" | "rejected";
+            status: components["schemas"]["RedemptionStatus"];
+        };
+        RedemptionChild: {
+            id: components["schemas"]["Id"];
+            name: string;
+            color: components["schemas"]["ProfileColor"];
+        };
+        /** @description A redemption as an adult sees it. approved is waiting to be given; fulfilled has been given. */
+        RedemptionRow: {
+            id: components["schemas"]["Id"];
+            child: components["schemas"]["RedemptionChild"];
+            title: string;
+            cost: number;
+            status: components["schemas"]["RedemptionStatus"];
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            fulfilledAt?: string;
+            /** Format: date-time */
+            cancelledAt?: string;
+            /** @description Screen time bought */
+            minutes?: number;
+            /** @description Screen time used so far (from slice 8; absent until then) */
+            usedMinutes?: number;
+            /** @description Points given back (a rejection or a cancellation) */
+            refundedPoints: number;
+            version: components["schemas"]["Version"];
         };
         InboxItem: {
             id: components["schemas"]["Id"];
@@ -1433,6 +1530,7 @@ export interface components {
             title: string;
             points: number;
             days: components["schemas"]["Days"];
+            version: components["schemas"]["Version"];
         };
         Points: number;
         NewChore: {
@@ -1440,6 +1538,13 @@ export interface components {
             title: components["schemas"]["Title"];
             points: components["schemas"]["Points"];
             days?: components["schemas"]["Days"];
+        };
+        ChoreEdit: {
+            childId: components["schemas"]["Id"];
+            title: components["schemas"]["Title"];
+            points: components["schemas"]["Points"];
+            days: components["schemas"]["Days"];
+            expectedVersion: components["schemas"]["Version"];
         };
         Routine: {
             id: components["schemas"]["Id"];
@@ -1451,6 +1556,7 @@ export interface components {
                 id: components["schemas"]["Id"];
                 title: string;
             }[];
+            version: components["schemas"]["Version"];
         };
         NewRoutine: {
             childId: components["schemas"]["Id"];
@@ -1458,6 +1564,18 @@ export interface components {
             points: components["schemas"]["Points"];
             days?: components["schemas"]["Days"];
             steps: components["schemas"]["Title"][];
+        };
+        RoutineEdit: {
+            childId: components["schemas"]["Id"];
+            title: components["schemas"]["Title"];
+            points: components["schemas"]["Points"];
+            days: components["schemas"]["Days"];
+            /** @description In order. A step with the id of one of this routine's steps keeps it (a tick today stays); one without is new; any left out are removed. */
+            steps: {
+                id?: components["schemas"]["Id"];
+                title: components["schemas"]["Title"];
+            }[];
+            expectedVersion: components["schemas"]["Version"];
         };
         /** @enum {string} */
         MealSlot: "breakfast" | "lunch" | "dinner";
@@ -2147,6 +2265,63 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateHousehold: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "The Rivera household",
+                 *       "timeZone": "America/New_York",
+                 *       "expectedVersion": 2
+                 *     }
+                 */
+                "application/json": {
+                    name?: string;
+                    /** @description An IANA zone name (`time_zone_unknown` otherwise) */
+                    timeZone?: string;
+                    expectedVersion: components["schemas"]["Version"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Household"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description `version_conflict`: it changed since `expectedVersion` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };
@@ -3141,6 +3316,64 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    updateReward: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                rewardId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "title": "30 min of iPad",
+                 *       "cost": 20,
+                 *       "kind": "screen_time",
+                 *       "minutes": 30,
+                 *       "available": true,
+                 *       "expectedVersion": 1
+                 *     }
+                 */
+                "application/json": components["schemas"]["RewardEdit"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reward"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `version_conflict`: it changed since `expectedVersion`; fetch it again */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
     archiveReward: {
         parameters: {
             query?: never;
@@ -3215,6 +3448,144 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listRedemptions: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["RedemptionStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The redemptions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        redemptions: components["schemas"]["RedemptionRow"][];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    fulfilRedemption: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                redemptionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "expectedVersion": 2
+                 *     }
+                 */
+                "application/json": {
+                    expectedVersion: components["schemas"]["Version"];
+                };
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedemptionRow"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `version_conflict`, or `not_approved` (only an approved reward is given) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    cancelRedemption: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                redemptionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "expectedVersion": 2,
+                 *       "reason": "Changed our plans"
+                 *     }
+                 */
+                "application/json": {
+                    expectedVersion: components["schemas"]["Version"];
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedemptionRow"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `version_conflict`; `not_cancellable` (pending, rejected, cancelled, or a given item); `already_used` (all of the screen time was used) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Error"];
         };
     };
@@ -3398,6 +3769,63 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    updateChore: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                choreId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "childId": "0190f0e0-0000-7000-8000-000000000001",
+                 *       "title": "Feed the cat",
+                 *       "points": 4,
+                 *       "days": [],
+                 *       "expectedVersion": 3
+                 *     }
+                 */
+                "application/json": components["schemas"]["ChoreEdit"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Chore"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `version_conflict`: it changed since `expectedVersion`; fetch it again */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
     archiveChore: {
         parameters: {
             query?: never;
@@ -3492,6 +3920,72 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateRoutine: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                routineId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "childId": "0190f0e0-0000-7000-8000-000000000001",
+                 *       "title": "Morning",
+                 *       "points": 3,
+                 *       "days": [],
+                 *       "steps": [
+                 *         {
+                 *           "id": "0190f0e0-0000-7000-8000-000000000010",
+                 *           "title": "Make the bed"
+                 *         },
+                 *         {
+                 *           "title": "Brush teeth"
+                 *         }
+                 *       ],
+                 *       "expectedVersion": 4
+                 *     }
+                 */
+                "application/json": components["schemas"]["RoutineEdit"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Routine"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `version_conflict`: it changed since `expectedVersion`; fetch it again */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             413: components["responses"]["TooLarge"];
             422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];

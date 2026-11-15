@@ -883,7 +883,7 @@ func TestRewards(t *testing.T) {
 		t.Fatalf("redeem without the points: %d %s", r.status, r.raw)
 	}
 	var reds int
-	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM redemption WHERE household_id = $1`, h.id).Scan(&reds); err != nil || reds != 1 {
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM redemption WHERE household_id = $1 AND id <> $2`, h.id, h.redemption).Scan(&reds); err != nil || reds != 1 {
 		t.Fatalf("redemptions after a refusal: %d %v", reds, err)
 	}
 

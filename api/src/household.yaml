@@ -19,11 +19,68 @@ household:
         $ref: common.yaml#/responses/Forbidden
       default:
         $ref: common.yaml#/responses/Error
+  patch:
+    operationId: updateHousehold
+    summary: Rename the household or change its time zone (the household day follows it)
+    tags: [household]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            minProperties: 2
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 80
+                pattern: \S
+              timeZone:
+                type: string
+                minLength: 1
+                maxLength: 64
+                description: An IANA zone name (`time_zone_unknown` otherwise)
+              expectedVersion:
+                $ref: common.yaml#/schemas/Version
+          example: { name: The Rivera household, timeZone: America/New_York, expectedVersion: 2 }
+    responses:
+      '200':
+        description: Saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Household'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '409':
+        description: '`version_conflict`: it changed since `expectedVersion`'
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
 
 schemas:
   Household:
     type: object
-    required: [id, name, timeZone]
+    required: [id, name, timeZone, version]
     properties:
       id:
         $ref: common.yaml#/schemas/Id
@@ -33,3 +90,5 @@ schemas:
         type: string
         description: IANA zone name; the household day follows it
         examples: [Europe/Amsterdam]
+      version:
+        $ref: common.yaml#/schemas/Version

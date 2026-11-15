@@ -13,11 +13,11 @@ import (
 )
 
 func toChore(c dbq.Chore) api.Chore {
-	return api.Chore{Id: c.ID, ChildId: c.ChildID, Title: c.Title, Points: int(c.Points), Days: daysList(c.Days)}
+	return api.Chore{Id: c.ID, ChildId: c.ChildID, Title: c.Title, Points: int(c.Points), Days: daysList(c.Days), Version: int(c.Version)}
 }
 
 func toRoutine(r dbq.Routine, steps []dbq.RoutineStep) api.Routine {
-	out := api.Routine{Id: r.ID, ChildId: r.ChildID, Title: r.Title, Points: int(r.Points), Days: daysList(r.Days)}
+	out := api.Routine{Id: r.ID, ChildId: r.ChildID, Title: r.Title, Points: int(r.Points), Days: daysList(r.Days), Version: int(r.Version)}
 	out.Steps = make([]struct {
 		Id    api.Id `json:"id"`
 		Title string `json:"title"`

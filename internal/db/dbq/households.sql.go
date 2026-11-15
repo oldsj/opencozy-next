@@ -64,7 +64,7 @@ func (q *Queries) CreateAdult(ctx context.Context, arg CreateAdultParams) (Adult
 }
 
 const createHousehold = `-- name: CreateHousehold :one
-INSERT INTO household (name, time_zone) VALUES ($1, $2) RETURNING id, name, time_zone, archived_at, created_at, lock_message
+INSERT INTO household (name, time_zone) VALUES ($1, $2) RETURNING id, name, time_zone, archived_at, created_at, lock_message, version
 `
 
 type CreateHouseholdParams struct {
@@ -82,6 +82,7 @@ func (q *Queries) CreateHousehold(ctx context.Context, arg CreateHouseholdParams
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.LockMessage,
+		&i.Version,
 	)
 	return i, err
 }
@@ -136,7 +137,7 @@ func (q *Queries) GetAdultByEmail(ctx context.Context, email string) (Adult, err
 }
 
 const getHousehold = `-- name: GetHousehold :one
-SELECT id, name, time_zone, archived_at, created_at, lock_message FROM household WHERE id = $1
+SELECT id, name, time_zone, archived_at, created_at, lock_message, version FROM household WHERE id = $1
 `
 
 func (q *Queries) GetHousehold(ctx context.Context, id uuid.UUID) (Household, error) {
@@ -149,12 +150,13 @@ func (q *Queries) GetHousehold(ctx context.Context, id uuid.UUID) (Household, er
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.LockMessage,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listHouseholds = `-- name: ListHouseholds :many
-SELECT id, name, time_zone, archived_at, created_at, lock_message FROM household ORDER BY created_at LIMIT 100
+SELECT id, name, time_zone, archived_at, created_at, lock_message, version FROM household ORDER BY created_at LIMIT 100
 `
 
 func (q *Queries) ListHouseholds(ctx context.Context) ([]Household, error) {
@@ -173,6 +175,7 @@ func (q *Queries) ListHouseholds(ctx context.Context) ([]Household, error) {
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.LockMessage,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -204,4 +207,37 @@ func (q *Queries) SetAdultPassword(ctx context.Context, arg SetAdultPasswordPara
 		arg.PasswordScheme,
 	)
 	return err
+}
+
+const updateHousehold = `-- name: UpdateHousehold :one
+UPDATE household SET name = $2, time_zone = $3, version = version + 1
+WHERE id = $1 AND version = $4
+RETURNING id, name, time_zone, archived_at, created_at, lock_message, version
+`
+
+type UpdateHouseholdParams struct {
+	ID              uuid.UUID
+	Name            string
+	TimeZone        string
+	ExpectedVersion int32
+}
+
+func (q *Queries) UpdateHousehold(ctx context.Context, arg UpdateHouseholdParams) (Household, error) {
+	row := q.db.QueryRow(ctx, updateHousehold,
+		arg.ID,
+		arg.Name,
+		arg.TimeZone,
+		arg.ExpectedVersion,
+	)
+	var i Household
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.TimeZone,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.LockMessage,
+		&i.Version,
+	)
+	return i, err
 }
