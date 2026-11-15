@@ -57,7 +57,15 @@ func importCalendars(ctx context.Context, x *run) error {
 		return safe(err)
 	}
 	carried := map[uuid.UUID]bool{}
-	var n, google int64
+	// A household can't have the same link twice. The old app could (two spellings of one
+	// address): the first is carried and the others are left out, since its events are theirs.
+	type householdLink struct {
+		household uuid.UUID
+		link      string
+	}
+	seen := map[householdLink]bool{}
+	duplicate := map[uuid.UUID]bool{}
+	var n, google, dupes int64
 	colorIndex := map[uuid.UUID]int{}
 	for _, s := range all {
 		if s.provider != "ics" || s.feedURL == nil {
@@ -72,6 +80,12 @@ func importCalendars(ctx context.Context, x *run) error {
 		if err != nil {
 			return fmt.Errorf("import: calendar source %s has a link the app would not accept", s.id)
 		}
+		if seen[householdLink{s.household, link}] {
+			duplicate[s.id] = true
+			dupes++
+			continue
+		}
+		seen[householdLink{s.household, link}] = true
 		sealed, mac, err := calendar.SealFeedURL(x.keys, s.household, s.id, link)
 		if err != nil {
 			return err
@@ -80,13 +94,19 @@ func importCalendars(ctx context.Context, x *run) error {
 		colorIndex[s.household]++
 		if _, err := x.dst.Exec(ctx, `INSERT INTO calendar_source (household_id, id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at)
 			VALUES ($1, $2, 'ics', $3, $4, $5, $6, $7, $8, $9)`, s.household, s.id, s.name, color, s.show, sealed, mac, s.version, s.created); err != nil {
-			return fmt.Errorf("import: calendar source %s: %w (two old links that are the same calendar?)", s.id, safe(err))
+			return fmt.Errorf("import: calendar source %s: %w", s.id, safe(err))
 		}
 		carried[s.id] = true
 		n++
 	}
 	if err := reconcileKind(ctx, x, "calendar_source", n, "calendar_source", google, "Google calendars wait on the Google slice"); err != nil {
 		return err
+	}
+	if dupes > 0 {
+		x.r.note("calendar_source", fmt.Sprintf("%d left out: the same link as another calendar of the household (sign-off: check which name to keep)", dupes))
+	}
+	if n > 0 {
+		x.r.note("calendar_source", "colours assigned in turn; the old app had none (sign-off)")
 	}
 
 	// Series of carried sources.
@@ -116,8 +136,14 @@ func importCalendars(ctx context.Context, x *run) error {
 		return safe(err)
 	}
 	seriesCarried := map[uuid.UUID]bool{}
-	var ns, waiting int64
+	seriesOfDuplicate := map[uuid.UUID]bool{}
+	var ns, waiting, dupSeries int64
 	for _, s := range allSeries {
+		if duplicate[s.source] {
+			seriesOfDuplicate[s.id] = true
+			dupSeries++
+			continue
+		}
 		if !carried[s.source] {
 			waiting++
 			continue
@@ -131,6 +157,9 @@ func importCalendars(ctx context.Context, x *run) error {
 	}
 	if err := reconcileKind(ctx, x, "calendar_series", ns, "calendar_series", waiting, "series of Google calendars wait with them"); err != nil {
 		return err
+	}
+	if dupSeries > 0 {
+		x.r.note("calendar_series", fmt.Sprintf("%d left out with their duplicate links", dupSeries))
 	}
 
 	// Active assignments of carried series: the series' own (no occurrence key) or one
@@ -159,9 +188,12 @@ func importCalendars(ctx context.Context, x *run) error {
 		return safe(err)
 	}
 	assignCarried := map[uuid.UUID]bool{}
-	var na, inactive, assignWaiting int64
+	var na, inactive, assignWaiting, assignDup int64
 	for _, a := range allAssignments {
 		switch {
+		case seriesOfDuplicate[a.series]:
+			assignDup++
+			continue
 		case !seriesCarried[a.series]:
 			assignWaiting++
 			continue
@@ -189,9 +221,12 @@ func importCalendars(ctx context.Context, x *run) error {
 		return err
 	}
 	x.r.table("calendar_assignment", src, "calendar_assignment", na, got)
-	x.r.check("calendar_assignment rows read", src, na+inactive+assignWaiting)
+	x.r.check("calendar_assignment rows read", src, na+inactive+assignWaiting+assignDup)
 	if inactive > 0 {
 		x.r.note("calendar_assignment", fmt.Sprintf("%d cleared ones left out (the old app ignored them)", inactive))
+	}
+	if assignDup > 0 {
+		x.r.note("calendar_assignment", fmt.Sprintf("%d left out with their duplicate links (sign-off: who those events were for)", assignDup))
 	}
 	if assignWaiting > 0 {
 		x.r.pending("calendar_assignment", fmt.Sprintf("%d wait with their Google calendars", assignWaiting))
@@ -230,7 +265,7 @@ func importCalendars(ctx context.Context, x *run) error {
 		return err
 	}
 	if dropped > 0 {
-		x.r.note("calendar_assignment_person", fmt.Sprintf("%d rows of cleared assignments left out", dropped))
+		x.r.note("calendar_assignment_person", fmt.Sprintf("%d rows of assignments left out", dropped))
 	}
 	return nil
 }
