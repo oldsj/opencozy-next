@@ -184,6 +184,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/display/pairings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A wall display asks to be paired
+         * @description Returns a code for the display to show, and sets a pairing cookie that only this display
+         *     holds. An adult enters the code (createDisplay); the display then claims its session
+         *     (claimDisplayPairing). The code lasts 10 minutes.
+         */
+        post: operations["startDisplayPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/display/pairings/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A wall display collects its session once an adult has entered its code */
+        post: operations["claimDisplayPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/displays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's paired wall displays */
+        get: operations["listDisplays"];
+        put?: never;
+        /**
+         * Pair the wall display showing this code
+         * @description Needs a sign-in within the last 10 minutes.
+         */
+        post: operations["createDisplay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/displays/{displayId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unpair a wall display; it stops working at once */
+        delete: operations["revokeDisplay"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/live": {
         parameters: {
             query?: never;
@@ -272,6 +349,35 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             expiresAt?: string;
+        };
+        Pairing: {
+            /**
+             * @description Six letters and digits, without 0, O, 1, I or L
+             * @example K7MXQ2
+             */
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        /** @enum {string} */
+        DisplayScope: "today" | "tv" | "calendar" | "meals" | "dashboard";
+        Display: {
+            id: components["schemas"]["Id"];
+            name: string;
+            scopes: components["schemas"]["DisplayScope"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        PairingWait: {
+            /** @enum {string} */
+            status: "waiting";
+        };
+        NewDisplay: {
+            code: string;
+            name: string;
+            scopes: components["schemas"]["DisplayScope"][];
         };
     };
     responses: {
@@ -799,6 +905,172 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    startDisplayPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pairing code to show */
+            201: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSession"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pairing"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            /** @description Too many pairings are open; try again in a few minutes */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    claimDisplayPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                /** @description Set by startDisplayPairing */
+                "__Host-display-pairing"?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paired. The display cookie is set. */
+            200: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSession"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Display"];
+                };
+            };
+            /** @description Not yet; ask again in a few seconds */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingWait"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDisplays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The displays */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Display"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createDisplay: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "code": "K7MXQ2",
+                 *       "name": "Kitchen",
+                 *       "scopes": [
+                 *         "today"
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewDisplay"];
+            };
+        };
+        responses: {
+            /** @description Paired; the display picks up its session within seconds */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Display"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    revokeDisplay: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                displayId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unpaired */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };

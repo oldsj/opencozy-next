@@ -42,6 +42,48 @@ func (e CredentialKind) Valid() bool {
 	}
 }
 
+// Defines values for DisplayScope.
+const (
+	Calendar  DisplayScope = "calendar"
+	Dashboard DisplayScope = "dashboard"
+	Meals     DisplayScope = "meals"
+	Today     DisplayScope = "today"
+	Tv        DisplayScope = "tv"
+)
+
+// Valid indicates whether the value is a known member of the DisplayScope enum.
+func (e DisplayScope) Valid() bool {
+	switch e {
+	case Calendar:
+		return true
+	case Dashboard:
+		return true
+	case Meals:
+		return true
+	case Today:
+		return true
+	case Tv:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PairingWaitStatus.
+const (
+	Waiting PairingWaitStatus = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the PairingWaitStatus enum.
+func (e PairingWaitStatus) Valid() bool {
+	switch e {
+	case Waiting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateCredentialJSONBodyKind.
 const (
 	CreateCredentialJSONBodyKindAssistant CreateCredentialJSONBodyKind = "assistant"
@@ -92,6 +134,18 @@ type Credentials struct {
 	Password string              `json:"password"`
 }
 
+// Display defines model for Display.
+type Display struct {
+	CreatedAt time.Time      `json:"createdAt"`
+	ExpiresAt time.Time      `json:"expiresAt"`
+	Id        Id             `json:"id"`
+	Name      string         `json:"name"`
+	Scopes    []DisplayScope `json:"scopes"`
+}
+
+// DisplayScope defines model for DisplayScope.
+type DisplayScope string
+
 // Error defines model for Error.
 type Error struct {
 	Error ErrorDetail `json:"error"`
@@ -131,6 +185,30 @@ type Me struct {
 	} `json:"adult"`
 	Household Household `json:"household"`
 }
+
+// NewDisplay defines model for NewDisplay.
+type NewDisplay struct {
+	Code   string         `json:"code"`
+	Name   string         `json:"name"`
+	Scopes []DisplayScope `json:"scopes"`
+}
+
+// Pairing defines model for Pairing.
+type Pairing struct {
+	// Code Six letters and digits, without 0, O, 1, I or L
+	//
+	// Examples: K7MXQ2
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// PairingWait defines model for PairingWait.
+type PairingWait struct {
+	Status PairingWaitStatus `json:"status"`
+}
+
+// PairingWaitStatus defines model for PairingWait.Status.
+type PairingWaitStatus string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
@@ -221,6 +299,26 @@ type RevokeCredentialParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ClaimDisplayPairingParams defines parameters for ClaimDisplayPairing.
+type ClaimDisplayPairingParams struct {
+	// UnderscoreUnderscoreHostDisplayPairing Set by startDisplayPairing
+	UnderscoreUnderscoreHostDisplayPairing *string `form:"__Host-display-pairing,omitempty" json:"__Host-display-pairing,omitempty"`
+}
+
+// CreateDisplayParams defines parameters for CreateDisplay.
+type CreateDisplayParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RevokeDisplayParams defines parameters for RevokeDisplay.
+type RevokeDisplayParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ConfirmSignInJSONRequestBody defines body for ConfirmSignIn for application/json ContentType.
 type ConfirmSignInJSONRequestBody ConfirmSignInJSONBody
 
@@ -235,6 +333,9 @@ type UpdateChildJSONRequestBody UpdateChildJSONBody
 
 // CreateCredentialJSONRequestBody defines body for CreateCredential for application/json ContentType.
 type CreateCredentialJSONRequestBody CreateCredentialJSONBody
+
+// CreateDisplayJSONRequestBody defines body for CreateDisplay for application/json ContentType.
+type CreateDisplayJSONRequestBody = NewDisplay
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -274,6 +375,21 @@ type ServerInterface interface {
 	// RevokeCredential Revoke a credential; it stops working at once
 	// (DELETE /credentials/{credentialId})
 	RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id, params RevokeCredentialParams)
+	// StartDisplayPairing A wall display asks to be paired
+	// (POST /display/pairings)
+	StartDisplayPairing(w http.ResponseWriter, r *http.Request)
+	// ClaimDisplayPairing A wall display collects its session once an adult has entered its code
+	// (POST /display/pairings/claim)
+	ClaimDisplayPairing(w http.ResponseWriter, r *http.Request, params ClaimDisplayPairingParams)
+	// ListDisplays The household's paired wall displays
+	// (GET /displays)
+	ListDisplays(w http.ResponseWriter, r *http.Request)
+	// CreateDisplay Pair the wall display showing this code
+	// (POST /displays)
+	CreateDisplay(w http.ResponseWriter, r *http.Request, params CreateDisplayParams)
+	// RevokeDisplay Unpair a wall display; it stops working at once
+	// (DELETE /displays/{displayId})
+	RevokeDisplay(w http.ResponseWriter, r *http.Request, displayId Id, params RevokeDisplayParams)
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(w http.ResponseWriter, r *http.Request)
@@ -632,6 +748,168 @@ func (siw *ServerInterfaceWrapper) RevokeCredential(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// StartDisplayPairing operation middleware
+func (siw *ServerInterfaceWrapper) StartDisplayPairing(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartDisplayPairing(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClaimDisplayPairing operation middleware
+func (siw *ServerInterfaceWrapper) ClaimDisplayPairing(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ClaimDisplayPairingParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("__Host-display-pairing"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "__Host-display-pairing", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "__Host-display-pairing", Err: err})
+				return
+			}
+			params.UnderscoreUnderscoreHostDisplayPairing = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClaimDisplayPairing(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDisplays operation middleware
+func (siw *ServerInterfaceWrapper) ListDisplays(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDisplays(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDisplay operation middleware
+func (siw *ServerInterfaceWrapper) CreateDisplay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateDisplayParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDisplay(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeDisplay operation middleware
+func (siw *ServerInterfaceWrapper) RevokeDisplay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "displayId" -------------
+	var displayId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "displayId", r.PathValue("displayId"), &displayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "displayId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeDisplayParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeDisplay(w, r, displayId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHousehold operation middleware
 func (siw *ServerInterfaceWrapper) GetHousehold(w http.ResponseWriter, r *http.Request) {
 
@@ -793,6 +1071,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/credentials", wrapper.CreateCredential)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/credentials/{credentialId}", wrapper.RevokeCredential)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/credential", wrapper.GetOwnCredential)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/display/pairings", wrapper.StartDisplayPairing)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/display/pairings/claim", wrapper.ClaimDisplayPairing)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/displays", wrapper.ListDisplays)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/displays", wrapper.CreateDisplay)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/displays/{displayId}", wrapper.RevokeDisplay)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/live", wrapper.OpenLive)
 
 	return m
@@ -1876,6 +2159,429 @@ func (response RevokeCredentialdefaultJSONResponse) VisitRevokeCredentialRespons
 	return err
 }
 
+type StartDisplayPairingRequestObject struct {
+}
+
+type StartDisplayPairingResponseObject interface {
+	VisitStartDisplayPairingResponse(w http.ResponseWriter) error
+}
+
+type StartDisplayPairing201ResponseHeaders struct {
+	SetCookie *string
+}
+
+type StartDisplayPairing201JSONResponse struct {
+	Body    Pairing
+	Headers StartDisplayPairing201ResponseHeaders
+}
+
+func (response StartDisplayPairing201JSONResponse) VisitStartDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDisplayPairing429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response StartDisplayPairing429JSONResponse) VisitStartDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDisplayPairing503JSONResponse Error
+
+func (response StartDisplayPairing503JSONResponse) VisitStartDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartDisplayPairingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response StartDisplayPairingdefaultJSONResponse) VisitStartDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClaimDisplayPairingRequestObject struct {
+	Params ClaimDisplayPairingParams
+}
+
+type ClaimDisplayPairingResponseObject interface {
+	VisitClaimDisplayPairingResponse(w http.ResponseWriter) error
+}
+
+type ClaimDisplayPairing200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type ClaimDisplayPairing200JSONResponse struct {
+	Body    Display
+	Headers ClaimDisplayPairing200ResponseHeaders
+}
+
+func (response ClaimDisplayPairing200JSONResponse) VisitClaimDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClaimDisplayPairing202JSONResponse PairingWait
+
+func (response ClaimDisplayPairing202JSONResponse) VisitClaimDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClaimDisplayPairing404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ClaimDisplayPairing404JSONResponse) VisitClaimDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClaimDisplayPairing429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response ClaimDisplayPairing429JSONResponse) VisitClaimDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClaimDisplayPairingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ClaimDisplayPairingdefaultJSONResponse) VisitClaimDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDisplaysRequestObject struct {
+}
+
+type ListDisplaysResponseObject interface {
+	VisitListDisplaysResponse(w http.ResponseWriter) error
+}
+
+type ListDisplays200JSONResponse []Display
+
+func (response ListDisplays200JSONResponse) VisitListDisplaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDisplays401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListDisplays401JSONResponse) VisitListDisplaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDisplaysdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDisplaysdefaultJSONResponse) VisitListDisplaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplayRequestObject struct {
+	Params CreateDisplayParams
+	Body   *CreateDisplayJSONRequestBody
+}
+
+type CreateDisplayResponseObject interface {
+	VisitCreateDisplayResponse(w http.ResponseWriter) error
+}
+
+type CreateDisplay201JSONResponse Display
+
+func (response CreateDisplay201JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplay400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateDisplay400JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplay401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateDisplay401JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplay403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateDisplay403JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplay404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateDisplay404JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplay413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response CreateDisplay413JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplay422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateDisplay422JSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateDisplaydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateDisplaydefaultJSONResponse) VisitCreateDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDisplayRequestObject struct {
+	DisplayId Id `json:"displayId"`
+	Params    RevokeDisplayParams
+}
+
+type RevokeDisplayResponseObject interface {
+	VisitRevokeDisplayResponse(w http.ResponseWriter) error
+}
+
+type RevokeDisplay204Response struct {
+}
+
+func (response RevokeDisplay204Response) VisitRevokeDisplayResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeDisplay401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RevokeDisplay401JSONResponse) VisitRevokeDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDisplay404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RevokeDisplay404JSONResponse) VisitRevokeDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDisplay422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RevokeDisplay422JSONResponse) VisitRevokeDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeDisplaydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RevokeDisplaydefaultJSONResponse) VisitRevokeDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHouseholdRequestObject struct {
 }
 
@@ -2054,6 +2760,21 @@ type StrictServerInterface interface {
 	// RevokeCredential Revoke a credential; it stops working at once
 	// (DELETE /credentials/{credentialId})
 	RevokeCredential(ctx context.Context, request RevokeCredentialRequestObject) (RevokeCredentialResponseObject, error)
+	// StartDisplayPairing A wall display asks to be paired
+	// (POST /display/pairings)
+	StartDisplayPairing(ctx context.Context, request StartDisplayPairingRequestObject) (StartDisplayPairingResponseObject, error)
+	// ClaimDisplayPairing A wall display collects its session once an adult has entered its code
+	// (POST /display/pairings/claim)
+	ClaimDisplayPairing(ctx context.Context, request ClaimDisplayPairingRequestObject) (ClaimDisplayPairingResponseObject, error)
+	// ListDisplays The household's paired wall displays
+	// (GET /displays)
+	ListDisplays(ctx context.Context, request ListDisplaysRequestObject) (ListDisplaysResponseObject, error)
+	// CreateDisplay Pair the wall display showing this code
+	// (POST /displays)
+	CreateDisplay(ctx context.Context, request CreateDisplayRequestObject) (CreateDisplayResponseObject, error)
+	// RevokeDisplay Unpair a wall display; it stops working at once
+	// (DELETE /displays/{displayId})
+	RevokeDisplay(ctx context.Context, request RevokeDisplayRequestObject) (RevokeDisplayResponseObject, error)
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(ctx context.Context, request GetHouseholdRequestObject) (GetHouseholdResponseObject, error)
@@ -2438,6 +3159,140 @@ func (sh *strictHandler) RevokeCredential(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// StartDisplayPairing operation middleware
+func (sh *strictHandler) StartDisplayPairing(w http.ResponseWriter, r *http.Request) {
+	var request StartDisplayPairingRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartDisplayPairing(ctx, request.(StartDisplayPairingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartDisplayPairing")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartDisplayPairingResponseObject); ok {
+		if err := validResponse.VisitStartDisplayPairingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ClaimDisplayPairing operation middleware
+func (sh *strictHandler) ClaimDisplayPairing(w http.ResponseWriter, r *http.Request, params ClaimDisplayPairingParams) {
+	var request ClaimDisplayPairingRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClaimDisplayPairing(ctx, request.(ClaimDisplayPairingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClaimDisplayPairing")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClaimDisplayPairingResponseObject); ok {
+		if err := validResponse.VisitClaimDisplayPairingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDisplays operation middleware
+func (sh *strictHandler) ListDisplays(w http.ResponseWriter, r *http.Request) {
+	var request ListDisplaysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDisplays(ctx, request.(ListDisplaysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDisplays")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDisplaysResponseObject); ok {
+		if err := validResponse.VisitListDisplaysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDisplay operation middleware
+func (sh *strictHandler) CreateDisplay(w http.ResponseWriter, r *http.Request, params CreateDisplayParams) {
+	var request CreateDisplayRequestObject
+
+	request.Params = params
+
+	var body CreateDisplayJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDisplay(ctx, request.(CreateDisplayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDisplay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDisplayResponseObject); ok {
+		if err := validResponse.VisitCreateDisplayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeDisplay operation middleware
+func (sh *strictHandler) RevokeDisplay(w http.ResponseWriter, r *http.Request, displayId Id, params RevokeDisplayParams) {
+	var request RevokeDisplayRequestObject
+
+	request.DisplayId = displayId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeDisplay(ctx, request.(RevokeDisplayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeDisplay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeDisplayResponseObject); ok {
+		if err := validResponse.VisitRevokeDisplayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHousehold operation middleware
 func (sh *strictHandler) GetHousehold(w http.ResponseWriter, r *http.Request) {
 	var request GetHouseholdRequestObject
@@ -2491,67 +3346,78 @@ func (sh *strictHandler) OpenLive(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"EoFmE2LM8nL5/wMA",
+	"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",
+	"57ZjoRZSkHGaJFAvQoi5fXv7fwMA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

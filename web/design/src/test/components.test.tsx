@@ -412,12 +412,14 @@ describe('slice one: Today and pairing', () => {
     expect(screen.getByRole('region', { name: 'Today by person' })).toBeInTheDocument();
   });
 
-  it('a code input takes exactly the code, with no autocomplete', () => {
+  it('a code input takes the code as the server reads it, with no autocomplete', () => {
     render(<CodeInput label="Family code" />);
     const input = screen.getByRole('textbox', { name: 'Family code' });
-    expect(input).toHaveAttribute('maxlength', '6');
     expect(input).toHaveAttribute('minlength', '6');
-    expect(input).toHaveAttribute('pattern', '[A-Za-z0-9]{6}');
+    // Browsers compile `pattern` anchored, with the v flag.
+    const pattern = new RegExp(`^(?:${input.getAttribute('pattern') ?? ''})$`, 'v');
+    for (const ok of ['K7Q2XM', 'k7q2xm', 'K7Q-2XM', 'K7Q 2XM']) expect(pattern.test(ok)).toBe(true);
+    for (const bad of ['K7Q2X', 'K7Q2XMM', 'K0Q2XM', 'KOQ2XM', 'K1Q2XM', 'KIQ2XM', 'KLQ2XM']) expect(pattern.test(bad)).toBe(false);
     expect(input).toHaveAttribute('autocomplete', 'off');
     expect(input).toHaveAttribute('spellcheck', 'false');
   });

@@ -87,6 +87,16 @@ type Display struct {
 	RevokedAt   *time.Time
 }
 
+type DisplayPairing struct {
+	ID          uuid.UUID
+	ClaimHash   []byte
+	CodeHash    []byte
+	HouseholdID *uuid.UUID
+	DisplayID   *uuid.UUID
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+}
+
 type Household struct {
 	ID         uuid.UUID
 	Name       string

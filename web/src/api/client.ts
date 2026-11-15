@@ -35,3 +35,11 @@ export const meQuery = queryOptions({
   },
   staleTime: 60_000,
 });
+
+export type Display = components['schemas']['Display'];
+export type DisplayScope = components['schemas']['DisplayScope'];
+
+// A fresh Idempotency-Key for one change. Reuse the same key when retrying that change.
+export function idempotencyKey(): { header: { 'Idempotency-Key': string } } {
+  return { header: { 'Idempotency-Key': crypto.randomUUID() } };
+}

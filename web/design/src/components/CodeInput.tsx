@@ -11,6 +11,16 @@ export interface CodeInputProps extends Omit<InputProps, 'type' | 'maxLength' | 
  * A one-time code (display pairing): large, spaced, letters and digits, no autocomplete, spelling
  * or autocorrect. Pair it with a sentence saying where the code comes from and when it expires.
  */
+/**
+ * Pairing codes use letters and digits without 0, O, 1, I or L. The server ignores case, spaces
+ * and dashes, so the field accepts "k7q-2xm" as well as "K7Q2XM".
+ */
+const CODE_CHAR = '[A-HJKMNP-Za-hjkmnp-z2-9]';
+
+function codePattern(length: number): string {
+  return `[ \\-]*(?:${CODE_CHAR}[ \\-]*){${String(length)}}`;
+}
+
 export function CodeInput({ className, length = 6, ...props }: CodeInputProps) {
   return (
     <Input
@@ -22,9 +32,9 @@ export function CodeInput({ className, length = 6, ...props }: CodeInputProps) {
       enterKeyHint="go"
       {...props}
       type="text"
-      maxLength={length}
+      maxLength={length * 2}
       minLength={length}
-      pattern={`[A-Za-z0-9]{${String(length)}}`}
+      pattern={codePattern(length)}
       className={cx('oc-input--code', className)}
     />
   );

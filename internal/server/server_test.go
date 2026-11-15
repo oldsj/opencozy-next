@@ -421,3 +421,115 @@ func TestRevokedWhileWaiting(t *testing.T) {
 		t.Fatalf("children named Waiting: %d %v", n, err)
 	}
 }
+
+// A wall display asks for a code, an adult enters it, and the display collects its session.
+func TestDisplayPairing(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	none := cred{}
+
+	start := e.send(none, "POST", "/api/display/pairings", nil)
+	if start.status != 201 {
+		t.Fatalf("start: %d %s", start.status, start.raw)
+	}
+	code := start.body["code"].(string)
+	var pairing *http.Cookie
+	for _, c := range (&http.Response{Header: start.header}).Cookies() {
+		if c.Name == PairingCookie {
+			pairing = c
+		}
+	}
+	if pairing == nil || !pairing.HttpOnly || !pairing.Secure || pairing.MaxAge != 600 {
+		t.Fatalf("pairing cookie: %+v", pairing)
+	}
+	claimer := cred{cookie: &http.Cookie{Name: PairingCookie, Value: pairing.Value}}
+
+	if r := e.send(claimer, "POST", "/api/display/pairings/claim", nil); r.status != 202 {
+		t.Fatalf("claim before approval: %d %s", r.status, r.raw)
+	}
+	if r := e.send(none, "POST", "/api/display/pairings/claim", nil); r.status != 404 || r.code() != "pairing_expired" {
+		t.Fatalf("claim without the cookie: %d %s", r.status, r.raw)
+	}
+	pair := func(c cred, code string) resp {
+		return e.send(c, "POST", "/api/displays", map[string]any{"code": code, "name": "Kitchen", "scopes": []string{"today"}})
+	}
+	if r := pair(h.actors["adult"], "ZZZZZZ"); r.status != 404 || r.code() != "no_such_code" {
+		t.Fatalf("wrong code: %d %s", r.status, r.raw)
+	}
+	if r := pair(h.actors["adult-stale"], code); r.status != 403 || r.code() != "reauthentication_required" {
+		t.Fatalf("stale sign-in: %d %s", r.status, r.raw)
+	}
+	// Typed loosely: lower case, with spaces.
+	created := pair(h.actors["adult"], strings.ToLower(code[:3]+" "+code[3:]))
+	if created.status != 201 {
+		t.Fatalf("pair: %d %s", created.status, created.raw)
+	}
+	if r := pair(h.actors["adult"], code); r.status != 404 {
+		t.Fatalf("the code works twice: %d %s", r.status, r.raw)
+	}
+
+	claim := e.send(claimer, "POST", "/api/display/pairings/claim", nil)
+	if claim.status != 200 || claim.body["name"] != "Kitchen" {
+		t.Fatalf("claim: %d %s", claim.status, claim.raw)
+	}
+	var session *http.Cookie
+	for _, c := range (&http.Response{Header: claim.header}).Cookies() {
+		if c.Name == actor.DisplayCookie {
+			session = c
+		}
+	}
+	if session == nil || !session.HttpOnly || session.MaxAge < 300*24*3600 {
+		t.Fatalf("display cookie: %+v", session)
+	}
+	if r := e.send(claimer, "POST", "/api/display/pairings/claim", nil); r.status != 404 {
+		t.Fatalf("second claim: %d %s", r.status, r.raw)
+	}
+	display := cred{cookie: &http.Cookie{Name: actor.DisplayCookie, Value: session.Value}}
+	if r := e.send(display, "GET", "/api/household", nil); r.status != 200 || r.body["id"] != h.id.String() {
+		t.Fatalf("the display reads its household: %d %s", r.status, r.raw)
+	}
+
+	list := e.send(h.actors["adult"], "GET", "/api/displays", nil)
+	if !strings.Contains(string(list.raw), "Kitchen") {
+		t.Fatalf("list: %s", list.raw)
+	}
+	id := created.body["id"].(string)
+	if r := e.send(h.actors["adult"], "DELETE", "/api/displays/"+id, nil); r.status != 204 {
+		t.Fatalf("unpair: %d %s", r.status, r.raw)
+	}
+	if r := e.send(display, "GET", "/api/household", nil); r.status != 401 {
+		t.Fatalf("after unpairing: %d %s", r.status, r.raw)
+	}
+}
+
+// An expired code cannot be entered, and its display cannot claim.
+func TestDisplayPairingExpires(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	start := e.send(cred{}, "POST", "/api/display/pairings", nil)
+	e.exec(`UPDATE display_pairing SET expires_at = now() - interval '1 second'`)
+	if r := e.send(h.actors["adult"], "POST", "/api/displays", map[string]any{"code": start.body["code"], "name": "Hall", "scopes": []string{"today"}}); r.status != 404 {
+		t.Fatalf("expired code: %d %s", r.status, r.raw)
+	}
+}
+
+// A display polling for its pairing does not use up sign-in attempts from the same address.
+func TestPairingDoesNotStarveSignIn(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.AuthRatePerMinute = 2 })
+	start := e.send(cred{}, "POST", "/api/display/pairings", nil)
+	var claim cred
+	for _, c := range (&http.Response{Header: start.header}).Cookies() {
+		if c.Name == PairingCookie {
+			claim = cred{cookie: c}
+		}
+	}
+	for i := range 40 { // two minutes of polling at once
+		if r := e.send(claim, "POST", "/api/display/pairings/claim", nil); r.status != 202 {
+			t.Fatalf("poll %d: %d %s", i, r.status, r.raw)
+		}
+	}
+	bad := map[string]string{"email": "x@example.test", "password": "wrong password!!"}
+	if r := e.send(cred{}, "POST", "/api/auth/login", bad); r.status != 401 {
+		t.Fatalf("sign-in after polling: %d %s", r.status, r.raw)
+	}
+}
