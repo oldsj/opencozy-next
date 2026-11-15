@@ -1,0 +1,175 @@
+# Generate OpenCozy.xcodeproj with:  xcodegen generate   (run in ios/)
+# The generated project is gitignored; this file is the source of truth.
+name: OpenCozy
+options:
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+configFiles:
+  Debug: Config/OpenCozy.xcconfig
+  Release: Config/OpenCozy.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: "1,2"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "2"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  OpenCozy:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(OPENCOZY_BUNDLE_ID)
+        PRODUCT_NAME: OpenCozy
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: OpenCozy
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        OpenCozyAppGroup: $(OPENCOZY_APP_GROUP)
+        NSCameraUsageDescription: OpenCozy uses the camera to scan the pairing code shown in OpenCozy on another screen.
+        # Parent mode: silent pushes refresh the inbox and badge.
+        UIBackgroundModes:
+          - remote-notification
+    entitlements:
+      path: App/OpenCozy.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        # Parent mode push. Distribution signing rewrites this to production; the
+        # app reads the real value from its provisioning profile at runtime.
+        aps-environment: development
+        # Parent passkeys. ?mode=developer makes a development-signed build fetch the
+        # apple-app-site-association file straight from the (LAN-only) host instead
+        # of Apple's CDN; needs Developer Mode on the phone (see README).
+        com.apple.developer.associated-domains:
+          - webcredentials:$(OPENCOZY_WEB_HOST)?mode=developer
+        com.apple.security.application-groups:
+          - $(OPENCOZY_APP_GROUP)
+    dependencies:
+      - target: OpenCozyMonitor
+      - target: OpenCozyShieldConfiguration
+      - target: OpenCozyShieldAction
+
+  OpenCozyMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Monitor
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(OPENCOZY_BUNDLE_ID).monitor
+        PRODUCT_NAME: OpenCozyMonitor
+    info:
+      path: Monitor/Info.plist
+      properties:
+        CFBundleDisplayName: OpenCozy Monitor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        OpenCozyAppGroup: $(OPENCOZY_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension
+    entitlements:
+      path: Monitor/OpenCozyMonitor.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - $(OPENCOZY_APP_GROUP)
+
+  OpenCozyShieldConfiguration:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ShieldConfiguration
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(OPENCOZY_BUNDLE_ID).shield-configuration
+        PRODUCT_NAME: OpenCozyShieldConfiguration
+    info:
+      path: ShieldConfiguration/Info.plist
+      properties:
+        CFBundleDisplayName: OpenCozy Shield
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        OpenCozyAppGroup: $(OPENCOZY_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
+    entitlements:
+      path: ShieldConfiguration/OpenCozyShieldConfiguration.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - $(OPENCOZY_APP_GROUP)
+
+  OpenCozyShieldAction:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ShieldAction
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(OPENCOZY_BUNDLE_ID).shield-action
+        PRODUCT_NAME: OpenCozyShieldAction
+    info:
+      path: ShieldAction/Info.plist
+      properties:
+        CFBundleDisplayName: OpenCozy Shield Action
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        OpenCozyAppGroup: $(OPENCOZY_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
+    entitlements:
+      path: ShieldAction/OpenCozyShieldAction.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - $(OPENCOZY_APP_GROUP)
+
+  OpenCozyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: OpenCozy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(OPENCOZY_BUNDLE_ID).tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/OpenCozy.app/OpenCozy
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  OpenCozy:
+    build:
+      targets:
+        OpenCozy: all
+    test:
+      targets:
+        - OpenCozyTests

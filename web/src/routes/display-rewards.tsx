@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { Button, ChoiceGroup, Notice, PageHeader, PointsBadge, pointsLabel, RewardTile, Sheet } from '@app/design';
 
-import { client, errorMessage, idempotencyKey, type Today } from '../api/client';
+import { client, errorMessage, useAttempts, type Today } from '../api/client';
 
 type Reward = { id: string; title: string; cost: number; available: boolean };
 
@@ -18,6 +18,8 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
   const [sent, setSent] = useState<Reward | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [retry, setRetry] = useState<string | null>(null); // the sheet's own problem: try again
+  const attempts = useAttempts();
   const rewards = useQuery({
     queryKey: rewardsKey,
     queryFn: async () => {
@@ -43,23 +45,42 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
     );
   }
 
+  // One request per choice: a retry after a lost answer reuses its key, so the points are spent once.
+  const attemptFor = (reward: Reward) => `${child.id}:${reward.id}`;
+  const close = () => {
+    if (choosing) attempts.settle(attemptFor(choosing));
+    setChoosing(null);
+    setRetry(null);
+  };
   const ask = async () => {
     if (!choosing) return;
     setBusy(true);
-    const { data, error, response } = await client.POST('/children/{childId}/redemptions', {
-      params: { path: { childId: child.id }, ...idempotencyKey() },
-      body: { rewardId: choosing.id },
-    });
-    setBusy(false);
-    if (response.status === 201 && data) {
-      setSent(choosing);
-      setProblem(null);
-    } else {
-      setProblem(errorMessage(error));
+    setRetry(null);
+    try {
+      const { data, error, response } = await client.POST('/children/{childId}/redemptions', {
+        params: { path: { childId: child.id }, ...attempts.params(attemptFor(choosing)) },
+        body: { rewardId: choosing.id },
+      });
+      if (response.status >= 500) {
+        setRetry('Couldn’t send that. Try again.');
+        return;
+      }
+      if (response.status === 201 && data) {
+        setSent(choosing);
+        setProblem(null);
+      } else {
+        setSent(null);
+        setProblem(errorMessage(error));
+      }
+      close();
+      await queryClient.invalidateQueries({ queryKey: todayKey });
+    } catch {
+      setRetry('Couldn’t reach the server. Check the connection and try again.');
+    } finally {
+      setBusy(false);
     }
-    setChoosing(null);
-    await queryClient.invalidateQueries({ queryKey: todayKey });
   };
+  const short = choosing ? choosing.cost - child.points : 0;
 
   return (
     <section className="flex flex-col gap-6">
@@ -86,23 +107,32 @@ export function DisplayRewards({ today, todayKey }: { today: Today | undefined; 
             name={reward.title}
             cost={reward.cost}
             balance={child.points}
-            disabled={!reward.available}
+            disabled={!reward.available || reward.cost > child.points}
             onSelect={() => { setChoosing(reward); }}
           />
         ))}
       </div>
       <Sheet
         open={choosing !== null}
-        onClose={() => { setChoosing(null); }}
+        onClose={close}
         title={choosing ? `Choose ${choosing.title}?` : ''}
-        description={choosing ? `This uses ${String(choosing.cost)} of ${child.name}’s ${pointsLabel(child.points)}. If an adult says no, the points come back.` : undefined}
+        description={
+          choosing &&
+          (short > 0
+            ? `${child.name} needs ${pointsLabel(short)} more for this.`
+            : `This uses ${String(choosing.cost)} of ${child.name}’s ${pointsLabel(child.points)}. If an adult says no, the points come back.`)
+        }
         footer={
           <>
-            <Button onClick={() => { setChoosing(null); }}>Not now</Button>
-            <Button variant="primary" disabled={busy} onClick={() => void ask()}>Ask for it</Button>
+            <Button onClick={close}>Not now</Button>
+            {short <= 0 && (
+              <Button variant="primary" disabled={busy} onClick={() => void ask()}>Ask for it</Button>
+            )}
           </>
         }
-      />
+      >
+        {retry && <Notice tone="error">{retry}</Notice>}
+      </Sheet>
     </section>
   );
 }

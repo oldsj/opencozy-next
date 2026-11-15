@@ -3,6 +3,7 @@
 import createFetchClient from 'openapi-fetch';
 import createQueryClient from 'openapi-react-query';
 import { queryOptions } from '@tanstack/react-query';
+import { useMemo, useRef } from 'react';
 
 import type { components, paths } from './schema.gen';
 
@@ -18,11 +19,38 @@ export const client = createFetchClient<paths>({
 });
 export const $api = createQueryClient(client);
 
-/** The user's message from an API error body, or a generic one. */
-export function errorMessage(error: unknown): string {
-  const e = error as Partial<ApiError> | undefined;
-  return e?.error?.message ?? 'Something went wrong. Try again.';
+/** Whether an error is the server's answer (an error body), rather than a request that never got one. */
+export function isAnswer(error: unknown): error is ApiError {
+  return typeof error === 'object' && error !== null && 'error' in error;
 }
+
+/** The error's stable code, if the server answered. */
+export function errorCode(error: unknown): string | undefined {
+  return isAnswer(error) ? error.error.code : undefined;
+}
+
+/** The user's message from an API error body, or one for a request that got no answer. */
+export function errorMessage(error: unknown): string {
+  if (!isAnswer(error)) return 'Couldn’t reach the server. Check the connection and try again.';
+  return error.error.message;
+}
+
+// Signed-out handling: a 401 from a signed-in page means the session ended (expired, revoked,
+// signed out elsewhere). The router registers what to do; the wall display and sign-in itself
+// handle their own 401s.
+let signedOut: (() => void) | undefined;
+export function onSignedOut(handler: () => void) {
+  signedOut = handler;
+}
+client.use({
+  onResponse({ request, response }) {
+    const path = new URL(request.url).pathname;
+    if (response.status === 401 && !path.startsWith('/api/auth/') && !window.location.pathname.startsWith('/display')) {
+      signedOut?.();
+    }
+    return undefined;
+  },
+});
 
 /** The signed-in adult and their household, or null when signed out. Shared by the router guard and the UI. */
 export const meQuery = queryOptions({
@@ -42,6 +70,39 @@ export type DisplayScope = components['schemas']['DisplayScope'];
 // A fresh Idempotency-Key for one change. Reuse the same key when retrying that change.
 export function idempotencyKey(): { header: { 'Idempotency-Key': string } } {
   return { header: { 'Idempotency-Key': crypto.randomUUID() } };
+}
+
+/**
+ * One Idempotency-Key per change, kept until the server gives a definite answer. If a response
+ * is lost after the server made the change, the retry sends the same key and the server replays
+ * its answer instead of making the change again. Name an attempt by what it changes (for a create,
+ * its body), and settle it once answered or abandoned.
+ */
+export function useAttempts() {
+  const keys = useRef(new Map<string, string>());
+  return useMemo(
+    () => ({
+      params(attempt: string): { header: { 'Idempotency-Key': string } } {
+        let key = keys.current.get(attempt);
+        if (!key) {
+          key = crypto.randomUUID();
+          keys.current.set(attempt, key);
+        }
+        return { header: { 'Idempotency-Key': key } };
+      },
+      /** The answer came (or the user gave up): a later try is a new change. */
+      settle(attempt: string) {
+        keys.current.delete(attempt);
+      },
+      /** For a mutation's onSettled: settle unless the request got no answer. */
+      settleIfAnswered(attempt: string) {
+        return (_data: unknown, error: unknown) => {
+          if (!error || isAnswer(error)) keys.current.delete(attempt);
+        };
+      },
+    }),
+    [],
+  );
 }
 
 export type MealWeek = components['schemas']['MealWeek'];

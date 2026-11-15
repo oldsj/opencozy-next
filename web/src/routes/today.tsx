@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { AppFrame, Button, ConnectionBanner, EmptyState, PeopleBoard, PersonCard, TabBar, TaskGroup, TaskRow, TopBar } from '@app/design';
 import type { TaskRowCheck } from '@app/design';
 
-import { client, idempotencyKey, type Household, type TodayGroup, type TodayItem } from '../api/client';
+import { client, useAttempts, type Household, type TodayGroup, type TodayItem } from '../api/client';
 import { DisplayRewards } from './display-rewards';
 
 export const todayKey = ['display', 'today'] as const;
@@ -32,6 +32,7 @@ function clock(at: Date, timeZone: string) {
 export function TodayBoard({ household }: { household: Household }) {
   const queryClient = useQueryClient();
   const [local, setLocal] = useState<Local>({});
+  const attempts = useAttempts();
   const [tab, setTab] = useState<'today' | 'rewards'>(window.location.hash === '#rewards' ? 'rewards' : 'today');
   const show = (t: 'today' | 'rewards') => (e: { preventDefault: () => void }) => {
     e.preventDefault();
@@ -48,20 +49,28 @@ export function TodayBoard({ household }: { household: Household }) {
     refetchInterval: 30_000,
   });
 
+  // A failed tap (no answer, or a server error) shows "try again"; the retry reuses its key.
   const mark = (group: TodayGroup, item: TodayItem) => async () => {
     setLocal((l) => ({ ...l, [item.id]: 'sending' }));
-    const { response } =
-      group.kind === 'routine'
-        ? await client.POST('/today/routines/{routineId}/steps/{stepId}/check', {
-            params: { path: { routineId: group.id, stepId: item.id }, ...idempotencyKey() },
-          })
-        : await client.POST('/today/chores/{choreId}/complete', {
-            params: { path: { choreId: item.id }, ...idempotencyKey() },
-          });
-    // 409: already done elsewhere, or no longer on today's list; the refreshed day shows which.
-    const ok = response.ok || response.status === 409 || response.status === 404;
-    await queryClient.invalidateQueries({ queryKey: todayKey });
+    let ok = false;
+    try {
+      const params = attempts.params(item.id);
+      const { response } =
+        group.kind === 'routine'
+          ? await client.POST('/today/routines/{routineId}/steps/{stepId}/check', {
+              params: { path: { routineId: group.id, stepId: item.id }, ...params },
+            })
+          : await client.POST('/today/chores/{choreId}/complete', {
+              params: { path: { choreId: item.id }, ...params },
+            });
+      // 409: already done elsewhere, or no longer on today's list; the refreshed day shows which.
+      ok = response.ok || response.status === 409 || response.status === 404;
+      if (response.status < 500) attempts.settle(item.id);
+    } catch {
+      ok = false;
+    }
     setLocal((l) => ({ ...l, [item.id]: ok ? undefined : 'failed' }));
+    await queryClient.invalidateQueries({ queryKey: todayKey }).catch(() => undefined);
   };
 
   const now = clock(today.data ? new Date(today.data.serverTime) : new Date(), household.timeZone);

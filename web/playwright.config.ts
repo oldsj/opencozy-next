@@ -25,6 +25,8 @@ export default defineConfig({
       LISTEN_ADDR: `127.0.0.1:${port}`,
       LOG_LEVEL: 'warn',
       DATABASE_URL: process.env.DATABASE_URL ?? '',
+      // Short, so reauth.spec.ts can see a sign-in go stale.
+      RECENT_AUTH_WINDOW: '15s',
     },
   },
 });

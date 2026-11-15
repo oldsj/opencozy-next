@@ -32,6 +32,7 @@ import {
   week,
 } from './fixtures-meals';
 import { pairingModules } from './fixtures';
+import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { manageGroups } from './fixtures-manage';
 
 export function Chores() {
@@ -452,8 +453,8 @@ export function Credentials() {
   return (
     <ManageShell nav={settingsNav('/manage/credentials')}>
       <PageHeader
-        title="Connected services"
-        description="Home servers and assistants that can read the family’s day. Each has its own key."
+        title="Connections"
+        description="Home servers, assistants and learning services. Each has its own key and sees only what you allow."
         actions={<Button variant="primary">Add a service</Button>}
       />
       <Section title="Connected" count={credentials.length}>
@@ -467,6 +468,7 @@ export function Credentials() {
                 credentialKinds[c.kind].label,
                 c.scopes.map((s) => scopeLabels[s] ?? s).join('; '),
                 whoFor(c),
+                c.awardRuleIds.length > 0 ? `awards ${c.awardRuleIds.map((id) => awardRules.find((r) => r.id === id)?.activityKey ?? id).join(', ')}` : null,
                 `added ${c.createdAt}`,
                 c.expiresAt === undefined ? null : `expires ${c.expiresAt}`,
               ]
@@ -485,24 +487,36 @@ export function Credentials() {
   );
 }
 
-/** Issuing a credential: what kind, a name, what it may see and for which children. */
-export function CredentialIssue() {
+/**
+ * Issuing a credential: what kind, a name, what it may do and for which children. Award rules
+ * appear only when "Give points for learning" is picked. Needs a sign-in within 10 minutes.
+ */
+export function CredentialIssue({ learning = false, signIn = false }: { learning?: boolean; signIn?: boolean }) {
+  const picked = learning ? ['learning:award'] : ['children:read'];
+  const live = awardRules.filter((r) => !r.archived);
   return (
     <>
       <Credentials />
       <Sheet
         open
         onClose={noop}
-        title="Add a service"
+        title="Add a connection"
         description="You’ll see its key once, on the next screen."
         footer={
           <>
             <Button>Cancel</Button>
-            <Button variant="primary">Create key</Button>
+            <Button variant="primary" disabled={signIn}>
+              Create key
+            </Button>
           </>
         }
       >
         <div className="grid gap-5">
+          {signIn && (
+            <Notice tone="attention" title="Sign in again first">
+              {learningErrorText.recent_auth_required} <ButtonLink href="#sign-in">Sign in again</ButtonLink>
+            </Notice>
+          )}
           <SegmentedControl
             label="Kind"
             value="service"
@@ -513,27 +527,60 @@ export function CredentialIssue() {
             ]}
           />
           <p className="m-0 text-muted-foreground">{credentialKinds.service.detail}</p>
-          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue="Router" required />
+          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue={learning ? 'Minecraft server' : 'Router'} required />
           <Section title="It can">
             <List>
               {Object.entries(scopeLabels).map(([scope, label]) => (
-                <ListRow key={scope} title={label} meta={scope} trailing={<CheckCircle checked={scope === 'children:read'} label={label} />} />
+                <ListRow key={scope} title={label} meta={scope} trailing={<CheckCircle checked={picked.includes(scope)} label={label} />} />
               ))}
             </List>
           </Section>
+          {learning && (
+            <Section title="Award rules it can use" description="It can give points only by these rules, up to each rule’s daily limit.">
+              <List>
+                {live.map((r) => (
+                  <ListRow key={r.id} title={r.activityKey} meta={ruleMeta(r)} trailing={<CheckCircle checked label={`Use ${r.activityKey}`} />} />
+                ))}
+              </List>
+            </Section>
+          )}
           <SegmentedControl
             label="For"
-            value="all"
+            value={learning ? 'some' : 'all'}
             onChange={noop}
             options={[
               { value: 'all', label: 'All children' },
               { value: 'some', label: 'Choose children' },
             ]}
           />
+          {learning && (
+            <List>
+              {householdChildren
+                .filter((c) => !c.archived)
+                .map((c) => (
+                  <ListRow
+                    key={c.id}
+                    leading={<ProfileAvatar name={c.name} color={c.color} size="small" aria-hidden="true" />}
+                    title={c.name}
+                    trailing={<CheckCircle checked={c.id !== 'c3'} label={c.name} />}
+                  />
+                ))}
+            </List>
+          )}
         </div>
       </Sheet>
     </>
   );
+}
+
+/** A learning service: points by award rules, for chosen children. */
+export function CredentialIssueLearning() {
+  return <CredentialIssue learning />;
+}
+
+/** The last sign-in is more than 10 minutes old (recent_auth_required): sign in again, then create. */
+export function CredentialIssueSignIn() {
+  return <CredentialIssue signIn />;
 }
 
 /** The key, shown once. A retry of the same request never shows it again. */
@@ -764,6 +811,168 @@ export function DeviceUnpair() {
         title="Unpair Ezra’s iPad?"
         description="It signs out at once and shows the pairing screen. Ezra’s points and history stay."
         confirmLabel="Unpair Ezra’s iPad"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+function ruleMeta(r: AwardRule): string {
+  return `${pointsLabel(r.points)} each · up to ${pointsLabel(r.dailyLimit)} a day`;
+}
+
+/**
+ * Learning: the award rules a learning service may use, and which player is which child. A service
+ * gives points only for a linked child, by a live rule, under its daily limit.
+ */
+export function Learning() {
+  const live = awardRules.filter((r) => !r.archived);
+  const archived = awardRules.filter((r) => r.archived);
+  return (
+    <ManageShell nav={settingsNav('/manage/learning')}>
+      <PageHeader title="Learning" description="Points for learning: what each activity is worth, and which player is which child." />
+      <Section title="Award rules" count={live.length} actions={<Button variant="primary">Add a rule</Button>}>
+        <List>
+          {live.map((r) => (
+            <ListRow
+              key={r.id}
+              stackOnNarrow
+              title={r.activityKey}
+              meta={ruleMeta(r)}
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Edit ${r.activityKey}`}>
+                    Edit
+                  </Button>
+                  <Button variant="quiet" aria-label={`Archive ${r.activityKey}`}>
+                    Archive…
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Archived rules" count={archived.length} description="No longer awarded. Points already given stay.">
+        <List>
+          {archived.map((r) => (
+            <ListRow key={r.id} muted title={r.activityKey} meta={ruleMeta(r)} />
+          ))}
+        </List>
+      </Section>
+      <Section title="Players" count={learningLinks.length} actions={<Button>Link a player</Button>}>
+        <List>
+          {learningLinks.map((l) => {
+            const child = householdChildren.find((c) => c.id === l.childId);
+            const name = child?.name ?? 'A child';
+            return (
+              <ListRow
+                key={l.id}
+                stackOnNarrow
+                leading={child ? <ProfileAvatar name={child.name} color={child.color} size="small" aria-hidden="true" /> : undefined}
+                title={`${name} is ${l.externalId}`}
+                meta={`${providerNames[l.provider]} · linked ${l.linkedAt}`}
+                trailing={
+                  <Button variant="quiet" aria-label={`Unlink ${l.externalId} from ${name}`}>
+                    Unlink…
+                  </Button>
+                }
+              />
+            );
+          })}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Adding or editing a rule; a second live rule for the same activity is rule_exists. */
+export function AwardRuleEdit() {
+  return (
+    <>
+      <Learning />
+      <Sheet
+        open
+        onClose={noop}
+        title="Add a rule"
+        description="The activity key is what the learning service sends when a child does it."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save rule</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <Input label="Activity key" defaultValue="quest.complete" maxLength={64} className="font-mono" error={learningErrorText.rule_exists} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Points each time" type="number" inputMode="numeric" min={1} defaultValue={5} />
+            <Input label="Daily limit, in points" type="number" inputMode="numeric" min={1} defaultValue={20} hint="Per child, per day." />
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function AwardRuleArchive() {
+  return (
+    <>
+      <Learning />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Archive lesson.finish?"
+        description="Services stop giving points for it. Points already given stay."
+        confirmLabel="Archive lesson.finish"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+/** Linking a player to a child; a player already linked is link_exists. */
+export function LearnerLink() {
+  return (
+    <>
+      <Learning />
+      <Sheet
+        open
+        onClose={noop}
+        title="Link a player"
+        description="Points for this player go to the child you pick."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Link</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <ChoiceGroup
+            label="Child"
+            onChoose={noop}
+            choices={householdChildren.filter((c) => !c.archived).map((c) => ({ value: c.id, label: c.name }))}
+          />
+          <Input label="Minecraft player ID" defaultValue="AdaBuilds" maxLength={64} error={learningErrorText.link_exists} />
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function LearnerUnlink() {
+  return (
+    <>
+      <Learning />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Unlink EzraCrafts from Ezra?"
+        description="That player stops earning points for Ezra. Points already given stay."
+        confirmLabel="Unlink EzraCrafts"
         tone="danger"
       />
     </>
