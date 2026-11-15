@@ -15,6 +15,7 @@ import {
   PageHeader,
   ProfileAvatar,
   QrCode,
+  qrModulesFromRows,
   Section,
   Sheet,
   Textarea,
@@ -187,7 +188,7 @@ export function DevicesPage() {
             {secondsLeft > 0 ? (
               <>
                 <div className="w-60 max-w-full">
-                  <QrCode modules={pairing.offer.qrModules.map((row) => Array.from({ length: row.length }, (_, i) => row[i] === '1'))} label={`Pairing code for ${pairing.child.name}’s device`} />
+                  <QrCode modules={qrModulesFromRows(pairing.offer.qrModules)} label={`Pairing code for ${pairing.child.name}’s device`} />
                 </div>
                 <p className="m-0 text-page font-semibold tabular-nums tracking-widest" aria-label={`Code ${pairing.offer.code.split('').join(' ')}`}>
                   {pairing.offer.code}

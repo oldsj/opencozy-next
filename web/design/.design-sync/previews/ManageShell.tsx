@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, qrModulesFromRows, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -31,8 +31,11 @@ import {
   STEP_MAX,
   week,
 } from './fixtures-meals';
-import { pairingModules } from './fixtures';
+import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
+import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
+import { me, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
 import { manageGroups } from './fixtures-manage';
+import { durationLabels, tvs, type Tv } from './fixtures-tv';
 
 export function Chores() {
   return (
@@ -452,8 +455,8 @@ export function Credentials() {
   return (
     <ManageShell nav={settingsNav('/manage/credentials')}>
       <PageHeader
-        title="Connected services"
-        description="Home servers and assistants that can read the family’s day. Each has its own key."
+        title="Connections"
+        description="Home servers, assistants and learning services. Each has its own key and sees only what you allow."
         actions={<Button variant="primary">Add a service</Button>}
       />
       <Section title="Connected" count={credentials.length}>
@@ -467,6 +470,7 @@ export function Credentials() {
                 credentialKinds[c.kind].label,
                 c.scopes.map((s) => scopeLabels[s] ?? s).join('; '),
                 whoFor(c),
+                c.awardRuleIds.length > 0 ? `awards ${c.awardRuleIds.map((id) => awardRules.find((r) => r.id === id)?.activityKey ?? id).join(', ')}` : null,
                 `added ${c.createdAt}`,
                 c.expiresAt === undefined ? null : `expires ${c.expiresAt}`,
               ]
@@ -485,24 +489,36 @@ export function Credentials() {
   );
 }
 
-/** Issuing a credential: what kind, a name, what it may see and for which children. */
-export function CredentialIssue() {
+/**
+ * Issuing a credential: what kind, a name, what it may do and for which children. Award rules
+ * appear only when "Give points for learning" is picked. Needs a sign-in within 10 minutes.
+ */
+export function CredentialIssue({ learning = false, signIn = false }: { learning?: boolean; signIn?: boolean }) {
+  const picked = learning ? ['learning:award'] : ['children:read'];
+  const live = awardRules.filter((r) => !r.archived);
   return (
     <>
       <Credentials />
       <Sheet
         open
         onClose={noop}
-        title="Add a service"
+        title="Add a connection"
         description="You’ll see its key once, on the next screen."
         footer={
           <>
             <Button>Cancel</Button>
-            <Button variant="primary">Create key</Button>
+            <Button variant="primary" disabled={signIn}>
+              Create key
+            </Button>
           </>
         }
       >
         <div className="grid gap-5">
+          {signIn && (
+            <Notice tone="attention" title="Sign in again first">
+              {learningErrorText.recent_auth_required} <ButtonLink href="#sign-in">Sign in again</ButtonLink>
+            </Notice>
+          )}
           <SegmentedControl
             label="Kind"
             value="service"
@@ -513,27 +529,60 @@ export function CredentialIssue() {
             ]}
           />
           <p className="m-0 text-muted-foreground">{credentialKinds.service.detail}</p>
-          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue="Router" required />
+          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue={learning ? 'Minecraft server' : 'Router'} required />
           <Section title="It can">
             <List>
               {Object.entries(scopeLabels).map(([scope, label]) => (
-                <ListRow key={scope} title={label} meta={scope} trailing={<CheckCircle checked={scope === 'children:read'} label={label} />} />
+                <ListRow key={scope} title={label} meta={scope} trailing={<CheckCircle checked={picked.includes(scope)} label={label} />} />
               ))}
             </List>
           </Section>
+          {learning && (
+            <Section title="Award rules it can use" description="It can give points only by these rules, up to each rule’s daily limit.">
+              <List>
+                {live.map((r) => (
+                  <ListRow key={r.id} title={r.activityKey} meta={ruleMeta(r)} trailing={<CheckCircle checked label={`Use ${r.activityKey}`} />} />
+                ))}
+              </List>
+            </Section>
+          )}
           <SegmentedControl
             label="For"
-            value="all"
+            value={learning ? 'some' : 'all'}
             onChange={noop}
             options={[
               { value: 'all', label: 'All children' },
               { value: 'some', label: 'Choose children' },
             ]}
           />
+          {learning && (
+            <List>
+              {householdChildren
+                .filter((c) => !c.archived)
+                .map((c) => (
+                  <ListRow
+                    key={c.id}
+                    leading={<ProfileAvatar name={c.name} color={c.color} size="small" aria-hidden="true" />}
+                    title={c.name}
+                    trailing={<CheckCircle checked={c.id !== 'c3'} label={c.name} />}
+                  />
+                ))}
+            </List>
+          )}
         </div>
       </Sheet>
     </>
   );
+}
+
+/** A learning service: points by award rules, for chosen children. */
+export function CredentialIssueLearning() {
+  return <CredentialIssue learning />;
+}
+
+/** The last sign-in is more than 10 minutes old (recent_auth_required): sign in again, then create. */
+export function CredentialIssueSignIn() {
+  return <CredentialIssue signIn />;
 }
 
 /** The key, shown once. A retry of the same request never shows it again. */
@@ -709,13 +758,13 @@ export function DevicePair() {
       >
         <div className="grid justify-items-center gap-5 text-center">
           <div className="w-60 max-w-full">
-            <QrCode modules={pairingModules} label="Pairing code for Ada’s iPad" />
+            <QrCode modules={qrModulesFromRows(offer.qrModules)} label="Pairing code for Ada’s iPad" />
           </div>
           <p className="m-0 text-page font-semibold tabular-nums tracking-widest" aria-label={`Code ${offer.code.split('').join(' ')}`}>
             {offer.code}
           </p>
           <p className="m-0 text-muted-foreground">
-            Waiting for the iPad · <Countdown seconds={262} lowAt={60} />
+            Waiting for the iPad · <Countdown seconds={562} lowAt={60} />
           </p>
         </div>
       </Sheet>
@@ -764,6 +813,710 @@ export function DeviceUnpair() {
         title="Unpair Ezra’s iPad?"
         description="It signs out at once and shows the pairing screen. Ezra’s points and history stay."
         confirmLabel="Unpair Ezra’s iPad"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+function ruleMeta(r: AwardRule): string {
+  return `${pointsLabel(r.points)} each · up to ${pointsLabel(r.dailyLimit)} a day`;
+}
+
+/**
+ * Learning: the award rules a learning service may use, and which player is which child. A service
+ * gives points only for a linked child, by a live rule, under its daily limit.
+ */
+export function Learning() {
+  const live = awardRules.filter((r) => !r.archived);
+  const archived = awardRules.filter((r) => r.archived);
+  return (
+    <ManageShell nav={settingsNav('/manage/learning')}>
+      <PageHeader title="Learning" description="Points for learning: what each activity is worth, and which player is which child." />
+      <Section title="Award rules" count={live.length} actions={<Button variant="primary">Add a rule</Button>}>
+        <List>
+          {live.map((r) => (
+            <ListRow
+              key={r.id}
+              stackOnNarrow
+              title={r.activityKey}
+              meta={ruleMeta(r)}
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Edit ${r.activityKey}`}>
+                    Edit
+                  </Button>
+                  <Button variant="quiet" aria-label={`Archive ${r.activityKey}`}>
+                    Archive…
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Archived rules" count={archived.length} description="No longer awarded. Points already given stay.">
+        <List>
+          {archived.map((r) => (
+            <ListRow key={r.id} muted title={r.activityKey} meta={ruleMeta(r)} />
+          ))}
+        </List>
+      </Section>
+      <Section title="Players" count={learningLinks.length} actions={<Button>Link a player</Button>}>
+        <List>
+          {learningLinks.map((l) => {
+            const child = householdChildren.find((c) => c.id === l.childId);
+            const name = child?.name ?? 'A child';
+            return (
+              <ListRow
+                key={l.id}
+                stackOnNarrow
+                leading={child ? <ProfileAvatar name={child.name} color={child.color} size="small" aria-hidden="true" /> : undefined}
+                title={`${name} is ${l.externalId}`}
+                meta={`${providerNames[l.provider]} · linked ${l.linkedAt}`}
+                trailing={
+                  <Button variant="quiet" aria-label={`Unlink ${l.externalId} from ${name}`}>
+                    Unlink…
+                  </Button>
+                }
+              />
+            );
+          })}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Adding or editing a rule; a second live rule for the same activity is rule_exists. */
+export function AwardRuleEdit() {
+  return (
+    <>
+      <Learning />
+      <Sheet
+        open
+        onClose={noop}
+        title="Add a rule"
+        description="The activity key is what the learning service sends when a child does it."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save rule</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <Input label="Activity key" defaultValue="quest.complete" maxLength={64} className="font-mono" error={learningErrorText.rule_exists} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Points each time" type="number" inputMode="numeric" min={1} defaultValue={5} />
+            <Input label="Daily limit, in points" type="number" inputMode="numeric" min={1} defaultValue={20} hint="Per child, per day." />
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function AwardRuleArchive() {
+  return (
+    <>
+      <Learning />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Archive lesson.finish?"
+        description="Services stop giving points for it. Points already given stay."
+        confirmLabel="Archive lesson.finish"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+/** Linking a player to a child; a player already linked is link_exists. */
+export function LearnerLink() {
+  return (
+    <>
+      <Learning />
+      <Sheet
+        open
+        onClose={noop}
+        title="Link a player"
+        description="Points for this player go to the child you pick."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Link</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <ChoiceGroup
+            label="Child"
+            onChoose={noop}
+            choices={householdChildren.filter((c) => !c.archived).map((c) => ({ value: c.id, label: c.name }))}
+          />
+          <Input label="Minecraft player ID" defaultValue="AdaBuilds" maxLength={64} error={learningErrorText.link_exists} />
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function LearnerUnlink() {
+  return (
+    <>
+      <Learning />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Unlink EzraCrafts from Ezra?"
+        description="That player stops earning points for Ezra. Points already given stay."
+        confirmLabel="Unlink EzraCrafts"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+/** Slice 8: a child's allowed hours. They limit when saved iPad time is used, never when it is earned. */
+export function ChildHours() {
+  return (
+    <>
+      <Children />
+      <Sheet
+        open
+        onClose={noop}
+        title="Ada’s screen time hours"
+        description="When Ada can use saved iPad time or start TV time. Earning and saving work at any hour; a parent can always give time."
+        footer={
+          <>
+            <Button variant="quiet">No limit</Button>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <div className="grid gap-6">
+          <Section title="School nights" description="Sunday to Thursday">
+            <div className="grid grid-cols-2 gap-4">
+              <Input type="time" label="From" defaultValue={adaHours.schoolNight.start} />
+              <Input type="time" label="Until" defaultValue={adaHours.schoolNight.end} />
+            </div>
+          </Section>
+          <Section title="Weekend" description="Friday and Saturday">
+            <div className="grid grid-cols-2 gap-4">
+              <Input type="time" label="From" defaultValue={adaHours.weekend.start} />
+              <Input type="time" label="Until" defaultValue="07:00" error="Weekend hours must end after they start, on the same day." />
+            </div>
+          </Section>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** A parent gives time for free: iPad time is saved (or started now), TV time adds to the balance. */
+export function GiveTime() {
+  return (
+    <>
+      <Children />
+      <Sheet
+        open
+        onClose={noop}
+        title="Give Ada time"
+        description="Free, from you. It doesn’t cost Ada any points."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Give 30 min of iPad time</Button>
+          </>
+        }
+      >
+        <div className="grid gap-6">
+          <SegmentedControl
+            label="Time for"
+            value="personal"
+            onChange={noop}
+            options={[
+              { value: 'personal', label: 'iPad' },
+              { value: 'tv', label: 'TV' },
+            ]}
+          />
+          <ChoiceGroup
+            label="How long"
+            onChoose={noop}
+            choices={[
+              { value: '15', label: '15 min' },
+              { value: '30', label: '30 min' },
+              { value: '60', label: '1 hour' },
+            ]}
+          />
+          <div className="flex items-center gap-3">
+            <CheckCircle checked label="Start it now on Ada’s iPad" />
+            <span>Start it now on Ada’s iPad (even outside Ada’s hours)</span>
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** A reward that is screen time: points buy minutes of iPad or TV time, with no adult step. */
+export function RewardScreenTime() {
+  return (
+    <ManageShell nav={settingsNav('/manage/rewards')}>
+      <PageHeader title="Edit reward" />
+      <form className="grid max-w-xl gap-6" onSubmit={(e) => { e.preventDefault(); }}>
+        <Input label="Name" defaultValue="30 min of iPad" maxLength={80} />
+        <Input label="Cost in points" type="number" inputMode="numeric" min={1} defaultValue={20} />
+        <SegmentedControl
+          label="What it gives"
+          value="personal"
+          onChange={noop}
+          options={[
+            { value: 'thing', label: 'Something else' },
+            { value: 'personal', label: 'iPad time' },
+            { value: 'tv', label: 'TV time' },
+          ]}
+        />
+        <Input
+          label="Minutes"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={240}
+          defaultValue={30}
+          hint="1 to 240. It’s saved on Ada’s iPad as soon as Ada chooses it; no need to approve."
+        />
+        <div className="flex gap-3">
+          <Button variant="primary" type="submit">
+            Save
+          </Button>
+          <ButtonLink href="#rewards">Cancel</ButtonLink>
+        </div>
+      </form>
+    </ManageShell>
+  );
+}
+
+/** Manage → Devices settings for every child's iPad: what the lock screen says, and blocked websites. */
+export function DeviceSettings() {
+  return (
+    <ManageShell nav={settingsNav('/manage/devices')}>
+      <PageHeader title="iPad settings" description="For every child’s iPad. They pick it up at their next sync, and keep it offline." />
+      <Section title="Lock screen message" description="Under it, the iPad adds when screen time opens and how much time is saved.">
+        <form className="grid max-w-xl gap-3" onSubmit={(e) => { e.preventDefault(); }}>
+          <Textarea label="Message" rows={3} maxLength={LOCK_MESSAGE_MAX} defaultValue={DEFAULT_LOCK_MESSAGE} hint={`Up to ${String(LOCK_MESSAGE_MAX)} characters.`} />
+          <div className="flex gap-3">
+            <Button variant="primary" type="submit">
+              Save message
+            </Button>
+            <Button variant="quiet">Use the default</Button>
+          </div>
+        </form>
+      </Section>
+      <Section title="Blocked websites" description="Browsers stay open; only these websites are blocked, in every browser on the iPad.">
+        <form className="grid max-w-xl gap-4" onSubmit={(e) => { e.preventDefault(); }}>
+          <Textarea
+            label="Always blocked"
+            rows={4}
+            defaultValue={webFilter.gamePortals.join('\n')}
+            hint="Game portals. One website per line, like games.example.test."
+          />
+          <Textarea
+            label="Blocked unless iPad time is running"
+            rows={5}
+            defaultValue={webFilter.games.join('\n')}
+            hint="Single games. One website per line."
+          />
+          <Notice tone="attention">An iPad applies up to 50 websites (always-blocked first). Parent setup on the iPad says if some didn’t fit.</Notice>
+          <div>
+            <Button variant="primary" type="submit">
+              Save websites
+            </Button>
+          </div>
+        </form>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** A TV's state in a few words, for adults: what the router lets through and who is watching. */
+function tvStatus(tv: Tv): { label: string; tone: 'neutral' | 'attention' | 'positive' | 'info' } {
+  if (tv.openUntil !== null) return { label: `Online · open until ${tv.openUntil}`, tone: 'info' };
+  if (tv.session?.watcher === 'parents') return { label: 'On · Parents', tone: 'positive' };
+  if (tv.session) return { label: `On · ${tv.session.childName ?? 'A child'}`, tone: 'positive' };
+  if (tv.prompt) return { label: 'Asking who’s watching', tone: 'attention' };
+  return { label: 'Offline', tone: 'neutral' };
+}
+
+function tvMeta(tv: Tv): string {
+  return [
+    tv.room,
+    tv.openHours ? `Open ${tv.openHours.start}–${tv.openHours.end}` : null,
+    tv.haEntityId ? 'Home Assistant' : 'Router only',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Slice 9: shared TVs stay offline until someone is watching; adults see each TV and act on it. */
+export function Tvs() {
+  return (
+    <ManageShell nav={settingsNav('/manage/devices')}>
+      <PageHeader
+        title="TVs"
+        description="TVs stay offline until someone is watching. A child’s TV time runs only while they watch."
+        actions={
+          <>
+            <Button>Open TVs…</Button>
+            <Button variant="primary">Add a TV</Button>
+          </>
+        }
+      />
+      <Section title="TVs" count={tvs.length}>
+        <List>
+          {tvs.map((tv) => {
+            const status = tvStatus(tv);
+            return (
+              <ListRow
+                key={tv.id}
+                stackOnNarrow
+                title={tv.name}
+                meta={
+                  <>
+                    <Tag tone={status.tone}>{status.label}</Tag> {tvMeta(tv)}
+                  </>
+                }
+                trailing={
+                  <>
+                    {tv.session ? (
+                      <Button aria-label={`Turn off ${tv.name}`}>Turn off</Button>
+                    ) : (
+                      <Button aria-label={`Turn on ${tv.name} for someone`}>Turn on for…</Button>
+                    )}
+                    <Button variant="quiet" aria-label={`Edit ${tv.name}`}>
+                      Edit
+                    </Button>
+                  </>
+                }
+              />
+            );
+          })}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/**
+ * "Who's watching?": a TV turned on. In the inbox and as a push. Children who can't watch say why;
+ * "Not now" keeps the TV offline until it is turned on again. One answer wins.
+ */
+export function TvWhoIsWatching() {
+  const tv = tvs[0];
+  if (!tv?.prompt) return null;
+  return (
+    <ManageShell
+      nav={<ManageNav groups={manageGroups('/manage/inbox')} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />}
+    >
+      <PageHeader title="Inbox" />
+      <Section title="Waiting for you" count={1}>
+        <List>
+          <ListRow
+            stackOnNarrow
+            title={`${tv.name} is on. Who’s watching?`}
+            meta={`Turned on at ${tv.prompt.raisedAt}`}
+            trailing={
+              <ChoiceGroup
+                label={`Who’s watching ${tv.name}`}
+                onChoose={noop}
+                choices={[
+                  ...tv.prompt.children.map((c) => ({
+                    value: c.childId,
+                    label: c.name,
+                    detail: c.canWatch ? `${String(Math.floor(c.tvSecondsRemaining / 60))} min` : (c.reason ?? 'can’t watch now'),
+                    disabled: !c.canWatch,
+                  })),
+                  { value: 'parents', label: 'Parents' },
+                  { value: 'not_now', label: 'Not now', variant: 'quiet' as const },
+                ]}
+              />
+            }
+          />
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Adding or editing a TV: name, room, its network addresses, Home Assistant, and open hours. */
+export function TvEdit() {
+  const tv = tvs[3];
+  return (
+    <>
+      <Tvs />
+      <Sheet
+        open
+        onClose={noop}
+        title={`Edit ${tv?.name ?? 'TV'}`}
+        footer={
+          <>
+            <Button variant="danger">Remove TV…</Button>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save TV</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <Input label="Name" defaultValue={tv?.name} maxLength={80} hint="For example Den TV." required />
+          <Input label="Room (optional)" defaultValue={tv?.room ?? ''} maxLength={80} />
+          <Textarea
+            label="MAC addresses"
+            rows={3}
+            defaultValue={tv?.macs.join('\n')}
+            className="font-mono"
+            hint="One per line, up to 8: the TV’s wired and Wi-Fi addresses, and any streaming box."
+          />
+          <Input
+            label="Home Assistant entity (optional)"
+            defaultValue={tv?.haEntityId ?? ''}
+            className="font-mono"
+            hint="For example media_player.den_tv. Home Assistant reports it turning on and off."
+          />
+          <Section title="Open hours" description="Online without asking, every day. An earlier end is the next morning.">
+            <div className="grid grid-cols-2 gap-4">
+              <Input type="time" label="Open from" defaultValue={tv?.openHours?.start} />
+              <Input type="time" label="Until" defaultValue={tv?.openHours?.end} />
+            </div>
+          </Section>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** Opening TVs: online for a while without asking; anyone watching is no longer charged. */
+export function TvOpen() {
+  return (
+    <>
+      <Tvs />
+      <Sheet
+        open
+        onClose={noop}
+        title="Open TVs"
+        description="The router stops limiting them until then. Nobody’s TV time runs."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Open 1 hour</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <SegmentedControl
+            label="Which TVs"
+            value="all"
+            onChange={noop}
+            options={[
+              { value: 'all', label: 'All TVs' },
+              { value: 'some', label: 'Choose TVs' },
+            ]}
+          />
+          <ChoiceGroup
+            label="How long"
+            onChoose={noop}
+            choices={Object.entries(durationLabels).map(([value, label]) => ({ value, label }))}
+          />
+          <Notice tone="info">Ezra is watching Living room TV. Opening it ends Ezra’s session now; the rest of Ezra’s TV time stays.</Notice>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/**
+ * Account (slices 10 and 11): how you sign in, and where you're signed in. Passkeys are named so you
+ * can tell them apart; phones are listed so a lost one can be signed out from here.
+ */
+export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
+  return (
+    <ManageShell nav={settingsNav('/manage/account')}>
+      <PageHeader title="Account" description={`Signed in as ${me.email}.`} />
+      <Section
+        title="Passkeys"
+        count={passkeys.length}
+        description="Sign in with your face, fingerprint or a security key instead of your password."
+        actions={<Button variant="primary">Add a passkey</Button>}
+      >
+        <List>
+          {passkeys.map((pk) => (
+            <ListRow
+              key={pk.id}
+              stackOnNarrow
+              title={pk.name}
+              meta={
+                <>
+                  <Tag tone={pk.backedUp ? 'positive' : 'neutral'}>{pk.backedUp ? 'Synced' : 'This device only'}</Tag>{' '}
+                  {[`added ${pk.createdAt}`, pk.lastUsedAt === undefined ? 'not used yet' : `last used ${pk.lastUsedAt}`].join(' · ')}
+                </>
+              }
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Rename ${pk.name}`}>
+                    Rename
+                  </Button>
+                  <Button variant="quiet" aria-label={`Remove ${pk.name}`}>
+                    Remove…
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Single sign-on" description="Your password and passkeys keep working either way.">
+        {link ? (
+          <List>
+            <ListRow
+              stackOnNarrow
+              title={`Linked to ${link.providerName}`}
+              meta={`${link.email} · since ${link.linkedAt}`}
+              trailing={
+                <Button variant="quiet" aria-label={`Unlink ${link.providerName}`}>
+                  Unlink…
+                </Button>
+              }
+            />
+          </List>
+        ) : (
+          <p className="m-0 text-muted-foreground">
+            Not linked. Choose “Sign in with Pocket ID” on the sign-in page once; it links when Pocket ID confirms {me.email}.
+          </p>
+        )}
+      </Section>
+      <Section title="Phones" count={phoneSessions.length} description="The OpenCozy app on your phone. Each stays signed in for 90 days.">
+        <List>
+          {phoneSessions.map((ps) => (
+            <ListRow
+              key={ps.id}
+              stackOnNarrow
+              title={ps.deviceName}
+              meta={[
+                `signed in ${ps.createdAt}`,
+                `last used ${ps.lastUsedAt}`,
+                ps.pushEnabled ? 'notifications on' : 'notifications off',
+                `until ${ps.expiresAt}`,
+              ].join(' · ')}
+              trailing={
+                <Button variant="quiet" aria-label={`Sign out ${ps.deviceName}`}>
+                  Sign out…
+                </Button>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+export function AccountNotLinked() {
+  return <Account link={null} />;
+}
+
+/** Naming a new passkey; then the browser asks for a face, fingerprint or key. */
+export function PasskeyAdd() {
+  return (
+    <>
+      <Account />
+      <Sheet
+        open
+        onClose={noop}
+        title="Add a passkey"
+        description="Next, your browser asks you to use your face, fingerprint or a security key."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Continue</Button>
+          </>
+        }
+      >
+        <Input label="Name" defaultValue="Laptop" maxLength={80} hint="So you can tell your passkeys apart, such as Laptop." required />
+      </Sheet>
+    </>
+  );
+}
+
+export function PasskeyRename() {
+  return (
+    <>
+      <Account />
+      <Sheet
+        open
+        onClose={noop}
+        title="Rename Security key"
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <Input label="Name" defaultValue="Security key" maxLength={80} required />
+      </Sheet>
+    </>
+  );
+}
+
+export function PasskeyRemove() {
+  return (
+    <>
+      <Account />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Remove Security key?"
+        description="It won’t sign you in here any more. Also delete it from the key or password manager that holds it."
+        confirmLabel="Remove Security key"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+export function SsoUnlink() {
+  return (
+    <>
+      <Account />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Unlink Pocket ID?"
+        description="“Sign in with Pocket ID” stops working for you until you use it again. Your password and passkeys keep working."
+        confirmLabel="Unlink Pocket ID"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+export function PhoneSignOut() {
+  return (
+    <>
+      <Account />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Sign out Old iPhone?"
+        description="The app on it is signed out at once and stops getting notifications. Sign in on that phone to use it again."
+        confirmLabel="Sign out Old iPhone"
         tone="danger"
       />
     </>

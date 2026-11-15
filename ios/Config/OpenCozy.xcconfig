@@ -1,0 +1,16 @@
+// Shared build settings for every target. Keep this file public-safe:
+// placeholder identifiers only, no team ID.
+//
+// Put real values in Config/Local.xcconfig (gitignored), for example:
+//   DEVELOPMENT_TEAM = ABCDE12345
+//   OPENCOZY_BUNDLE_ID = com.yourdomain.opencozy
+//   OPENCOZY_APP_GROUP = group.com.yourdomain.opencozy
+
+OPENCOZY_BUNDLE_ID = org.example.opencozy
+OPENCOZY_APP_GROUP = group.org.example.opencozy
+// Canonical OpenCozy host for passkeys (webcredentials Associated Domain).
+OPENCOZY_WEB_HOST = opencozy.example.test
+DEVELOPMENT_TEAM =
+CODE_SIGN_STYLE = Automatic
+
+#include? "Local.xcconfig"

@@ -37,6 +37,21 @@ INSERT INTO service_credential_child (household_id, credential_id, child_id) VAL
 INSERT INTO assistant_credential (household_id, id, user_id, name, credential_hash, scopes, created_at, last_used_at, revoked_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000e1', 'fixtureOwnerUser01', 'Desktop assistant', '47d9a070fe7da7e7e22399db85bd24b62aff8560c86afdeca7957c4ba107c617', '{approvals:read}', '2026-01-06T08:00:00Z', NULL, NULL);
 
+-- Slice 6: a learning app's credential and its rule (one live rule, one archived), and links
+-- (one unlinked).
+INSERT INTO service_credential (household_id, id, name, credential_hash, scopes, created_at, revoked_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d3', 'Example Learning App', 'a2e1420d7c78ceb4137c1e5c2dd2941ae130982e1e9594ce95ed281aa712db54', '{external:award}', '2026-01-05T08:02:00Z', NULL);
+INSERT INTO service_credential_child (household_id, credential_id, child_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d3', '0190a000-0000-7000-8000-0000000000c1');
+INSERT INTO award_rule (household_id, id, activity_key, points, daily_limit, version, archived_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000a1', 'build_house', 5, 20, 2, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000a2', 'read_book', 3, 9, 1, '2026-02-01T08:00:00Z');
+INSERT INTO service_credential_award_rule (household_id, credential_id, rule_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d3', '0190a000-0000-7000-8000-0000000000a1');
+INSERT INTO external_identity_link (household_id, child_id, provider, external_id, linked_at, unlinked_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c1', 'minecraft', 'Builder_42', '2026-01-06T08:00:00Z', NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c2', 'minecraft', 'Old_Miner', '2026-01-06T08:00:00Z', '2026-01-20T08:00:00Z');
+
 -- Slice 14: recipes (one archived) and a meal plan that uses them.
 INSERT INTO recipe (household_id, id, title, servings, ingredients, instructions, version, created_at, archived_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000f1', 'Lentil soup', 4,

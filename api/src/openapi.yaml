@@ -52,6 +52,8 @@ tags:
     description: Recipes and the meal plan
   - name: calendar
     description: Followed calendars, their events, and who they are for
+  - name: learning
+    description: Learning-app awards, their rules and children's linked accounts
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -163,6 +165,16 @@ paths:
     $ref: calendar.yaml#/calendars
   /calendars/{calendarId}:
     $ref: calendar.yaml#/calendarSource
+  /learning/rules:
+    $ref: learning.yaml#/rules
+  /learning/rules/{ruleId}:
+    $ref: learning.yaml#/rule
+  /learning/links:
+    $ref: learning.yaml#/links
+  /learning/links/{linkId}:
+    $ref: learning.yaml#/link
+  /learning/awards:
+    $ref: learning.yaml#/awards
 
 components:
   securitySchemes:

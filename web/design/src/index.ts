@@ -49,7 +49,7 @@ export { ProfileAvatar } from './components/ProfileAvatar';
 export type { ProfileAvatarProps } from './components/ProfileAvatar';
 export { ProgressBar } from './components/ProgressBar';
 export type { ProgressBarProps } from './components/ProgressBar';
-export { QrCode } from './components/QrCode';
+export { QrCode, qrModulesFromRows } from './components/QrCode';
 export type { QrCodeProps } from './components/QrCode';
 export { RewardTile } from './components/RewardTile';
 export type { RewardTileProps } from './components/RewardTile';

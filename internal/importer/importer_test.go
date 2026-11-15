@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -32,10 +33,11 @@ var (
 
 // The fixture's secrets, made for it (testdata/old_seed.sql stores only their hashes).
 const (
-	fixturePassword  = "fixture-owner-password"
-	fixtureReadToken = "ocz_W1-v8zbJaANPs1JmBbtLUMuPg_JCKYayABFBJ4F6zZc"
-	fixtureGateToken = "ocz__koCd_CivNhz2YxuA1Boq99DgqwxWJ9ULvrZgF5RUd0"
-	fixtureAsstToken = "oca_O_Fo_u99Yi1dz98twjLyVAfg2GzHdo9FMd_EIYafaS4"
+	fixturePassword   = "fixture-owner-password"
+	fixtureReadToken  = "ocz_W1-v8zbJaANPs1JmBbtLUMuPg_JCKYayABFBJ4F6zZc"
+	fixtureGateToken  = "ocz__koCd_CivNhz2YxuA1Boq99DgqwxWJ9ULvrZgF5RUd0"
+	fixtureAsstToken  = "oca_O_Fo_u99Yi1dz98twjLyVAfg2GzHdo9FMd_EIYafaS4"
+	fixtureLearnToken = "ocz_f1QOWWJY-49KChmmsnZw7-vg4mzAPST9AS4AoWeo9P0"
 )
 
 // oldDB makes a database holding the old app's schema and the fictional seed, dropped when t
@@ -136,23 +138,26 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                "pending", // lock_message and the game domains wait on later slices
-		"child":                    "pending", // the colour and allowed hours too
-		"auth_user":                "ok",
-		"household_owner":          "ok",
-		"auth_account":             "ok",
-		"service_credential":       "pending", // the router's tv:gate has no new name yet
-		"service_credential_child": "pending",
-		"assistant_credential":     "pending",
-		"auth_session":             "not carried",
-		"recipe":                   "ok",
-		"meal_plan_entry":          "ok",
+		"household":                     "pending", // lock_message and the game domains wait on later slices
+		"child":                         "pending", // the colour and allowed hours too
+		"auth_user":                     "ok",
+		"household_owner":               "ok",
+		"auth_account":                  "ok",
+		"service_credential":            "pending", // the router's tv:gate has no new name yet
+		"service_credential_child":      "pending",
+		"assistant_credential":          "pending",
+		"auth_session":                  "not carried",
+		"recipe":                        "ok",
+		"meal_plan_entry":               "ok",
+		"award_rule":                    "ok",
+		"external_identity_link":        "ok",
+		"service_credential_award_rule": "ok",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -222,12 +227,36 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		t.Errorf("meals: %d %v", meals, err)
 	}
 
+	// The learning credential keeps its rule; rules keep versions and archive times; links keep
+	// whether they were unlinked.
+	var learning string
+	if err := target.Owner.QueryRow(ctx, `SELECT c.scopes::text || ' ' || r.activity_key || ' ' || r.version
+		FROM credential c JOIN credential_award_rule cr ON cr.credential_id = c.id JOIN award_rule r ON r.id = cr.rule_id
+		WHERE c.id = '0190a000-0000-7000-8000-0000000000d3'`).Scan(&learning); err != nil || learning != "{learning:award} build_house 2" {
+		t.Errorf("learning credential: %q %v", learning, err)
+	}
+	var archivedRules, unlinked, live int
+	if err := target.Owner.QueryRow(ctx, `SELECT (SELECT count(*) FROM award_rule WHERE archived_at IS NOT NULL),
+		(SELECT count(*) FROM learning_link WHERE unlinked_at IS NOT NULL),
+		(SELECT count(*) FROM learning_link WHERE unlinked_at IS NULL AND external_id = 'Builder_42')`).Scan(&archivedRules, &unlinked, &live); err != nil ||
+		archivedRules != 1 || unlinked != 1 || live != 1 {
+		t.Errorf("rules/links: %d %d %d %v", archivedRules, unlinked, live, err)
+	}
+
 	// The old service secret authenticates, with exactly its old child.
 	r, _ := http.NewRequest(http.MethodGet, "/api/children", nil)
 	r.Header.Set("Authorization", "Bearer "+fixtureReadToken)
 	a, ok, err := actor.Resolver{Q: q}.Resolve(ctx, r)
 	if err != nil || !ok || a.Kind != actor.Service || a.AllChildren || len(a.Children) != 1 {
 		t.Fatalf("old ocz_ secret: %+v ok=%v err=%v", a, ok, err)
+	}
+
+	// The learning credential's old secret authenticates too, with its scope renamed.
+	r, _ = http.NewRequest(http.MethodPost, "/api/learning/awards", nil)
+	r.Header.Set("Authorization", "Bearer "+fixtureLearnToken)
+	a, ok, err = actor.Resolver{Q: q}.Resolve(ctx, r)
+	if err != nil || !ok || a.Kind != actor.Service || len(a.Children) != 1 || !slices.Equal(a.Scopes, []string{"learning:award"}) {
+		t.Fatalf("old learning secret: %+v ok=%v err=%v", a, ok, err)
 	}
 
 	// bootstrap-owner and a second import both refuse now.

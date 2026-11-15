@@ -1,0 +1,472 @@
+import Foundation
+import Observation
+
+/// Parent device settings: the server origin (not secret) and the parent session
+/// token (Keychain only).
+struct ParentStore: Sendable {
+    private static let baseURLKey = "parent.baseURL.v1"
+    private static let tokenAccount = "parent-session.v1"
+    private static let webHandoffOffKey = "parent.webHandoffOff.v1"
+    private static let phoneNameKey = "parent.phoneName.v1"
+
+    var keychain = Keychain()
+    var defaultsSuite: String?
+
+    private var defaults: UserDefaults { defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard }
+
+    var baseURL: URL? {
+        get { defaults.string(forKey: Self.baseURLKey).flatMap(URL.init(string:)) }
+        nonmutating set { defaults.set(newValue?.absoluteString, forKey: Self.baseURLKey) }
+    }
+
+    /// The name this phone's notification session gets in Manage → Devices.
+    var phoneName: String? {
+        get { defaults.string(forKey: Self.phoneNameKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.phoneNameKey) }
+    }
+
+    /// Set by Stop notifications, and when an adult revokes this phone (401 on its
+    /// session), so a web sign-in doesn't quietly turn notifications back on. Only
+    /// a sign-in from the bell sheet clears it.
+    var webHandoffOff: Bool {
+        get { defaults.bool(forKey: Self.webHandoffOffKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.webHandoffOffKey) }
+    }
+
+    var token: String? {
+        get { keychain.string(for: Self.tokenAccount) }
+        nonmutating set { keychain.set(newValue, for: Self.tokenAccount) }
+    }
+}
+
+/// Parent mode, native side: the server address the web view opens, and this
+/// phone's parent session for push and lock-screen Approve/Reject (the approval
+/// list is kept only to sync the badge and delivered notifications). The inbox
+/// itself is the web app. Never touches Family Controls.
+@MainActor
+@Observable
+final class ParentModel {
+    /// The OpenCozy server the web view opens.
+    private(set) var origin: URL?
+    private(set) var household: HouseholdInfo?
+    private(set) var session: ParentSessionInfo?
+    private(set) var approvals: [Approval] = []
+    private(set) var pendingCount = 0
+    private(set) var isLoading = false
+    /// Approval IDs with a decision in flight.
+    private(set) var busy: Set<String> = []
+    /// The last request couldn't reach the server (LAN only: away from home, no VPN).
+    private(set) var isUnreachable = false
+    var errorMessage: String?
+
+    static let unreachableMessage = WebShell.unreachableMessage
+    static let addressHint = "Enter the OpenCozy address, for example https://opencozy.example.org."
+
+    let store: ParentStore
+    private let makeAPI: @Sendable (URL, String?) -> any ParentAPI
+    /// Badge and delivered-notification housekeeping; replaced in tests.
+    private let notifier: ApprovalNotifier
+    private let webData: WebDataGate
+    private var pushToken: String?
+    private var registeredPushToken: String?
+
+    init(store: ParentStore = ParentStore(),
+         makeAPI: @escaping @Sendable (URL, String?) -> any ParentAPI = { HTTPParentAPI(baseURL: $0, token: $1) },
+         notifier: ApprovalNotifier = .system,
+         webData: WebDataGate = .shared) {
+        self.store = store
+        self.webData = webData
+        self.makeAPI = makeAPI
+        self.notifier = notifier
+        self.origin = store.baseURL
+    }
+
+    /// Sets the server the web view opens. Returns false for an address that
+    /// isn't https (or this machine).
+    @discardableResult
+    func connect(_ server: String) -> Bool {
+        guard let url = BaseURL.parse(server) else { return false }
+        if url != store.baseURL { clearSession() }
+        store.baseURL = url
+        origin = url
+        errorMessage = nil
+        return true
+    }
+
+    /// Forgets the server (and this phone's notification session), and wipes the
+    /// web view's cookies so nothing signed in survives into another role.
+    func disconnect() async {
+        webData.reset()
+        await signOut()
+        store.baseURL = nil
+        origin = nil
+    }
+
+    /// What this phone is called in Manage → Devices: the parent's choice, or a
+    /// suggestion that tells phones apart (`DeviceName`).
+    var phoneName: String {
+        get { store.phoneName ?? DeviceName.suggested() }
+        set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            store.phoneName = trimmed.isEmpty ? nil : String(trimmed.prefix(80))
+        }
+    }
+
+    var isSignedIn: Bool { store.baseURL != nil && !(store.token ?? "").isEmpty }
+
+    private var api: (any ParentAPI)? {
+        guard let url = store.baseURL, let token = store.token, !token.isEmpty else { return nil }
+        return makeAPI(url, token)
+    }
+
+    // MARK: Sign-in
+
+    /// Returns whether sign-in succeeded. Errors are left in `errorMessage`.
+    @discardableResult
+    func signIn(server: String, email: String, password: String, deviceName: String) async -> Bool {
+        guard let url = BaseURL.parse(server) else {
+            errorMessage = Self.addressHint
+            return false
+        }
+        let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        do {
+            let result = try await makeAPI(url, nil).signIn(SignInRequest(
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password,
+                deviceName: name.isEmpty ? "Parent device" : name))
+            store.baseURL = url
+            origin = url
+            store.token = result.token
+            return await signedIn(result.session, result.household)
+        } catch {
+            handle(error, signingIn: true)
+            return false
+        }
+    }
+
+    /// Passkey sign-in. `authenticate` shows the system passkey sheet for the
+    /// server's relying party and challenge (injected for tests).
+    @discardableResult
+    func signInWithPasskey(server: String, deviceName: String,
+                           authenticate: @MainActor (_ rpId: String, _ challenge: Data) async throws -> PasskeyAssertion) async -> Bool {
+        guard let url = BaseURL.parse(server) else {
+            errorMessage = Self.addressHint
+            return false
+        }
+        let api = makeAPI(url, nil)
+        do {
+            let options = try await api.passkeyOptions()
+            guard let challenge = Data(base64URL: options.options.challenge) else { throw APIError.decoding("challenge") }
+            let assertion = try await authenticate(options.options.rpId, challenge)
+            let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+            let result = try await api.signIn(passkey: PasskeySessionRequest(
+                challengeId: options.challengeId, credential: AuthenticationResponseJSON(assertion),
+                deviceName: name.isEmpty ? "Parent device" : name))
+            store.baseURL = url
+            origin = url
+            store.token = result.token
+            return await signedIn(result.session, result.household)
+        } catch PasskeyAuthenticator.PasskeyError.cancelled {
+            errorMessage = nil
+            return false
+        } catch {
+            handle(error, signingIn: true)
+            return false
+        }
+    }
+
+    // MARK: From the web sign-in
+
+    enum WebHandoff: Equatable {
+        /// This phone now has its notification session.
+        case enabled
+        /// Nothing to do: already on, turned off by the parent, no server, or busy.
+        case skipped
+        /// The web view isn't signed in as an adult (401/403).
+        case notSignedIn
+        /// The server has no `POST /api/parent-sessions` (404/405): manual sign-in only.
+        case unsupported
+        /// Unreachable or a server error; the bell sheet still works.
+        case failed
+    }
+
+    private var handingOff = false
+
+    /// Turns the web view's adult sign-in into this phone's notification session
+    /// (`POST /api/parent-sessions` with the web cookie, sent natively by `mint`),
+    /// so the parent doesn't sign in twice. `mint` returns nil when there's no web
+    /// cookie to use. Quiet on failure: the manual sign-in in the bell sheet remains.
+    @discardableResult
+    func enableFromWebSession(deviceName: String,
+                              mint: @MainActor (_ deviceName: String) async throws -> (status: Int, body: Data)?) async -> WebHandoff {
+        guard let url = origin, !isSignedIn, !store.webHandoffOff, !handingOff else { return .skipped }
+        handingOff = true
+        defer { handingOff = false }
+        let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        do {
+            guard let (status, body) = try await mint(name.isEmpty ? "Parent device" : name) else { return .notSignedIn }
+            switch status {
+            case 200, 201:
+                let result = try APIDates.decoder().decode(SignInResponse.self, from: body)
+                // The server may have changed while the request was out.
+                guard origin == url, !isSignedIn else { return .skipped }
+                store.token = result.token
+                _ = await signedIn(result.session, result.household)
+                return .enabled
+            case 401, 403: return .notSignedIn
+            case 404, 405: return .unsupported
+            default: return .failed
+            }
+        } catch {
+            return .failed
+        }
+    }
+
+    /// Stores the session from any sign-in method and loads the inbox.
+    func signedIn(_ session: ParentSessionInfo, _ household: HouseholdInfo) async -> Bool {
+        store.webHandoffOff = false
+        self.session = session
+        self.household = household
+        errorMessage = nil
+        isUnreachable = false
+        await registerPushTokenIfNeeded()
+        await refresh()
+        return true
+    }
+
+    /// Stop notifications in the bell sheet: signs this phone's notification
+    /// session out and keeps later web sign-ins from turning it back on.
+    func stopNotifications() async {
+        store.webHandoffOff = true
+        await signOut()
+    }
+
+    func signOut() async {
+        if let api {
+            // Best effort: the server also drops the push token when the session goes.
+            try? await api.signOut()
+        }
+        clearSession()
+    }
+
+    private func clearSession() {
+        store.token = nil
+        session = nil
+        household = nil
+        approvals = []
+        pendingCount = 0
+        registeredPushToken = nil
+        Task { await notifier.sync([], 0) }
+    }
+
+    // MARK: Inbox
+
+    func refresh() async {
+        guard let api, !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let result = try await api.approvals()
+            apply(result)
+            if household == nil, let info = try? await api.session() {
+                session = info.session
+                household = info.household
+            }
+        } catch {
+            handle(error)
+        }
+    }
+
+    private func apply(_ result: ApprovalsResponse) {
+        approvals = result.approvals
+            .filter { $0.state == .pending }
+            .sorted { ($0.requestedAt, $0.id) < ($1.requestedAt, $1.id) }
+        pendingCount = result.pendingCount
+        isUnreachable = false
+        errorMessage = nil
+        let ids = Set(approvals.map(\.id))
+        Task { await notifier.sync(ids, result.pendingCount) }
+    }
+
+    enum Outcome: Equatable {
+        /// The server recorded (or had already recorded) this decision.
+        case done
+        /// 404/409: another parent acted, the child withdrew it, or the version moved.
+        case alreadyHandled
+        case failed
+    }
+
+    private func decide(_ id: String, version: Int, decision: ApprovalDecision, retries: Int) async -> Outcome {
+        guard let api, !busy.contains(id) else { return .failed }
+        busy.insert(id)
+        defer { busy.remove(id) }
+        // One request ID per tap, reused across retries of that tap.
+        let requestId = UUID().uuidString.lowercased()
+        var attempt = 0
+        while true {
+            do {
+                switch decision {
+                case .approve:
+                    _ = try await api.approve(id: id, ApproveRequest(requestId: requestId, expectedVersion: version))
+                case .reject:
+                    _ = try await api.reject(id: id, RejectRequest(requestId: requestId, expectedVersion: version, reason: nil))
+                }
+                removeLocally(id)
+                errorMessage = nil
+                isUnreachable = false
+                await refresh()
+                return .done
+            } catch let error as APIError where error.isRetryable && attempt < retries {
+                attempt += 1
+                try? await Task.sleep(for: .seconds(2))
+            } catch {
+                handle(error)
+                // 404/409: someone else acted or it was withdrawn; show the truth.
+                if case APIError.server(let status, _) = error, status == 404 || status == 409 {
+                    removeLocally(id)
+                    let explanation = errorMessage
+                    await refresh()
+                    // Keep saying why the item went, unless the refresh hit a new problem.
+                    if errorMessage == nil { errorMessage = explanation }
+                    return .alreadyHandled
+                }
+                return .failed
+            }
+        }
+    }
+
+    private func removeLocally(_ id: String) {
+        if approvals.contains(where: { $0.id == id }) {
+            approvals.removeAll { $0.id == id }
+            pendingCount = max(0, pendingCount - 1)
+        }
+    }
+
+    /// A notification action. The system has already required Face ID or the
+    /// passcode. Transport failures are retried a few times with the same request ID.
+    /// The notification is removed once the item is settled either way.
+    @discardableResult
+    func handleAction(_ decision: ApprovalDecision, push: ApprovalPush) async -> Outcome {
+        guard case .pending(let version) = push.event else { return .failed }
+        guard isSignedIn else {
+            await notifier.post(Self.notSentTitle, "Turn on notifications in OpenCozy on this phone first.")
+            return .failed
+        }
+        let outcome = await decide(push.approvalId, version: version, decision: decision, retries: 2)
+        switch outcome {
+        case .done:
+            await notifier.remove(push.approvalId)
+        case .alreadyHandled:
+            await notifier.remove(push.approvalId)
+            await notifier.post(Self.alreadyHandledTitle, errorMessage ?? "Someone already dealt with this one.")
+        case .failed:
+            await notifier.post(Self.notSentTitle, errorMessage ?? "Try again in OpenCozy.")
+        }
+        return outcome
+    }
+
+    /// A TIME_REQUEST action: answers once, retrying a lost response with the
+    /// same request ID, and says what happened.
+    @discardableResult
+    func handleTimeAction(_ choice: TimeChoice, push: TimePush) async -> Outcome {
+        guard let version = push.version else { return .failed }
+        guard let api, isSignedIn else {
+            await notifier.post(Self.timeNotSentTitle, "Turn on notifications in OpenCozy on this phone first.")
+            return .failed
+        }
+        let request = TimeAnswerRequest(requestId: UUID().uuidString.lowercased(), expectedVersion: version, choice: choice.wire)
+        var attempt = 0
+        while true {
+            do {
+                try await api.answerTimeRequest(id: push.requestId, request)
+                await notifier.remove(push.requestId)
+                await refresh()
+                return .done
+            } catch let error as APIError where error.isRetryable && attempt < 2 {
+                attempt += 1
+                try? await Task.sleep(for: .seconds(2))
+            } catch {
+                if case APIError.server(let status, let message) = error, status == 404 || status == 409 {
+                    await notifier.remove(push.requestId)
+                    await notifier.post(Self.alreadyHandledTitle, message)
+                    await refresh()
+                    return .alreadyHandled
+                }
+                handle(error)
+                await notifier.post(Self.timeNotSentTitle, errorMessage ?? "Try again in OpenCozy.")
+                return .failed
+            }
+        }
+    }
+
+    /// `time.resolved`: answered elsewhere; drop the delivered notification and set the badge.
+    func handleResolvedTimePush(_ push: TimePush) async {
+        guard push.version == nil else { return }
+        await notifier.remove(push.requestId)
+        if let count = push.pendingCount {
+            pendingCount = max(0, count)
+            await notifier.setBadge(pendingCount)
+        }
+    }
+
+    static let timeNotSentTitle = "Answer not sent"
+    static let notSentTitle = "Approval not sent"
+    static let alreadyHandledTitle = "Already handled"
+
+    /// `approval.resolved`: the item left the inbox elsewhere. Drop its delivered
+    /// notification (so a stale Approve/Reject can't be tapped later) and set the
+    /// badge from the payload, before any network call. The caller refreshes after.
+    func handleResolvedPush(_ push: ApprovalPush) async {
+        guard push.event == .resolved else { return }
+        await notifier.remove(push.approvalId)
+        removeLocally(push.approvalId)
+        if let count = push.pendingCount {
+            pendingCount = max(0, count)
+            await notifier.setBadge(pendingCount)
+        }
+    }
+
+    // MARK: Push
+
+    func didReceivePushToken(_ token: Data) async {
+        pushToken = token.hexString
+        await registerPushTokenIfNeeded()
+    }
+
+    private func registerPushTokenIfNeeded() async {
+        guard let api, let pushToken, pushToken != registeredPushToken else { return }
+        do {
+            try await api.registerPushToken(PushTokenRequest(token: pushToken, environment: .current))
+            registeredPushToken = pushToken
+        } catch {
+            // Not fatal: the inbox still works by pull to refresh. Retried at next launch.
+            if case APIError.server(401, _) = error { handle(error) }
+        }
+    }
+
+    // MARK: Errors
+
+    private func handle(_ error: Error, signingIn: Bool = false) {
+        isUnreachable = false
+        switch error {
+        case APIError.transport:
+            isUnreachable = true
+            errorMessage = Self.unreachableMessage
+        case APIError.server(401, let message) where signingIn:
+            errorMessage = message
+        case APIError.server(401, _):
+            // An adult revoked this phone (or its session ended). Make it stick: no
+            // automatic re-mint from the web sign-in until a manual sign-in here.
+            store.webHandoffOff = true
+            clearSession()
+            errorMessage = "This phone was signed out of notifications. Sign in here to turn them back on."
+        case APIError.server(403, _) where signingIn:
+            errorMessage = "That account doesn't manage an OpenCozy household."
+        case APIError.server(let status, let message) where status < 500:
+            errorMessage = message
+        case APIError.server:
+            errorMessage = "OpenCozy had a problem. Try again in a moment."
+        default:
+            errorMessage = error.localizedDescription
+        }
+    }
+}
