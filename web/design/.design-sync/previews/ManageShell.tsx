@@ -35,6 +35,7 @@ import { pairingModules } from './fixtures';
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
 import { manageGroups } from './fixtures-manage';
+import { durationLabels, tvs, type Tv } from './fixtures-tv';
 
 export function Chores() {
   return (
@@ -1140,5 +1141,199 @@ export function DeviceSettings() {
         </form>
       </Section>
     </ManageShell>
+  );
+}
+
+/** A TV's state in a few words, for adults: what the router lets through and who is watching. */
+function tvStatus(tv: Tv): { label: string; tone: 'neutral' | 'attention' | 'positive' | 'info' } {
+  if (tv.openUntil !== null) return { label: `Online · open until ${tv.openUntil}`, tone: 'info' };
+  if (tv.session?.watcher === 'parents') return { label: 'On · Parents', tone: 'positive' };
+  if (tv.session) return { label: `On · ${tv.session.childName ?? 'A child'}`, tone: 'positive' };
+  if (tv.prompt) return { label: 'Asking who’s watching', tone: 'attention' };
+  return { label: 'Offline', tone: 'neutral' };
+}
+
+function tvMeta(tv: Tv): string {
+  return [
+    tv.room,
+    tv.openHours ? `Open ${tv.openHours.start}–${tv.openHours.end}` : null,
+    tv.haEntityId ? 'Home Assistant' : 'Router only',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Slice 9: shared TVs stay offline until someone is watching; adults see each TV and act on it. */
+export function Tvs() {
+  return (
+    <ManageShell nav={settingsNav('/manage/devices')}>
+      <PageHeader
+        title="TVs"
+        description="TVs stay offline until someone is watching. A child’s TV time runs only while they watch."
+        actions={
+          <>
+            <Button>Open TVs…</Button>
+            <Button variant="primary">Add a TV</Button>
+          </>
+        }
+      />
+      <Section title="TVs" count={tvs.length}>
+        <List>
+          {tvs.map((tv) => {
+            const status = tvStatus(tv);
+            return (
+              <ListRow
+                key={tv.id}
+                stackOnNarrow
+                title={tv.name}
+                meta={
+                  <>
+                    <Tag tone={status.tone}>{status.label}</Tag> {tvMeta(tv)}
+                  </>
+                }
+                trailing={
+                  <>
+                    {tv.session ? (
+                      <Button aria-label={`Turn off ${tv.name}`}>Turn off</Button>
+                    ) : (
+                      <Button aria-label={`Turn on ${tv.name} for someone`}>Turn on for…</Button>
+                    )}
+                    <Button variant="quiet" aria-label={`Edit ${tv.name}`}>
+                      Edit
+                    </Button>
+                  </>
+                }
+              />
+            );
+          })}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/**
+ * "Who's watching?": a TV turned on. In the inbox and as a push. Children who can't watch say why;
+ * "Not now" keeps the TV offline until it is turned on again. One answer wins.
+ */
+export function TvWhoIsWatching() {
+  const tv = tvs[0];
+  if (!tv?.prompt) return null;
+  return (
+    <ManageShell
+      nav={<ManageNav groups={manageGroups('/manage/inbox')} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />}
+    >
+      <PageHeader title="Inbox" />
+      <Section title="Waiting for you" count={1}>
+        <List>
+          <ListRow
+            stackOnNarrow
+            title={`${tv.name} is on. Who’s watching?`}
+            meta={`Turned on at ${tv.prompt.raisedAt}`}
+            trailing={
+              <ChoiceGroup
+                label={`Who’s watching ${tv.name}`}
+                onChoose={noop}
+                choices={[
+                  ...tv.prompt.children.map((c) => ({
+                    value: c.childId,
+                    label: c.name,
+                    detail: c.canWatch ? `${String(Math.floor(c.tvSecondsRemaining / 60))} min` : (c.reason ?? 'can’t watch now'),
+                    disabled: !c.canWatch,
+                  })),
+                  { value: 'parents', label: 'Parents' },
+                  { value: 'not_now', label: 'Not now', variant: 'quiet' as const },
+                ]}
+              />
+            }
+          />
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Adding or editing a TV: name, room, its network addresses, Home Assistant, and open hours. */
+export function TvEdit() {
+  const tv = tvs[3];
+  return (
+    <>
+      <Tvs />
+      <Sheet
+        open
+        onClose={noop}
+        title={`Edit ${tv?.name ?? 'TV'}`}
+        footer={
+          <>
+            <Button variant="danger">Remove TV…</Button>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save TV</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <Input label="Name" defaultValue={tv?.name} maxLength={80} hint="For example Den TV." required />
+          <Input label="Room (optional)" defaultValue={tv?.room ?? ''} maxLength={80} />
+          <Textarea
+            label="MAC addresses"
+            rows={3}
+            defaultValue={tv?.macs.join('\n')}
+            className="font-mono"
+            hint="One per line, up to 8: the TV’s wired and Wi-Fi addresses, and any streaming box."
+          />
+          <Input
+            label="Home Assistant entity (optional)"
+            defaultValue={tv?.haEntityId ?? ''}
+            className="font-mono"
+            hint="For example media_player.den_tv. Home Assistant reports it turning on and off."
+          />
+          <Section title="Open hours" description="Online without asking, every day. An earlier end is the next morning.">
+            <div className="grid grid-cols-2 gap-4">
+              <Input type="time" label="Open from" defaultValue={tv?.openHours?.start} />
+              <Input type="time" label="Until" defaultValue={tv?.openHours?.end} />
+            </div>
+          </Section>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** Opening TVs: online for a while without asking; anyone watching is no longer charged. */
+export function TvOpen() {
+  return (
+    <>
+      <Tvs />
+      <Sheet
+        open
+        onClose={noop}
+        title="Open TVs"
+        description="The router stops limiting them until then. Nobody’s TV time runs."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Open 1 hour</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <SegmentedControl
+            label="Which TVs"
+            value="all"
+            onChange={noop}
+            options={[
+              { value: 'all', label: 'All TVs' },
+              { value: 'some', label: 'Choose TVs' },
+            ]}
+          />
+          <ChoiceGroup
+            label="How long"
+            onChoose={noop}
+            choices={Object.entries(durationLabels).map(([value, label]) => ({ value, label }))}
+          />
+          <Notice tone="info">Ezra is watching Living room TV. Opening it ends Ezra’s session now; the rest of Ezra’s TV time stays.</Notice>
+        </div>
+      </Sheet>
+    </>
   );
 }

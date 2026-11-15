@@ -1,5 +1,5 @@
 // @dsCard group="Today"
-import { AlarmClock, BrushCleaning, ClipboardCheck, Gift, House, Tablet, Lock, Sunrise } from 'lucide-react';
+import { AlarmClock, BrushCleaning, ClipboardCheck, Gift, House, Tablet, Tv, Lock, Sunrise } from 'lucide-react';
 
 import {
   AppFrame,
@@ -22,6 +22,7 @@ import {
 } from '../../src';
 
 import { kid } from './fixtures-devices';
+import { kidTvStates, type KidTv } from './fixtures-tv';
 import { SPEND_MINUTES, timeStates, type PersonalTime } from './fixtures-screentime';
 import { rewards } from './fixtures-points';
 import { today, type TodayItem } from './fixtures-today';
@@ -246,6 +247,58 @@ export function KidTimeStates() {
       <KidTime time={timeStates.asked} />
       <KidTime time={timeStates.yes} />
       <KidTime time={timeStates.no} />
+    </div>
+  );
+}
+
+/**
+ * The child's TV time on /kid: the balance, a TV asking "Who's watching?" that they can start from
+ * here, the session running now (with Done watching), and why not when they can't.
+ */
+function KidTvTime({ tv }: { tv: KidTv }) {
+  const watching = tv.watching;
+  const waiting = tv.waiting[0];
+  return (
+    <Widget title="TV time" icon={Tv}>
+      <div className="grid gap-4">
+        {watching ? (
+          <>
+            <div className="grid gap-1">
+              <Countdown size="large" seconds={watching.secondsRemaining} />
+              <p className="m-0 text-muted-foreground">
+                On {watching.tvName}
+                {watching.endsWithHours ? ' · screen time ends then' : ''}
+              </p>
+            </div>
+            <div>
+              <Button>Done watching</Button>
+            </div>
+          </>
+        ) : (
+          <p className="m-0 text-section">{tv.secondsRemaining > 0 ? `${minutes(tv.secondsRemaining)} of TV time` : 'No TV time'}</p>
+        )}
+        {!watching && !tv.hoursOpen && <Notice tone="info">Screen time starts at {tv.opensAt}.</Notice>}
+        {!watching && waiting && tv.hoursOpen && tv.secondsRemaining > 0 && (
+          <Notice tone="success" title={`${waiting.tvName} is on`}>
+            <Button variant="primary">Watch on {waiting.tvName}</Button>
+          </Notice>
+        )}
+        {!watching && tv.secondsRemaining === 0 && <p className="m-0 text-muted-foreground">Earn TV time with chores and rewards, or ask a parent.</p>}
+      </div>
+    </Widget>
+  );
+}
+
+/** Every state of the kid's TV time, side by side. */
+export function KidTvStates() {
+  return (
+    <div className={`${profileClass(kid.color)} grid gap-4 md:grid-cols-2`}>
+      <KidTvTime tv={kidTvStates.idle} />
+      <KidTvTime tv={kidTvStates.waiting} />
+      <KidTvTime tv={kidTvStates.watching} />
+      <KidTvTime tv={kidTvStates.endsWithHours} />
+      <KidTvTime tv={kidTvStates.outsideHours} />
+      <KidTvTime tv={kidTvStates.none} />
     </div>
   );
 }
