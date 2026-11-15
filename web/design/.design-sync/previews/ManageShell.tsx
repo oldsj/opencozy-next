@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, qrModulesFromRows, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -31,7 +31,6 @@ import {
   STEP_MAX,
   week,
 } from './fixtures-meals';
-import { pairingModules } from './fixtures';
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
 import { me, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
@@ -759,7 +758,7 @@ export function DevicePair() {
       >
         <div className="grid justify-items-center gap-5 text-center">
           <div className="w-60 max-w-full">
-            <QrCode modules={pairingModules} label="Pairing code for Ada’s iPad" />
+            <QrCode modules={qrModulesFromRows(offer.qrModules)} label="Pairing code for Ada’s iPad" />
           </div>
           <p className="m-0 text-page font-semibold tabular-nums tracking-widest" aria-label={`Code ${offer.code.split('').join(' ')}`}>
             {offer.code}
