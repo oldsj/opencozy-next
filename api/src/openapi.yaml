@@ -70,6 +70,12 @@ paths:
     $ref: today.yaml#/completeChore
   /today/routines/{routineId}/steps/{stepId}/check:
     $ref: today.yaml#/checkStep
+  /inbox:
+    $ref: inbox.yaml#/inbox
+  /inbox/{itemId}/approve:
+    $ref: inbox.yaml#/approve
+  /inbox/{itemId}/reject:
+    $ref: inbox.yaml#/reject
   /chores:
     $ref: chores.yaml#/chores
   /chores/{choreId}:

@@ -241,6 +241,29 @@ func openOccurrence(ctx context.Context, cmd *command.Cmd, child, definition uui
 	return &occ, nil, nil
 }
 
+// finish ends today's occurrence. Done by a child (on a display), it waits for an adult's
+// approval; done by an adult, it is approved at once and the points land.
+func finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurrence, kind, title string, checked []uuid.UUID) (dbq.Occurrence, error) {
+	adult := a.Kind == actor.Adult || a.Kind == actor.Phone
+	state := "pending"
+	if adult {
+		state = "complete"
+	}
+	updated, err := cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
+		HouseholdID: cmd.HouseholdID(), ID: occ.ID, State: state, CheckedSteps: checked, Points: occ.Points,
+	})
+	if err != nil {
+		return dbq.Occurrence{}, err
+	}
+	if adult {
+		return updated, award(ctx, cmd, a.AdultID, updated)
+	}
+	_, err = cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
+		HouseholdID: cmd.HouseholdID(), ChildID: occ.ChildID, Kind: kind, OccurrenceID: occ.ID, Title: title, Points: occ.Points,
+	})
+	return updated, err
+}
+
 // CompleteChore marks today's chore done and asks an adult to approve it.
 func (s *Server) CompleteChore(ctx context.Context, req api.CompleteChoreRequestObject) (api.CompleteChoreResponseObject, error) {
 	a, cmd := mustActor(ctx), mustCmd(ctx)
@@ -264,15 +287,8 @@ func (s *Server) CompleteChore(ctx context.Context, req api.CompleteChoreRequest
 	if occ.State != "open" {
 		return api.CompleteChore409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(errAlreadyDone)}, nil
 	}
-	updated, err := cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
-		HouseholdID: a.HouseholdID, ID: occ.ID, State: "pending", CheckedSteps: []uuid.UUID{}, Points: c.Points,
-	})
+	updated, err := finish(ctx, cmd, a, *occ, "completion", c.Title, []uuid.UUID{})
 	if err != nil {
-		return nil, err
-	}
-	if _, err := cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
-		HouseholdID: a.HouseholdID, ChildID: c.ChildID, Kind: "completion", OccurrenceID: occ.ID, Title: c.Title, Points: c.Points,
-	}); err != nil {
 		return nil, err
 	}
 	return api.CompleteChore200JSONResponse(choreItem(c, &updated)), nil
@@ -312,23 +328,16 @@ func (s *Server) CheckRoutineStep(ctx context.Context, req api.CheckRoutineStepR
 	if !slices.Contains(checked, req.StepId) {
 		checked = append(checked, req.StepId)
 	}
-	state := "open"
-	reason := occ.RejectedReason
+	var updated dbq.Occurrence
 	if len(checked) == len(steps) {
-		state, reason = "pending", nil
+		updated, err = finish(ctx, cmd, a, *occ, "routine", r.Title, checked)
+	} else {
+		updated, err = cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
+			HouseholdID: a.HouseholdID, ID: occ.ID, State: "open", CheckedSteps: checked, Points: occ.Points, RejectedReason: occ.RejectedReason,
+		})
 	}
-	updated, err := cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
-		HouseholdID: a.HouseholdID, ID: occ.ID, State: state, CheckedSteps: checked, Points: r.Points, RejectedReason: reason,
-	})
 	if err != nil {
 		return nil, err
-	}
-	if state == "pending" {
-		if _, err := cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
-			HouseholdID: a.HouseholdID, ChildID: r.ChildID, Kind: "routine", OccurrenceID: occ.ID, Title: r.Title, Points: r.Points,
-		}); err != nil {
-			return nil, err
-		}
 	}
 	return api.CheckRoutineStep200JSONResponse(routineGroup(r, steps, &updated)), nil
 }

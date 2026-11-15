@@ -4,7 +4,7 @@ import { owner } from './global-setup';
 
 // The core chore loop, grown slice by slice: pair the wall display, a child marks a chore done
 // (and, in later slices, an adult approves it, points land and the child redeems a reward).
-test('pair the wall display, a child marks a chore done', async ({ browser }) => {
+test('pair the wall display, a child marks a chore done, an adult approves it', async ({ browser }) => {
   const problems: string[] = [];
   const watch = (page: Page) => {
     page.on('console', (m) => {
@@ -62,6 +62,15 @@ test('pair the wall display, a child marks a chore done', async ({ browser }) =>
   await expect(check).toHaveAttribute('aria-checked', 'true');
   await wall.reload();
   await expect(wall.getByRole('checkbox', { name: chore })).toHaveAttribute('aria-checked', 'true');
+
+  // An adult approves it in the inbox, and the points land on the wall display.
+  const card = wall.getByRole('article', { name: `${child}'s today` });
+  await expect(card.locator('.oc-points-badge')).toHaveText('0 points');
+  await adult.goto('/inbox');
+  await adult.getByRole('button', { name: `Approve: ${chore} (${child})` }).click();
+  await expect(adult.getByRole('button', { name: `Approve: ${chore} (${child})` })).toHaveCount(0);
+  await wall.reload();
+  await expect(card.locator('.oc-points-badge')).toHaveText('4 points');
 
   expect(problems).toEqual([]);
 });

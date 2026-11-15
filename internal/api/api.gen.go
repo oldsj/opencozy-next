@@ -42,6 +42,24 @@ func (e CredentialKind) Valid() bool {
 	}
 }
 
+// Defines values for DecisionState.
+const (
+	Approved DecisionState = "approved"
+	Rejected DecisionState = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the DecisionState enum.
+func (e DecisionState) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DisplayScope.
 const (
 	DisplayScopeCalendar  DisplayScope = "calendar"
@@ -63,6 +81,30 @@ func (e DisplayScope) Valid() bool {
 	case DisplayScopeToday:
 		return true
 	case DisplayScopeTv:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InboxItemKind.
+const (
+	InboxItemKindCompletion  InboxItemKind = "completion"
+	InboxItemKindRedemption  InboxItemKind = "redemption"
+	InboxItemKindRoutine     InboxItemKind = "routine"
+	InboxItemKindTimeRequest InboxItemKind = "time_request"
+)
+
+// Valid indicates whether the value is a known member of the InboxItemKind enum.
+func (e InboxItemKind) Valid() bool {
+	switch e {
+	case InboxItemKindCompletion:
+		return true
+	case InboxItemKindRedemption:
+		return true
+	case InboxItemKindRoutine:
+		return true
+	case InboxItemKindTimeRequest:
 		return true
 	default:
 		return false
@@ -245,6 +287,15 @@ type Credentials struct {
 // Days Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
 type Days = []int
 
+// Decision defines model for Decision.
+type Decision struct {
+	Id    Id            `json:"id"`
+	State DecisionState `json:"state"`
+}
+
+// DecisionState defines model for Decision.State.
+type DecisionState string
+
 // Display defines model for Display.
 type Display struct {
 	CreatedAt time.Time      `json:"createdAt"`
@@ -286,6 +337,30 @@ type Household struct {
 
 // Id defines model for Id.
 type Id = openapi_types.UUID
+
+// Inbox defines model for Inbox.
+type Inbox struct {
+	Items []InboxItem `json:"items"`
+}
+
+// InboxItem defines model for InboxItem.
+type InboxItem struct {
+	Child struct {
+		Color ProfileColor `json:"color"`
+		Id    Id           `json:"id"`
+		Name  string       `json:"name"`
+	} `json:"child"`
+	Detail           *string       `json:"detail,omitempty"`
+	Id               Id            `json:"id"`
+	Kind             InboxItemKind `json:"kind"`
+	MinutesRequested *int          `json:"minutesRequested,omitempty"`
+	Points           *int          `json:"points,omitempty"`
+	SubmittedAt      time.Time     `json:"submittedAt"`
+	Title            string        `json:"title"`
+}
+
+// InboxItemKind defines model for InboxItem.Kind.
+type InboxItemKind string
 
 // Ingredients defines model for Ingredients.
 type Ingredients = []string
@@ -506,6 +581,9 @@ type TodayItemState string
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
+// ItemId defines model for ItemId.
+type ItemId = Id
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
@@ -627,6 +705,28 @@ type RevokeDisplayParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ApproveInboxItemJSONBody defines parameters for ApproveInboxItem.
+type ApproveInboxItemJSONBody = map[string]interface{}
+
+// ApproveInboxItemParams defines parameters for ApproveInboxItem.
+type ApproveInboxItemParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RejectInboxItemJSONBody defines parameters for RejectInboxItem.
+type RejectInboxItemJSONBody struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+// RejectInboxItemParams defines parameters for RejectInboxItem.
+type RejectInboxItemParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // GetMealWeekParams defines parameters for GetMealWeek.
 type GetMealWeekParams struct {
 	// Week Any date in the week
@@ -718,6 +818,12 @@ type CreateCredentialJSONRequestBody CreateCredentialJSONBody
 // CreateDisplayJSONRequestBody defines body for CreateDisplay for application/json ContentType.
 type CreateDisplayJSONRequestBody = NewDisplay
 
+// ApproveInboxItemJSONRequestBody defines body for ApproveInboxItem for application/json ContentType.
+type ApproveInboxItemJSONRequestBody = ApproveInboxItemJSONBody
+
+// RejectInboxItemJSONRequestBody defines body for RejectInboxItem for application/json ContentType.
+type RejectInboxItemJSONRequestBody RejectInboxItemJSONBody
+
 // SetMealJSONRequestBody defines body for SetMeal for application/json ContentType.
 type SetMealJSONRequestBody = SetMeal
 
@@ -795,6 +901,15 @@ type ServerInterface interface {
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(w http.ResponseWriter, r *http.Request)
+	// GetInbox What waits for an adult's decision, oldest first
+	// (GET /inbox)
+	GetInbox(w http.ResponseWriter, r *http.Request)
+	// ApproveInboxItem Say yes; a completion's points land
+	// (POST /inbox/{itemId}/approve)
+	ApproveInboxItem(w http.ResponseWriter, r *http.Request, itemId ItemId, params ApproveInboxItemParams)
+	// RejectInboxItem Send it back, with an optional reason the child sees
+	// (POST /inbox/{itemId}/reject)
+	RejectInboxItem(w http.ResponseWriter, r *http.Request, itemId ItemId, params RejectInboxItemParams)
 	// OpenLive Live updates (WebSocket)
 	// (GET /live)
 	OpenLive(w http.ResponseWriter, r *http.Request)
@@ -1469,6 +1584,128 @@ func (siw *ServerInterfaceWrapper) GetHousehold(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHousehold(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInbox operation middleware
+func (siw *ServerInterfaceWrapper) GetInbox(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInbox(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveInboxItem operation middleware
+func (siw *ServerInterfaceWrapper) ApproveInboxItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", r.PathValue("itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApproveInboxItemParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveInboxItem(w, r, itemId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RejectInboxItem operation middleware
+func (siw *ServerInterfaceWrapper) RejectInboxItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", r.PathValue("itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RejectInboxItemParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RejectInboxItem(w, r, itemId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2207,6 +2444,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/today", wrapper.GetToday)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/today/chores/{choreId}/complete", wrapper.CompleteChore)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/today/routines/{routineId}/steps/{stepId}/check", wrapper.CheckRoutineStep)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/inbox", wrapper.GetInbox)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/inbox/{itemId}/approve", wrapper.ApproveInboxItem)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/inbox/{itemId}/reject", wrapper.RejectInboxItem)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/chores", wrapper.ListChores)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/chores", wrapper.CreateChore)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/chores/{choreId}", wrapper.ArchiveChore)
@@ -4034,6 +4274,312 @@ func (response GetHouseholddefaultJSONResponse) VisitGetHouseholdResponse(w http
 	return err
 }
 
+type GetInboxRequestObject struct {
+}
+
+type GetInboxResponseObject interface {
+	VisitGetInboxResponse(w http.ResponseWriter) error
+}
+
+type GetInbox200JSONResponse Inbox
+
+func (response GetInbox200JSONResponse) VisitGetInboxResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInbox401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetInbox401JSONResponse) VisitGetInboxResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInboxdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetInboxdefaultJSONResponse) VisitGetInboxResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItemRequestObject struct {
+	ItemId ItemId `json:"itemId"`
+	Params ApproveInboxItemParams
+	Body   *ApproveInboxItemJSONRequestBody
+}
+
+type ApproveInboxItemResponseObject interface {
+	VisitApproveInboxItemResponse(w http.ResponseWriter) error
+}
+
+type ApproveInboxItem200JSONResponse Decision
+
+func (response ApproveInboxItem200JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItem400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ApproveInboxItem400JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItem401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ApproveInboxItem401JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItem404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ApproveInboxItem404JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItem409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ApproveInboxItem409JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItem413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response ApproveInboxItem413JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItem422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ApproveInboxItem422JSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveInboxItemdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ApproveInboxItemdefaultJSONResponse) VisitApproveInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItemRequestObject struct {
+	ItemId ItemId `json:"itemId"`
+	Params RejectInboxItemParams
+	Body   *RejectInboxItemJSONRequestBody
+}
+
+type RejectInboxItemResponseObject interface {
+	VisitRejectInboxItemResponse(w http.ResponseWriter) error
+}
+
+type RejectInboxItem200JSONResponse Decision
+
+func (response RejectInboxItem200JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItem400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RejectInboxItem400JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItem401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RejectInboxItem401JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItem404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RejectInboxItem404JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItem409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RejectInboxItem409JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItem413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response RejectInboxItem413JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItem422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RejectInboxItem422JSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectInboxItemdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RejectInboxItemdefaultJSONResponse) VisitRejectInboxItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type OpenLiveRequestObject struct {
 }
 
@@ -5465,6 +6011,15 @@ type StrictServerInterface interface {
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(ctx context.Context, request GetHouseholdRequestObject) (GetHouseholdResponseObject, error)
+	// GetInbox What waits for an adult's decision, oldest first
+	// (GET /inbox)
+	GetInbox(ctx context.Context, request GetInboxRequestObject) (GetInboxResponseObject, error)
+	// ApproveInboxItem Say yes; a completion's points land
+	// (POST /inbox/{itemId}/approve)
+	ApproveInboxItem(ctx context.Context, request ApproveInboxItemRequestObject) (ApproveInboxItemResponseObject, error)
+	// RejectInboxItem Send it back, with an optional reason the child sees
+	// (POST /inbox/{itemId}/reject)
+	RejectInboxItem(ctx context.Context, request RejectInboxItemRequestObject) (RejectInboxItemResponseObject, error)
 	// OpenLive Live updates (WebSocket)
 	// (GET /live)
 	OpenLive(ctx context.Context, request OpenLiveRequestObject) (OpenLiveResponseObject, error)
@@ -6127,6 +6682,98 @@ func (sh *strictHandler) GetHousehold(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetInbox operation middleware
+func (sh *strictHandler) GetInbox(w http.ResponseWriter, r *http.Request) {
+	var request GetInboxRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInbox(ctx, request.(GetInboxRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInbox")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInboxResponseObject); ok {
+		if err := validResponse.VisitGetInboxResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApproveInboxItem operation middleware
+func (sh *strictHandler) ApproveInboxItem(w http.ResponseWriter, r *http.Request, itemId ItemId, params ApproveInboxItemParams) {
+	var request ApproveInboxItemRequestObject
+
+	request.ItemId = itemId
+	request.Params = params
+
+	var body ApproveInboxItemJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveInboxItem(ctx, request.(ApproveInboxItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveInboxItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveInboxItemResponseObject); ok {
+		if err := validResponse.VisitApproveInboxItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RejectInboxItem operation middleware
+func (sh *strictHandler) RejectInboxItem(w http.ResponseWriter, r *http.Request, itemId ItemId, params RejectInboxItemParams) {
+	var request RejectInboxItemRequestObject
+
+	request.ItemId = itemId
+	request.Params = params
+
+	var body RejectInboxItemJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RejectInboxItem(ctx, request.(RejectInboxItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RejectInboxItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RejectInboxItemResponseObject); ok {
+		if err := validResponse.VisitRejectInboxItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // OpenLive operation middleware
 func (sh *strictHandler) OpenLive(w http.ResponseWriter, r *http.Request) {
 	var request OpenLiveRequestObject
@@ -6527,115 +7174,121 @@ func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"DAA=",
+	"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",
+	"/xkA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

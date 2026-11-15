@@ -12,6 +12,7 @@ import { LoginPage } from './routes/login';
 import { HomePage } from './routes/home';
 import { DisplayPage } from './routes/display';
 import { ChoresPage } from './routes/chores';
+import { InboxPage } from './routes/inbox';
 import { DisplaysPage } from './routes/displays';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
@@ -74,6 +75,18 @@ const choresRoute = createRoute({
   component: ChoresPage,
 });
 
+// Manage: approve what the children finished.
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/inbox',
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: InboxPage,
+});
+
 // Manage: the week's meals, and the recipes they use.
 const mealsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -118,7 +131,7 @@ const displayRoute = createRoute({
   component: DisplayPage,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, mealsRoute, recipesRoute, recipeRoute, displayRoute]);
+const routeTree = rootRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, mealsRoute, recipesRoute, recipeRoute, displayRoute]);
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent' });

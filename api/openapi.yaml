@@ -813,6 +813,119 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
+  /inbox:
+    get:
+      operationId: getInbox
+      summary: What waits for an adult's decision, oldest first
+      tags:
+        - inbox
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: The inbox
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inbox'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+  /inbox/{itemId}/approve:
+    post:
+      operationId: approveInboxItem
+      summary: Say yes; a completion's points land
+      tags:
+        - inbox
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 64
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /inbox/{itemId}/reject:
+    post:
+      operationId: rejectInboxItem
+      summary: Send it back, with an optional reason the child sees
+      tags:
+        - inbox
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  pattern: \S
+            example:
+              reason: The bed still needs making.
+      responses:
+        '200':
+          description: Sent back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
   /chores:
     get:
       operationId: listChores
@@ -1685,6 +1798,70 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TodayChild'
+    InboxItem:
+      type: object
+      required:
+        - id
+        - kind
+        - child
+        - title
+        - submittedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        kind:
+          type: string
+          enum:
+            - completion
+            - routine
+            - redemption
+            - time_request
+        child:
+          type: object
+          required:
+            - id
+            - name
+            - color
+          properties:
+            id:
+              $ref: '#/components/schemas/Id'
+            name:
+              type: string
+            color:
+              $ref: '#/components/schemas/ProfileColor'
+        title:
+          type: string
+        detail:
+          type: string
+        points:
+          type: integer
+        submittedAt:
+          type: string
+          format: date-time
+        minutesRequested:
+          type: integer
+    Inbox:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InboxItem'
+    Decision:
+      type: object
+      required:
+        - id
+        - state
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        state:
+          type: string
+          enum:
+            - approved
+            - rejected
     Days:
       type: array
       description: Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
@@ -2063,3 +2240,9 @@ components:
         minLength: 1
         maxLength: 128
         pattern: ^[!-~]+$
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
