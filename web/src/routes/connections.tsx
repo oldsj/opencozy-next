@@ -3,7 +3,7 @@ import { useState, type SyntheticEvent } from 'react';
 
 import { Button, CheckCircle, ConfirmDialog, EmptyState, Input, List, ListRow, Notice, PageHeader, ProfileAvatar, Section, SegmentedControl, Sheet } from '@app/design';
 
-import { $api, errorMessage, idempotencyKey, useAttempts, type Child } from '../api/client';
+import { $api, errorMessage, idempotencyKey, isAnswer, useAttempts, type Child } from '../api/client';
 import type { components, paths } from '../api/schema.gen';
 import { useReauth } from './reauth';
 import { ruleMeta } from './learning';
@@ -39,7 +39,8 @@ export function ConnectionsPage() {
   const children = $api.useQuery('get', '/children');
   const rules = $api.useQuery('get', '/learning/rules', {});
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['get', '/credentials'] });
-  const create = $api.useMutation('post', '/credentials', { onSuccess: refresh });
+  // gcTime 0: the response holds the key, so it doesn't stay in the mutation cache.
+  const create = $api.useMutation('post', '/credentials', { onSuccess: refresh, gcTime: 0 });
   const revoke = $api.useMutation('delete', '/credentials/{credentialId}', { onSuccess: refresh });
   const attempts = useAttempts();
   const reauth = useReauth();
@@ -48,7 +49,8 @@ export function ConnectionsPage() {
   const [kind, setKind] = useState<Kind>('service');
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<string[]>([]);
-  const [all, setAll] = useState(true);
+  // Which children a key may act for is always picked on purpose: none until chosen.
+  const [all, setAll] = useState(false);
   const [childIds, setChildIds] = useState<string[]>([]);
   const [ruleIds, setRuleIds] = useState<string[]>([]);
   const [secret, setSecret] = useState<{ name: string; secret: string } | null>(null);
@@ -66,7 +68,7 @@ export function ConnectionsPage() {
     setAdding(false);
     setName('');
     setScopes([]);
-    setAll(true);
+    setAll(false);
     setChildIds([]);
     setRuleIds([]);
     create.reset();
@@ -83,7 +85,11 @@ export function ConnectionsPage() {
           setCopied(false);
           setSecret({ name: r.credential.name, secret: r.secret });
         },
-        onError: (error) => { reauth.ask(error, () => { issue(body); }); },
+        onError: (error) => {
+          // No answer: it may have been created; show the list as it is now.
+          if (!isAnswer(error)) void refresh();
+          reauth.ask(error, () => { issue(body); });
+        },
       },
     );
   };

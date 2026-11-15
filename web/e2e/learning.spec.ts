@@ -67,6 +67,8 @@ test('award rules, players and a learning connection', async ({ page }) => {
   await sheet.getByLabel('Name').fill(app);
   await sheet.getByRole('checkbox', { name: 'Give points for learning, by your award rules' }).click();
   await sheet.getByRole('checkbox', { name: `Use ${key}` }).click();
+  await sheet.getByRole('button', { name: 'Choose children' }).click();
+  await sheet.getByRole('checkbox', { name: child }).click();
   await sheet.getByRole('button', { name: 'Create key' }).click();
   const secret = page.getByRole('dialog', { name: `Key for ${app}` });
   const again = page.getByRole('alertdialog', { name: 'Enter your password again' });
