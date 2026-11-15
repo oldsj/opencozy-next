@@ -228,6 +228,8 @@ paths:
         - adult
         - phone
       x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       x-body-limit: 1024
       requestBody:
         required: true
@@ -258,6 +260,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
   /children/{childId}:
@@ -307,6 +311,8 @@ paths:
         - adult
         - phone
       x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       x-child-param: childId
       x-body-limit: 1024
       requestBody:
@@ -350,6 +356,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
   /credentials:
@@ -389,6 +397,9 @@ paths:
       x-actors:
         - adult
       x-command: true
+      x-record-response: false
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       x-recent-auth: true
       x-body-limit: 4096
       requestBody:
@@ -457,6 +468,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: A retry of a credential that was already issued. Its secret is not shown again; revoke it and issue another.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
   /credentials/{credentialId}:
@@ -474,6 +493,8 @@ paths:
       x-actors:
         - adult
       x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '204':
           description: Revoked
@@ -483,6 +504,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
   /credential:
@@ -698,6 +721,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    UnprocessableEntity:
+      description: This Idempotency-Key was already used for a different request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     NotFound:
       description: No such resource for this caller
       content:
@@ -709,3 +738,16 @@ components:
       description: Sets or clears the __Host-session cookie
       schema:
         type: string
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Required on every state change. A retry with the same key, from the same caller with the
+        same body, gets the first answer (for 30 days) instead of doing it again.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[!-~]+$

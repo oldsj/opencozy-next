@@ -8,7 +8,10 @@
 //	x-child-param:    the path parameter naming a child; actors limited to some children get 404 for others
 //	x-recent-auth:    true: an adult web session must have signed in within RecentAuth
 //	x-body-limit:     the body cap in bytes (default DefaultBodyLimit)
-//	x-command:        true: a state change, run by internal/command (transaction, locks, idempotency)
+//	x-command:        true: a state change, run by internal/command (transaction, locks, idempotency).
+//	                  It must declare the required Idempotency-Key header (common.yaml).
+//	x-record-response: false: a command whose response holds a secret; only the outcome is
+//	                  recorded, and a replay is told the request already succeeded
 package authz
 
 import (
@@ -47,6 +50,8 @@ type Policy struct {
 	RecentAuth    bool
 	BodyLimit     int64
 	Command       bool
+	// RecordResponse is false when the response must never be stored (it holds a secret).
+	RecordResponse bool
 }
 
 // Decision is the outcome of checking an actor against a policy.
@@ -178,7 +183,7 @@ func Policies(spec *openapi3.T) (map[string]Policy, error) {
 }
 
 func parse(op *openapi3.Operation, item *openapi3.PathItem) (Policy, error) {
-	p := Policy{OperationID: op.OperationID, BodyLimit: DefaultBodyLimit}
+	p := Policy{OperationID: op.OperationID, BodyLimit: DefaultBodyLimit, RecordResponse: true}
 	actors, ok := stringList(op.Extensions["x-actors"])
 	if !ok || len(actors) == 0 {
 		return p, errors.New("x-actors is missing")
@@ -229,6 +234,11 @@ func parse(op *openapi3.Operation, item *openapi3.PathItem) (Policy, error) {
 		}
 		p.RecentAuth = b
 	}
+	// Recent sign-in is defined for the adult web session only; a phone session has no rule yet,
+	// so it would pass unchecked.
+	if p.RecentAuth && slices.ContainsFunc(p.Actors, func(k actor.Kind) bool { return k != actor.Adult }) {
+		return p, errors.New("x-recent-auth is only defined for the adult actor")
+	}
 	if v, present := op.Extensions["x-command"]; present {
 		b, ok := v.(bool)
 		if !ok {
@@ -238,6 +248,16 @@ func parse(op *openapi3.Operation, item *openapi3.PathItem) (Policy, error) {
 	}
 	if p.Public && p.Command {
 		return p, errors.New("x-command needs an actor; a public operation cannot be one")
+	}
+	if p.Command && !hasRequiredHeader(op, item, "Idempotency-Key") {
+		return p, errors.New("x-command needs the required Idempotency-Key header parameter")
+	}
+	if v, present := op.Extensions["x-record-response"]; present {
+		b, ok := v.(bool)
+		if !ok || !p.Command {
+			return p, errors.New("x-record-response must be a boolean, on an x-command operation")
+		}
+		p.RecordResponse = b
 	}
 	if v, present := op.Extensions["x-body-limit"]; present {
 		n, ok := v.(float64)
@@ -263,6 +283,17 @@ func stringList(v any) ([]string, bool) {
 		out = append(out, s)
 	}
 	return out, true
+}
+
+func hasRequiredHeader(op *openapi3.Operation, item *openapi3.PathItem, name string) bool {
+	for _, ps := range []openapi3.Parameters{item.Parameters, op.Parameters} {
+		for _, ref := range ps {
+			if ref.Value != nil && ref.Value.In == "header" && ref.Value.Name == name && ref.Value.Required {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func hasPathParam(op *openapi3.Operation, item *openapi3.PathItem, name string) bool {

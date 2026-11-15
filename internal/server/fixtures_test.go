@@ -76,7 +76,8 @@ func (r resp) code() string {
 	return s
 }
 
-// send makes one request. body is JSON-encoded unless it is already []byte.
+// send makes one request. body is JSON-encoded unless it is already []byte. Changes get a fresh
+// Idempotency-Key unless headers set one; setting it to "" sends none.
 func (e *env) send(c cred, method, path string, body any, headers ...string) resp {
 	e.t.Helper()
 	var rd io.Reader
@@ -93,7 +94,14 @@ func (e *env) send(c cred, method, path string, body any, headers ...string) res
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	if method != http.MethodGet && method != http.MethodHead {
+		req.Header.Set("Idempotency-Key", uuid.NewString())
+	}
 	for i := 0; i+1 < len(headers); i += 2 {
+		if headers[i+1] == "" {
+			req.Header.Del(headers[i])
+			continue
+		}
 		req.Header.Set(headers[i], headers[i+1])
 	}
 	c.apply(req)

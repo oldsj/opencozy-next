@@ -1,16 +1,20 @@
 // Package command runs state-changing requests (operations marked x-command) the same way
 // every time:
 //
-//  1. With an Idempotency-Key header, a retry of a recorded command gets the recorded answer.
-//     The key is checked against a hash of the actor, the operation and the body, so the same
-//     key for a different request is refused.
+//  1. The Idempotency-Key header is required. A retry of a recorded command gets the recorded
+//     answer. The key is checked against a hash of the actor, the operation and the body, so the
+//     same key for a different request is refused.
 //  2. One READ COMMITTED transaction.
-//  3. Locks in a fixed order: the household row, then children by id (Lock), then other rows.
-//  4. The handler re-validates under the locks and takes the time from Now, which reads the
+//  3. Locks in a fixed order: the household row, then children by id (LockChildren), then other
+//     rows.
+//  4. Right after the household lock the actor's own credential is checked again (Spec.Recheck),
+//     so a revocation that committed while the command waited stops it. The handler then
+//     re-validates its rows under the locks and takes the time from Now, which reads the
 //     database clock after the locks are held.
 //  5. The handler runs inside a SAVEPOINT.
 //  6. A 2xx commits. A 404 or 409 rolls back to the savepoint, so nothing changes, and is
-//     recorded. Anything else rolls back the whole transaction and is not recorded.
+//     recorded. Anything else rolls back the whole transaction and is not recorded. An operation
+//     whose response holds a secret records only that it succeeded (Spec.RecordResponse).
 //  7. Recorded answers expire after 30 days (DeleteExpired).
 package command
 
@@ -90,23 +94,36 @@ func (c *Cmd) Now(ctx context.Context) (time.Time, error) {
 	return c.now, nil
 }
 
+// Spec is how one operation runs as a command.
+type Spec struct {
+	Op string
+	// RecordResponse is false when the response holds a secret: a success is recorded as a
+	// 409 telling a retry that the request already succeeded, never with the body.
+	RecordResponse bool
+	// Recheck validates the actor again inside the transaction, after the household lock, and
+	// returns its current state. When the actor is no longer allowed it writes the refusal and
+	// returns false.
+	Recheck func(ctx context.Context, q *dbq.Queries, w http.ResponseWriter, a actor.Actor) (actor.Actor, bool)
+}
+
 // Runner runs commands.
 type Runner struct {
 	Pool *pgxpool.Pool
 	Log  *slog.Logger
 }
 
-// Wrap runs next as a command for the operation op. The actor must already be on the context:
-// this runs after authorization.
-func (rn Runner) Wrap(op string, next http.Handler, w http.ResponseWriter, r *http.Request) {
+// Wrap runs next as the command spec. The actor must already be on the context: this runs after
+// authorization.
+func (rn Runner) Wrap(spec Spec, next http.Handler, w http.ResponseWriter, r *http.Request) {
+	op := spec.Op
 	a, ok := actor.From(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "Sign in to continue.")
 		return
 	}
 	idem := r.Header.Get(KeyHeader)
-	if len(idem) > 128 {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_idempotency_key", "Idempotency-Key is at most 128 characters.")
+	if idem == "" || len(idem) > 128 {
+		httpx.WriteError(w, http.StatusBadRequest, "idempotency_key_required", "Send an Idempotency-Key header of 1 to 128 characters with every change.")
 		return
 	}
 	body, err := io.ReadAll(r.Body) // already capped by the operation's body limit
@@ -133,7 +150,15 @@ func (rn Runner) Wrap(op string, next http.Handler, w http.ResponseWriter, r *ht
 		fail(err)
 		return
 	}
-	if idem != "" {
+	if spec.Recheck != nil {
+		fresh, ok := spec.Recheck(ctx, q, w, a)
+		if !ok {
+			return // refused; the deferred rollback ends the transaction
+		}
+		a = fresh
+		ctx = actor.With(ctx, a)
+	}
+	{
 		prev, err := q.GetCommand(ctx, dbq.GetCommandParams{HouseholdID: a.HouseholdID, IdempotencyKey: idem})
 		switch {
 		case err == nil && subtle.ConstantTimeCompare(prev.RequestHash, hash) == 1:
@@ -170,14 +195,18 @@ func (rn Runner) Wrap(op string, next http.Handler, w http.ResponseWriter, r *ht
 		rec.flush(w)
 		return
 	}
-	if idem != "" {
-		if err := q.RecordCommand(ctx, dbq.RecordCommandParams{
-			HouseholdID: a.HouseholdID, IdempotencyKey: idem, RequestHash: hash,
-			Status: int32(rec.status), ContentType: rec.header.Get("Content-Type"), Body: rec.body.Bytes(), //nolint:gosec // an HTTP status
-		}); err != nil {
-			fail(err)
-			return
-		}
+	// A 204 has no body; pgx would send a nil slice as NULL.
+	status, contentType, body := rec.status, rec.header.Get("Content-Type"), append([]byte{}, rec.body.Bytes()...)
+	if !spec.RecordResponse && status >= 200 && status < 300 {
+		status, contentType = http.StatusConflict, "application/json"
+		body = []byte(`{"error":{"code":"already_done","message":"This was already done. Its secret is shown only once: revoke it and create another if it was lost."}}` + "\n")
+	}
+	if err := q.RecordCommand(ctx, dbq.RecordCommandParams{
+		HouseholdID: a.HouseholdID, IdempotencyKey: idem, RequestHash: hash,
+		Status: int32(status), ContentType: contentType, Body: body, //nolint:gosec // an HTTP status
+	}); err != nil {
+		fail(err)
+		return
 	}
 	if err := tx.Commit(ctx); err != nil {
 		fail(err)
@@ -196,7 +225,7 @@ func requestHash(a actor.Actor, op string, r *http.Request, body []byte) []byte 
 	field([]byte(a.Kind))
 	field(a.AdultID[:])
 	field(a.CredentialID[:])
-	field(a.SessionHash)
+	field(a.TokenHash)
 	field([]byte(op))
 	field([]byte(r.URL.Path))
 	field([]byte(r.URL.RawQuery))

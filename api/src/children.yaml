@@ -39,6 +39,8 @@ children:
     tags: [children]
     x-actors: [adult, phone]
     x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
     x-body-limit: 1024
     requestBody:
       required: true
@@ -67,6 +69,8 @@ children:
         $ref: common.yaml#/responses/Forbidden
       '409':
         $ref: common.yaml#/responses/Conflict
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
       default:
         $ref: common.yaml#/responses/Error
 child:
@@ -105,6 +109,8 @@ child:
     tags: [children]
     x-actors: [adult, phone]
     x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
     x-child-param: childId
     x-body-limit: 1024
     requestBody:
@@ -142,6 +148,8 @@ child:
         $ref: common.yaml#/responses/NotFound
       '409':
         $ref: common.yaml#/responses/Conflict
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
       default:
         $ref: common.yaml#/responses/Error
 

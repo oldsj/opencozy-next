@@ -43,8 +43,9 @@ type Actor struct {
 	Children    []uuid.UUID
 	// AuthenticatedAt is the adult's last password or passkey check (Adult only).
 	AuthenticatedAt time.Time
-	// SessionHash is the adult session's token hash, for sign-out and re-confirmation.
-	SessionHash []byte
+	// TokenHash is the SHA-256 of the secret that authenticated the request: for sign-out,
+	// re-confirmation and the re-check inside a command.
+	TokenHash []byte
 }
 
 // HasScopes reports whether the actor holds every one of want.

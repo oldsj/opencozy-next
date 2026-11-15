@@ -86,25 +86,50 @@ func (rv Resolver) bearer(ctx context.Context, header string) (Actor, error) {
 	if !ok {
 		return Actor{}, ErrUnauthenticated
 	}
-	hash := auth.HashToken(secret)
-	switch prefix {
-	case auth.PrefixPhone:
+	kind := map[string]Kind{auth.PrefixPhone: Phone, auth.PrefixService: Service, auth.PrefixAssistant: Assistant}[prefix]
+	return rv.byHash(ctx, kind, auth.HashToken(secret))
+}
+
+func (rv Resolver) adult(ctx context.Context, token string) (Actor, error) {
+	return rv.byHash(ctx, Adult, auth.HashToken(token))
+}
+
+func (rv Resolver) display(ctx context.Context, token string) (Actor, error) {
+	return rv.byHash(ctx, Display, auth.HashToken(token))
+}
+
+// byHash looks up a live credential of the given kind by its token hash.
+func (rv Resolver) byHash(ctx context.Context, kind Kind, hash []byte) (Actor, error) {
+	switch kind {
+	case Adult:
+		row, err := rv.Q.GetAdultSession(ctx, hash)
+		if err != nil {
+			return Actor{}, notFound(err)
+		}
+		return Actor{Kind: Adult, HouseholdID: row.HouseholdID, AdultID: row.AdultID, AllChildren: true,
+			AuthenticatedAt: row.AuthenticatedAt, TokenHash: hash}, nil
+	case Display:
+		row, err := rv.Q.GetDisplayByHash(ctx, hash)
+		if err != nil {
+			return Actor{}, notFound(err)
+		}
+		return Actor{Kind: Display, HouseholdID: row.HouseholdID, CredentialID: row.ID, Scopes: row.Scopes, AllChildren: true, TokenHash: hash}, nil
+	case Phone:
 		row, err := rv.Q.GetPhoneSessionByHash(ctx, hash)
 		if err != nil {
 			return Actor{}, notFound(err)
 		}
-		return Actor{Kind: Phone, HouseholdID: row.HouseholdID, AdultID: row.AdultID, CredentialID: row.ID, AllChildren: true}, nil
-	default:
+		return Actor{Kind: Phone, HouseholdID: row.HouseholdID, AdultID: row.AdultID, CredentialID: row.ID, AllChildren: true, TokenHash: hash}, nil
+	case Service, Assistant:
 		row, err := rv.Q.GetCredentialByHash(ctx, hash)
 		if err != nil {
 			return Actor{}, notFound(err)
 		}
 		// The prefix must match the stored kind, so a secret can't change what it is.
-		want := map[string]string{auth.PrefixService: "service", auth.PrefixAssistant: "assistant"}[prefix]
-		if row.Kind != want {
+		if Kind(row.Kind) != kind {
 			return Actor{}, ErrUnauthenticated
 		}
-		a := Actor{Kind: Kind(row.Kind), HouseholdID: row.HouseholdID, CredentialID: row.ID, Scopes: row.Scopes, AllChildren: row.AllChildren}
+		a := Actor{Kind: kind, HouseholdID: row.HouseholdID, CredentialID: row.ID, Scopes: row.Scopes, AllChildren: row.AllChildren, TokenHash: hash}
 		if row.AdultID != nil {
 			a.AdultID = *row.AdultID
 		}
@@ -117,24 +142,22 @@ func (rv Resolver) bearer(ctx context.Context, header string) (Actor, error) {
 		}
 		return a, nil
 	}
+	return Actor{}, ErrUnauthenticated
 }
 
-func (rv Resolver) adult(ctx context.Context, token string) (Actor, error) {
-	hash := auth.HashToken(token)
-	row, err := rv.Q.GetAdultSession(ctx, hash)
+// Recheck looks the actor's own credential up again and returns its current state: its scopes
+// and children may have changed. A command calls it inside its transaction, after the household
+// lock, so a revocation that committed while the command waited is seen (design rule 4).
+// ErrUnauthenticated if the credential is gone or no longer the same one.
+func (rv Resolver) Recheck(ctx context.Context, a Actor) (Actor, error) {
+	fresh, err := rv.byHash(ctx, a.Kind, a.TokenHash)
 	if err != nil {
-		return Actor{}, notFound(err)
+		return Actor{}, err
 	}
-	return Actor{Kind: Adult, HouseholdID: row.HouseholdID, AdultID: row.AdultID, AllChildren: true,
-		AuthenticatedAt: row.AuthenticatedAt, SessionHash: hash}, nil
-}
-
-func (rv Resolver) display(ctx context.Context, token string) (Actor, error) {
-	row, err := rv.Q.GetDisplayByHash(ctx, auth.HashToken(token))
-	if err != nil {
-		return Actor{}, notFound(err)
+	if fresh.HouseholdID != a.HouseholdID || fresh.AdultID != a.AdultID || fresh.CredentialID != a.CredentialID {
+		return Actor{}, ErrUnauthenticated
 	}
-	return Actor{Kind: Display, HouseholdID: row.HouseholdID, CredentialID: row.ID, Scopes: row.Scopes, AllChildren: true}, nil
+	return fresh, nil
 }
 
 // deviceWeb resolves a device web session. Devices arrive in slice 7; until then no such

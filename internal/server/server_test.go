@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/scrypt"
 
@@ -328,5 +329,95 @@ func TestRuntimeRoleIsRowsOnly(t *testing.T) {
 		if _, err := e.srv.pool.Exec(t.Context(), sql); err == nil {
 			t.Errorf("runtime role ran %q", sql)
 		}
+	}
+}
+
+func TestCommandsNeedAnIdempotencyKey(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	if r := e.send(h.actors["adult"], "POST", "/api/children", map[string]string{"name": "Ash"}, "Idempotency-Key", ""); r.status != 400 || r.code() != "idempotency_key_required" {
+		t.Fatalf("no key: %d %s", r.status, r.raw)
+	}
+}
+
+// A new credential's secret is shown once and never stored: not in the command log either.
+func TestCredentialSecretNeverStored(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", e.srv.table.Scopes())
+	key := []string{"Idempotency-Key", "issue-router-1"}
+	body := map[string]any{"kind": "service", "name": "Router", "scopes": []string{"children:read"}, "allChildren": true}
+	r := e.send(h.actors["adult"], "POST", "/api/credentials", body, key...)
+	if r.status != 201 {
+		t.Fatalf("create: %d %s", r.status, r.raw)
+	}
+	secret := r.body["secret"].(string)
+	var hits int
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM command_log x
+		WHERE position(convert_to($1, 'UTF8') in x.body) > 0 OR x::text LIKE '%' || $1 || '%'`, secret).Scan(&hits); err != nil {
+		t.Fatal(err)
+	}
+	if hits != 0 {
+		t.Fatal("the secret is in command_log")
+	}
+	again := e.send(h.actors["adult"], "POST", "/api/credentials", body, key...)
+	if again.status != 409 || again.code() != "already_done" || strings.Contains(string(again.raw), secret) {
+		t.Fatalf("replay: %d %s", again.status, again.raw)
+	}
+	var n int
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM credential WHERE household_id = $1 AND name = 'Router'`, h.id).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("credentials named Router: %d %v", n, err)
+	}
+}
+
+// A credential revoked while its command waits for the household lock stops the command: the
+// re-check after the lock sees the revocation (design rule 4).
+func TestRevokedWhileWaiting(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	ctx := t.Context()
+	var role string
+	if err := e.srv.pool.QueryRow(ctx, `SELECT current_user`).Scan(&role); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := e.owner.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after Commit
+	if _, err := tx.Exec(ctx, `SELECT id FROM household WHERE id = $1 FOR UPDATE`, h.id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE phone_session SET revoked_at = now() WHERE household_id = $1`, h.id); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan resp, 1)
+	go func() {
+		done <- e.send(h.actors["phone"], "POST", "/api/children", map[string]string{"name": "Waiting"})
+	}()
+	waiting := false
+	for range 200 {
+		var n int
+		if err := e.owner.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE usename = $1 AND wait_event_type = 'Lock'`, role).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n > 0 {
+			waiting = true
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if !waiting {
+		t.Fatal("the command never waited for the household lock")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r := <-done
+	if r.status != 401 {
+		t.Fatalf("revoked while waiting: %d %s", r.status, r.raw)
+	}
+	var n int
+	if err := e.owner.QueryRow(ctx, `SELECT count(*) FROM child WHERE household_id = $1 AND name = 'Waiting'`, h.id).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("children named Waiting: %d %v", n, err)
 	}
 }

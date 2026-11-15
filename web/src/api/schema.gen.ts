@@ -309,6 +309,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description This Idempotency-Key was already used for a different request */
+        UnprocessableEntity: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description No such resource for this caller */
         NotFound: {
             headers: {
@@ -319,7 +328,13 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        /**
+         * @description Required on every state change. A retry with the same key, from the same caller with the
+         *     same body, gets the first answer (for 30 days) instead of doing it again.
+         */
+        IdempotencyKey: string;
+    };
     requestBodies: never;
     headers: {
         /** @description Sets or clears the __Host-session cookie */
@@ -497,7 +512,13 @@ export interface operations {
     createChild: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -527,6 +548,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };
@@ -559,7 +581,13 @@ export interface operations {
     updateChild: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 childId: components["schemas"]["Id"];
             };
@@ -596,6 +624,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };
@@ -627,7 +656,13 @@ export interface operations {
     createCredential: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -671,13 +706,29 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            /** @description A retry of a credential that was already issued. Its secret is not shown again; revoke it and issue another. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };
     revokeCredential: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 credentialId: components["schemas"]["Id"];
             };
@@ -695,6 +746,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };

@@ -132,6 +132,9 @@ type Me struct {
 	Household Household `json:"household"`
 }
 
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
@@ -153,6 +156,9 @@ type TooManyRequests = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// UnprocessableEntity defines model for UnprocessableEntity.
+type UnprocessableEntity = Error
+
 // ConfirmSignInJSONBody defines parameters for ConfirmSignIn.
 type ConfirmSignInJSONBody struct {
 	Password string `json:"password"`
@@ -168,11 +174,25 @@ type CreateChildJSONBody struct {
 	Name ChildName `json:"name"`
 }
 
+// CreateChildParams defines parameters for CreateChild.
+type CreateChildParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // UpdateChildJSONBody defines parameters for UpdateChild.
 type UpdateChildJSONBody struct {
 	Archived        bool      `json:"archived"`
 	ExpectedVersion int       `json:"expectedVersion"`
 	Name            ChildName `json:"name"`
+}
+
+// UpdateChildParams defines parameters for UpdateChild.
+type UpdateChildParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
 // CreateCredentialJSONBody defines parameters for CreateCredential.
@@ -184,8 +204,22 @@ type CreateCredentialJSONBody struct {
 	Scopes      []string                     `json:"scopes"`
 }
 
+// CreateCredentialParams defines parameters for CreateCredential.
+type CreateCredentialParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // CreateCredentialJSONBodyKind defines parameters for CreateCredential.
 type CreateCredentialJSONBodyKind string
+
+// RevokeCredentialParams defines parameters for RevokeCredential.
+type RevokeCredentialParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
 
 // ConfirmSignInJSONRequestBody defines body for ConfirmSignIn for application/json ContentType.
 type ConfirmSignInJSONRequestBody ConfirmSignInJSONBody
@@ -221,13 +255,13 @@ type ServerInterface interface {
 	ListChildren(w http.ResponseWriter, r *http.Request, params ListChildrenParams)
 	// CreateChild Add a child
 	// (POST /children)
-	CreateChild(w http.ResponseWriter, r *http.Request)
+	CreateChild(w http.ResponseWriter, r *http.Request, params CreateChildParams)
 	// GetChild One child
 	// (GET /children/{childId})
 	GetChild(w http.ResponseWriter, r *http.Request, childId Id)
 	// UpdateChild Rename a child, or archive or restore them
 	// (PATCH /children/{childId})
-	UpdateChild(w http.ResponseWriter, r *http.Request, childId Id)
+	UpdateChild(w http.ResponseWriter, r *http.Request, childId Id, params UpdateChildParams)
 	// GetOwnCredential The calling service or assistant credential
 	// (GET /credential)
 	GetOwnCredential(w http.ResponseWriter, r *http.Request)
@@ -236,10 +270,10 @@ type ServerInterface interface {
 	ListCredentials(w http.ResponseWriter, r *http.Request)
 	// CreateCredential Issue a service or assistant credential
 	// (POST /credentials)
-	CreateCredential(w http.ResponseWriter, r *http.Request)
+	CreateCredential(w http.ResponseWriter, r *http.Request, params CreateCredentialParams)
 	// RevokeCredential Revoke a credential; it stops working at once
 	// (DELETE /credentials/{credentialId})
-	RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id)
+	RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id, params RevokeCredentialParams)
 	// GetHousehold The caller's household
 	// (GET /household)
 	GetHousehold(w http.ResponseWriter, r *http.Request)
@@ -346,8 +380,39 @@ func (siw *ServerInterfaceWrapper) ListChildren(w http.ResponseWriter, r *http.R
 // CreateChild operation middleware
 func (siw *ServerInterfaceWrapper) CreateChild(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateChildParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateChild(w, r)
+		siw.Handler.CreateChild(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -398,8 +463,36 @@ func (siw *ServerInterfaceWrapper) UpdateChild(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateChildParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateChild(w, r, childId)
+		siw.Handler.UpdateChild(w, r, childId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -440,8 +533,39 @@ func (siw *ServerInterfaceWrapper) ListCredentials(w http.ResponseWriter, r *htt
 // CreateCredential operation middleware
 func (siw *ServerInterfaceWrapper) CreateCredential(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateCredentialParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateCredential(w, r)
+		siw.Handler.CreateCredential(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -466,8 +590,36 @@ func (siw *ServerInterfaceWrapper) RevokeCredential(w http.ResponseWriter, r *ht
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeCredentialParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RevokeCredential(w, r, credentialId)
+		siw.Handler.RevokeCredential(w, r, credentialId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -643,6 +795,8 @@ type TooLargeJSONResponse Error
 type TooManyRequestsJSONResponse Error
 
 type UnauthorizedJSONResponse Error
+
+type UnprocessableEntityJSONResponse Error
 
 type ConfirmSignInRequestObject struct {
 	Body *ConfirmSignInJSONRequestBody
@@ -1042,7 +1196,8 @@ func (response ListChildrendefaultJSONResponse) VisitListChildrenResponse(w http
 }
 
 type CreateChildRequestObject struct {
-	Body *CreateChildJSONRequestBody
+	Params CreateChildParams
+	Body   *CreateChildJSONRequestBody
 }
 
 type CreateChildResponseObject interface {
@@ -1115,6 +1270,22 @@ func (response CreateChild409JSONResponse) VisitCreateChildResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChild422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateChild422JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1219,6 +1390,7 @@ func (response GetChilddefaultJSONResponse) VisitGetChildResponse(w http.Respons
 
 type UpdateChildRequestObject struct {
 	ChildId Id `json:"childId"`
+	Params  UpdateChildParams
 	Body    *UpdateChildJSONRequestBody
 }
 
@@ -1306,6 +1478,22 @@ func (response UpdateChild409JSONResponse) VisitUpdateChildResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response UpdateChild422JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1462,7 +1650,8 @@ func (response ListCredentialsdefaultJSONResponse) VisitListCredentialsResponse(
 }
 
 type CreateCredentialRequestObject struct {
-	Body *CreateCredentialJSONRequestBody
+	Params CreateCredentialParams
+	Body   *CreateCredentialJSONRequestBody
 }
 
 type CreateCredentialResponseObject interface {
@@ -1530,6 +1719,36 @@ func (response CreateCredential403JSONResponse) VisitCreateCredentialResponse(w 
 	return err
 }
 
+type CreateCredential409JSONResponse Error
+
+func (response CreateCredential409JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredential422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateCredential422JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateCredentialdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
@@ -1549,6 +1768,7 @@ func (response CreateCredentialdefaultJSONResponse) VisitCreateCredentialRespons
 
 type RevokeCredentialRequestObject struct {
 	CredentialId Id `json:"credentialId"`
+	Params       RevokeCredentialParams
 }
 
 type RevokeCredentialResponseObject interface {
@@ -1601,6 +1821,22 @@ func (response RevokeCredential404JSONResponse) VisitRevokeCredentialResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeCredential422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RevokeCredential422JSONResponse) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1907,8 +2143,10 @@ func (sh *strictHandler) ListChildren(w http.ResponseWriter, r *http.Request, pa
 }
 
 // CreateChild operation middleware
-func (sh *strictHandler) CreateChild(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) CreateChild(w http.ResponseWriter, r *http.Request, params CreateChildParams) {
 	var request CreateChildRequestObject
+
+	request.Params = params
 
 	var body CreateChildJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
@@ -1964,10 +2202,11 @@ func (sh *strictHandler) GetChild(w http.ResponseWriter, r *http.Request, childI
 }
 
 // UpdateChild operation middleware
-func (sh *strictHandler) UpdateChild(w http.ResponseWriter, r *http.Request, childId Id) {
+func (sh *strictHandler) UpdateChild(w http.ResponseWriter, r *http.Request, childId Id, params UpdateChildParams) {
 	var request UpdateChildRequestObject
 
 	request.ChildId = childId
+	request.Params = params
 
 	var body UpdateChildJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
@@ -2045,8 +2284,10 @@ func (sh *strictHandler) ListCredentials(w http.ResponseWriter, r *http.Request)
 }
 
 // CreateCredential operation middleware
-func (sh *strictHandler) CreateCredential(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) CreateCredential(w http.ResponseWriter, r *http.Request, params CreateCredentialParams) {
 	var request CreateCredentialRequestObject
+
+	request.Params = params
 
 	var body CreateCredentialJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
@@ -2076,10 +2317,11 @@ func (sh *strictHandler) CreateCredential(w http.ResponseWriter, r *http.Request
 }
 
 // RevokeCredential operation middleware
-func (sh *strictHandler) RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id) {
+func (sh *strictHandler) RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id, params RevokeCredentialParams) {
 	var request RevokeCredentialRequestObject
 
 	request.CredentialId = credentialId
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.RevokeCredential(ctx, request.(RevokeCredentialRequestObject))
@@ -2130,55 +2372,59 @@ func (sh *strictHandler) GetHousehold(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

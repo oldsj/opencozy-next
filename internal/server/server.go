@@ -96,8 +96,8 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiHandler runs every API request through, in order: the route's policy (deny by default),
-// the body cap, rate limits, authentication, the request validator, authorization, and only
-// then the handler. Authentication comes before anything parses the body.
+// the body cap, rate limits, authentication, the Idempotency-Key check for commands, the request
+// validator, authorization, the command runner, and only then the handler. Authentication comes before anything parses the body.
 func (s *Server) apiHandler() (http.Handler, error) {
 	spec, err := api.GetSpec()
 	if err != nil {
@@ -151,6 +151,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 		bodyCap,
 		limitAuth,
 		s.authenticate,
+		requireKey,
 		validator,
 		s.authorize,
 		s.commands,

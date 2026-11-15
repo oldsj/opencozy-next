@@ -71,7 +71,7 @@ func (s *Server) Login(ctx context.Context, req api.LoginRequestObject) (api.Log
 // Logout ends the session, if there is one, and clears the cookie.
 func (s *Server) Logout(ctx context.Context, _ api.LogoutRequestObject) (api.LogoutResponseObject, error) {
 	if a, ok := actor.From(ctx); ok && a.Kind == actor.Adult {
-		if err := s.q.DeleteAdultSession(ctx, a.SessionHash); err != nil {
+		if err := s.q.DeleteAdultSession(ctx, a.TokenHash); err != nil {
 			return nil, err
 		}
 	}
@@ -107,7 +107,7 @@ func (s *Server) ConfirmSignIn(ctx context.Context, req api.ConfirmSignInRequest
 	if !ok {
 		return api.ConfirmSignIn403JSONResponse{ForbiddenJSONResponse: api.ForbiddenJSONResponse(apiError("wrong_password", "That password is not right."))}, nil
 	}
-	if err := s.q.ConfirmAdultSession(ctx, a.SessionHash); err != nil {
+	if err := s.q.ConfirmAdultSession(ctx, a.TokenHash); err != nil {
 		return nil, err
 	}
 	return api.ConfirmSignIn204Response{}, nil

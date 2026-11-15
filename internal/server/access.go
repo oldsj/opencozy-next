@@ -9,6 +9,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/authz"
 	"github.com/oldsj/opencozy-next/internal/command"
+	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/httpx"
 )
 
@@ -84,24 +85,44 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// requireKey gives a command without an Idempotency-Key a clear 400 before the validator's
+// generic one.
+func requireKey(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if routeFrom(r.Context()).policy.Command && r.Header.Get(command.KeyHeader) == "" {
+			httpx.WriteError(w, http.StatusBadRequest, "idempotency_key_required", "Send an Idempotency-Key header with every change.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // authorize applies the operation's policy to the actor, after the request has been validated.
 func (s *Server) authorize(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ri := routeFrom(r.Context())
 		a, ok := actor.From(r.Context())
-		switch ri.policy.Check(a, ok, ri.params, time.Now()) {
-		case authz.Allow:
+		if s.decide(w, ri.policy.Check(a, ok, ri.params, time.Now())) {
 			next.ServeHTTP(w, r)
-		case authz.Unauthenticated:
-			writeUnauthorized(w)
-		case authz.Reauthenticate:
-			httpx.WriteError(w, http.StatusForbidden, "reauthentication_required", "Enter your password again to continue.")
-		case authz.NotFound:
-			httpx.WriteError(w, http.StatusNotFound, "not_found", "Not found.")
-		default:
-			writeForbidden(w)
 		}
 	})
+}
+
+// decide writes the refusal for d and reports whether the request may go on.
+func (s *Server) decide(w http.ResponseWriter, d authz.Decision) bool {
+	switch d {
+	case authz.Allow:
+		return true
+	case authz.Unauthenticated:
+		writeUnauthorized(w)
+	case authz.Reauthenticate:
+		httpx.WriteError(w, http.StatusForbidden, "reauthentication_required", "Enter your password again to continue.")
+	case authz.NotFound:
+		httpx.WriteError(w, http.StatusNotFound, "not_found", "Not found.")
+	default:
+		writeForbidden(w)
+	}
+	return false
 }
 
 // commands runs x-command operations through internal/command.
@@ -112,7 +133,24 @@ func (s *Server) commands(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		s.runner.Wrap(p.OperationID, next, w, r)
+		ri := routeFrom(r.Context())
+		s.runner.Wrap(command.Spec{Op: p.OperationID, RecordResponse: p.RecordResponse, Recheck: func(ctx context.Context, q *dbq.Queries, w http.ResponseWriter, a actor.Actor) (actor.Actor, bool) {
+			fresh, err := actor.Resolver{Q: q}.Recheck(ctx, a)
+			if errors.Is(err, actor.ErrUnauthenticated) {
+				writeUnauthorized(w)
+				return actor.Actor{}, false
+			}
+			if err != nil {
+				s.log.ErrorContext(ctx, "actor recheck", "err", err)
+				httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
+				return actor.Actor{}, false
+			}
+			// Scopes or children may have changed while the command waited.
+			if !s.decide(w, p.Check(fresh, true, ri.params, time.Now())) {
+				return actor.Actor{}, false
+			}
+			return fresh, true
+		}}, next, w, r)
 	})
 }
 

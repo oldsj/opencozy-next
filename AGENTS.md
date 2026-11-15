@@ -66,8 +66,10 @@ Example: let adults rename the household.
    responses. Declare who may call it: `x-actors: [adult]` (or `[public]`), plus `x-scopes` when
    service or assistant credentials are allowed, `x-display-scopes` for displays, `x-child-param`
    for a child in the path, `x-recent-auth: true` for sensitive changes, `x-body-limit` in bytes
-   and `x-command: true` for any state change. An operation without `x-actors` stops the server
-   from starting (`internal/authz`). A new path also gets one line in `api/src/openapi.yaml`.
+   and `x-command: true` for any state change, with the required
+   `$ref: common.yaml#/parameters/IdempotencyKey` header (add `x-record-response: false` when the
+   response holds a secret). An operation without `x-actors` stops the server from starting
+   (`internal/authz`). A new path also gets one line in `api/src/openapi.yaml`.
 2. **Schema.** A new goose migration, `internal/db/migrations/NNNNN_name.sql`, if needed.
 3. **Query.** In `internal/db/queries/households.sql`:
    `-- name: RenameHousehold :one` / `UPDATE household SET name = $2 WHERE id = $1 RETURNING *;`
