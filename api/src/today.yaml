@@ -1,0 +1,178 @@
+today:
+  get:
+    operationId: getToday
+    summary: Today for every child, as the wall display shows it
+    tags: [today]
+    x-actors: [adult, phone, display]
+    x-display-scopes: [today]
+    responses:
+      '200':
+        description: Today
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Today'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+completeChore:
+  post:
+    operationId: completeChore
+    summary: Mark today's chore done; it waits for an adult's approval
+    tags: [today]
+    x-actors: [adult, phone, display]
+    x-display-scopes: [today]
+    x-command: true
+    x-body-limit: 1
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: choreId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    responses:
+      '200':
+        description: Done, waiting for approval
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/TodayItem'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+checkStep:
+  post:
+    operationId: checkRoutineStep
+    summary: Tick a step of today's routine; the last one sends the routine for approval
+    tags: [today]
+    x-actors: [adult, phone, display]
+    x-display-scopes: [today]
+    x-command: true
+    x-body-limit: 1
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: routineId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    responses:
+      '200':
+        description: Ticked
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/TodayGroup'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  Today:
+    type: object
+    required: [children, householdDay, serverTime]
+    properties:
+      householdDay:
+        type: string
+        format: date
+      serverTime:
+        type: string
+        format: date-time
+      children:
+        type: array
+        items:
+          $ref: '#/schemas/TodayChild'
+  TodayChild:
+    type: object
+    required: [child, groups]
+    properties:
+      child:
+        type: object
+        required: [id, name, color, points, earnedToday, completed, total]
+        properties:
+          id:
+            $ref: common.yaml#/schemas/Id
+          name:
+            type: string
+          color:
+            $ref: children.yaml#/schemas/ProfileColor
+          points:
+            type: integer
+            format: int64
+          earnedToday:
+            type: integer
+            format: int64
+          completed:
+            type: integer
+          total:
+            type: integer
+      groups:
+        type: array
+        items:
+          $ref: '#/schemas/TodayGroup'
+  TodayGroup:
+    type: object
+    required: [id, kind, title, done, pending, items]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      kind:
+        type: string
+        enum: [routine, chores]
+      title:
+        type: string
+      status:
+        type: string
+        description: A short note, such as "3 points"
+      done:
+        type: boolean
+      pending:
+        type: boolean
+        description: Finished, waiting for an adult's approval
+      items:
+        type: array
+        items:
+          $ref: '#/schemas/TodayItem'
+  TodayItem:
+    type: object
+    required: [id, title, state]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      title:
+        type: string
+      points:
+        type: integer
+      state:
+        type: string
+        enum: [open, pending, complete]
+      rejectedReason:
+        type: string
+        maxLength: 200

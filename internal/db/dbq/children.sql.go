@@ -24,16 +24,17 @@ func (q *Queries) CountChildren(ctx context.Context, householdID uuid.UUID) (int
 }
 
 const createChild = `-- name: CreateChild :one
-INSERT INTO child (household_id, name) VALUES ($1, $2) RETURNING id, household_id, name, archived_at, version, created_at
+INSERT INTO child (household_id, name, color) VALUES ($1, $2, $3) RETURNING id, household_id, name, archived_at, version, created_at, color
 `
 
 type CreateChildParams struct {
 	HouseholdID uuid.UUID
 	Name        string
+	Color       string
 }
 
 func (q *Queries) CreateChild(ctx context.Context, arg CreateChildParams) (Child, error) {
-	row := q.db.QueryRow(ctx, createChild, arg.HouseholdID, arg.Name)
+	row := q.db.QueryRow(ctx, createChild, arg.HouseholdID, arg.Name, arg.Color)
 	var i Child
 	err := row.Scan(
 		&i.ID,
@@ -42,12 +43,13 @@ func (q *Queries) CreateChild(ctx context.Context, arg CreateChildParams) (Child
 		&i.ArchivedAt,
 		&i.Version,
 		&i.CreatedAt,
+		&i.Color,
 	)
 	return i, err
 }
 
 const getChild = `-- name: GetChild :one
-SELECT id, household_id, name, archived_at, version, created_at FROM child WHERE household_id = $1 AND id = $2
+SELECT id, household_id, name, archived_at, version, created_at, color FROM child WHERE household_id = $1 AND id = $2
 `
 
 type GetChildParams struct {
@@ -65,12 +67,13 @@ func (q *Queries) GetChild(ctx context.Context, arg GetChildParams) (Child, erro
 		&i.ArchivedAt,
 		&i.Version,
 		&i.CreatedAt,
+		&i.Color,
 	)
 	return i, err
 }
 
 const listChildren = `-- name: ListChildren :many
-SELECT id, household_id, name, archived_at, version, created_at FROM child
+SELECT id, household_id, name, archived_at, version, created_at, color FROM child
 WHERE household_id = $1 AND ($2::boolean OR archived_at IS NULL)
 ORDER BY created_at
 LIMIT 50
@@ -97,6 +100,7 @@ func (q *Queries) ListChildren(ctx context.Context, arg ListChildrenParams) ([]C
 			&i.ArchivedAt,
 			&i.Version,
 			&i.CreatedAt,
+			&i.Color,
 		); err != nil {
 			return nil, err
 		}
@@ -130,7 +134,7 @@ SET name = $4,
     archived_at = CASE WHEN $5::boolean THEN coalesce(archived_at, $6::timestamptz) ELSE NULL END,
     version = version + 1
 WHERE household_id = $1 AND id = $2 AND version = $3
-RETURNING id, household_id, name, archived_at, version, created_at
+RETURNING id, household_id, name, archived_at, version, created_at, color
 `
 
 type UpdateChildParams struct {
@@ -159,6 +163,7 @@ func (q *Queries) UpdateChild(ctx context.Context, arg UpdateChildParams) (Child
 		&i.ArchivedAt,
 		&i.Version,
 		&i.CreatedAt,
+		&i.Color,
 	)
 	return i, err
 }

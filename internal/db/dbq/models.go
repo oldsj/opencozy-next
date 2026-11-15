@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ActiveAward struct {
@@ -37,12 +38,40 @@ type AdultSession struct {
 	ExpiresAt       time.Time
 }
 
+type Approval struct {
+	ID           uuid.UUID
+	HouseholdID  uuid.UUID
+	ChildID      uuid.UUID
+	Kind         string
+	OccurrenceID uuid.UUID
+	Title        string
+	Points       int32
+	State        string
+	Reason       *string
+	Version      int32
+	DecidedAt    *time.Time
+	DecidedBy    *uuid.UUID
+	CreatedAt    time.Time
+}
+
 type Child struct {
 	ID          uuid.UUID
 	HouseholdID uuid.UUID
 	Name        string
 	ArchivedAt  *time.Time
 	Version     int32
+	CreatedAt   time.Time
+	Color       string
+}
+
+type Chore struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	Title       string
+	Points      int32
+	Days        int16
+	ArchivedAt  *time.Time
 	CreatedAt   time.Time
 }
 
@@ -111,6 +140,20 @@ type JobLease struct {
 	ExpiresAt time.Time
 }
 
+type Occurrence struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	ChildID        uuid.UUID
+	Kind           string
+	DefinitionID   uuid.UUID
+	Day            pgtype.Date
+	State          string
+	Points         int32
+	CheckedSteps   []uuid.UUID
+	RejectedReason *string
+	UpdatedAt      time.Time
+}
+
 type PhoneSession struct {
 	ID          uuid.UUID
 	HouseholdID uuid.UUID
@@ -147,4 +190,23 @@ type PushOutbox struct {
 	Attempts      int32
 	NextAttemptAt time.Time
 	CreatedAt     time.Time
+}
+
+type Routine struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	Title       string
+	Points      int32
+	Days        int16
+	ArchivedAt  *time.Time
+	CreatedAt   time.Time
+}
+
+type RoutineStep struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	RoutineID   uuid.UUID
+	Title       string
+	Position    int16
 }

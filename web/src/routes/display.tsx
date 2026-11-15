@@ -1,14 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { EmptyState, Notice, PageHeader } from '@app/design';
+import { Notice, PageHeader } from '@app/design';
 
 import { client } from '../api/client';
+import { TodayBoard } from './today';
 
 const householdKey = ['display', 'household'] as const;
 
 // The wall display. Unpaired, it shows a code for an adult to enter under Displays; once the
-// adult has, it collects its session and shows the household (Today arrives in slice 2).
+// adult has, it collects its session and shows Today.
 export function DisplayPage() {
   const household = useQuery({
     queryKey: householdKey,
@@ -23,12 +24,7 @@ export function DisplayPage() {
 
   if (household.isPending) return null;
   if (household.data) {
-    return (
-      <section>
-        <PageHeader title={household.data.name} description="This display is paired." />
-        <EmptyState title="Today will show here" description="Chores and routines arrive with the next update." />
-      </section>
-    );
+    return <TodayBoard household={household.data} />;
   }
   return <Pairing />;
 }

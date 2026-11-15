@@ -1,0 +1,248 @@
+chores:
+  get:
+    operationId: listChores
+    summary: The household's chores
+    tags: [chores]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The chores
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/schemas/Chore'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: createChore
+    summary: Add a chore for a child
+    tags: [chores]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 2048
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewChore'
+          example: { childId: 0190f0e0-0000-7000-8000-000000000001, title: Feed the cat, points: 4, days: [1, 2, 3, 4, 5] }
+    responses:
+      '201':
+        description: Added
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Chore'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+chore:
+  delete:
+    operationId: archiveChore
+    summary: Remove a chore from now on (history stays)
+    tags: [chores]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: choreId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    responses:
+      '204':
+        description: Removed
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+routines:
+  get:
+    operationId: listRoutines
+    summary: The household's routines
+    tags: [chores]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: The routines
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/schemas/Routine'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: createRoutine
+    summary: Add a routine (a list of steps, approved as one) for a child
+    tags: [chores]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 8192
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewRoutine'
+          example: { childId: 0190f0e0-0000-7000-8000-000000000001, title: Morning, points: 3, steps: [Make the bed, Brush teeth] }
+    responses:
+      '201':
+        description: Added
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Routine'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+routine:
+  delete:
+    operationId: archiveRoutine
+    summary: Remove a routine from now on (history stays)
+    tags: [chores]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: routineId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    responses:
+      '204':
+        description: Removed
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  Days:
+    type: array
+    description: Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
+    maxItems: 7
+    uniqueItems: true
+    items:
+      type: integer
+      minimum: 0
+      maximum: 6
+  Title:
+    type: string
+    minLength: 1
+    maxLength: 80
+    pattern: \S
+  Points:
+    type: integer
+    minimum: 0
+    maximum: 1000
+  NewChore:
+    type: object
+    additionalProperties: false
+    required: [childId, title, points]
+    properties:
+      childId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        $ref: '#/schemas/Title'
+      points:
+        $ref: '#/schemas/Points'
+      days:
+        $ref: '#/schemas/Days'
+  Chore:
+    type: object
+    required: [id, childId, title, points, days]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      childId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        type: string
+      points:
+        type: integer
+      days:
+        $ref: '#/schemas/Days'
+  NewRoutine:
+    type: object
+    additionalProperties: false
+    required: [childId, title, points, steps]
+    properties:
+      childId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        $ref: '#/schemas/Title'
+      points:
+        $ref: '#/schemas/Points'
+      days:
+        $ref: '#/schemas/Days'
+      steps:
+        type: array
+        minItems: 1
+        maxItems: 20
+        items:
+          $ref: '#/schemas/Title'
+  Routine:
+    type: object
+    required: [id, childId, title, points, days, steps]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      childId:
+        $ref: common.yaml#/schemas/Id
+      title:
+        type: string
+      points:
+        type: integer
+      days:
+        $ref: '#/schemas/Days'
+      steps:
+        type: array
+        items:
+          type: object
+          required: [id, title]
+          properties:
+            id:
+              $ref: common.yaml#/schemas/Id
+            title:
+              type: string

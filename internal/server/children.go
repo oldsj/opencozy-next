@@ -13,8 +13,11 @@ import (
 // maxChildren is the most active children a household may have.
 const maxChildren = 20
 
+// profileColors is the design system's ProfileColor, in the order new children get them.
+var profileColors = []string{"sky", "sage", "lilac", "peach", "butter", "teal", "rose", "sand"}
+
 func toChild(c dbq.Child) api.Child {
-	return api.Child{Id: c.ID, Name: c.Name, Archived: c.ArchivedAt != nil, Version: int(c.Version)}
+	return api.Child{Id: c.ID, Name: c.Name, Color: api.ProfileColor(c.Color), Archived: c.ArchivedAt != nil, Version: int(c.Version)}
 }
 
 // ListChildren lists the children the caller may act for.
@@ -45,7 +48,11 @@ func (s *Server) CreateChild(ctx context.Context, req api.CreateChildRequestObje
 	if n >= maxChildren {
 		return api.CreateChild409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(apiError("too_many_children", "A household can have at most 20 children."))}, nil
 	}
-	c, err := cmd.Q.CreateChild(ctx, dbq.CreateChildParams{HouseholdID: a.HouseholdID, Name: req.Body.Name})
+	color := profileColors[n%int64(len(profileColors))] // a different colour for each new child
+	if req.Body.Color != nil {
+		color = string(*req.Body.Color)
+	}
+	c, err := cmd.Q.CreateChild(ctx, dbq.CreateChildParams{HouseholdID: a.HouseholdID, Name: req.Body.Name, Color: color})
 	if err != nil {
 		return nil, err
 	}

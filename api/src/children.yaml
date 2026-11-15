@@ -53,7 +53,9 @@ children:
             properties:
               name:
                 $ref: '#/schemas/ChildName'
-          example: { name: Robin }
+              color:
+                $ref: '#/schemas/ProfileColor'
+          example: { name: Robin, color: sage }
     responses:
       '201':
         description: Added
@@ -159,14 +161,19 @@ schemas:
     minLength: 1
     maxLength: 40
     pattern: \S
+  ProfileColor:
+    type: string
+    enum: [rose, sage, sky, butter, lilac, peach, teal, sand]
   Child:
     type: object
-    required: [id, name, archived, version]
+    required: [id, name, color, archived, version]
     properties:
       id:
         $ref: common.yaml#/schemas/Id
       name:
         type: string
+      color:
+        $ref: '#/schemas/ProfileColor'
       archived:
         type: boolean
       version:
