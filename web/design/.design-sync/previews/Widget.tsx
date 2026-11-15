@@ -1,7 +1,7 @@
 // @dsCard group="Dashboard"
-import { CalendarDays, UtensilsCrossed } from 'lucide-react';
+import { CalendarDays, Tv, UtensilsCrossed } from 'lucide-react';
 
-import { AppFrame, ButtonLink, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
+import { AppFrame, ButtonLink, Countdown, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
 
 import { calendar, dayHeadings, dayOf, kids, todayDate, when, type CalendarEvent } from './fixtures-calendar';
 
@@ -121,5 +121,37 @@ export function Agenda() {
         </Section>
       ))}
     </AppFrame>
+  );
+}
+
+/** Which screens are on, who's watching and the time left (the wall display and the adult dashboard). */
+export function WatchingNow() {
+  return (
+    <Widget title="Watching now" icon={Tv}>
+      <List>
+        <ListRow
+          leading={<ProfileAvatar name="Ada" color="sky" size="small" aria-hidden="true" />}
+          title="Living room TV"
+          meta="Ada"
+          trailing={
+            <Tag tone="attention">
+              <Countdown seconds={240} />
+            </Tag>
+          }
+        />
+        <ListRow
+          leading={<ProfileAvatar name="Ezra" color="sage" size="small" aria-hidden="true" />}
+          title="Ezra’s iPad"
+          meta="Ezra"
+          trailing={
+            <Tag tone="info">
+              <Countdown seconds={1499} />
+            </Tag>
+          }
+        />
+        <ListRow title="Basement TV" meta="Parents" trailing={<Tag>No limit</Tag>} />
+        <ListRow muted title="Bedroom TV" meta="Off" />
+      </List>
+    </Widget>
   );
 }
