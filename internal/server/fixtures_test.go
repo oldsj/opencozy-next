@@ -135,6 +135,7 @@ func (e *env) id(sql string, args ...any) uuid.UUID {
 // house is one fictional household with an adult, two children and one actor of every kind.
 type house struct {
 	id, adult, child1, child2, target uuid.UUID // target: a credential to revoke
+	screen                            uuid.UUID // a display to unpair (not one of the actors)
 	actors                            map[string]cred
 }
 
@@ -196,6 +197,8 @@ func (e *env) house(label string, scopes []string) house {
 	}
 	h.actors["display-today"] = display([]string{"today"})
 	h.actors["display-none"] = display([]string{})
+	h.screen = e.id(`INSERT INTO display (household_id, name, scopes, expires_at)
+		VALUES ($1, 'Spare', '{today}', now() + interval '1 day') RETURNING id`, h.id)
 
 	credential := func(kind string, scopes []string, all bool, children []uuid.UUID, extra string) (cred, uuid.UUID) {
 		prefix := auth.PrefixService

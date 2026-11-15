@@ -10,6 +10,8 @@ import {
 import { meQuery } from './api/client';
 import { LoginPage } from './routes/login';
 import { HomePage } from './routes/home';
+import { DisplayPage } from './routes/display';
+import { DisplaysPage } from './routes/displays';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -45,7 +47,26 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
-const routeTree = rootRoute.addChildren([homeRoute, loginRoute]);
+// Manage: the household's wall displays.
+const displaysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/displays',
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: DisplaysPage,
+});
+
+// The wall display itself: pairs, then shows the household's day. No adult sign-in.
+const displayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/display',
+  component: DisplayPage,
+});
+
+const routeTree = rootRoute.addChildren([homeRoute, loginRoute, displaysRoute, displayRoute]);
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent' });

@@ -531,6 +531,171 @@ paths:
           $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
+  /display/pairings:
+    post:
+      operationId: startDisplayPairing
+      summary: A wall display asks to be paired
+      description: |
+        Returns a code for the display to show, and sets a pairing cookie that only this display
+        holds. An adult enters the code (createDisplay); the display then claims its session
+        (claimDisplayPairing). The code lasts 10 minutes.
+      tags:
+        - displays
+      x-actors:
+        - public
+      x-body-limit: 1
+      responses:
+        '201':
+          description: The pairing code to show
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pairing'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: Too many pairings are open; try again in a few minutes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /display/pairings/claim:
+    post:
+      operationId: claimDisplayPairing
+      summary: A wall display collects its session once an adult has entered its code
+      tags:
+        - displays
+      x-actors:
+        - public
+      x-body-limit: 1
+      parameters:
+        - name: __Host-display-pairing
+          in: cookie
+          required: false
+          description: Set by startDisplayPairing
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        '200':
+          description: Paired. The display cookie is set.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Display'
+        '202':
+          description: Not yet; ask again in a few seconds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingWait'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /displays:
+    get:
+      operationId: listDisplays
+      summary: The household's paired wall displays
+      tags:
+        - displays
+      x-actors:
+        - adult
+      responses:
+        '200':
+          description: The displays
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Display'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createDisplay
+      summary: Pair the wall display showing this code
+      description: Needs a sign-in within the last 10 minutes.
+      tags:
+        - displays
+      x-actors:
+        - adult
+      x-recent-auth: true
+      x-command: true
+      x-body-limit: 4096
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewDisplay'
+            example:
+              code: K7MXQ2
+              name: Kitchen
+              scopes:
+                - today
+      responses:
+        '201':
+          description: Paired; the display picks up its session within seconds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Display'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /displays/{displayId}:
+    delete:
+      operationId: revokeDisplay
+      summary: Unpair a wall display; it stops working at once
+      tags:
+        - displays
+      x-actors:
+        - adult
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: displayId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      responses:
+        '204':
+          description: Unpaired
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     session:
@@ -678,6 +843,83 @@ components:
         expiresAt:
           type: string
           format: date-time
+    Pairing:
+      type: object
+      required:
+        - code
+        - expiresAt
+      properties:
+        code:
+          type: string
+          description: Six letters and digits, without 0, O, 1, I or L
+          examples:
+            - K7MXQ2
+        expiresAt:
+          type: string
+          format: date-time
+    DisplayScope:
+      type: string
+      enum:
+        - today
+        - tv
+        - calendar
+        - meals
+        - dashboard
+    Display:
+      type: object
+      required:
+        - id
+        - name
+        - scopes
+        - createdAt
+        - expiresAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisplayScope'
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    PairingWait:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - waiting
+    NewDisplay:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - name
+        - scopes
+      properties:
+        code:
+          type: string
+          minLength: 6
+          maxLength: 16
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        scopes:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/DisplayScope'
   responses:
     Error:
       description: Unexpected error

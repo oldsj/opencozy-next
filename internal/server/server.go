@@ -137,7 +137,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	limitAuth := func(next http.Handler) http.Handler {
 		limited := limiter.Middleware(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost && (r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm") {
+			if r.Method == http.MethodPost && (r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/display/pairings")) {
 				limited.ServeHTTP(w, r)
 				return
 			}
