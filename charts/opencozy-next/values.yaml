@@ -111,3 +111,18 @@ resources:
     cpu: "1"
     memory: 256Mi
     ephemeral-storage: 64Mi
+
+# Slice 0c: outbound requests from integrations (design §10). The app checks every address
+# itself (internal/egress); this adds a NetworkPolicy, when networkPolicy.enabled, that allows the
+# same: public addresses on ports 80, 443, 8080 and 8443, and each private allowlist on its
+# ports. Each list of CIDRs is also passed to the app, which refuses to start on anything but
+# RFC 1918 or ULA ranges. Integration secrets need OPENCOZY_SECRET_KEYS in secrets.env, e.g.
+# `- name: OPENCOZY_SECRET_KEYS` / `key: secret-keys`.
+egress:
+  internet: true
+  homeAssistant:
+    cidrs: []
+    ports: [8123]
+  oidc:
+    cidrs: []
+    ports: [443]

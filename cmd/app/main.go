@@ -11,6 +11,7 @@ import (
 
 	"github.com/oldsj/opencozy-next/internal/config"
 	"github.com/oldsj/opencozy-next/internal/db"
+	"github.com/oldsj/opencozy-next/internal/keyring"
 	"github.com/oldsj/opencozy-next/internal/server"
 )
 
@@ -44,6 +45,8 @@ func run(ctx context.Context, args []string) error {
 	switch cmd {
 	case "migrate":
 		return db.Migrate(ctx, pool, log)
+	case "rekey": // re-encrypt stored secrets under the first OPENCOZY_SECRET_KEYS key
+		return keyring.RekeyAll(ctx, pool, cfg.SecretKeys, log)
 	case "serve":
 		if cfg.MigrateOnStart {
 			if err := db.Migrate(ctx, pool, log); err != nil {

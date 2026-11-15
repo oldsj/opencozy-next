@@ -80,6 +80,7 @@ spec:
             - name: PGSSLROOTCERT
               value: /etc/db-ca/ca.crt
             {{- end }}
+            {{- with include "app.egressEnv" . | trim }}{{ . | nindent 12 }}{{ end }}
             {{- range .Values.secrets.env }}
             - name: {{ .name | quote }}
               valueFrom:

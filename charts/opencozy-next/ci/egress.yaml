@@ -1,0 +1,10 @@
+# Slice 0c: private allowlists for Home Assistant and a private OIDC issuer (fictional ranges).
+egress:
+  homeAssistant:
+    cidrs: [192.168.40.0/24, "fd00:40::/64"]
+    ports: [8123]
+  oidc:
+    cidrs: [10.20.30.0/24]
+    ports: [443, 8443]
+image:
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
