@@ -32,14 +32,14 @@ test('add a recipe and plan it', async ({ page }) => {
   const plan = page.getByRole('button', { name: /^Plan Dinner,/ }).first();
   const slot = ((await plan.getAttribute('aria-label')) ?? '').replace(/^Plan /, '');
   await plan.click();
-  await page.getByRole('textbox', { name: 'Meal', exact: true }).fill(title);
+  await page.getByRole('combobox', { name: 'Meal', exact: true }).fill(title);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   const change = page.getByRole('button', { name: `Change ${slot}` });
   await expect(change).toBeVisible();
   await expect(page.getByText(title)).toBeVisible();
 
   await change.click();
-  await page.getByRole('textbox', { name: 'Meal', exact: true }).fill(`Leftovers ${run}`);
+  await page.getByRole('combobox', { name: 'Meal', exact: true }).fill(`Leftovers ${run}`);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText(`Leftovers ${run}`)).toBeVisible();
   await expect(page.getByText(title)).toHaveCount(0);
