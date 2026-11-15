@@ -312,6 +312,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/children/{childId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A child's balance and points history, newest first */
+        get: operations["getPointsHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/points/{entryId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back the points of an award (a chore done by mistake)
+         * @description Refused when the child has already spent them. The chore can then be done again.
+         */
+        post: operations["reversePoints"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inbox": {
         parameters: {
             query?: never;
@@ -594,6 +631,27 @@ export interface components {
             /** Format: date-time */
             serverTime: string;
             children: components["schemas"]["TodayChild"][];
+        };
+        HistoryEntry: {
+            id: components["schemas"]["Id"];
+            /** Format: date-time */
+            at: string;
+            /** @enum {string} */
+            kind: "earned" | "reversed" | "redeemed" | "refunded";
+            title: string;
+            /** @description Signed; negative takes points away */
+            points: number;
+            reason?: string;
+            reversedBy?: components["schemas"]["Id"];
+            reverses?: components["schemas"]["Id"];
+            /** @description The adult who decided it, by name */
+            by?: string;
+        };
+        History: {
+            /** Format: int64 */
+            balance: number;
+            /** @description The newest 200 */
+            entries: components["schemas"]["HistoryEntry"][];
         };
         InboxItem: {
             id: components["schemas"]["Id"];
@@ -1440,6 +1498,77 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPointsHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                childId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["History"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    reversePoints: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                entryId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "reason": "Marked done by mistake."
+                 *     }
+                 */
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reversed; the new entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
             422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
