@@ -180,6 +180,9 @@ func (s *Server) PasskeySignInOptions(ctx context.Context, _ api.PasskeySignInOp
 
 // PasskeySignIn signs in with a passkey: the same session as a password sign-in.
 func (s *Server) PasskeySignIn(ctx context.Context, req api.PasskeySignInRequestObject) (api.PasskeySignInResponseObject, error) {
+	if onKidDevice(ctx) {
+		return api.PasskeySignIn409JSONResponse(errKidDevice), nil
+	}
 	refused := api.PasskeySignIn401JSONResponse{UnauthorizedJSONResponse: api.UnauthorizedJSONResponse(errPasskey)}
 	if s.wa == nil {
 		return refused, nil

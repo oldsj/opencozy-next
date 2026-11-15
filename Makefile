@@ -109,8 +109,13 @@ build: ## The single binary with the SPA embedded, in bin/app
 	$(PNPM) build
 	CGO_ENABLED=0 go build -tags embedweb -trimpath -o bin/app ./cmd/app
 
+.PHONY: build-e2e
+build-e2e: ## bin/app as an e2e build: its calendar client may reach 127.0.0.1 (never ship it)
+	$(PNPM) build
+	CGO_ENABLED=0 go build -tags embedweb,e2e -trimpath -o bin/app ./cmd/app
+
 .PHONY: e2e
-e2e: build $(E2E_DB_RESET) ## Playwright against bin/app and a fresh database
+e2e: build-e2e $(E2E_DB_RESET) ## Playwright against an e2e build of bin/app and a fresh database
 	cd web && DATABASE_URL='$(E2E_DATABASE_URL)' pnpm exec playwright test
 
 .PHONY: e2e-db-reset

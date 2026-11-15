@@ -49,9 +49,10 @@ export const passkeys: Passkey[] = [
   { id: 'pk2', name: 'Security key', createdAt: 'Sep 2', backedUp: false },
 ];
 
-export const methods: SignInMethods = { oidc: { name: 'Pocket ID' } };
+/** The button name comes from the server's single sign-on display-name setting; this one is made up. */
+export const methods: SignInMethods = { oidc: { name: 'Example ID' } };
 
-export const oidcLink: OidcLink = { providerName: 'Pocket ID', email: 'sam@example.test', linkedAt: 'Sep 4' };
+export const oidcLink: OidcLink = { providerName: 'Example ID', email: 'sam@example.test', linkedAt: 'Sep 4' };
 
 export const phoneSessions: PhoneSession[] = [
   { id: 'ps1', deviceName: 'Sam’s iPhone', createdAt: 'Sep 3', lastUsedAt: '5 minutes ago', expiresAt: 'Dec 2', pushEnabled: true },
@@ -64,7 +65,8 @@ export const accountErrorText = {
   passkey_not_recognized: 'This passkey isn’t set up here. Sign in with your password, then add it under Account.',
   passkey_cancelled: 'No passkey was used. Try again, or use your password.',
   oidc_no_adult: 'No adult here uses that email. Sign in another way, or ask whoever set up OpenCozy.',
-  oidc_unverified: 'Pocket ID hasn’t confirmed that email yet, so it can’t be used to sign in here.',
+  /** {provider} is the configured single sign-on name. */
+  oidc_unverified: '{provider} hasn’t confirmed that email yet, so it can’t be used to sign in here.',
   too_many_attempts: 'Too many tries. Wait 15 minutes, then try again.',
   wrong_password: 'That password isn’t right.',
 } as const;

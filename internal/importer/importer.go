@@ -27,6 +27,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/oldsj/opencozy-next/internal/importer/oldsecret"
+	"github.com/oldsj/opencozy-next/internal/keyring"
 )
 
 // oldSchema is where the old app keeps its tables.
@@ -42,6 +45,11 @@ type Options struct {
 	Target *pgxpool.Pool
 	DryRun bool
 	Out    io.Writer
+	// Keys seals imported calendar links (OPENCOZY_SECRET_KEYS); needed only when there are any.
+	Keys *keyring.Keyring
+	// OldSecret opens the old app's integration secrets (--old-auth-secret-file) so they can be
+	// sealed under Keys. Without it, those integrations import as "reconnect needed".
+	OldSecret *oldsecret.Secret
 }
 
 // Errors.
@@ -76,12 +84,13 @@ func Run(ctx context.Context, o Options) error {
 	}
 
 	r := &Report{}
-	run := &run{src: src.tx, dst: tx, r: r, adults: map[string]adultRef{}}
+	run := &run{src: src.tx, dst: tx, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret}
 	for _, d := range domains {
 		if err := d(ctx, run); err != nil {
 			return err
 		}
 	}
+	run.remarkOldSecret()
 	if err := coverage(ctx, src.tx, r); err != nil {
 		return err
 	}
@@ -110,6 +119,17 @@ type run struct {
 	r   *Report
 	// adults maps old Better Auth user IDs to the new adults.
 	adults map[string]adultRef
+	keys   *keyring.Keyring
+	old    *oldsecret.Secret
+}
+
+// remarkOldSecret says in the report whether old integration secrets could be opened.
+func (x *run) remarkOldSecret() {
+	if x.old == nil {
+		x.r.Remarks = append(x.r.Remarks, "Old integration secrets: no --old-auth-secret-file, so Google, iCloud and Home Assistant import as \"reconnect needed\".")
+		return
+	}
+	x.r.Remarks = append(x.r.Remarks, "Old integration secrets: opened with --old-auth-secret-file and sealed with OPENCOZY_SECRET_KEYS.")
 }
 
 // domains run in order; later ones use the IDs earlier ones mapped.
@@ -119,6 +139,7 @@ var domains = []func(context.Context, *run) error{
 	importAdults,
 	importCredentials,
 	importLearning,
+	importCalendars,
 	importRecipes,
 	importMeals,
 }

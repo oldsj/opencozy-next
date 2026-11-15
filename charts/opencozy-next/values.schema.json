@@ -101,6 +101,10 @@
         },
         "webauthnOrigins": {
           "type": "string"
+        },
+        "publicOrigin": {
+          "type": "string",
+          "pattern": "^(https://[^/?#@]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)?$"
         }
       }
     },

@@ -4,6 +4,11 @@
   gap: var(--space-md);
 }
 
+/* Sections stacked on a page: a clear break between one and the next. */
+.oc-section + .oc-section {
+  margin-block-start: var(--space-xl);
+}
+
 .oc-section__header {
   display: flex;
   flex-wrap: wrap;

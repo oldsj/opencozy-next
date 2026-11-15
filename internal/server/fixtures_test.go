@@ -2,11 +2,18 @@ package server
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,10 +55,59 @@ func newEnv(t *testing.T, mutate func(*config.Config)) *env {
 	return &env{t: t, base: ts.URL, http: ts.Client(), srv: srv, owner: db.Owner}
 }
 
-// cred is how a request authenticates: a header, a cookie or nothing.
+// cred is how a request authenticates: a header, a cookie, a device's signature or nothing.
 type cred struct {
 	bearer string
 	cookie *http.Cookie
+	device *deviceKey
+	// cookies are more cookies in the same jar (a web view holding several).
+	cookies []*http.Cookie
+}
+
+// deviceKey is a paired kid device's id and private key, to sign requests as the app does.
+type deviceKey struct {
+	id  uuid.UUID
+	key *ecdsa.PrivateKey
+}
+
+func newDeviceKey() *deviceKey {
+	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	return &deviceKey{key: k}
+}
+
+// publicKey is the uncompressed point, as the app sends it.
+func (d *deviceKey) publicKey() []byte {
+	b, err := d.key.PublicKey.Bytes()
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+// signRaw signs msg as the app does: SHA-256, raw r||s, base64url.
+func (d *deviceKey) signRaw(msg string) string {
+	sum := sha256.Sum256([]byte(msg))
+	r, s, err := ecdsa.Sign(rand.Reader, d.key, sum[:])
+	if err != nil {
+		panic(err)
+	}
+	out := make([]byte, 64)
+	r.FillBytes(out[:32])
+	s.FillBytes(out[32:])
+	return base64.RawURLEncoding.EncodeToString(out)
+}
+
+// sign adds the four signature headers for this request.
+func (d *deviceKey) sign(req *http.Request, body []byte) {
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	nonce := strings.ReplaceAll(uuid.NewString(), "-", "")
+	req.Header.Set(actor.DeviceHeader, d.id.String())
+	req.Header.Set(actor.TimestampHeader, ts)
+	req.Header.Set(actor.NonceHeader, nonce)
+	req.Header.Set(actor.SignatureHeader, d.signRaw(actor.CanonicalRequest(req.Method, req.URL.RequestURI(), ts, nonce, body, d.id.String())))
 }
 
 func (c cred) apply(r *http.Request) {
@@ -60,6 +116,9 @@ func (c cred) apply(r *http.Request) {
 	}
 	if c.cookie != nil {
 		r.AddCookie(c.cookie)
+	}
+	for _, more := range c.cookies {
+		r.AddCookie(more)
 	}
 }
 
@@ -80,14 +139,17 @@ func (r resp) code() string {
 // Idempotency-Key unless headers set one; setting it to "" sends none.
 func (e *env) send(c cred, method, path string, body any, headers ...string) resp {
 	e.t.Helper()
-	var rd io.Reader
+	var raw []byte
 	switch b := body.(type) {
 	case nil:
 	case []byte:
-		rd = bytes.NewReader(b)
+		raw = b
 	default:
-		j, _ := json.Marshal(b)
-		rd = bytes.NewReader(j)
+		raw, _ = json.Marshal(b)
+	}
+	var rd io.Reader
+	if body != nil {
+		rd = bytes.NewReader(raw)
 	}
 	req, _ := http.NewRequestWithContext(e.t.Context(), method, e.base+path, rd)
 	if body != nil {
@@ -98,6 +160,10 @@ func (e *env) send(c cred, method, path string, body any, headers ...string) res
 		req.Header.Set("Idempotency-Key", uuid.NewString())
 	}
 	for i := 0; i+1 < len(headers); i += 2 {
+		if headers[i] == "Host" {
+			req.Host = headers[i+1]
+			continue
+		}
 		if headers[i+1] == "" {
 			req.Header.Del(headers[i])
 			continue
@@ -105,15 +171,18 @@ func (e *env) send(c cred, method, path string, body any, headers ...string) res
 		req.Header.Set(headers[i], headers[i+1])
 	}
 	c.apply(req)
+	if c.device != nil {
+		c.device.sign(req, raw)
+	}
 	res, err := e.http.Do(req)
 	if err != nil {
 		e.t.Fatal(err)
 	}
 	defer func() { _ = res.Body.Close() }()
-	raw, _ := io.ReadAll(res.Body)
+	got, _ := io.ReadAll(res.Body)
 	var out map[string]any
-	_ = json.Unmarshal(raw, &out)
-	return resp{status: res.StatusCode, raw: raw, body: out, header: res.Header}
+	_ = json.Unmarshal(got, &out)
+	return resp{status: res.StatusCode, raw: got, body: out, header: res.Header}
 }
 
 func (e *env) exec(sql string, args ...any) {
@@ -143,6 +212,7 @@ type house struct {
 	reward                            uuid.UUID // costs 3
 	calendar, event                   uuid.UUID // an ICS calendar shown on displays, with one event
 	passkey                           uuid.UUID // the adult's only passkey
+	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
 	actors                            map[string]cred
 }
@@ -150,7 +220,7 @@ type house struct {
 // actorNames are the actors every house has. Kinds are what Policy.Check compares.
 var actorNames = []string{
 	"adult", "adult-stale", "phone", "display-today", "display-meals", "display-calendar", "display-none",
-	"service-all", "service-none", "service-child1", "assistant",
+	"service-all", "service-none", "service-child1", "assistant", "device", "device-web",
 	"revoked", "malformed", "expired", "none",
 }
 
@@ -166,6 +236,10 @@ func actorKind(name string) (actor.Kind, bool) {
 		return actor.Service, true
 	case "assistant":
 		return actor.Assistant, true
+	case "device":
+		return actor.Device, true
+	case "device-web":
+		return actor.DeviceWeb, true
 	}
 	return "", false // no live credential
 }
@@ -258,6 +332,14 @@ func (e *env) house(label string, scopes []string) house {
 	h.actors["revoked"], _ = credential("service", scopes, true, nil, "revoked_at = now()")
 	h.actors["expired"], _ = credential("service", scopes, true, nil, "expires_at = now() - interval '1 minute'")
 	_, h.target = credential("service", scopes, true, nil, "")
+	// child1's iPad signs requests; its web view has a device web session.
+	ipad := newDeviceKey()
+	ipad.id = e.id(`INSERT INTO device (household_id, child_id, name, platform, public_key) VALUES ($1, $2, 'iPad', 'ios', $3) RETURNING id`, h.id, h.child1, ipad.publicKey())
+	h.actors["device"] = cred{device: ipad}
+	webTok, webHash, _ := auth.NewSessionToken()
+	e.exec(`INSERT INTO device_web_session (token_hash, device_id, expires_at) VALUES ($1, $2, now() + interval '1 day')`, webHash, ipad.id)
+	h.actors["device-web"] = cred{cookie: &http.Cookie{Name: actor.DeviceWebCookie, Value: webTok}}
+	h.device = e.id(`INSERT INTO device (household_id, child_id, name, platform, public_key) VALUES ($1, $2, 'Tablet', 'ios', $3) RETURNING id`, h.id, h.child2, newDeviceKey().publicKey())
 	h.actors["malformed"] = cred{bearer: "ocz_not-a-real-token"}
 	h.actors["none"] = cred{}
 	return h

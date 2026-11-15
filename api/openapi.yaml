@@ -18,6 +18,23 @@ info:
     `__Host-display` cookie; parent phones (`ocp_`), service credentials (`ocz_`) and assistants
     (`oca_`) send `Authorization: Bearer`. Every authentication failure is the same 401.
     Cross-site state-changing requests with cookies are refused by Go's `http.CrossOriginProtection`.
+
+    **Signed device requests** (the `device` actor, slice 7). A paired kid app signs every
+    request with the P-256 key it made at pairing, in four headers:
+    `X-OpenCozy-Device` (the device id), `X-OpenCozy-Timestamp` (Unix seconds),
+    `X-OpenCozy-Nonce` (16–64 characters of `[A-Za-z0-9_-]`, new for every request) and
+    `X-OpenCozy-Signature` (ECDSA P-256 over SHA-256, raw r||s, base64url, 86 characters) of
+
+        OPENCOZY-DEVICE-V1\n<METHOD>\n<path and query, as sent, from /api>\n<timestamp>\n<nonce>\n<hex sha256 of the body>\n<device id>
+
+    A timestamp more than 60 seconds off, a nonce already seen from that device in the last
+    300 seconds, an unknown or unpaired device, a device whose child is archived, or a bad
+    signature all get the same 401; its `Date` header lets the app correct its clock. The device
+    acts only for its own child. Its web view uses the `__Host-device` cookie (`device-web`, 24
+    hours, also only its child). A present device cookie decides the request on its own: when it
+    is no longer valid the request gets 401, never the adult or display cookie beside it, and
+    signing in while it is present is refused (409 `kid_device`).
+    Clients send `X-OpenCozy-Client: <app>/<version>`; a client too old for the server gets 426.
 servers:
   - url: /api
 tags:
@@ -25,6 +42,8 @@ tags:
     description: Adult sign-in
   - name: household
     description: The caller's household
+  - name: devices
+    description: Kid devices (iPad, iPhone) and their pairing
   - name: children
     description: Children of the household
   - name: credentials
@@ -70,6 +89,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '413':
           $ref: '#/components/responses/TooLarge'
         '429':
@@ -207,6 +232,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '413':
           $ref: '#/components/responses/TooLarge'
         '429':
@@ -942,6 +973,323 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
+  /devices:
+    get:
+      operationId: listDevices
+      summary: The household's paired devices, and the lock message
+      tags:
+        - devices
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: Devices, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Devices'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /devices/pairings:
+    post:
+      operationId: createDevicePairing
+      summary: Offer a pairing for one child's device
+      description: |
+        The offer lasts 5 minutes and works once. Show `code` (and a QR code of `qrPayload`) to the device. The token and code are shown only in this answer.
+      tags:
+        - devices
+      x-actors:
+        - adult
+      x-recent-auth: true
+      x-command: true
+      x-body-limit: 1024
+      x-record-response: false
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - childId
+              properties:
+                childId:
+                  $ref: '#/components/schemas/Id'
+            example:
+              childId: 0195f2d4-0000-7000-8000-000000000001
+      responses:
+        '201':
+          description: The offer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevicePairingOffer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        default:
+          $ref: '#/components/responses/Error'
+  /devices/lock-message:
+    put:
+      operationId: setLockMessage
+      summary: Set the message the kid app shows on a locked device
+      tags:
+        - devices
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - lockMessage
+              properties:
+                lockMessage:
+                  description: 1–200 characters after trimming; null goes back to the default
+                  oneOf:
+                    - $ref: '#/components/schemas/LockMessage'
+                    - type: 'null'
+            example:
+              lockMessage: Time for a break. Ask an adult if you need more.
+      responses:
+        '204':
+          description: Set
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /devices/{deviceId}:
+    parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Id'
+    patch:
+      operationId: updateDevice
+      summary: Rename a device, or give it to another child
+      tags:
+        - devices
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                name:
+                  $ref: '#/components/schemas/DeviceName'
+                childId:
+                  $ref: '#/components/schemas/Id'
+            example:
+              name: Robin's iPad
+      responses:
+        '200':
+          description: The device
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: revokeDevice
+      summary: Unpair a device; it stops working at once
+      tags:
+        - devices
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Unpaired
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /device:
+    get:
+      operationId: getDevice
+      summary: This device, its child and household; every sync starts here
+      tags:
+        - devices
+      x-actors:
+        - device
+      responses:
+        '200':
+          description: This device
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSelf'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+  /device/pair:
+    post:
+      operationId: pairDevice
+      summary: Redeem a pairing offer with this device's new key
+      description: |
+        Send exactly one of `token` (from the QR code) or `code` (typed; case, spaces and dashes don't matter). `proof` is the device key's signature (ECDSA P-256 over SHA-256, raw r||s, base64url) of `OPENCOZY-PAIR-V1\n<token or code, as sent>\n<publicKey>`, so nobody can pair or use up an offer with a key they do not hold. Every refusal of a well-formed request is the same 409 `pairing_unavailable`.
+      tags:
+        - devices
+      x-actors:
+        - public
+      x-body-limit: 4096
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevicePairRequest'
+            example:
+              code: ABCD-EF23
+              publicKey: BPd0ExampleOnlyBase64X963PointOf65BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+              proof: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+              platform: ios
+              name: Robin's iPad
+      responses:
+        '201':
+          description: Paired. From now on, sign every request with the key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSelf'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /device/web-session:
+    post:
+      operationId: createDeviceWebSession
+      summary: A one-time link that signs the web view in as this device
+      description: |
+        Open `url` in the app's web view within 60 seconds. GET /device/session?token=… (a page route, outside /api) sets the __Host-device cookie (24 hours), signs out any adult or display session in that cookie jar, and redirects to /kid. A used or expired link redirects to /device/expired, where the app makes a new one.
+      tags:
+        - devices
+      x-actors:
+        - device
+      x-body-limit: 64
+      responses:
+        '201':
+          description: The link
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - url
+                  - expiresAt
+                properties:
+                  url:
+                    type: string
+                    description: Same origin, /device/session?token=…
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /device/session:
+    get:
+      operationId: getDeviceWebSession
+      summary: The kid view's own session, child and household
+      tags:
+        - devices
+      x-actors:
+        - device-web
+      responses:
+        '200':
+          description: The session
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - child
+                  - household
+                  - expiresAt
+                properties:
+                  child:
+                    $ref: '#/components/schemas/Child'
+                  household:
+                    $ref: '#/components/schemas/DeviceHousehold'
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
   /today:
     get:
       operationId: getToday
@@ -952,6 +1300,7 @@ paths:
         - adult
         - phone
         - display
+        - device-web
       x-display-scopes:
         - today
       responses:
@@ -977,6 +1326,7 @@ paths:
         - adult
         - phone
         - display
+        - device-web
       x-display-scopes:
         - today
       x-command: true
@@ -1017,6 +1367,7 @@ paths:
         - adult
         - phone
         - display
+        - device-web
       x-display-scopes:
         - today
       x-command: true
@@ -1146,6 +1497,7 @@ paths:
         - adult
         - phone
         - display
+        - device-web
       x-display-scopes:
         - today
       responses:
@@ -1240,6 +1592,7 @@ paths:
         - adult
         - phone
         - display
+        - device-web
       x-display-scopes:
         - today
       x-child-param: childId
@@ -2545,6 +2898,15 @@ components:
       type: apiKey
       in: cookie
       name: __Host-display
+    device:
+      type: apiKey
+      in: header
+      name: X-OpenCozy-Signature
+      description: Signed device request; see the API description
+    deviceWeb:
+      type: apiKey
+      in: cookie
+      name: __Host-device
     bearer:
       type: http
       scheme: bearer
@@ -2855,6 +3217,177 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/DisplayScope'
+    DeviceName:
+      type: string
+      minLength: 1
+      maxLength: 80
+    Platform:
+      type: string
+      enum:
+        - ios
+        - android
+    DeviceChild:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - color
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        color:
+          $ref: '#/components/schemas/ProfileColor'
+    Device:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - platform
+        - child
+        - pairedAt
+      description: |
+        `child` is null when the device's child was archived. Such a device can't act (its signed requests get 401) until an adult gives it to another child.
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          $ref: '#/components/schemas/DeviceName'
+        platform:
+          $ref: '#/components/schemas/Platform'
+        child:
+          oneOf:
+            - $ref: '#/components/schemas/DeviceChild'
+            - type: 'null'
+        pairedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+    LockMessage:
+      type: string
+      minLength: 1
+      maxLength: 200
+      description: Shown on a locked device's shield
+    Devices:
+      type: object
+      additionalProperties: false
+      required:
+        - devices
+        - lockMessage
+        - defaultLockMessage
+      properties:
+        devices:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/Device'
+        lockMessage:
+          description: The household's own message; null means the default
+          oneOf:
+            - $ref: '#/components/schemas/LockMessage'
+            - type: 'null'
+        defaultLockMessage:
+          $ref: '#/components/schemas/LockMessage'
+    DevicePairingOffer:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - code
+        - token
+        - qrPayload
+        - qrModules
+        - expiresAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        code:
+          type: string
+          description: Eight characters as XXXX-XXXX, from an alphabet without look-alikes
+          examples:
+            - ABCD-EF23
+        token:
+          type: string
+          description: 43 characters, base64url
+        qrPayload:
+          type: string
+          description: opencozy-pair:v1?origin=<url-encoded origin>&token=<token>
+        qrModules:
+          type: array
+          description: The QR code of qrPayload (error correction M), row by row; "1" is a dark module
+          maxItems: 177
+          items:
+            type: string
+            pattern: ^[01]+$
+            maxLength: 177
+        expiresAt:
+          type: string
+          format: date-time
+    DeviceHousehold:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - timeZone
+        - lockMessage
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        timeZone:
+          type: string
+          description: IANA zone name; the household day follows it
+        lockMessage:
+          description: The message to show; the default when the household has none
+          $ref: '#/components/schemas/LockMessage'
+    DeviceSelf:
+      type: object
+      additionalProperties: false
+      required:
+        - device
+        - household
+        - serverTime
+      properties:
+        device:
+          $ref: '#/components/schemas/Device'
+        household:
+          $ref: '#/components/schemas/DeviceHousehold'
+        serverTime:
+          type: string
+          format: date-time
+    DevicePairRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - publicKey
+        - proof
+        - platform
+        - name
+      properties:
+        token:
+          type: string
+          maxLength: 64
+        code:
+          type: string
+          maxLength: 16
+        publicKey:
+          type: string
+          maxLength: 100
+          description: The 65-byte uncompressed P-256 point (X9.63), standard base64
+        proof:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{86}$
+        platform:
+          $ref: '#/components/schemas/Platform'
+        name:
+          $ref: '#/components/schemas/DeviceName'
     TodayItem:
       type: object
       required:
@@ -3881,6 +4414,12 @@ components:
             $ref: '#/components/schemas/Error'
     UnprocessableEntity:
       description: This Idempotency-Key was already used for a different request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServiceUnavailable:
+      description: Not available on this server until it is configured
       content:
         application/json:
           schema:

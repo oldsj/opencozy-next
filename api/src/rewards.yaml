@@ -3,7 +3,7 @@ rewards:
     operationId: listRewards
     summary: The rewards children can spend points on
     tags: [rewards]
-    x-actors: [adult, phone, display]
+    x-actors: [adult, phone, display, device-web]
     x-display-scopes: [today]
     responses:
       '200':
@@ -84,7 +84,7 @@ redemptions:
       The points are spent at once. Asked for on a display, it waits for an adult, who approves it
       or says no (and the points come back); asked for by an adult, it is approved at once.
     tags: [rewards]
-    x-actors: [adult, phone, display]
+    x-actors: [adult, phone, display, device-web]
     x-display-scopes: [today]
     x-child-param: childId
     x-command: true

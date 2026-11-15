@@ -1,10 +1,11 @@
 // @dsCard group="Dashboard"
-import { CalendarDays, Tv, UtensilsCrossed } from 'lucide-react';
+import { CalendarDays, DoorOpen, House, Lock, Thermometer, Tv, UtensilsCrossed, type LucideIcon } from 'lucide-react';
 
-import { AppFrame, Button, ButtonLink, Countdown, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
+import { AppFrame, Button, Reading, ButtonLink, Countdown, EmptyState, List, ListRow, PageHeader, ProfileAvatar, Section, Tag, TopBar, Widget } from '../../src';
 
 import { calendar, dayHeadings, dayOf, kids, todayDate, when, type CalendarEvent } from './fixtures-calendar';
 
+import { entities, readingFor, type HomeEntity } from './fixtures-home';
 import { tvs } from './fixtures-tv';
 
 import { mealSlots, slotLabels, today, week, type MealDay } from './fixtures-meals';
@@ -208,4 +209,35 @@ export function TvsOnDisplay() {
       </List>
     </Widget>
   );
+}
+
+function homeIcon(e: HomeEntity): LucideIcon | undefined {
+  if (e.entityId.startsWith('lock.')) return Lock;
+  if (e.status === 'ok' || e.status === 'stale') {
+    if (e.attributes.device_class === 'temperature') return Thermometer;
+    if (e.attributes.device_class === 'door') return DoorOpen;
+  }
+  return undefined;
+}
+
+/**
+ * Home (slice 15): readings an adult shares from Home Assistant. Read-only; the display never
+ * controls anything. Each reading keeps its own freshness, so one failing entity never blanks the
+ * others. On a display, leave the widget out entirely while Home Assistant isn't connected.
+ */
+export function HomeNow({ shown = entities, title = 'Home' }: { shown?: HomeEntity[]; title?: string }) {
+  return (
+    <Widget title={title} icon={House}>
+      <div className="oc-readings">
+        {shown.map((e) => (
+          <Reading key={e.entityId} icon={homeIcon(e)} {...readingFor(e)} />
+        ))}
+      </div>
+    </Widget>
+  );
+}
+
+/** A small Home widget with only the entities the adult picked for this spot, under their own title. */
+export function HomeDoors({ title = 'Home' }: { title?: string }) {
+  return <HomeNow title={title} shown={entities.filter((e) => e.entityId === 'binary_sensor.back_door' || e.entityId === 'lock.front_door')} />;
 }

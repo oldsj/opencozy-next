@@ -184,6 +184,46 @@ type CredentialChild struct {
 	ChildID      uuid.UUID
 }
 
+type Device struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     *uuid.UUID
+	Name        string
+	Platform    string
+	PublicKey   []byte
+	PairedAt    time.Time
+	LastSeenAt  *time.Time
+	RevokedAt   *time.Time
+}
+
+type DeviceNonce struct {
+	DeviceID uuid.UUID
+	Nonce    string
+	SeenAt   time.Time
+}
+
+type DevicePairing struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	TokenHash   []byte
+	CodeHash    []byte
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+}
+
+type DeviceWebLink struct {
+	TokenHash []byte
+	DeviceID  uuid.UUID
+	ExpiresAt time.Time
+}
+
+type DeviceWebSession struct {
+	TokenHash []byte
+	DeviceID  uuid.UUID
+	ExpiresAt time.Time
+}
+
 type Display struct {
 	ID          uuid.UUID
 	HouseholdID uuid.UUID
@@ -206,11 +246,12 @@ type DisplayPairing struct {
 }
 
 type Household struct {
-	ID         uuid.UUID
-	Name       string
-	TimeZone   string
-	ArchivedAt *time.Time
-	CreatedAt  time.Time
+	ID          uuid.UUID
+	Name        string
+	TimeZone    string
+	ArchivedAt  *time.Time
+	CreatedAt   time.Time
+	LockMessage *string
 }
 
 type JobLease struct {

@@ -33,7 +33,7 @@ import {
 } from './fixtures-meals';
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
-import { me, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
+import { me, methods, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
 import {
   catalogErrorText,
   catalogRewards,
@@ -47,6 +47,8 @@ import {
   timeZones,
   type RedemptionRow,
 } from './fixtures-catalog';
+import { views } from './fixtures-dashboards';
+import { connection, entities, homeErrorText, readingFor } from './fixtures-home';
 import { manageGroups } from './fixtures-manage';
 import { durationLabels, tvs, type Tv } from './fixtures-tv';
 
@@ -1379,7 +1381,7 @@ export function TvOpen() {
  * Account (slices 10 and 11): how you sign in, and where you're signed in. Passkeys are named so you
  * can tell them apart; phones are listed so a lost one can be signed out from here.
  */
-export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
+export function Account({ link = oidcLink, provider = methods.oidc?.name }: { link?: OidcLink | null; provider?: string | undefined }) {
   return (
     <ManageShell nav={settingsNav('/manage/account')}>
       <PageHeader title="Account" description={`Signed in as ${me.email}.`} />
@@ -1415,6 +1417,7 @@ export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
           ))}
         </List>
       </Section>
+      {(link !== null || provider !== undefined) && (
       <Section title="Single sign-on" description="Your password and passkeys keep working either way.">
         {link ? (
           <List>
@@ -1431,10 +1434,11 @@ export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
           </List>
         ) : (
           <p className="m-0 text-muted-foreground">
-            Not linked. Choose “Sign in with Pocket ID” on the sign-in page once; it links when Pocket ID confirms {me.email}.
+            Not linked. Choose “Sign in with {provider}” on the sign-in page once; it links when {provider} confirms {me.email}.
           </p>
         )}
       </Section>
+      )}
       <Section title="Phones" count={phoneSessions.length} description="The OpenCozy app on your phone. Each stays signed in for 90 days.">
         <List>
           {phoneSessions.map((ps) => (
@@ -1534,9 +1538,9 @@ export function SsoUnlink() {
         open
         onCancel={noop}
         onConfirm={noop}
-        title="Unlink Pocket ID?"
-        description="“Sign in with Pocket ID” stops working for you until you use it again. Your password and passkeys keep working."
-        confirmLabel="Unlink Pocket ID"
+        title={`Unlink ${oidcLink.providerName}?`}
+        description={`“Sign in with ${oidcLink.providerName}” stops working for you until you use it again. Your password and passkeys keep working.`}
+        confirmLabel={`Unlink ${oidcLink.providerName}`}
         tone="danger"
       />
     </>
@@ -1861,5 +1865,202 @@ export function HouseholdSettings() {
         </div>
       </form>
     </ManageShell>
+  );
+}
+
+const dashboardNav = (current: string) => (
+  <ManageNav groups={manageGroups(current)} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />
+);
+
+/**
+ * Dashboard views (slice 16): named layouts a display can show. Without one, a display shows the
+ * Today board. Archiving a view keeps it; a display showing it goes back to Today.
+ */
+export function Dashboards() {
+  const live = views.filter((v) => !v.archived);
+  const archived = views.filter((v) => v.archived);
+  return (
+    <ManageShell nav={dashboardNav('/manage/dashboard')}>
+      <PageHeader title="Dashboard" description="Views for the wall displays. A display without one shows the Today board." actions={<Button variant="primary">New view</Button>} />
+      <Section title="Views" count={live.length}>
+        <List>
+          {live.map((v) => (
+            <ListRow
+              key={v.id}
+              stackOnNarrow
+              title={v.name}
+              meta={[`${String(v.widgets.length)} widgets`, v.displays.length > 0 ? `on ${v.displays.join(', ')}` : 'not on a display', v.widgets.some((w) => !w.valid) ? 'one widget needs attention' : null]
+                .filter(Boolean)
+                .join(' · ')}
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Edit ${v.name}`}>
+                    Edit
+                  </Button>
+                  <Button variant="quiet" aria-label={`Rename ${v.name}`}>
+                    Rename
+                  </Button>
+                  <Button variant="quiet" aria-label={`Archive ${v.name}`}>
+                    Archive…
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Archived" count={archived.length}>
+        <List>
+          {archived.map((v) => (
+            <ListRow key={v.id} muted title={v.name} trailing={<Button aria-label={`Restore ${v.name}`}>Restore</Button>} />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Which view a display shows (Manage → Displays → a display). */
+export function DisplayShowsView() {
+  return (
+    <>
+      <Dashboards />
+      <Sheet
+        open
+        onClose={noop}
+        title="What Kitchen display shows"
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <SegmentedControl
+          label="View for Kitchen display"
+          value="v1"
+          onChange={noop}
+          options={[{ value: 'today', label: 'Today board' }, ...views.filter((v) => !v.archived).map((v) => ({ value: v.id, label: v.name }))]}
+        />
+      </Sheet>
+    </>
+  );
+}
+
+/**
+ * Home Assistant (slice 15): one connection, and the entities shared with the dashboard. OpenCozy
+ * only reads; the token is stored encrypted and never shown again.
+ */
+export function HomeAssistant() {
+  return (
+    <ManageShell nav={dashboardNav('/manage/home-assistant')}>
+      <PageHeader title="Home Assistant" description="Share readings like temperatures and doors with the dashboard. OpenCozy only reads; it never controls anything." />
+      <Section
+        title="Connection"
+        actions={
+          <>
+            <Button>Check now</Button>
+            <Button variant="quiet">Replace…</Button>
+            <Button variant="quiet">Remove…</Button>
+          </>
+        }
+      >
+        <List>
+          <ListRow
+            stackOnNarrow
+            title={connection.url}
+            meta={
+              <>
+                <Tag tone={connection.status === 'ok' ? 'positive' : connection.status === 'error' ? 'error' : 'neutral'}>
+                  {connection.status === 'ok' ? 'Connected' : connection.status === 'error' ? 'Can’t reach it' : 'Not checked yet'}
+                </Tag>{' '}
+                {connection.lastCheckedAt === null ? null : `checked ${connection.lastCheckedAt}`}
+              </>
+            }
+          />
+        </List>
+      </Section>
+      <Section title="Shared with the dashboard" count={entities.length} description="Each reading refreshes every few minutes; an old one shows its age.">
+        <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start" onSubmit={(e) => { e.preventDefault(); }}>
+          <Input label="Entity ID" placeholder="sensor.kitchen_temperature" className="font-mono" hint="Find it in Home Assistant under Settings → Entities." />
+          <Button type="submit" className="sm:mt-7">
+            Share
+          </Button>
+        </form>
+        <List>
+          {entities.map((e) => {
+            const r = readingFor(e);
+            const value = r.status === 'error' ? 'can’t read' : r.status === 'pending' ? 'not read yet' : `${r.value ?? ''}${r.unit ?? ''}`;
+            return (
+              <ListRow
+                key={e.entityId}
+                stackOnNarrow
+                title={r.label}
+                meta={[e.entityId, value, r.note].filter(Boolean).join(' · ')}
+                trailing={
+                  <Button variant="quiet" aria-label={`Stop sharing ${r.label}`}>
+                    Stop sharing
+                  </Button>
+                }
+              />
+            );
+          })}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Connecting: the address and a long-lived access token. The token is write-only. */
+export function HomeAssistantConnect({ rejected = false }: { rejected?: boolean }) {
+  return (
+    <>
+      <HomeAssistant />
+      <Sheet
+        open
+        onClose={noop}
+        title="Connect Home Assistant"
+        description="Saving a new connection replaces this one and clears the shared readings."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save and check</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          {rejected && <Notice tone="error">{homeErrorText.token_rejected}</Notice>}
+          <Input label="Address" type="url" defaultValue={connection.url} hint="https, or http on your home network if whoever runs OpenCozy allowed it." required />
+          <Input
+            label="Long-lived access token"
+            type="password"
+            autoComplete="off"
+            hint="Create one in Home Assistant under your profile → Security. It’s stored encrypted and never shown again."
+            required
+          />
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function HomeAssistantTokenRejected() {
+  return <HomeAssistantConnect rejected />;
+}
+
+export function HomeAssistantRemove() {
+  return (
+    <>
+      <HomeAssistant />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title="Remove the Home Assistant connection?"
+        description="The dashboard stops showing Home readings. A new connection starts with nothing shared."
+        confirmLabel="Remove connection"
+        tone="danger"
+      />
+    </>
   );
 }

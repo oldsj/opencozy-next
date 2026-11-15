@@ -1,8 +1,13 @@
+import { randomBytes } from 'node:crypto';
+
 import { defineConfig, devices } from '@playwright/test';
 
 // Runs against the production binary (`make build`, SPA embedded, strict CSP), not the Vite dev
 // server, so the test sees what users get. DATABASE_URL must point at a disposable database.
 const port = process.env.E2E_PORT ?? '18080';
+// A throwaway keyring for the server's encrypted secrets (calendar links), new on every run and
+// never written anywhere. The server is started from this process, so this is the key it gets.
+const secretKeys = `e2e:${randomBytes(32).toString('base64')}`;
 
 export default defineConfig({
   testDir: 'e2e',
@@ -27,6 +32,9 @@ export default defineConfig({
       DATABASE_URL: process.env.DATABASE_URL ?? '',
       // Short, so reauth.spec.ts can see a sign-in go stale.
       RECENT_AUTH_WINDOW: '15s',
+      OPENCOZY_SECRET_KEYS: secretKeys,
+      // bin/app is an e2e build (make build-e2e); it refuses to start without this.
+      OPENCOZY_E2E_BUILD: '1',
     },
   },
 });

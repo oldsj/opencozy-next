@@ -30,15 +30,17 @@ import (
 
 // Server holds what the handlers need.
 type Server struct {
-	cfg      config.Config
-	log      *slog.Logger
-	pool     *pgxpool.Pool
-	q        *dbq.Queries
-	actors   actor.Resolver
-	table    *authz.Table
-	runner   command.Runner
-	draining atomic.Bool
-	live     atomic.Pointer[live.Hub] // slice 0d: StartLive
+	cfg config.Config
+	// deviceLinks limits each kid device's web-session links (deviceLinkRatePerMinute).
+	deviceLinks *httpx.RateLimiter
+	log         *slog.Logger
+	pool        *pgxpool.Pool
+	q           *dbq.Queries
+	actors      actor.Resolver
+	table       *authz.Table
+	runner      command.Runner
+	draining    atomic.Bool
+	live        atomic.Pointer[live.Hub] // slice 0d: StartLive
 	// calendarWake starts the calendar refresh early (slice 13a).
 	calendarWake chan struct{}
 	wa           *webauthn.WebAuthn // nil when passkeys are off
@@ -49,7 +51,7 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	q := dbq.New(pool)
-	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1)}
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute)}
 }
 
 // Drain makes /readyz fail, so the load balancer stops sending traffic before shutdown.
@@ -71,6 +73,7 @@ func (s *Server) Handler() (http.Handler, error) {
 
 	app := http.NewServeMux()
 	app.Handle("/api/", http.StripPrefix("/api", apiHandler))
+	app.HandleFunc("GET /device/session", s.deviceSessionPage)
 	app.Handle("/", web.Handler(web.Dist()))
 
 	// Go's CSRF defence: refuses cross-origin unsafe requests using Sec-Fetch-Site and Origin.
@@ -151,8 +154,9 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	// must not use up the sign-in attempts of an adult at the same address.
 	limited := httpx.NewRateLimiter(s.cfg.AuthRatePerMinute).Middleware
 	pairing := httpx.NewRateLimiter(pairingRatePerMinute).Middleware
+	devicePairing := httpx.NewRateLimiter(devicePairRatePerMinute).Middleware
 	limitAuth := func(next http.Handler) http.Handler {
-		auth, pair := limited(next), pairing(next)
+		auth, pair, devicePair := limited(next), pairing(next), devicePairing(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.Method != http.MethodPost:
@@ -161,6 +165,8 @@ func (s *Server) apiHandler() (http.Handler, error) {
 				auth.ServeHTTP(w, r)
 			case strings.HasPrefix(r.URL.Path, "/display/pairings"):
 				pair.ServeHTTP(w, r)
+			case r.URL.Path == "/device/pair":
+				devicePair.ServeHTTP(w, r)
 			default:
 				next.ServeHTTP(w, r)
 			}
