@@ -16,6 +16,8 @@ export interface Meal {
   recipeId?: string | undefined;
   /** Up to 200 characters. */
   note?: string | undefined;
+  /** For the conflict check; never shown. */
+  version: number;
 }
 
 export interface MealDay {
@@ -35,6 +37,8 @@ export interface RecipeSummary {
   /** Up to 160 characters; design for 80 visible and wrap the rest. */
   title: string;
   servings: number;
+  /** Archived recipes stay on old meals but leave the suggestions. */
+  archived: boolean;
 }
 
 /** GET /api/recipes/{id}. `version` is for the editor's conflict check and is never shown. */
@@ -43,8 +47,15 @@ export interface Recipe extends RecipeSummary {
   ingredients: string[];
   /** Up to 40, each up to 2000 characters, shown wrapped in full. */
   steps: string[];
+  /** For the editor's conflict check; never shown. */
   version: number;
 }
+
+/**
+ * Planning a slot: a recipe or a plain title, an optional note, and the slot's current version
+ * (0 when it is empty).
+ */
+export type PlanSlotRequest = ({ recipeId: string } | { title: string }) & { note?: string | undefined; expectedVersion: number };
 
 export const RECIPE_TITLE_MAX = 160;
 export const MEAL_NOTE_MAX = 200;
@@ -57,21 +68,21 @@ export const week: MealWeek = {
     {
       date: '2026-09-14',
       meals: [
-        { id: 'm1', slot: 'breakfast', title: 'Porridge with apples', recipeId: 'r2' },
-        { id: 'm2', slot: 'dinner', title: 'Lentil soup with crusty bread', recipeId: 'r1', note: 'Make a double batch for Wednesday.' },
+        { id: 'm1', slot: 'breakfast', title: 'Porridge with apples', recipeId: 'r2', version: 1 },
+        { id: 'm2', slot: 'dinner', title: 'Lentil soup with crusty bread', recipeId: 'r1', note: 'Make a double batch for Wednesday.', version: 1 },
       ],
     },
-    { date: '2026-09-15', meals: [{ id: 'm3', slot: 'dinner', title: 'Sheet-pan chicken and potatoes', recipeId: 'r3' }] },
-    { date: '2026-09-16', meals: [{ id: 'm4', slot: 'dinner', title: 'Leftovers' }] },
+    { date: '2026-09-15', meals: [{ id: 'm3', slot: 'dinner', title: 'Sheet-pan chicken and potatoes', recipeId: 'r3', version: 1 }] },
+    { date: '2026-09-16', meals: [{ id: 'm4', slot: 'dinner', title: 'Leftovers', version: 1 }] },
     { date: '2026-09-17', meals: [] },
     {
       date: '2026-09-18',
       meals: [
-        { id: 'm5', slot: 'lunch', title: 'Picnic sandwiches', note: 'School trip: pack two each.' },
-        { id: 'm6', slot: 'dinner', title: 'Homemade pizza night', recipeId: 'r4' },
+        { id: 'm5', slot: 'lunch', title: 'Picnic sandwiches', note: 'School trip: pack two each.', version: 1 },
+        { id: 'm6', slot: 'dinner', title: 'Homemade pizza night', recipeId: 'r4', version: 1 },
       ],
     },
-    { date: '2026-09-19', meals: [{ id: 'm7', slot: 'breakfast', title: 'Pancakes', recipeId: 'r5' }] },
+    { date: '2026-09-19', meals: [{ id: 'm7', slot: 'breakfast', title: 'Pancakes', recipeId: 'r5', version: 1 }] },
     { date: '2026-09-20', meals: [] },
   ],
 };
@@ -89,17 +100,19 @@ export const dayLabels: Record<string, string> = {
 export const today = '2026-09-14';
 
 export const recipes: RecipeSummary[] = [
-  { id: 'r1', title: 'Lentil soup with crusty bread', servings: 6 },
-  { id: 'r2', title: 'Porridge with apples', servings: 4 },
-  { id: 'r3', title: 'Sheet-pan chicken and potatoes with lemon, garlic and whatever greens are in the fridge', servings: 4 },
-  { id: 'r4', title: 'Homemade pizza night', servings: 5 },
-  { id: 'r5', title: 'Pancakes', servings: 4 },
+  { id: 'r1', title: 'Lentil soup with crusty bread', servings: 6, archived: false },
+  { id: 'r2', title: 'Porridge with apples', servings: 4, archived: false },
+  { id: 'r3', title: 'Sheet-pan chicken and potatoes with lemon, garlic and whatever greens are in the fridge', servings: 4, archived: false },
+  { id: 'r4', title: 'Homemade pizza night', servings: 5, archived: false },
+  { id: 'r5', title: 'Pancakes', servings: 4, archived: false },
+  { id: 'r6', title: 'Summer gazpacho', servings: 4, archived: true },
 ];
 
 export const recipe: Recipe = {
   id: 'r1',
   title: 'Lentil soup with crusty bread',
   servings: 6,
+  archived: false,
   version: 3,
   ingredients: ['1 tbsp olive oil', '1 onion, chopped', '2 carrots, diced', '2 cloves garlic', '300 g red lentils', '1.5 l vegetable stock', '1 lemon', 'Crusty bread, to serve'],
   steps: [
