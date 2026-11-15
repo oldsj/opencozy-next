@@ -28,10 +28,12 @@ info:
         OPENCOZY-DEVICE-V1\n<METHOD>\n<path and query, as sent, from /api>\n<timestamp>\n<nonce>\n<hex sha256 of the body>\n<device id>
 
     A timestamp more than 60 seconds off, a nonce already seen from that device in the last
-    120 seconds, an unknown or unpaired device, a device whose child is archived, or a bad
+    300 seconds, an unknown or unpaired device, a device whose child is archived, or a bad
     signature all get the same 401; its `Date` header lets the app correct its clock. The device
     acts only for its own child. Its web view uses the `__Host-device` cookie (`device-web`, 24
-    hours, also only its child), which outranks an adult or display cookie in the same jar.
+    hours, also only its child). A present device cookie decides the request on its own: when it
+    is no longer valid the request gets 401, never the adult or display cookie beside it, and
+    signing in while it is present is refused (409 `kid_device`).
     Clients send `X-OpenCozy-Client: <app>/<version>`; a client too old for the server gets 426.
 servers:
   - url: /api

@@ -50,6 +50,8 @@ pairings:
         $ref: common.yaml#/responses/NotFound
       '422':
         $ref: common.yaml#/responses/UnprocessableEntity
+      '503':
+        $ref: common.yaml#/responses/ServiceUnavailable
       default:
         $ref: common.yaml#/responses/Error
 devices:
@@ -271,6 +273,8 @@ webSession:
                   format: date-time
       '401':
         $ref: common.yaml#/responses/Unauthorized
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
       default:
         $ref: common.yaml#/responses/Error
 session:

@@ -107,6 +107,12 @@ func TestDevices(t *testing.T) {
 	if s := signed(func(req *http.Request) { req.Header = replay }); s != 401 {
 		t.Errorf("replayed nonce: %d", s)
 	}
+	// Still refused when its nonce is 150 s old by the database's clock (the request is
+	// acceptable for 120 s, and the clocks may differ): nonces are kept for 300 s.
+	e.exec(`UPDATE device_nonce SET seen_at = clock_timestamp() - interval '150 seconds' WHERE nonce = $1`, replay.Get(actor.NonceHeader))
+	if s := signed(func(req *http.Request) { req.Header = replay }); s != 401 {
+		t.Errorf("replayed nonce, 150 s on: %d", s)
+	}
 	if s := signed(func(req *http.Request) {
 		ts := strconv.FormatInt(time.Now().Add(-2*time.Minute).Unix(), 10)
 		nonce := strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -232,12 +238,71 @@ func TestDevices(t *testing.T) {
 	if r := e.send(device, "GET", "/api/device", nil); r.status != 200 {
 		t.Errorf("reassigned: %d", r.status)
 	}
+	// A present device cookie decides the request: never the adult's cookie beside it.
+	exchange := func() *http.Cookie {
+		t.Helper()
+		r := e.send(device, "POST", "/api/device/web-session", map[string]any{})
+		if r.status != 201 {
+			t.Fatalf("web-session: %d %s", r.status, r.raw)
+		}
+		for _, c := range open(r.body["url"].(string)).cookies {
+			if c.Name == actor.DeviceWebCookie {
+				return &http.Cookie{Name: c.Name, Value: c.Value}
+			}
+		}
+		t.Fatal("no device cookie")
+		return nil
+	}
+	both := func(kid *http.Cookie) cred {
+		return cred{cookie: kid, cookies: []*http.Cookie{freshSession(e, h.adult)}}
+	}
+	kid := exchange()
+	if r := e.send(both(kid), "GET", "/api/household", nil); r.status != 403 {
+		t.Errorf("device + adult cookie on an adult page: %d", r.status)
+	}
+	if r := e.send(both(kid), "GET", "/api/device/session", nil); r.status != 200 {
+		t.Errorf("device + adult cookie on the kid view: %d", r.status)
+	}
+	// Signing in on the child's web view is refused, by password and by passkey.
+	if r := e.send(cred{cookie: kid}, "POST", "/api/auth/login", map[string]any{"email": "sam.a@example.test", "password": "x"}); r.status != 409 || errCode(r) != "kid_device" {
+		t.Errorf("sign-in with a device cookie: %d %s", r.status, r.raw)
+	}
+	e.exec(`UPDATE device_web_session SET expires_at = clock_timestamp() - interval '1 second' WHERE device_id = $1`, kit.id)
+	for _, path := range []string{"/api/household", "/api/device/session", "/api/today"} {
+		if r := e.send(both(kid), "GET", path, nil); r.status != 401 {
+			t.Errorf("expired device cookie + adult cookie, %s: %d", path, r.status)
+		}
+	}
+	if r := e.send(both(&http.Cookie{Name: actor.DeviceWebCookie, Value: "not well formed"}), "GET", "/api/household", nil); r.status != 401 {
+		t.Errorf("malformed device cookie + adult cookie: %d", r.status)
+	}
+	revoked := exchange() // checked after unpairing, below
+	// Ten links a minute per device.
+	limited := false
+	for range 10 {
+		if r := e.send(device, "POST", "/api/device/web-session", map[string]any{}); r.status == 429 {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Error("web-session links are not limited")
+	}
+	// The QR code's origin is never the request's Host: without PUBLIC_ORIGIN, only a loopback
+	// name is used.
+	if r := e.send(a, "POST", "/api/devices/pairings", map[string]any{"childId": h.child2}, "Host", "cozy.attacker.example.test"); r.status != 503 || errCode(r) != "public_origin_unset" {
+		t.Errorf("pairing offer under another Host: %d %s", r.status, r.raw)
+	}
+
 	// Unpairing: the next request gets 401.
 	if r := e.send(a, "DELETE", "/api/devices/"+kit.id.String(), nil); r.status != 204 {
 		t.Fatalf("revoke: %d %s", r.status, r.raw)
 	}
 	if r := e.send(device, "GET", "/api/device", nil); r.status != 401 {
 		t.Errorf("revoked: %d", r.status)
+	}
+	if r := e.send(both(revoked), "GET", "/api/household", nil); r.status != 401 {
+		t.Errorf("revoked device's cookie + adult cookie: %d", r.status)
 	}
 	// An expired link goes to /device/expired too.
 	if res := open("/device/session?token=" + url.QueryEscape("not-a-token")); res.location != "/device/expired" {
@@ -246,4 +311,12 @@ func TestDevices(t *testing.T) {
 	if r := e.send(adult, "GET", "/api/devices", nil); r.status != 200 || len(r.body["devices"].([]any)) != 2 {
 		t.Errorf("household B sees only its own: %d %s", r.status, r.raw)
 	}
+}
+
+func errCode(r resp) string {
+	if e, ok := r.body["error"].(map[string]any); ok {
+		c, _ := e["code"].(string)
+		return c
+	}
+	return ""
 }

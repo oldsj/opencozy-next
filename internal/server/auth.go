@@ -41,6 +41,9 @@ func (s *Server) checkPassword(ctx context.Context, a dbq.Adult, password string
 
 // Login checks the password and starts a new session.
 func (s *Server) Login(ctx context.Context, req api.LoginRequestObject) (api.LoginResponseObject, error) {
+	if onKidDevice(ctx) {
+		return api.Login409JSONResponse(errKidDevice), nil
+	}
 	wrong := api.Login401JSONResponse{UnauthorizedJSONResponse: api.UnauthorizedJSONResponse(errWrong)}
 	a, err := s.q.GetAdultByEmail(ctx, normalizeEmail(string(req.Body.Email)))
 	if errors.Is(err, pgx.ErrNoRows) {

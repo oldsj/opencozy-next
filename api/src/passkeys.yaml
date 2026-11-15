@@ -49,6 +49,12 @@ signIn:
         $ref: common.yaml#/responses/BadRequest
       '401':
         $ref: common.yaml#/responses/Unauthorized
+      '409':
+        description: A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
       '413':
         $ref: common.yaml#/responses/TooLarge
       '429':

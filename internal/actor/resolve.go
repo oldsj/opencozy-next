@@ -35,11 +35,13 @@ type Resolver struct {
 // database failures.
 //
 // A signed device request (X-OpenCozy-Device) is resolved from its signature alone, and a
-// request with an Authorization header from it alone. Otherwise cookies are tried
-// in order: device web session, adult, display; the first live one wins (an iPad's web view can
-// hold several). A present but dead cookie is skipped, not an error, because browsers keep
-// stale cookies; only when no cookie is live and at least one was present is the result
-// ErrUnauthenticated.
+// request with an Authorization header from it alone. A device web session cookie, when present,
+// decides the request on its own: live is the device's child, anything else is
+// ErrUnauthenticated. It never falls through to an adult cookie in the same jar (the child's web
+// view must not turn into an adult's when its session ends). Otherwise the adult, then the
+// display cookie is tried; the first live one wins. A present but dead one of those is skipped,
+// not an error, because browsers keep stale cookies; only when no cookie is live and at least
+// one was present is the result ErrUnauthenticated.
 func (rv Resolver) Resolve(ctx context.Context, r *http.Request) (a Actor, ok bool, err error) {
 	if r.Header.Get(DeviceHeader) != "" {
 		a, err := rv.signed(ctx, r)
@@ -49,12 +51,18 @@ func (rv Resolver) Resolve(ctx context.Context, r *http.Request) (a Actor, ok bo
 		a, err := rv.bearer(ctx, h)
 		return a, err == nil, err
 	}
+	if c, err := r.Cookie(DeviceWebCookie); err == nil && c.Value != "" {
+		if !auth.WellFormedCookie(c.Value) {
+			return Actor{}, false, ErrUnauthenticated
+		}
+		a, err := rv.deviceWeb(ctx, c.Value)
+		return a, err == nil, err
+	}
 	present := false
 	for _, try := range []struct {
 		name string
 		fn   func(context.Context, string) (Actor, error)
 	}{
-		{DeviceWebCookie, rv.deviceWeb},
 		{AdultCookie, rv.adult},
 		{DisplayCookie, rv.display},
 	} {

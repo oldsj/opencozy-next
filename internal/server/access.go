@@ -45,7 +45,9 @@ func (s *Server) route(next http.Handler) http.Handler {
 			writeForbidden(w)
 			return
 		}
-		ctx := context.WithValue(withRoute(r.Context(), routeInfo{policy: p, params: params}), originKey{}, requestOrigin(r))
+		ctx := withRoute(r.Context(), routeInfo{policy: p, params: params})
+		ctx = context.WithValue(ctx, loopbackKey{}, loopbackOrigin(r))
+		ctx = context.WithValue(ctx, deviceCookieKey{}, hasDeviceCookie(r))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

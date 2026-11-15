@@ -1,7 +1,7 @@
 -- name: DeleteExpiredDeviceState :exec
 WITH p AS (DELETE FROM device_pairing WHERE expires_at <= clock_timestamp()),
      l AS (DELETE FROM device_web_link WHERE expires_at <= clock_timestamp()),
-     n AS (DELETE FROM device_nonce WHERE seen_at <= clock_timestamp() - interval '120 seconds')
+     n AS (DELETE FROM device_nonce WHERE seen_at <= clock_timestamp() - interval '300 seconds')
 DELETE FROM device_web_session WHERE expires_at <= clock_timestamp();
 
 -- name: CreateDevicePairing :one
@@ -38,10 +38,12 @@ JOIN child c ON c.household_id = d.household_id AND c.id = d.child_id
 WHERE d.id = $1 AND d.revoked_at IS NULL AND h.archived_at IS NULL AND c.archived_at IS NULL;
 
 -- name: RecordDeviceNonce :execrows
--- One row when the nonce is new (or older than 120 seconds), none when it is a replay.
+-- One row when the nonce is new (or older than 300 seconds), none when it is a replay. A request
+-- is acceptable for 120 seconds (timestamp ±60 s); 300 leaves room for the app's and the
+-- database's clocks to differ.
 INSERT INTO device_nonce (device_id, nonce) VALUES ($1, $2)
 ON CONFLICT (device_id, nonce) DO UPDATE SET seen_at = clock_timestamp()
-WHERE device_nonce.seen_at <= clock_timestamp() - interval '120 seconds';
+WHERE device_nonce.seen_at <= clock_timestamp() - interval '300 seconds';
 
 -- name: TouchDevice :exec
 UPDATE device SET last_seen_at = clock_timestamp()

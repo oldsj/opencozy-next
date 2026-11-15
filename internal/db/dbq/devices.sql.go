@@ -128,7 +128,7 @@ func (q *Queries) DeleteDeviceWebSessions(ctx context.Context, deviceID uuid.UUI
 const deleteExpiredDeviceState = `-- name: DeleteExpiredDeviceState :exec
 WITH p AS (DELETE FROM device_pairing WHERE expires_at <= clock_timestamp()),
      l AS (DELETE FROM device_web_link WHERE expires_at <= clock_timestamp()),
-     n AS (DELETE FROM device_nonce WHERE seen_at <= clock_timestamp() - interval '120 seconds')
+     n AS (DELETE FROM device_nonce WHERE seen_at <= clock_timestamp() - interval '300 seconds')
 DELETE FROM device_web_session WHERE expires_at <= clock_timestamp()
 `
 
@@ -336,7 +336,7 @@ func (q *Queries) LockDevicePairing(ctx context.Context, arg LockDevicePairingPa
 const recordDeviceNonce = `-- name: RecordDeviceNonce :execrows
 INSERT INTO device_nonce (device_id, nonce) VALUES ($1, $2)
 ON CONFLICT (device_id, nonce) DO UPDATE SET seen_at = clock_timestamp()
-WHERE device_nonce.seen_at <= clock_timestamp() - interval '120 seconds'
+WHERE device_nonce.seen_at <= clock_timestamp() - interval '300 seconds'
 `
 
 type RecordDeviceNonceParams struct {
@@ -344,7 +344,9 @@ type RecordDeviceNonceParams struct {
 	Nonce    string
 }
 
-// One row when the nonce is new (or older than 120 seconds), none when it is a replay.
+// One row when the nonce is new (or older than 300 seconds), none when it is a replay. A request
+// is acceptable for 120 seconds (timestamp ±60 s); 300 leaves room for the app's and the
+// database's clocks to differ.
 func (q *Queries) RecordDeviceNonce(ctx context.Context, arg RecordDeviceNonceParams) (int64, error) {
 	result, err := q.db.Exec(ctx, recordDeviceNonce, arg.DeviceID, arg.Nonce)
 	if err != nil {

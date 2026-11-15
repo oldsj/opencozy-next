@@ -60,6 +60,8 @@ type cred struct {
 	bearer string
 	cookie *http.Cookie
 	device *deviceKey
+	// cookies are more cookies in the same jar (a web view holding several).
+	cookies []*http.Cookie
 }
 
 // deviceKey is a paired kid device's id and private key, to sign requests as the app does.
@@ -115,6 +117,9 @@ func (c cred) apply(r *http.Request) {
 	if c.cookie != nil {
 		r.AddCookie(c.cookie)
 	}
+	for _, more := range c.cookies {
+		r.AddCookie(more)
+	}
 }
 
 type resp struct {
@@ -155,6 +160,10 @@ func (e *env) send(c cred, method, path string, body any, headers ...string) res
 		req.Header.Set("Idempotency-Key", uuid.NewString())
 	}
 	for i := 0; i+1 < len(headers); i += 2 {
+		if headers[i] == "Host" {
+			req.Host = headers[i+1]
+			continue
+		}
 		if headers[i+1] == "" {
 			req.Header.Del(headers[i])
 			continue

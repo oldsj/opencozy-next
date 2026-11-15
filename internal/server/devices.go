@@ -20,6 +20,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/api"
 	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/httpx"
 )
 
 // DefaultLockMessage is what a locked device shows when the household set none (the iOS app's
@@ -28,6 +29,9 @@ const DefaultLockMessage = "Earn time on the chore board, then spend your points
 
 // devicePairRatePerMinute is per client address, for redeeming offers (the old app's 20).
 const devicePairRatePerMinute = 20
+
+// deviceLinkRatePerMinute is per device, for web-session links (the old app's 10).
+const deviceLinkRatePerMinute = 10
 
 func newDeviceCode() (string, error) {
 	out := make([]byte, 8)
@@ -67,25 +71,34 @@ func qrModules(text string) ([]string, error) {
 	return rows, nil
 }
 
-type originKey struct{}
+type loopbackKey struct{}
 
-// requestOrigin is the origin the client reached the server at, for the pairing QR code: https,
-// except plain http to a loopback address (development and the e2e tests).
-func requestOrigin(r *http.Request) string {
-	host := r.Host
-	h := host
-	if hh, _, err := net.SplitHostPort(host); err == nil {
+// loopbackOrigin is the origin of a request from and to a loopback address (development and the
+// tests), or "". It stands in for PUBLIC_ORIGIN only there: a name a request from elsewhere
+// claims (Host) never goes into a pairing code.
+func loopbackOrigin(r *http.Request) string {
+	h := r.Host
+	if hh, _, err := net.SplitHostPort(h); err == nil {
 		h = hh
 	}
-	scheme := "https"
-	if r.TLS == nil && (h == "localhost" || net.ParseIP(h).IsLoopback()) {
-		scheme = "http"
+	if h != "localhost" && !net.ParseIP(h).IsLoopback() {
+		return ""
 	}
-	return scheme + "://" + host
+	if ip := net.ParseIP(httpx.ClientIPFrom(r.Context())); ip == nil || !ip.IsLoopback() {
+		return ""
+	}
+	if r.TLS != nil {
+		return "https://" + r.Host
+	}
+	return "http://" + r.Host
 }
 
-func originFrom(ctx context.Context) string {
-	o, _ := ctx.Value(originKey{}).(string)
+// publicOrigin is the origin for the pairing QR code: PUBLIC_ORIGIN, or a loopback request's.
+func (s *Server) publicOrigin(ctx context.Context) string {
+	if s.cfg.PublicOrigin != "" {
+		return s.cfg.PublicOrigin
+	}
+	o, _ := ctx.Value(loopbackKey{}).(string)
 	return o
 }
 
@@ -144,6 +157,10 @@ func (s *Server) CreateDevicePairing(ctx context.Context, req api.CreateDevicePa
 	if err != nil {
 		return nil, err
 	}
+	origin := s.publicOrigin(ctx)
+	if origin == "" {
+		return api.CreateDevicePairing503JSONResponse{ServiceUnavailableJSONResponse: api.ServiceUnavailableJSONResponse(apiError("public_origin_unset", "Pairing a device needs PUBLIC_ORIGIN to be set."))}, nil
+	}
 	code, err := newDeviceCode()
 	if err != nil {
 		return nil, err
@@ -152,7 +169,7 @@ func (s *Server) CreateDevicePairing(ctx context.Context, req api.CreateDevicePa
 	if err != nil {
 		return nil, err
 	}
-	payload := "opencozy-pair:v1?origin=" + url.QueryEscape(originFrom(ctx)) + "&token=" + token
+	payload := "opencozy-pair:v1?origin=" + url.QueryEscape(origin) + "&token=" + token
 	modules, err := qrModules(payload)
 	if err != nil {
 		return nil, err
@@ -232,6 +249,10 @@ func (s *Server) GetDevice(ctx context.Context, _ api.GetDeviceRequestObject) (a
 
 // CreateDeviceWebSession makes the one-time link the app opens in its web view.
 func (s *Server) CreateDeviceWebSession(ctx context.Context, _ api.CreateDeviceWebSessionRequestObject) (api.CreateDeviceWebSessionResponseObject, error) {
+	// Ten a minute per device, as before: each call writes a row.
+	if ok, _ := s.deviceLinks.Allow(mustActor(ctx).CredentialID.String()); !ok {
+		return api.CreateDeviceWebSession429JSONResponse{TooManyRequestsJSONResponse: api.TooManyRequestsJSONResponse(apiError("too_many_requests", "Too many requests. Try again in a minute."))}, nil
+	}
 	token, hash, err := auth.NewSessionToken()
 	if err != nil {
 		return nil, err
@@ -410,3 +431,19 @@ func (s *Server) SetLockMessage(ctx context.Context, req api.SetLockMessageReque
 	}
 	return api.SetLockMessage204Response{}, nil
 }
+
+type deviceCookieKey struct{}
+
+func hasDeviceCookie(r *http.Request) bool {
+	c, err := r.Cookie(actor.DeviceWebCookie)
+	return err == nil && c.Value != ""
+}
+
+// onKidDevice reports whether the request came from a child's web view (it carries a device
+// cookie). Signing in there is refused: the adult's session would sit beside the child's.
+func onKidDevice(ctx context.Context) bool {
+	v, _ := ctx.Value(deviceCookieKey{}).(bool)
+	return v
+}
+
+var errKidDevice = apiError("kid_device", "This is a child’s device. Sign in on your own phone or computer.")

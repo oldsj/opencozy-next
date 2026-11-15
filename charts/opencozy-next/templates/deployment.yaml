@@ -89,6 +89,10 @@ spec:
             - name: TRUSTED_PROXIES
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.config.publicOrigin }}
+            - name: PUBLIC_ORIGIN
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.config.webauthnRPID }}
             - name: WEBAUTHN_RP_ID
               value: {{ . | quote }}

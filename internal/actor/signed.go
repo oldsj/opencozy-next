@@ -35,8 +35,10 @@ const (
 	SignatureVersion = "OPENCOZY-DEVICE-V1"
 	PairProofVersion = "OPENCOZY-PAIR-V1"
 
-	// SignatureWindow is how far a request's timestamp may be from the server's clock. Nonces
-	// are kept for twice that (device_nonce, 120 seconds), so a replay can't outlive its nonce.
+	// SignatureWindow is how far a request's timestamp may be from the server's clock, so a
+	// request is acceptable for twice that. Nonces are kept for 300 seconds (device_nonce), well
+	// past that span even when the app's and the database's clocks differ, so a replay can't
+	// outlive its nonce.
 	SignatureWindow = 60 * time.Second
 )
 

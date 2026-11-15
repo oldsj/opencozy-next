@@ -29,6 +29,9 @@ config:
   # CIDRs of the gateway pods whose X-Forwarded-For is trusted (usually the cluster's pod
   # network). Empty: use the TCP peer as the client address.
   trustedProxies: ""
+  # The origin people reach OpenCozy at, e.g. https://cozy.example.test. Kid devices are told
+  # it when they pair; empty means devices can't be paired.
+  publicOrigin: ""
   # Passkeys: the site's hostname, which must never change once passkeys exist, and the
   # comma-separated origins they are used from. Empty turns passkeys off.
   webauthnRPID: ""
