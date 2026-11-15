@@ -1,6 +1,7 @@
 import type { HTMLAttributes, MouseEventHandler, ReactNode } from 'react';
 
 import { cx } from '../cx';
+import { pointsLabel } from '../points';
 import { Button } from './Button';
 import { CheckCircle, type CheckCircleProps } from './CheckCircle';
 
@@ -102,7 +103,7 @@ export function TaskRow({
         <h3 className="oc-task-row__title">{title}</h3>
         {(points !== undefined || metadata) && (
           <p className="oc-task-row__meta">
-            {points !== undefined && <span>{points} points</span>}
+            {points !== undefined && <span>{pointsLabel(points)}</span>}
             {points !== undefined && metadata && <span aria-hidden="true"> · </span>}
             {metadata}
           </p>

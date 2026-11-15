@@ -100,7 +100,7 @@ test('the chore loop: pair the display, do a chore, approve it, spend the points
   await adult.getByRole('button', { name: `Approve: ${reward} (${child})` }).click();
   await expect(adult.getByRole('button', { name: `Approve: ${reward} (${child})` })).toHaveCount(0);
   await wall.goto('/display');
-  await expect(card.locator('.oc-points-badge')).toHaveText('1 points');
+  await expect(card.locator('.oc-points-badge')).toHaveText('1 point');
 
   expect(problems).toEqual([]);
 });

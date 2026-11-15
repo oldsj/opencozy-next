@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { Button, EmptyState, List, ListRow, Notice, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
+import { Button, EmptyState, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type InboxItem } from '../api/client';
 
@@ -48,7 +48,7 @@ export function InboxPage() {
         <Section title="Waiting for you" count={items.length}>
           <List aria-label="Waiting for you">
             {items.map((item) => {
-              const meta = [item.child.name, item.points === undefined ? null : `${String(item.points)} points`, kindLabels[item.kind], when.format(new Date(item.submittedAt))]
+              const meta = [item.child.name, item.points === undefined ? null : pointsLabel(item.points), kindLabels[item.kind], when.format(new Date(item.submittedAt))]
                 .filter(Boolean)
                 .join(' · ');
               return (
