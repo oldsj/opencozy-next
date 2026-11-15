@@ -22,5 +22,6 @@ DELETE FROM active_award
 WHERE household_id = $1 AND source_kind = $2 AND source_id = $3
 RETURNING ledger_id;
 
--- name: GetRefund :one
-SELECT id FROM point_ledger WHERE household_id = $1 AND reverses_id = $2;
+-- name: RefundedAmount :one
+SELECT COALESCE(SUM(delta), 0)::bigint AS refunded FROM point_ledger
+WHERE household_id = $1 AND reverses_id = $2 AND kind = 'refund';

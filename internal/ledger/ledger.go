@@ -4,7 +4,7 @@
 //   - Award pays for a source (a chore occurrence, say) once. active_award holds the current
 //     award, so a second award for the same source is refused until the first is reversed.
 //   - Reverse undoes the current award for a source; the source can then be awarded again.
-//   - Redeem spends points; Refund gives a redemption back.
+//   - Redeem spends points; Refund gives back part or all of a redemption, up to what it spent.
 //
 // A balance never goes below zero: Redeem and Reverse check it under the child's lock. The ledger
 // is append-only (database triggers), so a mistake is corrected with a new row, never an edit.
@@ -37,8 +37,8 @@ var (
 	ErrAlreadyAwarded = errors.New("ledger: already awarded")
 	// ErrNotAwarded means the source has no award to reverse.
 	ErrNotAwarded = errors.New("ledger: not awarded")
-	// ErrAlreadyRefunded means the redemption was already refunded.
-	ErrAlreadyRefunded = errors.New("ledger: already refunded")
+	// ErrOverRefund means the refund is more than is left of the redemption.
+	ErrOverRefund = errors.New("ledger: refund exceeds what is left of the redemption")
 	// ErrInsufficient means the change would take the child's balance below zero.
 	ErrInsufficient = errors.New("ledger: not enough points")
 	// ErrAmount means the amount is not a positive number of points.
@@ -90,13 +90,12 @@ func Award(ctx context.Context, c *command.Cmd, e Entry) (dbq.PointLedger, error
 	return row, nil
 }
 
-// Reverse undoes the source's current award. e.Points is ignored: a reversal takes back exactly
-// what was awarded. It is refused when the child has already spent those points.
+// Reverse undoes the source's current award to e.Child. e.Points is ignored: a reversal takes
+// back exactly what was awarded. It is refused when the child has already spent those points.
+// Every check comes before the first write, so a refusal leaves nothing behind.
 func Reverse(ctx context.Context, c *command.Cmd, e Entry) (dbq.PointLedger, error) {
-	if !c.Holds(e.Child) {
-		return dbq.PointLedger{}, ErrNotLocked
-	}
-	id, err := c.Q.DeleteActiveAward(ctx, dbq.DeleteActiveAwardParams{HouseholdID: c.HouseholdID(), SourceKind: e.SourceKind, SourceID: e.SourceID})
+	key := dbq.GetActiveAwardParams{HouseholdID: c.HouseholdID(), SourceKind: e.SourceKind, SourceID: e.SourceID}
+	id, err := c.Q.GetActiveAward(ctx, key)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return dbq.PointLedger{}, ErrNotAwarded
 	} else if err != nil {
@@ -109,7 +108,13 @@ func Reverse(ctx context.Context, c *command.Cmd, e Entry) (dbq.PointLedger, err
 	if award.ChildID != e.Child {
 		return dbq.PointLedger{}, ErrNotAwarded
 	}
-	if err := cover(ctx, c, e.Child, award.Delta); err != nil {
+	if !c.Holds(award.ChildID) {
+		return dbq.PointLedger{}, ErrNotLocked
+	}
+	if err := cover(ctx, c, award.ChildID, award.Delta); err != nil {
+		return dbq.PointLedger{}, err
+	}
+	if _, err := c.Q.DeleteActiveAward(ctx, dbq.DeleteActiveAwardParams(key)); err != nil {
 		return dbq.PointLedger{}, err
 	}
 	return insert(ctx, c, e, KindReversal, -award.Delta, &award.ID)
@@ -126,8 +131,13 @@ func Redeem(ctx context.Context, c *command.Cmd, e Entry) (dbq.PointLedger, erro
 	return insert(ctx, c, e, KindRedemption, -e.Points, nil)
 }
 
-// Refund gives back the redemption row redemptionID, once.
+// Refund gives back by.Points of the redemption row redemptionID: all of it, or the unused share
+// (a cancelled or shortened screen-time redemption). Refunds of one redemption together never
+// exceed what it spent.
 func Refund(ctx context.Context, c *command.Cmd, redemptionID uuid.UUID, by Entry) (dbq.PointLedger, error) {
+	if by.Points <= 0 || by.Points > MaxAmount {
+		return dbq.PointLedger{}, ErrAmount
+	}
 	red, err := c.Q.GetLedgerEntry(ctx, dbq.GetLedgerEntryParams{HouseholdID: c.HouseholdID(), ID: redemptionID})
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && red.Kind != KindRedemption) {
 		return dbq.PointLedger{}, fmt.Errorf("ledger: %s is not a redemption", redemptionID)
@@ -137,14 +147,16 @@ func Refund(ctx context.Context, c *command.Cmd, redemptionID uuid.UUID, by Entr
 	if !c.Holds(red.ChildID) {
 		return dbq.PointLedger{}, ErrNotLocked
 	}
-	if _, err := c.Q.GetRefund(ctx, dbq.GetRefundParams{HouseholdID: c.HouseholdID(), ReversesID: &red.ID}); err == nil {
-		return dbq.PointLedger{}, ErrAlreadyRefunded
-	} else if !errors.Is(err, pgx.ErrNoRows) {
+	refunded, err := c.Q.RefundedAmount(ctx, dbq.RefundedAmountParams{HouseholdID: c.HouseholdID(), ReversesID: &red.ID})
+	if err != nil {
 		return dbq.PointLedger{}, err
+	}
+	if refunded+int64(by.Points) > -int64(red.Delta) {
+		return dbq.PointLedger{}, ErrOverRefund
 	}
 	e := by
 	e.Child, e.SourceKind, e.SourceID = red.ChildID, red.SourceKind, red.SourceID
-	return insert(ctx, c, e, KindRefund, -red.Delta, &red.ID)
+	return insert(ctx, c, e, KindRefund, by.Points, &red.ID)
 }
 
 func check(c *command.Cmd, e Entry) error {

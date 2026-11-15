@@ -94,22 +94,6 @@ func (q *Queries) GetLedgerEntry(ctx context.Context, arg GetLedgerEntryParams) 
 	return i, err
 }
 
-const getRefund = `-- name: GetRefund :one
-SELECT id FROM point_ledger WHERE household_id = $1 AND reverses_id = $2
-`
-
-type GetRefundParams struct {
-	HouseholdID uuid.UUID
-	ReversesID  *uuid.UUID
-}
-
-func (q *Queries) GetRefund(ctx context.Context, arg GetRefundParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, getRefund, arg.HouseholdID, arg.ReversesID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const insertActiveAward = `-- name: InsertActiveAward :exec
 INSERT INTO active_award (household_id, source_kind, source_id, ledger_id) VALUES ($1, $2, $3, $4)
 `
@@ -179,4 +163,21 @@ func (q *Queries) InsertLedgerEntry(ctx context.Context, arg InsertLedgerEntryPa
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const refundedAmount = `-- name: RefundedAmount :one
+SELECT COALESCE(SUM(delta), 0)::bigint AS refunded FROM point_ledger
+WHERE household_id = $1 AND reverses_id = $2 AND kind = 'refund'
+`
+
+type RefundedAmountParams struct {
+	HouseholdID uuid.UUID
+	ReversesID  *uuid.UUID
+}
+
+func (q *Queries) RefundedAmount(ctx context.Context, arg RefundedAmountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, refundedAmount, arg.HouseholdID, arg.ReversesID)
+	var refunded int64
+	err := row.Scan(&refunded)
+	return refunded, err
 }

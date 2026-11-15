@@ -19,12 +19,13 @@ CREATE TABLE point_ledger (
     child_id      uuid NOT NULL,
     delta         integer NOT NULL CHECK (delta <> 0 AND delta BETWEEN -1000000 AND 1000000),
     -- award and redemption start something; reversal undoes an award, refund a redemption.
-    kind          text NOT NULL CHECK (kind IN ('award', 'reversal', 'redemption', 'refund', 'adjustment')),
+    kind          text NOT NULL CHECK (kind IN ('award', 'reversal', 'redemption', 'refund')),
     -- What the points are for: a chore occurrence, a reward redemption, a learning event...
     source_kind   text NOT NULL CHECK (source_kind ~ '^[a-z][a-z_]{0,39}$'),
     source_id     uuid NOT NULL,
-    -- The row a reversal or refund undoes. A row is undone at most once.
-    reverses_id   uuid UNIQUE REFERENCES point_ledger (id),
+    -- The row a reversal or refund undoes. An award is reversed at most once, in full; a
+    -- redemption can be refunded in parts, up to what it spent.
+    reverses_id   uuid REFERENCES point_ledger (id),
     -- Who caused it: an adult, a credential, or neither (a job).
     adult_id      uuid,
     credential_id uuid,
@@ -39,24 +40,39 @@ CREATE TABLE point_ledger (
 );
 CREATE INDEX point_ledger_child_idx ON point_ledger (household_id, child_id, created_at);
 CREATE INDEX point_ledger_source_idx ON point_ledger (source_kind, source_id);
+CREATE INDEX point_ledger_reverses_idx ON point_ledger (reverses_id) WHERE reverses_id IS NOT NULL;
+CREATE UNIQUE INDEX point_ledger_one_reversal ON point_ledger (reverses_id) WHERE kind = 'reversal';
 
--- A reversal or refund must undo exactly the row it names: same child, same source, the
--- opposite amount, an award for a reversal and a redemption for a refund.
+-- A reversal or refund must undo the row it names: same child and source; a reversal undoes an
+-- award, in full; a refund gives back part or all of a redemption, and all refunds of one
+-- redemption together never exceed what it spent.
 -- +goose StatementBegin
 CREATE FUNCTION point_ledger_check_undo() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
-    orig point_ledger;
+    orig     point_ledger;
+    refunded bigint;
 BEGIN
     IF NEW.reverses_id IS NULL THEN
         RETURN NEW;
     END IF;
     SELECT * INTO orig FROM point_ledger WHERE id = NEW.reverses_id;
-    IF orig.household_id <> NEW.household_id OR orig.child_id <> NEW.child_id
+    IF NOT FOUND OR orig.household_id <> NEW.household_id OR orig.child_id <> NEW.child_id
         OR orig.source_kind <> NEW.source_kind OR orig.source_id <> NEW.source_id
-        OR orig.delta <> -NEW.delta
-        OR orig.kind <> (CASE NEW.kind WHEN 'reversal' THEN 'award' ELSE 'redemption' END) THEN
+        OR orig.kind <> (CASE NEW.kind WHEN 'reversal' THEN 'award' ELSE 'redemption' END)
+        OR (NEW.kind = 'reversal' AND NEW.delta <> -orig.delta) THEN
         RAISE EXCEPTION 'point_ledger: % does not undo row %', NEW.kind, NEW.reverses_id
             USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.kind = 'refund' THEN
+        -- Serialize refunds of one redemption, so two cannot both fit the remainder. (Row locks on
+        -- the ledger need UPDATE, which no one has.)
+        PERFORM pg_advisory_xact_lock(hashtextextended(NEW.reverses_id::text, 0));
+        SELECT COALESCE(SUM(delta), 0) INTO refunded FROM point_ledger
+        WHERE reverses_id = NEW.reverses_id AND kind = 'refund';
+        IF refunded + NEW.delta > -orig.delta THEN
+            RAISE EXCEPTION 'point_ledger: refunds of % exceed what it spent', NEW.reverses_id
+                USING ERRCODE = 'check_violation';
+        END IF;
     END IF;
     RETURN NEW;
 END

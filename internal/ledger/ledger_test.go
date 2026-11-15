@@ -150,20 +150,38 @@ func TestBalanceNeverBelowZero(t *testing.T) {
 	}); !errors.Is(err, ledger.ErrInsufficient) {
 		t.Fatalf("reverse spent points: %v", err)
 	}
-	refund := func() error {
+	refund := func(points int32) error {
 		return on(func(ctx context.Context, c *command.Cmd) error {
-			_, err := ledger.Refund(ctx, c, redemption, ledger.Entry{})
+			_, err := ledger.Refund(ctx, c, redemption, ledger.Entry{Points: points})
 			return err
 		})
 	}
-	if err := refund(); err != nil {
+	// 8 spent: a partial refund of 3, then 6 is too much, then the remaining 5, then nothing.
+	if err := refund(3); err != nil {
 		t.Fatal(err)
 	}
-	if err := refund(); !errors.Is(err, ledger.ErrAlreadyRefunded) {
-		t.Fatalf("second refund: %v", err)
+	if got := f.balance(t, f.child); got != 5 {
+		t.Fatalf("balance after partial refund %d, want 5", got)
+	}
+	if err := refund(6); !errors.Is(err, ledger.ErrOverRefund) {
+		t.Fatalf("over-refund: %v", err)
+	}
+	if err := refund(5); err != nil {
+		t.Fatal(err)
+	}
+	if err := refund(1); !errors.Is(err, ledger.ErrOverRefund) {
+		t.Fatalf("refund past the full amount: %v", err)
+	}
+	if err := refund(0); !errors.Is(err, ledger.ErrAmount) {
+		t.Fatalf("refund of 0: %v", err)
 	}
 	if got := f.balance(t, f.child); got != 10 {
 		t.Fatalf("balance %d, want 10", got)
+	}
+	// The trigger holds the same line without Go: a direct over-refund is refused.
+	if _, err := f.db.Runtime.Exec(t.Context(), `INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id, reverses_id)
+		VALUES ($1, $2, 1, 'refund', 'chore_occurrence', $3, $4)`, f.house, f.child, reward, redemption); err == nil || !strings.Contains(err.Error(), "exceed") {
+		t.Fatalf("direct over-refund: %v", err)
 	}
 }
 
@@ -194,11 +212,30 @@ func TestLedgerNeedsTheChildLock(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.run(t, []uuid.UUID{f.other}, func(ctx context.Context, c *command.Cmd) error {
-		_, err := ledger.Reverse(ctx, c, entry(f.other, chore, 0))
-		return err
-	}); !errors.Is(err, ledger.ErrNotAwarded) {
+	// A reversal names the award's child. Another child's attempt is refused and, even if its
+	// command commits anyway, writes nothing: the award is still there to reverse.
+	tx, err := f.db.Runtime.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := command.Lock(t.Context(), tx, f.house, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.LockChildren(t.Context(), f.other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.Reverse(t.Context(), c, entry(f.other, chore, 0)); !errors.Is(err, ledger.ErrNotAwarded) {
 		t.Fatalf("reverse through another child: %v", err)
+	}
+	if err := tx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run(t, []uuid.UUID{f.child}, func(ctx context.Context, c *command.Cmd) error {
+		_, err := ledger.Reverse(ctx, c, entry(f.child, chore, 0))
+		return err
+	}); err != nil {
+		t.Fatalf("the award is gone after a refused reversal: %v", err)
 	}
 }
 
