@@ -52,6 +52,14 @@ paths:
     $ref: credentials.yaml#/credential
   /credential:
     $ref: credentials.yaml#/self
+  /display/pairings:
+    $ref: displays.yaml#/pairings
+  /display/pairings/claim:
+    $ref: displays.yaml#/claim
+  /displays:
+    $ref: displays.yaml#/displays
+  /displays/{displayId}:
+    $ref: displays.yaml#/display
 
 components:
   securitySchemes:

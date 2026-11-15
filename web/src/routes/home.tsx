@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 
 import { Button, EmptyState, List, ListRow, PageHeader } from '@app/design';
 
@@ -23,9 +23,12 @@ export function HomePage({ me }: { me: Me }) {
         title={me.household.name}
         description={`Signed in as ${me.adult.name}.`}
         actions={
+          <>
+          <Link to="/displays">Displays</Link>
           <Button onClick={() => { logout.mutate({}); }} disabled={logout.isPending}>
             Sign out
           </Button>
+          </>
         }
       />
       {children.data?.items.length ? (

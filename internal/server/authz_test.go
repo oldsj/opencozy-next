@@ -60,6 +60,7 @@ func TestAuthzMatrix(t *testing.T) {
 			url := func(h house, child uuid.UUID) string {
 				u := strings.ReplaceAll(path, "{childId}", child.String())
 				u = strings.ReplaceAll(u, "{credentialId}", h.target.String())
+				u = strings.ReplaceAll(u, "{displayId}", h.screen.String())
 				return "/api" + u
 			}
 			body := func() any {
