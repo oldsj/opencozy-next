@@ -2,12 +2,14 @@ package server
 
 import (
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/scrypt"
 
 	"github.com/oldsj/opencozy-next/internal/actor"
@@ -601,7 +603,7 @@ func TestToday(t *testing.T) {
 	}
 
 	var approvals int
-	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM approval WHERE household_id = $1 AND state = 'pending'`, h.id).Scan(&approvals); err != nil {
+	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM approval WHERE household_id = $1 AND state = 'pending' AND id <> $2`, h.id, h.approval).Scan(&approvals); err != nil {
 		t.Fatal(err)
 	}
 	if approvals != 2 {
@@ -627,5 +629,112 @@ func TestToday(t *testing.T) {
 	}
 	if r := e.send(wall, "POST", "/api/today/chores/"+h.chore.String()+"/complete", nil); r.status != 404 {
 		t.Fatalf("an archived chore: %d %s", r.status, r.raw)
+	}
+}
+
+// A child's completion waits in the inbox; an adult approves it (points land) or sends it back
+// (the child sees why and can do it again). An adult's own completion is approved at once.
+func TestInbox(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	adult, wall := h.actors["adult"], h.actors["display-today"]
+	points := func(child uuid.UUID) float64 {
+		r := e.send(wall, "GET", "/api/today", nil)
+		for _, c := range r.body["children"].([]any) {
+			c := c.(map[string]any)
+			if ch := c["child"].(map[string]any); ch["id"] == child.String() {
+				return ch["points"].(float64)
+			}
+		}
+		t.Fatalf("child %s not on today", child)
+		return 0
+	}
+	inbox := func() []any {
+		r := e.send(adult, "GET", "/api/inbox", nil)
+		if r.status != 200 {
+			t.Fatalf("inbox: %d %s", r.status, r.raw)
+		}
+		return r.body["items"].([]any)
+	}
+	decide := func(id any, how string, body any) resp {
+		return e.send(adult, "POST", fmt.Sprintf("/api/inbox/%v/%s", id, how), body)
+	}
+	find := func(title string) map[string]any {
+		for _, it := range inbox() {
+			if it := it.(map[string]any); it["title"] == title {
+				return it
+			}
+		}
+		return nil
+	}
+
+	// The fixture's earlier chore is already waiting; decide it out of the way.
+	if r := decide(h.approval, "reject", map[string]any{}); r.status != 200 {
+		t.Fatalf("reject the fixture's: %d %s", r.status, r.raw)
+	}
+
+	if r := e.send(wall, "POST", "/api/today/chores/"+h.chore.String()+"/complete", nil); r.status != 200 {
+		t.Fatalf("complete: %d %s", r.status, r.raw)
+	}
+	if r := e.send(wall, "POST", "/api/today/routines/"+h.routine.String()+"/steps/"+h.step.String()+"/check", nil); r.status != 200 {
+		t.Fatalf("routine: %d %s", r.status, r.raw)
+	}
+	items := inbox()
+	if len(items) != 2 {
+		t.Fatalf("inbox: %v", items)
+	}
+	chore, routine := find("Feed the cat"), find("Morning")
+	if chore == nil || chore["kind"] != "completion" || chore["points"] != float64(4) ||
+		chore["child"].(map[string]any)["id"] != h.child1.String() || routine == nil || routine["kind"] != "routine" {
+		t.Fatalf("inbox items: %v", items)
+	}
+
+	before := points(h.child1)
+	if r := decide(chore["id"], "approve", map[string]any{}); r.status != 200 || r.body["state"] != "approved" {
+		t.Fatalf("approve: %d %s", r.status, r.raw)
+	}
+	if got := points(h.child1); got != before+4 {
+		t.Fatalf("points after approval: %v, want %v", got, before+4)
+	}
+	if r := decide(chore["id"], "approve", map[string]any{}); r.status != 409 || r.code() != "already_decided" {
+		t.Fatalf("approve twice: %d %s", r.status, r.raw)
+	}
+	if r := decide(chore["id"], "reject", map[string]any{}); r.status != 409 {
+		t.Fatalf("reject after approval: %d %s", r.status, r.raw)
+	}
+
+	reason := "The bed still needs making."
+	if r := decide(routine["id"], "reject", map[string]any{"reason": reason}); r.status != 200 || r.body["state"] != "rejected" {
+		t.Fatalf("reject: %d %s", r.status, r.raw)
+	}
+	if got := points(h.child1); got != before+4 {
+		t.Fatalf("points after rejection: %v", got)
+	}
+	again := e.send(wall, "POST", "/api/today/routines/"+h.routine.String()+"/steps/"+h.step.String()+"/check", nil)
+	if again.status != 200 || again.body["pending"] != true {
+		t.Fatalf("try again after rejection: %d %s", again.status, again.raw)
+	}
+	if n := len(inbox()); n != 1 {
+		t.Fatalf("inbox after trying again: %d items", n)
+	}
+
+	if r := decide(uuid.New(), "approve", map[string]any{}); r.status != 404 {
+		t.Fatalf("unknown item: %d", r.status)
+	}
+	if r := decide(chore["id"], "reject", map[string]any{"reason": strings.Repeat("x", 201)}); r.status != 400 && r.status != 422 {
+		t.Fatalf("a long reason: %d", r.status)
+	}
+
+	// An adult marking a chore done approves it on the spot.
+	extra := e.send(adult, "POST", "/api/chores", map[string]any{"childId": h.child2, "title": "Tidy up", "points": 3})
+	before2 := points(h.child2)
+	if r := e.send(adult, "POST", "/api/today/chores/"+extra.body["id"].(string)+"/complete", nil); r.status != 200 || r.body["state"] != "complete" {
+		t.Fatalf("an adult's completion: %d %s", r.status, r.raw)
+	}
+	if got := points(h.child2); got != before2+3 {
+		t.Fatalf("points after an adult's completion: %v, want %v", got, before2+3)
+	}
+	if n := len(inbox()); n != 1 {
+		t.Fatalf("an adult's completion went to the inbox: %d items", n)
 	}
 }
