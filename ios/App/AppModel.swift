@@ -368,7 +368,7 @@ final class AppModel {
         let (key, blob) = try config.keys.generate()
         let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
         var request = DevicePairRequest(publicKey: key.publicKeyX963.base64EncodedString(),
-                                        platform: DevicePlatform.current(idiom: UIDevice.current.userInterfaceIdiom),
+                                        platform: DevicePlatform.current,
                                         name: name.isEmpty ? "Child's device" : name)
         switch input {
         case .token(_, let token): request.token = token

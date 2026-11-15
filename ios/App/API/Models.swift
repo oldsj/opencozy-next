@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 // Wire models for the OpenCozy API (api/openapi.yaml). Decoding is deliberately
 // tolerant of extra fields so the server can add fields without breaking the app.
@@ -32,6 +31,8 @@ struct DeviceRecord: Decodable, Equatable, Sendable {
 struct DeviceHousehold: Decodable, Equatable, Sendable {
     var id: String
     var name: String
+    /// IANA zone name; the household day follows it.
+    var timeZone: String
     var lockMessage: String
 }
 
@@ -42,11 +43,10 @@ struct DeviceInfo: Decodable, Equatable, Sendable {
     var serverTime: Date
 }
 
-/// `ipad` or `iphone`, as the pairing request sends it.
+/// The pairing request's `platform` (`ios` or `android`). An iPad and an iPhone
+/// are both `ios`; the name tells them apart.
 enum DevicePlatform {
-    static func current(idiom: UIUserInterfaceIdiom) -> String {
-        idiom == .pad ? "ipad" : "iphone"
-    }
+    static let current = "ios"
 }
 
 enum ScreenTimeTarget: String, Codable, Sendable {
