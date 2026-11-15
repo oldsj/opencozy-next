@@ -1,3 +1,5 @@
+import { devices } from './fixtures-devices';
+
 /**
  * Slice 8 (iPad time), shaped like the old API (docs/api.md: Screen-time rewards, Ask for more
  * time, Allowed hours, Lock screen message, Blocked websites). Fictional data; the builders adjust
@@ -60,7 +62,8 @@ export interface WebFilter {
 }
 
 export const LOCK_MESSAGE_MAX = 200;
-export const DEFAULT_LOCK_MESSAGE = 'Earn time on the chore board, then spend your points in OpenCozy.';
+/** The lock message comes with the devices list (fixtures-devices.ts). */
+export const DEFAULT_LOCK_MESSAGE = devices.defaultLockMessage;
 
 const base: PersonalTime = {
   childId: 'c1',

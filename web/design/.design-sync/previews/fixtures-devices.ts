@@ -25,9 +25,16 @@ export interface Device {
   lastSeenAt?: string | undefined;
 }
 
-/** GET /api/devices. PATCH {name?, childId?} renames or reassigns; DELETE revokes. */
+/**
+ * GET /api/devices. PATCH {name?, childId?} renames or reassigns; DELETE revokes. The lock message is
+ * household-wide: PUT /api/devices/lock-message {lockMessage: string | null} (1-200 characters after
+ * trimming; null restores the default).
+ */
 export interface DevicesResponse {
   devices: Device[];
+  /** Null while the default applies. */
+  lockMessage: string | null;
+  defaultLockMessage: string;
 }
 
 export const platformLabels: Record<Device['platform'], string> = { ipad: 'iPad', iphone: 'iPhone' };
@@ -38,6 +45,8 @@ export const devices: DevicesResponse = {
     { id: 'd2', name: 'Ezra’s iPad', platform: 'ipad', child: { id: 'c2', name: 'Ezra', color: 'sage' }, pairedAt: 'Sep 3', lastSeenAt: 'Yesterday' },
     { id: 'd3', name: 'Old iPhone', platform: 'iphone', child: null, pairedAt: 'Jun 18' },
   ],
+  lockMessage: null,
+  defaultLockMessage: 'Earn time on the chore board, then spend your points in OpenCozy.',
 };
 
 export const offer: PairingOffer = {
