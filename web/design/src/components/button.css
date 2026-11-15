@@ -1,0 +1,72 @@
+.oc-button {
+  display: inline-flex;
+  min-width: 3rem;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) 1.125rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--control-radius);
+  cursor: pointer;
+  font-weight: var(--font-weight-label);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.oc-button--primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.oc-button--primary:hover:not(:disabled) {
+  border-color: var(--positive-ink);
+  background: var(--positive-ink);
+}
+
+.oc-button--secondary {
+  background: var(--surface-soft);
+  color: var(--foreground);
+}
+
+.oc-button--secondary:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.oc-button--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--primary);
+}
+
+.oc-button--quiet:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+
+.oc-button--danger {
+  background: var(--surface-soft);
+  color: var(--danger-ink);
+}
+
+.oc-button--danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.oc-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.oc-button--full {
+  width: 100%;
+}
+
+.oc-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

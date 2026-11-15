@@ -1,0 +1,32 @@
+.oc-status-pill {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--pill-radius);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: 1.2;
+}
+
+.oc-status-pill--reconnecting {
+  border-color: var(--attention-line);
+  background: var(--attention-soft);
+  color: var(--attention-ink);
+}
+
+.oc-status-pill--offline {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+.oc-status-pill__spinner {
+  animation: oc-status-spin 900ms linear infinite;
+}
+
+@keyframes oc-status-spin {
+  to { transform: rotate(360deg); }
+}

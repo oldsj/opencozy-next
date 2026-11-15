@@ -1,0 +1,23 @@
+# What a deployment's values file looks like. Every value here is a placeholder.
+fullnameOverride: opencozy
+image:
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+config:
+  trustedProxies: 10.0.0.0/16
+database:
+  cnpg:
+    storage:
+      size: 10Gi
+      storageClass: example-ssd
+secrets:
+  env:
+    - name: EXAMPLE_API_KEY
+      key: example-api-key
+onepassword:
+  itemPath: vaults/example/items/opencozy
+route:
+  enabled: true
+  hostname: opencozy.example.test
+  gateway:
+    name: example-gateway
+    namespace: example-gateway

@@ -1,0 +1,27 @@
+.oc-check-circle {
+  display: inline-grid;
+  width: var(--target-kid);
+  height: var(--target-kid);
+  flex: 0 0 var(--target-kid);
+  place-items: center;
+  padding: 0;
+  border: 2px solid var(--input);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--primary);
+  cursor: pointer;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
+}
+
+.oc-check-circle:hover:not(:disabled) { border-color: var(--primary); transform: scale(1.04); }
+.oc-check-circle:active:not(:disabled) { transform: scale(0.96); }
+.oc-check-circle:disabled { cursor: not-allowed; opacity: 0.58; }
+.oc-check-circle--sending { border-color: var(--attention-line); color: var(--attention-ink); }
+.oc-check-circle--sending svg { animation: oc-check-spin 800ms linear infinite; }
+.oc-check-circle--complete { border-color: var(--positive-ink); background: var(--positive-ink); color: var(--surface-raised); opacity: 1; }
+.oc-check-circle--failed { border-color: var(--danger-line); background: var(--danger-soft); color: var(--danger-ink); }
+
+@keyframes oc-check-spin { to { transform: rotate(1turn); } }
+
+/* Icons scale with the circle on every surface. */
+.oc-check-circle svg { width: 45%; height: 45%; }

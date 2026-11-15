@@ -1,0 +1,346 @@
+openapi: 3.1.0
+info:
+  title: Template Webapp API
+  version: 0.1.0
+  description: |
+    The wire contract. The Go server types and handlers interface (internal/api) and the
+    TypeScript client (web/src/api/schema.gen.ts) are generated from this file: change it
+    first, then run `make gen`.
+
+    Authentication is a server-side session in the `__Host-session` cookie (HttpOnly, Secure,
+    SameSite=Lax). Cross-site state-changing requests are refused by Go's
+    `http.CrossOriginProtection`, so the client sends no CSRF token.
+servers:
+  - url: /api
+security:
+  - session: []
+tags:
+  - name: auth
+    description: Sign up, sign in and out
+  - name: notes
+    description: The signed-in user's notes
+
+paths:
+  /auth/signup:
+    post:
+      operationId: signup
+      summary: Create an account and sign in
+      description: Only when the server runs with ALLOW_SIGNUP=true; otherwise 403.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+      responses:
+        '201':
+          description: Signed up and signed in
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: Sign in
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+      responses:
+        '200':
+          description: Signed in
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Sign out and end the session
+      tags: [auth]
+      security: []
+      responses:
+        '204':
+          description: Signed out (also when there was no session)
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/me:
+    get:
+      operationId: getMe
+      summary: The signed-in user
+      tags: [auth]
+      responses:
+        '200':
+          description: The signed-in user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notes:
+    get:
+      operationId: listNotes
+      summary: List notes, newest first
+      tags: [notes]
+      responses:
+        '200':
+          description: Notes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createNote
+      summary: Create a note
+      tags: [notes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /notes/{noteId}:
+    parameters:
+      - name: noteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: updateNote
+      summary: Replace a note's title and body
+      tags: [notes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteNote
+      summary: Delete a note
+      tags: [notes]
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-session
+
+  headers:
+    SetSession:
+      description: Sets or clears the __Host-session cookie
+      schema:
+        type: string
+
+  schemas:
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+
+    User:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+
+    NoteInput:
+      type: object
+      additionalProperties: false
+      required: [title, body]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 20000
+
+    Note:
+      type: object
+      required: [id, title, body, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+    ErrorDetail:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable, machine-readable, snake_case
+          examples: [not_found]
+        message:
+          type: string
+          description: Safe to show to the user; never contains internals
+
+  responses:
+    BadRequest:
+      description: The request does not match the contract
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Not signed in, or wrong credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Not allowed, including any cross-origin unsafe request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: No such resource for this user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Rate limited; retry after the Retry-After header
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

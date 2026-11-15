@@ -1,0 +1,79 @@
+.oc-person-tab {
+  display: grid;
+  min-width: 9.0625rem;
+  min-height: 4.875rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  align-items: center;
+  gap: 2px 0.625rem;
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  background: var(--surface-soft);
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.oc-person-tab:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+.oc-person-tab--selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  transform: translateY(-2px);
+}
+
+.oc-person-tab__mark {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  grid-row: span 2;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--foreground);
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px var(--hairline-shadow);
+}
+
+.oc-profile--rose .oc-person-tab__mark { background: var(--profile-rose-soft); color: var(--profile-rose-ink); }
+.oc-profile--sage .oc-person-tab__mark { background: var(--profile-sage-soft); color: var(--profile-sage-ink); }
+.oc-profile--sky .oc-person-tab__mark { background: var(--profile-sky-soft); color: var(--profile-sky-ink); }
+.oc-profile--butter .oc-person-tab__mark { background: var(--profile-butter-soft); color: var(--profile-butter-ink); }
+.oc-profile--lilac .oc-person-tab__mark { background: var(--profile-lilac-soft); color: var(--profile-lilac-ink); }
+.oc-profile--peach .oc-person-tab__mark { background: var(--profile-peach-soft); color: var(--profile-peach-ink); }
+.oc-profile--teal .oc-person-tab__mark { background: var(--profile-teal-soft); color: var(--profile-teal-ink); }
+.oc-profile--sand .oc-person-tab__mark { background: var(--profile-sand-soft); color: var(--profile-sand-ink); }
+
+.oc-person-tab__name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-person-tab__points {
+  grid-column: 2;
+  font-size: 1rem;
+}
+
+.oc-person-tab__points small {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-label);
+}
+
+.oc-person-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-person-tab--selected {
+    transform: none;
+  }
+}

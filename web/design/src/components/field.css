@@ -1,0 +1,55 @@
+.oc-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.oc-field__label {
+  color: var(--foreground);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+}
+
+.oc-field__hint {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+
+.oc-field > :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+  width: 100%;
+  min-height: 3rem;
+  padding: var(--space-md) 0.875rem;
+  border: 1px solid var(--input);
+  border-radius: var(--control-radius);
+  background-color: var(--surface-raised);
+  color: var(--foreground);
+}
+
+.oc-field > textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.oc-field > select {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23706a66' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.875rem center;
+  background-repeat: no-repeat;
+}
+
+.oc-field > :is(input, select, textarea):hover:not(:disabled) {
+  border-color: var(--muted-foreground);
+}
+
+.oc-field > :is(input, select, textarea)::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
+}
+
+.oc-field > :is(input, select, textarea):disabled {
+  background-color: var(--surface-soft);
+  color: var(--muted-foreground);
+}

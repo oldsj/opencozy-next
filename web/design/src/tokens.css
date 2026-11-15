@@ -1,0 +1,366 @@
+/*
+ * OpenCozy's identity: every colour, type, shape and motion decision lives here (DESIGN.md says
+ * why). Components use these through Tailwind utilities (src/theme.css) or var(); nothing else
+ * names a colour.
+ *
+ * Two themes with the same tokens: light by default; dark when the OS asks (phones) or the app sets
+ * data-theme="dark" on <html> (the wall display at night, TV views). In both, foreground and
+ * muted-foreground pass 4.5:1 on every surface and soft fill, lane inks 6:1 and person inks 7:1 on
+ * their fills, and input borders and the focus ring 3:1.
+ *
+ * Surfaces: data-surface="kiosk" (the portrait wall display) or "tv" (a dashboard across the room)
+ * on <html> scales the whole rem-based system; phones and desktops use the default.
+ */
+
+@import './fonts/fonts.css';
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces, text and lines */
+  --background: #f4f3ef;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-soft: #f9f8f5;
+  --surface-muted: #eceae4;
+  --foreground: #1d2433;
+  --muted-foreground: #5f6677;
+  --placeholder: #6b7180;
+  --border: #dedbd3;
+  --border-strong: #c4c0b6;
+  --input: #888d96;
+  --ring: #c2410c;
+  --primary: #2f4fc4;
+  --primary-foreground: #ffffff;
+  --primary-soft: #eaedf9;
+
+  /* Status lanes: base (fills, icons), ink (text on soft), soft (fills), line (borders) */
+  --positive: #2f8f5b;
+  --positive-ink: #216440;
+  --positive-soft: #e4f0ea;
+  --positive-line: #98bda3;
+  --attention: #e3a92b;
+  --attention-ink: #765816;
+  --attention-soft: #fbf4e3;
+  --attention-line: #e0c790;
+  --danger: #d9534f;
+  --danger-ink: #963937;
+  --danger-soft: #fae9e8;
+  --danger-line: #dca59e;
+  --info-ink: #2d55a0;
+  --info-soft: #e6ecf9;
+  --info-line: #9db0d2;
+
+  /* People: each child's colour. soft (their header), base (avatar, progress), ink (text on
+   * soft or wash), line, track (behind base), wash (their task rows). Precomputed: no color-mix(). */
+  --profile-rose-soft: #fae7ec;
+  --profile-rose-base: #e0607e;
+  --profile-rose-ink: #7d3647;
+  --profile-rose-line: #dfaab1;
+  --profile-rose-track: #eaced0;
+  --profile-rose-wash: #f7eceb;
+  --profile-sage-soft: #e7f2ea;
+  --profile-sage-base: #5fa874;
+  --profile-sage-ink: #31573c;
+  --profile-sage-line: #abc7ad;
+  --profile-sage-track: #d0ddce;
+  --profile-sage-wash: #edf2eb;
+  --profile-sky-soft: #e4f0fa;
+  --profile-sky-base: #4a9be0;
+  --profile-sky-ink: #275277;
+  --profile-sky-line: #a3c1d8;
+  --profile-sky-track: #ccdae3;
+  --profile-sky-wash: #ebf1f3;
+  --profile-butter-soft: #fbf4df;
+  --profile-butter-base: #e3b52c;
+  --profile-butter-ink: #645013;
+  --profile-butter-line: #e0cc90;
+  --profile-butter-track: #eadfbf;
+  --profile-butter-wash: #f7f3e5;
+  --profile-lilac-soft: #f0ecfa;
+  --profile-lilac-base: #9b7fe0;
+  --profile-lilac-ink: #55467b;
+  --profile-lilac-line: #c3b6d8;
+  --profile-lilac-track: #dcd5e3;
+  --profile-lilac-wash: #f1eef3;
+  --profile-peach-soft: #fdede6;
+  --profile-peach-base: #ef8656;
+  --profile-peach-ink: #77432b;
+  --profile-peach-line: #e5b9a1;
+  --profile-peach-track: #edd6c8;
+  --profile-peach-wash: #f8efe8;
+  --profile-teal-soft: #e0f2f1;
+  --profile-teal-base: #2fa6a0;
+  --profile-teal-ink: #195855;
+  --profile-teal-line: #98c6bf;
+  --profile-teal-track: #c6dcd6;
+  --profile-teal-wash: #e9f1ee;
+  --profile-sand-soft: #f4efe9;
+  --profile-sand-base: #b8956a;
+  --profile-sand-ink: #604d37;
+  --profile-sand-line: #cfbfa9;
+  --profile-sand-track: #e2d9cc;
+  --profile-sand-wash: #f4f0ea;
+
+  /* Depth */
+  --soft-shadow: 0 1px 2px rgba(29, 36, 51, 0.06), 0 8px 24px rgba(29, 36, 51, 0.06);
+  --hairline-shadow: rgba(29, 36, 51, 0.1);
+  --segment-shadow: 0 1px 2px rgba(29, 36, 51, 0.14), 0 0 0 1px rgba(29, 36, 51, 0.05);
+  --sheet-shadow-side: -16px 0 40px rgba(29, 36, 51, 0.16);
+  --sheet-shadow-bottom: 0 -16px 40px rgba(29, 36, 51, 0.16);
+  --toast-shadow: 0 12px 32px rgba(29, 36, 51, 0.22);
+  --toast-icon-surface: rgba(255, 255, 255, 0.16);
+  --backdrop: rgba(17, 20, 27, 0.48);
+
+  /* Type: Fraunces, a soft display serif, for names, headings and the clock. Atkinson Hyperlegible
+   * Next for everything else: it was drawn for low-vision readers and keeps I l 1 and b d apart,
+   * which helps early readers too. */
+  --heading-font: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --body-font: 'Atkinson Hyperlegible Next', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --heading-variation: 'SOFT' 100, 'WONK' 0;
+  --root-size: 100%;
+  --font-size-clock: 5rem;
+  --font-size-page: 2rem;
+  --font-size-section: 1.375rem;
+  --font-size-task: 1.1875rem;
+  --font-size-body: 1rem;
+  --font-size-meta: 0.875rem;
+  --font-size-label: 0.9375rem;
+  --font-weight-heading: 600;
+  --font-weight-body: 400;
+  --font-weight-label: 700;
+  --line-height-heading: 1.15;
+  --line-height-body: 1.5;
+  --line-height-label: 1.3;
+  --letter-spacing-heading: -0.015em;
+
+  /* Shape and rhythm, in rem so a surface scales them */
+  --panel-radius: 1.25rem;
+  --control-radius: 0.875rem;
+  --small-radius: 0.75rem;
+  --pill-radius: 999px;
+  --target-min: 2.75rem;
+  --target-kid: 4rem;
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-section: 2rem;
+
+  /* Motion: quick for state changes, a springy beat only for a confirmed success. */
+  --duration-quick: 160ms;
+  --duration-celebrate: 520ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    /* Surfaces, text and lines */
+    --background: #11141b;
+    --surface: #191d26;
+    --surface-raised: #212632;
+    --surface-soft: #161a22;
+    --surface-muted: #262b37;
+    --foreground: #eef0f4;
+    --muted-foreground: #a0a7b5;
+    --placeholder: #8a91a0;
+    --border: #2f3542;
+    --border-strong: #454c5c;
+    --input: #687081;
+    --ring: #ff9a5c;
+    --primary: #8fa6ff;
+    --primary-foreground: #0f1430;
+    --primary-soft: #2e364d;
+
+    /* Status lanes: base (fills, icons), ink (text on soft), soft (fills), line (borders) */
+    --positive: #4fbf86;
+    --positive-ink: #62c693;
+    --positive-soft: #223735;
+    --positive-line: #3d7361;
+    --attention: #f0c45a;
+    --attention-ink: #f0c45a;
+    --attention-soft: #3b382e;
+    --attention-line: #86754d;
+    --danger: #ef7b76;
+    --danger-ink: #f29793;
+    --danger-soft: #3b2c33;
+    --danger-line: #855559;
+    --info-ink: #92b3f2;
+    --info-soft: #293346;
+    --info-line: #536890;
+
+    /* People: each child's colour. soft (their header), base (avatar, progress), ink (text on
+     * soft or wash), line, track (behind base), wash (their task rows). Precomputed: no color-mix(). */
+    --profile-rose-soft: #412a38;
+    --profile-rose-base: #e0607e;
+    --profile-rose-ink: #efacbc;
+    --profile-rose-line: #884b60;
+    --profile-rose-track: #553849;
+    --profile-rose-wash: #2a212b;
+    --profile-sage-soft: #273936;
+    --profile-sage-base: #5fa874;
+    --profile-sage-ink: #a7cfb3;
+    --profile-sage-line: #476f5b;
+    --profile-sage-track: #344a46;
+    --profile-sage-wash: #1d282a;
+    --profile-sky-soft: #23364b;
+    --profile-sky-base: #4a9be0;
+    --profile-sky-ink: #9dc9ee;
+    --profile-sky-line: #3d6891;
+    --profile-sky-track: #2f4761;
+    --profile-sky-wash: #1b2735;
+    --profile-butter-soft: #413b27;
+    --profile-butter-base: #e3b52c;
+    --profile-butter-ink: #ebca67;
+    --profile-butter-line: #897537;
+    --profile-butter-track: #554e34;
+    --profile-butter-wash: #2b2a23;
+    --profile-lilac-soft: #33314b;
+    --profile-lilac-base: #9b7fe0;
+    --profile-lilac-ink: #cabbef;
+    --profile-lilac-line: #655a91;
+    --profile-lilac-track: #434061;
+    --profile-lilac-wash: #232435;
+    --profile-peach-soft: #443230;
+    --profile-peach-base: #ef8656;
+    --profile-peach-ink: #f6b89b;
+    --profile-peach-line: #8f5e4c;
+    --profile-peach-track: #58423f;
+    --profile-peach-wash: #2c2527;
+    --profile-teal-soft: #1d383e;
+    --profile-teal-base: #2fa6a0;
+    --profile-teal-ink: #8dcecb;
+    --profile-teal-line: #2f6e71;
+    --profile-teal-track: #284a51;
+    --profile-teal-wash: #19282f;
+    --profile-sand-soft: #393534;
+    --profile-sand-base: #b8956a;
+    --profile-sand-ink: #d6c2a9;
+    --profile-sand-line: #746556;
+    --profile-sand-track: #4b4644;
+    --profile-sand-wash: #262629;
+
+    /* Depth */
+    --soft-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+    --hairline-shadow: rgba(0, 0, 0, 0.5);
+    --segment-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --sheet-shadow-side: -16px 0 40px rgba(0, 0, 0, 0.5);
+    --sheet-shadow-bottom: 0 -16px 40px rgba(0, 0, 0, 0.5);
+    --toast-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    --toast-icon-surface: rgba(15, 20, 48, 0.12);
+    --backdrop: rgba(0, 0, 0, 0.62);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces, text and lines */
+  --background: #11141b;
+  --surface: #191d26;
+  --surface-raised: #212632;
+  --surface-soft: #161a22;
+  --surface-muted: #262b37;
+  --foreground: #eef0f4;
+  --muted-foreground: #a0a7b5;
+  --placeholder: #8a91a0;
+  --border: #2f3542;
+  --border-strong: #454c5c;
+  --input: #687081;
+  --ring: #ff9a5c;
+  --primary: #8fa6ff;
+  --primary-foreground: #0f1430;
+  --primary-soft: #2e364d;
+
+  /* Status lanes: base (fills, icons), ink (text on soft), soft (fills), line (borders) */
+  --positive: #4fbf86;
+  --positive-ink: #62c693;
+  --positive-soft: #223735;
+  --positive-line: #3d7361;
+  --attention: #f0c45a;
+  --attention-ink: #f0c45a;
+  --attention-soft: #3b382e;
+  --attention-line: #86754d;
+  --danger: #ef7b76;
+  --danger-ink: #f29793;
+  --danger-soft: #3b2c33;
+  --danger-line: #855559;
+  --info-ink: #92b3f2;
+  --info-soft: #293346;
+  --info-line: #536890;
+
+  /* People: each child's colour. soft (their header), base (avatar, progress), ink (text on
+   * soft or wash), line, track (behind base), wash (their task rows). Precomputed: no color-mix(). */
+  --profile-rose-soft: #412a38;
+  --profile-rose-base: #e0607e;
+  --profile-rose-ink: #efacbc;
+  --profile-rose-line: #884b60;
+  --profile-rose-track: #553849;
+  --profile-rose-wash: #2a212b;
+  --profile-sage-soft: #273936;
+  --profile-sage-base: #5fa874;
+  --profile-sage-ink: #a7cfb3;
+  --profile-sage-line: #476f5b;
+  --profile-sage-track: #344a46;
+  --profile-sage-wash: #1d282a;
+  --profile-sky-soft: #23364b;
+  --profile-sky-base: #4a9be0;
+  --profile-sky-ink: #9dc9ee;
+  --profile-sky-line: #3d6891;
+  --profile-sky-track: #2f4761;
+  --profile-sky-wash: #1b2735;
+  --profile-butter-soft: #413b27;
+  --profile-butter-base: #e3b52c;
+  --profile-butter-ink: #ebca67;
+  --profile-butter-line: #897537;
+  --profile-butter-track: #554e34;
+  --profile-butter-wash: #2b2a23;
+  --profile-lilac-soft: #33314b;
+  --profile-lilac-base: #9b7fe0;
+  --profile-lilac-ink: #cabbef;
+  --profile-lilac-line: #655a91;
+  --profile-lilac-track: #434061;
+  --profile-lilac-wash: #232435;
+  --profile-peach-soft: #443230;
+  --profile-peach-base: #ef8656;
+  --profile-peach-ink: #f6b89b;
+  --profile-peach-line: #8f5e4c;
+  --profile-peach-track: #58423f;
+  --profile-peach-wash: #2c2527;
+  --profile-teal-soft: #1d383e;
+  --profile-teal-base: #2fa6a0;
+  --profile-teal-ink: #8dcecb;
+  --profile-teal-line: #2f6e71;
+  --profile-teal-track: #284a51;
+  --profile-teal-wash: #19282f;
+  --profile-sand-soft: #393534;
+  --profile-sand-base: #b8956a;
+  --profile-sand-ink: #d6c2a9;
+  --profile-sand-line: #746556;
+  --profile-sand-track: #4b4644;
+  --profile-sand-wash: #262629;
+
+  /* Depth */
+  --soft-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --hairline-shadow: rgba(0, 0, 0, 0.5);
+  --segment-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --sheet-shadow-side: -16px 0 40px rgba(0, 0, 0, 0.5);
+  --sheet-shadow-bottom: 0 -16px 40px rgba(0, 0, 0, 0.5);
+  --toast-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --toast-icon-surface: rgba(15, 20, 48, 0.12);
+  --backdrop: rgba(0, 0, 0, 0.62);
+}
+
+/* The portrait wall display: tapped at arm's length, glanced at from across the room. */
+:root[data-surface='kiosk'] {
+  --root-size: 125%;
+}
+
+/* A dashboard view on a TV, three metres away. */
+:root[data-surface='tv'] {
+  --root-size: 160%;
+}

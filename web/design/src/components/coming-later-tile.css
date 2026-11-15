@@ -1,0 +1,65 @@
+/* Two columns at every width: the status sits under the title, so a narrow
+   tile never squeezes the title column to nothing. */
+.oc-coming-later-tile {
+  display: grid;
+  min-width: 0;
+  min-height: 6rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--small-radius);
+  background: var(--surface-soft);
+  color: var(--foreground);
+}
+
+.oc-coming-later-tile__icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  grid-row: span 2;
+  place-items: center;
+  border-radius: var(--control-radius);
+  background: var(--info-soft);
+  color: var(--info-ink);
+}
+
+.oc-coming-later-tile__copy {
+  min-width: 0;
+}
+
+.oc-coming-later-tile h3,
+.oc-coming-later-tile p {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+.oc-coming-later-tile h3 {
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-task);
+  font-weight: var(--font-weight-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  line-height: var(--line-height-heading);
+}
+
+.oc-coming-later-tile p {
+  margin-top: var(--space-xs);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+
+.oc-coming-later-tile__status {
+  grid-column: 2;
+  justify-self: start;
+  padding: 2px 0.625rem;
+  border-radius: var(--pill-radius);
+  background: var(--surface-muted);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+  white-space: nowrap;
+}

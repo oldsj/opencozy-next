@@ -1,0 +1,122 @@
+.oc-task-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  padding: var(--space-lg) 1.125rem;
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  background: var(--surface-soft);
+  color: var(--foreground);
+  position: relative;
+}
+
+.oc-task-row--complete {
+  border-color: var(--positive-ink);
+  background: var(--positive-soft);
+}
+
+.oc-task-row--celebrate {
+  animation: oc-task-settle 420ms ease-out both;
+}
+
+.oc-task-row--pending,
+.oc-task-row--sending {
+  border-color: var(--attention-line);
+  background: var(--attention-soft);
+}
+
+
+/* A parent's reason (up to 200 characters) or another note: its own full-width line. */
+.oc-task-row__message {
+  flex-basis: 100%;
+  margin: -0.5rem 0 0 3.5rem;
+  color: var(--foreground);
+  font-size: var(--font-size-meta);
+  overflow-wrap: anywhere;
+}
+.oc-task-row--no-icon .oc-task-row__message { margin-left: 0; }
+
+.oc-task-row--failed { border-color: var(--danger-line); background: var(--danger-soft); }
+.oc-task-row__icon { display: inline-grid; width: 2.5rem; height: 2.5rem; flex: 0 0 2.5rem; place-items: center; border-radius: var(--small-radius); background: var(--profile-soft, var(--surface-muted)); color: var(--profile-ink, var(--foreground)); }
+.oc-task-row__error { flex-basis: 100%; margin: -0.5rem 4.5rem 0 3.5rem; color: var(--danger-ink); font-size: var(--font-size-meta); }
+
+.oc-task-row__content {
+  min-width: 0;
+  flex: 1 1 15rem;
+}
+
+/* A check circle always stays beside its title; only an error takes its own line. */
+.oc-task-row--check {
+  align-items: center;
+}
+
+/* Without a check or an action (a chore waiting for approval, say) the title
+   still sits beside its icon: there is nothing that needs its own line. */
+.oc-task-row--check .oc-task-row__content,
+.oc-task-row--inline .oc-task-row__content {
+  flex-basis: 0;
+}
+
+.oc-task-row__assignee,
+.oc-task-row__title,
+.oc-task-row__meta {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.oc-task-row__assignee {
+  color: var(--muted-foreground);
+  font-size: 0.86rem;
+  font-weight: var(--font-weight-label);
+}
+
+.oc-task-row__title {
+  color: var(--foreground);
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-task);
+  font-weight: var(--font-weight-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  line-height: 1.2;
+}
+
+.oc-task-row__meta {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+
+.oc-task-row__status {
+  align-self: center;
+  color: var(--positive-ink);
+  font-weight: var(--font-weight-label);
+  text-align: right;
+}
+
+.oc-task-row__status--pending,
+.oc-task-row__status--sending { color: var(--attention-ink); }
+
+@keyframes oc-task-settle {
+  from {
+    opacity: 0.72;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 560px) {
+  .oc-task-row__status {
+    flex-basis: 100%;
+    text-align: left;
+  }
+
+  .oc-task-row .oc-button {
+    width: 100%;
+  }
+}
+.oc-task-row--no-icon .oc-task-row__error { margin-left: 0; }

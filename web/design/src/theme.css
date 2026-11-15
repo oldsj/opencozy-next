@@ -1,0 +1,120 @@
+/*
+ * The Tailwind 4 theme: semantic names only, no values (tokens.css holds them). It is the same
+ * shape in every app made from the template. `--color-*: initial` removes Tailwind's palette, so
+ * bg-stone-100 or text-red-700 generate nothing and `make design` flags them.
+ */
+
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-placeholder: var(--placeholder);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-positive: var(--positive);
+  --color-positive-ink: var(--positive-ink);
+  --color-positive-soft: var(--positive-soft);
+  --color-positive-line: var(--positive-line);
+  --color-attention: var(--attention);
+  --color-attention-ink: var(--attention-ink);
+  --color-attention-soft: var(--attention-soft);
+  --color-attention-line: var(--attention-line);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-info-ink: var(--info-ink);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-profile-rose-soft: var(--profile-rose-soft);
+  --color-profile-rose-base: var(--profile-rose-base);
+  --color-profile-rose-ink: var(--profile-rose-ink);
+  --color-profile-rose-line: var(--profile-rose-line);
+  --color-profile-rose-wash: var(--profile-rose-wash);
+  --color-profile-rose-track: var(--profile-rose-track);
+  --color-profile-sage-soft: var(--profile-sage-soft);
+  --color-profile-sage-base: var(--profile-sage-base);
+  --color-profile-sage-ink: var(--profile-sage-ink);
+  --color-profile-sage-line: var(--profile-sage-line);
+  --color-profile-sage-wash: var(--profile-sage-wash);
+  --color-profile-sage-track: var(--profile-sage-track);
+  --color-profile-sky-soft: var(--profile-sky-soft);
+  --color-profile-sky-base: var(--profile-sky-base);
+  --color-profile-sky-ink: var(--profile-sky-ink);
+  --color-profile-sky-line: var(--profile-sky-line);
+  --color-profile-sky-wash: var(--profile-sky-wash);
+  --color-profile-sky-track: var(--profile-sky-track);
+  --color-profile-butter-soft: var(--profile-butter-soft);
+  --color-profile-butter-base: var(--profile-butter-base);
+  --color-profile-butter-ink: var(--profile-butter-ink);
+  --color-profile-butter-line: var(--profile-butter-line);
+  --color-profile-butter-wash: var(--profile-butter-wash);
+  --color-profile-butter-track: var(--profile-butter-track);
+  --color-profile-lilac-soft: var(--profile-lilac-soft);
+  --color-profile-lilac-base: var(--profile-lilac-base);
+  --color-profile-lilac-ink: var(--profile-lilac-ink);
+  --color-profile-lilac-line: var(--profile-lilac-line);
+  --color-profile-lilac-wash: var(--profile-lilac-wash);
+  --color-profile-lilac-track: var(--profile-lilac-track);
+  --color-profile-peach-soft: var(--profile-peach-soft);
+  --color-profile-peach-base: var(--profile-peach-base);
+  --color-profile-peach-ink: var(--profile-peach-ink);
+  --color-profile-peach-line: var(--profile-peach-line);
+  --color-profile-peach-wash: var(--profile-peach-wash);
+  --color-profile-peach-track: var(--profile-peach-track);
+  --color-profile-teal-soft: var(--profile-teal-soft);
+  --color-profile-teal-base: var(--profile-teal-base);
+  --color-profile-teal-ink: var(--profile-teal-ink);
+  --color-profile-teal-line: var(--profile-teal-line);
+  --color-profile-teal-wash: var(--profile-teal-wash);
+  --color-profile-teal-track: var(--profile-teal-track);
+  --color-profile-sand-soft: var(--profile-sand-soft);
+  --color-profile-sand-base: var(--profile-sand-base);
+  --color-profile-sand-ink: var(--profile-sand-ink);
+  --color-profile-sand-line: var(--profile-sand-line);
+  --color-profile-sand-wash: var(--profile-sand-wash);
+  --color-profile-sand-track: var(--profile-sand-track);
+
+  --font-*: initial;
+  --font-heading: var(--heading-font);
+  --font-body: var(--body-font);
+  --font-sans: var(--body-font);
+
+  --text-*: initial;
+  --text-clock: var(--font-size-clock);
+  --text-clock--line-height: 1;
+  --text-page: var(--font-size-page);
+  --text-page--line-height: var(--line-height-heading);
+  --text-section: var(--font-size-section);
+  --text-section--line-height: var(--line-height-heading);
+  --text-task: var(--font-size-task);
+  --text-task--line-height: 1.2;
+  --text-body: var(--font-size-body);
+  --text-body--line-height: var(--line-height-body);
+  --text-meta: var(--font-size-meta);
+  --text-meta--line-height: var(--line-height-label);
+  --text-label: var(--font-size-label);
+  --text-label--line-height: var(--line-height-label);
+
+  --radius-*: initial;
+  --radius-panel: var(--panel-radius);
+  --radius-control: var(--control-radius);
+  --radius-small: var(--small-radius);
+  --radius-pill: var(--pill-radius);
+
+  --shadow-*: initial;
+  --shadow-soft: var(--soft-shadow);
+}

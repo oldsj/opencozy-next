@@ -1,0 +1,18 @@
+.oc-tag {
+  display: inline-flex;
+  min-height: 1.625rem;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 2px 0.625rem;
+  border-radius: var(--pill-radius);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-label);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.oc-tag--neutral { background: var(--surface-muted); color: var(--muted-foreground); }
+.oc-tag--attention { background: var(--attention-soft); color: var(--attention-ink); }
+.oc-tag--positive { background: var(--positive-soft); color: var(--positive-ink); }
+.oc-tag--info { background: var(--info-soft); color: var(--info-ink); }
+.oc-tag--error { background: var(--danger-soft); color: var(--danger-ink); }

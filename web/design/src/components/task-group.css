@@ -1,0 +1,28 @@
+.oc-task-group + .oc-task-group { margin-top: 1.125rem; }
+.oc-task-group__header { display: flex; min-height: 2rem; align-items: center; gap: var(--space-sm); margin: 0 0.25rem var(--space-sm); }
+.oc-task-group__header svg { flex: none; color: var(--profile-ink, var(--muted-foreground)); }
+.oc-task-group__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-heading);
+}
+.oc-task-group__status { color: var(--muted-foreground); font-size: var(--font-size-meta); white-space: nowrap; }
+.oc-task-group__status--pending { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--attention-ink); font-weight: var(--font-weight-label); }
+.oc-task-group__status--earned { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--positive-ink); font-weight: var(--font-weight-label); }
+.oc-task-group--done .oc-task-group__header { margin-bottom: 0; }
+.oc-task-group--done .oc-task-group__title { color: var(--muted-foreground); }
+.oc-task-group__rows > * + * { margin-top: var(--space-sm); }
+.oc-task-group__message { margin: 0.375rem var(--space-sm) 0; color: var(--muted-foreground); font-size: var(--font-size-meta); }
+
+/* Inside a person's column the rows are compact and take the person's wash. */
+.oc-person-card .oc-task-row { padding: 0.75rem 0.75rem 0.75rem 0.875rem; border: 0; border-radius: var(--small-radius); background: var(--profile-wash); }
+.oc-person-card .oc-task-row--complete { background: var(--positive-soft); }
+.oc-person-card .oc-task-row--failed { background: var(--danger-soft); }
+.oc-person-card .oc-task-row--pending { background: var(--attention-soft); }
+/* The group already says it is waiting; its rows need not repeat it. */
+.oc-task-group--pending .oc-task-row__status--pending { display: none; }

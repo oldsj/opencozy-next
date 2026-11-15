@@ -1,0 +1,113 @@
+# Defaults are safe and minimal; the deployment's own values file sets the rest.
+fullnameOverride: ""
+# Two pods on different nodes, so a node reboot doesn't take the app down. The app keeps nothing
+# in memory that must be shared (sessions are in Postgres; rate limits are per pod).
+replicaCount: 2
+
+# Keep the pods on different nodes (kubernetes.io/hostname). DoNotSchedule with
+# nodeTaintsPolicy Honor: a cordoned, NotReady or tainted node (the control plane) doesn't count,
+# so with one worker left both pods still run there. The image must be multi-arch.
+spread:
+  enabled: true
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: DoNotSchedule
+
+# A PodDisruptionBudget, when replicaCount > 1: a drain moves the pods one at a time.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+image:
+  repository: ghcr.io/oldsj/opencozy-next
+  # Required: the multi-arch image digest for Chart.appVersion. Images are never pulled by tag.
+  digest: ""
+
+config:
+  logLevel: info
+  # Anyone may create an account. Turn on to make the first account, then off.
+  allowSignup: false
+  sessionTTL: 720h
+  authRatePerMinute: 10
+  # CIDRs of the gateway pods whose X-Forwarded-For is trusted (usually the cluster's pod
+  # network). Empty: use the TCP peer as the client address.
+  trustedProxies: ""
+
+database:
+  # cnpg.enabled: the chart makes a CloudNativePG Cluster named <fullname>-db, and the app
+  # reads the `uri` key of the <fullname>-db-app Secret that CNPG generates, verifying the
+  # server certificate against <fullname>-db-ca. Otherwise give an existing Secret.
+  cnpg:
+    enabled: true
+    instances: 1
+    imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:53a4ece3bb160ec8e0612c484e2b4111fc4e0e443e522fd3d0394fc683dacd86
+    storage:
+      size: 5Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+  # Used when cnpg.enabled is false.
+  existingSecret: ""
+  urlKey: uri
+  # Optional Secret with ca.crt; then PGSSLMODE=verify-full.
+  caSecret: ""
+
+# App secrets beyond the database, as env vars from one Secret. The Secret comes from the
+# deployment, or the chart makes a OnePasswordItem for it when onepassword.itemPath is set. Secret values never go in values.
+secrets:
+  existingSecret: ""
+  # - name: SMTP_PASSWORD
+  #   key: smtp-password
+  env: []
+
+onepassword:
+  # e.g. vaults/<vault>/items/<item>; creates OnePasswordItem <fullname>-secrets.
+  itemPath: ""
+
+# Exposure through a Gateway API gateway: a cert-manager Certificate, a ListenerSet on the
+# gateway and an HTTPRoute. Set gateway.name and gateway.namespace to the cluster's gateway.
+route:
+  enabled: false
+  hostname: ""
+  gateway:
+    name: gateway
+    namespace: gateway
+  clusterIssuer: letsencrypt-prod
+
+networkPolicy:
+  enabled: true
+  # Pods allowed to reach the app: the Envoy Gateway proxies of a gateway named `gateway` in
+  # namespace `gateway` by default. Match it to route.gateway.
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+      podSelector:
+        matchLabels:
+          gateway.envoyproxy.io/owning-gateway-name: gateway
+          gateway.envoyproxy.io/owning-gateway-namespace: gateway
+  dnsTo:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  # Database peers when cnpg is off (with cnpg on, the chart's own Cluster is allowed).
+  databaseTo: []
+  databasePort: 5432
+  # NetworkPolicyEgressRule objects appended as-is.
+  extraEgress: []
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+    ephemeral-storage: 16Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi
+    ephemeral-storage: 64Mi

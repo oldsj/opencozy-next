@@ -1,0 +1,4 @@
+/* Dark on light at full contrast whatever the surface around it, so every scanner reads it. */
+.oc-qr-code { display: block; width: 100%; max-width: 17.5rem; height: auto; border-radius: var(--small-radius); }
+.oc-qr-code__light { fill: var(--surface-raised); }
+.oc-qr-code__dark { fill: var(--foreground); }

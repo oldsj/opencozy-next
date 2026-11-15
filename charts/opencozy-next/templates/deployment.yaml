@@ -1,0 +1,125 @@
+{{- $ca := include "app.dbCASecret" . }}
+{{- $secret := include "app.secretName" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if .Values.spread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: {{ .Values.spread.topologyKey | quote }}
+          whenUnsatisfiable: {{ .Values.spread.whenUnsatisfiable }}
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              {{- include "app.selectorLabels" . | nindent 14 }}
+          # Count only this rollout's pods, so a rolling update isn't blocked by the old ones.
+          matchLabelKeys:
+            - pod-template-hash
+      {{- end }}
+      containers:
+        - name: app
+          image: {{ printf "%s@%s" .Values.image.repository (required "image.digest is required" .Values.image.digest) | quote }}
+          imagePullPolicy: IfNotPresent
+          args: [serve]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: ALLOW_SIGNUP
+              value: {{ .Values.config.allowSignup | quote }}
+            - name: SESSION_TTL
+              value: {{ .Values.config.sessionTTL | quote }}
+            - name: AUTH_RATE_PER_MINUTE
+              value: {{ .Values.config.authRatePerMinute | quote }}
+            {{- with .Values.config.trustedProxies }}
+            - name: TRUSTED_PROXIES
+              value: {{ . | quote }}
+            {{- end }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.dbSecret" . | quote }}
+                  key: {{ .Values.database.urlKey | quote }}
+            {{- if $ca }}
+            # pgx reads these libpq variables: TLS, with the server's certificate and name checked.
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/db-ca/ca.crt
+            {{- end }}
+            {{- range .Values.secrets.env }}
+            - name: {{ .name | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "secrets.existingSecret or onepassword.itemPath is required with secrets.env" $secret | quote }}
+                  key: {{ .key | quote }}
+            {{- end }}
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if $ca }}
+          volumeMounts:
+            - name: db-ca
+              mountPath: /etc/db-ca
+              readOnly: true
+          {{- end }}
+      {{- if $ca }}
+      volumes:
+        - name: db-ca
+          secret:
+            secretName: {{ $ca | quote }}
+            defaultMode: 0444
+            items:
+              - key: ca.crt
+                path: ca.crt
+      {{- end }}

@@ -1,0 +1,21 @@
+/*
+ * Fraunces and Atkinson Hyperlegible Next, both SIL Open Font License 1.1
+ * (https://openfontlicense.org/; the texts are beside the files). The .ttf files are the upstream
+ * variable fonts from github.com/google/fonts, unmodified: not subset or converted.
+ */
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./Fraunces-var.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./AtkinsonHyperlegibleNext-var.ttf') format('truetype');
+}

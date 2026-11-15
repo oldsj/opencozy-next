@@ -1,0 +1,9 @@
+.oc-countdown { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oc-countdown--large {
+  display: block;
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-page);
+  font-weight: var(--font-weight-heading);
+  line-height: 1.1;
+}

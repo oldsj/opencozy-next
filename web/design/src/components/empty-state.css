@@ -1,0 +1,8 @@
+.oc-empty-state { display: grid; justify-items: center; gap: var(--space-sm); padding: var(--space-xl); color: var(--muted-foreground); text-align: center; }
+.oc-empty-state svg { color: var(--profile-ink, var(--positive-ink)); }
+.oc-empty-state strong { color: var(--foreground); font-family: var(--heading-font); font-variation-settings: var(--heading-variation); font-size: var(--font-size-task); font-weight: var(--font-weight-heading); }
+.oc-empty-state p { max-width: 42ch; margin: 0; }
+.oc-empty-state__action { margin-top: var(--space-sm); }
+.oc-empty-state--plain { min-height: 9.375rem; place-content: center; }
+.oc-empty-state--surface { padding: 1.75rem var(--space-xl); border: 1px solid var(--border); border-radius: var(--panel-radius); background: var(--surface); }
+.oc-empty-state--surface svg { color: var(--muted-foreground); }

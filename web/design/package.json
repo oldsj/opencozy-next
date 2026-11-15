@@ -1,0 +1,19 @@
+{
+  "name": "@app/design",
+  "private": true,
+  "version": "0.0.0",
+  "description": "OpenCozy's design system: tokens, components and their previews.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "types": "./src/index.ts",
+  "style": "./src/styles.css",
+  "dependencies": {
+    "lucide-react": "^1.63.0"
+  },
+  "peerDependencies": {
+    "react": "^19.3.1"
+  }
+}

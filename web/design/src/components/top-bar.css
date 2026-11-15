@@ -1,0 +1,94 @@
+.oc-top-bar {
+  display: flex;
+  width: 100%;
+  max-width: 90rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xl);
+  margin-inline: auto;
+  padding: var(--space-lg) 1.25rem 0;
+}
+
+.oc-top-bar__ambient {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--space-lg);
+}
+
+.oc-top-bar__time,
+.oc-top-bar__date,
+.oc-top-bar__household {
+  margin: 0;
+}
+
+.oc-top-bar__time {
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-clock);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* The period stays on the clock's line: a narrow frame must not drop a 2.1875rem
+   "PM" onto its own row. */
+.oc-top-bar__period {
+  margin-left: 0.18em;
+  font-size: 0.4em;
+  letter-spacing: 0;
+}
+
+.oc-top-bar__context {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.oc-top-bar__date {
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-heading);
+  line-height: var(--line-height-heading);
+}
+
+.oc-top-bar__household {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-label);
+}
+
+.oc-top-bar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 719px) {
+  .oc-top-bar {
+    align-items: flex-start;
+    padding-top: var(--space-md);
+  }
+
+  .oc-top-bar__ambient {
+    display: grid;
+    gap: var(--space-xs);
+  }
+
+  .oc-top-bar__time {
+    font-size: var(--font-size-page);
+  }
+
+  .oc-top-bar__period {
+    font-size: 0.6em;
+  }
+
+  .oc-top-bar__date {
+    font-family: var(--body-font);
+    font-size: var(--font-size-meta);
+    font-weight: var(--font-weight-body);
+  }
+}

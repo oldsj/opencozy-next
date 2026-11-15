@@ -1,0 +1,58 @@
+.oc-input-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.oc-input-field__label {
+  color: var(--foreground);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+}
+
+.oc-input {
+  width: 100%;
+  min-height: 3rem;
+  padding: var(--space-md) 0.875rem;
+  border: 1px solid var(--input);
+  border-radius: var(--control-radius);
+  background: var(--surface-raised);
+  color: var(--foreground);
+}
+
+.oc-input::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
+}
+
+.oc-input-field__hint,
+.oc-input-field__error {
+  font-size: 0.9rem;
+}
+
+.oc-input-field__hint {
+  color: var(--muted-foreground);
+}
+
+.oc-input-field__error {
+  color: var(--danger-ink);
+  font-weight: var(--font-weight-label);
+}
+
+.oc-input--multiline {
+  min-height: 7.5rem;
+  padding-block: 0.75rem;
+  line-height: var(--line-height-body);
+  resize: vertical;
+}
+
+.oc-input--code {
+  max-width: 16ch;
+  min-height: 4rem;
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: opencozy-next
+description: OpenCozy, a self-hosted family dashboard (Go + React rewrite)
+type: application
+# Bump on every change under charts/: CI publishes each version once and refuses to overwrite.
+version: 0.1.1
+# The image tag (the commit) values.image.digest was built from. Bump together with the digest.
+appVersion: "0.0.0-unreleased"
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/oldsj/opencozy-next
+sources:
+  - https://github.com/oldsj/opencozy-next

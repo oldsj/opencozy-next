@@ -1,0 +1,107 @@
+/* Wide screens: a sticky rail beside the page. Phones: a bar above it, with a Menu sheet. */
+.oc-manage-shell { display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--background); }
+.oc-manage-shell__main { min-width: 0; flex: 1; padding: var(--space-xl) var(--space-lg) var(--space-section); }
+
+.oc-manage-nav__rail { display: none; }
+.oc-manage-nav__bar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) max(var(--space-lg), env(safe-area-inset-right)) var(--space-sm) max(var(--space-lg), env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.oc-manage-nav__current {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oc-manage-nav__current svg { flex: none; color: var(--primary); }
+
+.oc-manage-nav__shortcut,
+.oc-manage-nav__menu,
+.oc-manage-nav__item,
+.oc-manage-nav__back {
+  display: flex;
+  min-height: var(--target-min);
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: var(--font-weight-label);
+  text-decoration: none;
+}
+.oc-manage-nav__menu { border-color: var(--border-strong); background: var(--surface-raised); cursor: pointer; }
+.oc-manage-nav__shortcut:hover,
+.oc-manage-nav__menu:hover,
+.oc-manage-nav__item:hover,
+.oc-manage-nav__back:hover { background: var(--surface-soft); }
+
+.oc-manage-nav__back { margin-bottom: var(--space-md); color: var(--muted-foreground); }
+.oc-manage-nav__group + .oc-manage-nav__group { margin-top: var(--space-lg); }
+.oc-manage-nav__group-label {
+  margin: 0 0 var(--space-xs);
+  padding-inline: var(--space-md);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.oc-manage-nav__items { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.oc-manage-nav__item svg { flex: none; color: var(--muted-foreground); }
+.oc-manage-nav__label { min-width: 0; flex: 1; }
+.oc-manage-nav__item--current { border-color: var(--border); background: var(--primary-soft); color: var(--primary); }
+.oc-manage-nav__item--current svg { color: var(--primary); }
+.oc-manage-nav__badge {
+  display: inline-grid;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  padding-inline: 0.375rem;
+  border-radius: var(--pill-radius);
+  background: var(--danger-ink);
+  color: var(--surface);
+  font-size: var(--font-size-meta);
+  font-variant-numeric: tabular-nums;
+}
+.oc-manage-nav__footer { margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid var(--border); }
+
+@media (max-width: 479px) {
+  /* The shortcut keeps its icon and badge; its word goes to save room. */
+  .oc-manage-nav__shortcut .oc-manage-nav__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+@media (min-width: 1024px) {
+  .oc-manage-shell { flex-direction: row; }
+  .oc-manage-shell__main { max-width: 72rem; padding: var(--space-section) var(--space-section) 4rem; }
+  .oc-manage-nav { flex: 0 0 17rem; }
+  .oc-manage-nav__bar { display: none; }
+  .oc-manage-nav__rail {
+    position: sticky;
+    top: 0;
+    display: block;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding: var(--space-xl) var(--space-md);
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+}

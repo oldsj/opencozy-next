@@ -1,0 +1,128 @@
+.oc-sheet {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.oc-sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.oc-sheet::backdrop {
+  background: var(--backdrop);
+}
+
+.oc-sheet__surface {
+  display: flex;
+  width: min(100%, 35rem);
+  height: 100%;
+  flex-direction: column;
+  margin-left: auto;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--sheet-shadow-side);
+}
+
+.oc-sheet__header,
+.oc-sheet__footer {
+  display: flex;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+}
+
+.oc-sheet__header {
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.oc-sheet__footer {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.oc-sheet__title,
+.oc-sheet__description {
+  margin: 0;
+}
+
+.oc-sheet__title {
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-page);
+  font-weight: var(--font-weight-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  line-height: var(--line-height-heading);
+}
+
+.oc-sheet__description {
+  max-width: 65ch;
+  margin-top: var(--space-sm);
+  color: var(--muted-foreground);
+}
+
+.oc-sheet__close {
+  display: inline-grid;
+  min-width: 3rem;
+  min-height: 3rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--control-radius);
+  background: var(--surface-soft);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.oc-sheet__close:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.oc-sheet__close:active {
+  background: var(--surface-muted);
+}
+
+.oc-sheet__body {
+  flex: 1 1 auto;
+  padding: var(--space-xl);
+  overflow-y: auto;
+}
+
+.oc-sheet--bottom .oc-sheet__surface {
+  width: min(100%, 45rem);
+  height: auto;
+  max-height: min(84vh, 45rem);
+  max-height: min(84dvh, 45rem);
+  margin: auto auto 0;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: var(--panel-radius) var(--panel-radius) 0 0;
+  box-shadow: var(--sheet-shadow-bottom);
+}
+
+/* Phones and the tall portrait display rise from the bottom, keeping the
+   question next to its answer; landscape screens slide in from the right. */
+@media (max-width: 719px), (orientation: portrait) {
+  .oc-sheet--adaptive .oc-sheet__surface {
+    width: min(100%, 45rem);
+    height: auto;
+    max-height: min(84vh, 45rem);
+    max-height: min(84dvh, 45rem);
+    margin: auto auto 0;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: var(--panel-radius) var(--panel-radius) 0 0;
+    box-shadow: var(--sheet-shadow-bottom);
+  }
+}

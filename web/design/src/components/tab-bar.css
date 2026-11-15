@@ -1,0 +1,79 @@
+/* In reach at the bottom on phones and the portrait display: the frame orders
+   the bar after the content and it sticks to the viewport edge, so pages never
+   pad around a fixed overlay. Landscape desktops move it above the content. */
+.oc-tab-bar {
+  position: sticky;
+  z-index: 20;
+  bottom: 0;
+  order: 1;
+  padding: var(--space-sm) max(1.25rem, env(safe-area-inset-right)) max(var(--space-sm), env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.oc-tab-bar__items {
+  display: flex;
+  max-width: 45rem;
+  align-items: stretch;
+  gap: var(--space-xs);
+  margin-inline: auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.oc-tab-bar__item {
+  display: inline-flex;
+  min-width: 5.5rem;
+  min-height: 4rem;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--small-radius);
+  color: var(--muted-foreground);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  text-decoration: none;
+}
+
+.oc-tab-bar__item:hover {
+  background: var(--surface-soft);
+  color: var(--foreground);
+}
+
+.oc-tab-bar__item--current {
+  border-color: var(--border);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.oc-tab-bar__item:active {
+  background: var(--surface-muted);
+}
+
+@media (min-width: 1080px) and (orientation: landscape) {
+  .oc-tab-bar {
+    top: 0;
+    bottom: auto;
+    order: 0;
+    padding: var(--space-sm) 2rem;
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--background);
+  }
+
+  .oc-tab-bar__items {
+    max-width: 86rem;
+    justify-content: flex-start;
+  }
+
+  .oc-tab-bar__item {
+    flex: 0 0 auto;
+  }
+
+  .oc-tab-bar__item:hover {
+    background: var(--surface);
+  }
+}

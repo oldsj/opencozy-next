@@ -1,0 +1,40 @@
+.oc-app-frame {
+  display: flex;
+  min-width: 20rem;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.oc-app-frame__skip-link {
+  position: fixed;
+  z-index: 30;
+  top: var(--space-md);
+  left: var(--space-md);
+  min-height: 3rem;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--control-radius);
+  background: var(--foreground);
+  color: var(--surface);
+  transform: translateY(calc(-100% - var(--space-xl)));
+}
+
+.oc-app-frame__skip-link:focus {
+  transform: translateY(0);
+}
+
+.oc-app-frame__content {
+  width: 100%;
+  max-width: 90rem;
+  flex: 1 1 auto;
+  margin-inline: auto;
+  padding: var(--space-lg) 1.25rem var(--space-xl);
+}
+
+@media (min-width: 720px) {
+  .oc-app-frame__content {
+    padding: var(--space-xl) 2rem var(--space-section);
+  }
+}

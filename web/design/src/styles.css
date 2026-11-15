@@ -1,0 +1,145 @@
+/*
+ * OpenCozy's stylesheet, imported once by the app after Tailwind (web/src/index.css):
+ *
+ *   @import 'tailwindcss';
+ *   @import '@app/design/styles.css';
+ *
+ * Tokens, the Tailwind theme, every component's CSS and the element defaults. It does not import
+ * Tailwind itself.
+ *
+ * Component CSS and the profile classes are deliberately unlayered: an engine without cascade layers
+ * (before Chrome/WebView 99, Safari 15.4) ignores every @layer block, Tailwind's included, but still
+ * draws the components. The cost: a utility in a component's className cannot override a property
+ * the component sets, so use className for placement (margin, grid area), not for restyling.
+ */
+
+@import './tokens.css';
+@import './theme.css';
+@import './components/app-frame.css';
+@import './components/button.css';
+@import './components/check-circle.css';
+@import './components/coming-later-tile.css';
+@import './components/confirm-dialog.css';
+@import './components/countdown.css';
+@import './components/empty-state.css';
+@import './components/field.css';
+@import './components/input.css';
+@import './components/list.css';
+@import './components/manage-nav.css';
+@import './components/notice.css';
+@import './components/page-header.css';
+@import './components/panel.css';
+@import './components/people-board.css';
+@import './components/person-card.css';
+@import './components/person-tab.css';
+@import './components/points-badge.css';
+@import './components/profile-avatar.css';
+@import './components/qr-code.css';
+@import './components/progress-bar.css';
+@import './components/reward-tile.css';
+@import './components/section.css';
+@import './components/segmented-control.css';
+@import './components/sheet.css';
+@import './components/status-pill.css';
+@import './components/tab-bar.css';
+@import './components/tag.css';
+@import './components/task-group.css';
+@import './components/task-row.css';
+@import './components/toast.css';
+@import './components/top-bar.css';
+
+@source './components';
+
+/* The person context: a component with oc-profile--<key> reads these. */
+.oc-profile--rose { --profile-soft: var(--profile-rose-soft); --profile-base: var(--profile-rose-base); --profile-ink: var(--profile-rose-ink); --profile-line: var(--profile-rose-line); --profile-track: var(--profile-rose-track); --profile-wash: var(--profile-rose-wash); }
+.oc-profile--sage { --profile-soft: var(--profile-sage-soft); --profile-base: var(--profile-sage-base); --profile-ink: var(--profile-sage-ink); --profile-line: var(--profile-sage-line); --profile-track: var(--profile-sage-track); --profile-wash: var(--profile-sage-wash); }
+.oc-profile--sky { --profile-soft: var(--profile-sky-soft); --profile-base: var(--profile-sky-base); --profile-ink: var(--profile-sky-ink); --profile-line: var(--profile-sky-line); --profile-track: var(--profile-sky-track); --profile-wash: var(--profile-sky-wash); }
+.oc-profile--butter { --profile-soft: var(--profile-butter-soft); --profile-base: var(--profile-butter-base); --profile-ink: var(--profile-butter-ink); --profile-line: var(--profile-butter-line); --profile-track: var(--profile-butter-track); --profile-wash: var(--profile-butter-wash); }
+.oc-profile--lilac { --profile-soft: var(--profile-lilac-soft); --profile-base: var(--profile-lilac-base); --profile-ink: var(--profile-lilac-ink); --profile-line: var(--profile-lilac-line); --profile-track: var(--profile-lilac-track); --profile-wash: var(--profile-lilac-wash); }
+.oc-profile--peach { --profile-soft: var(--profile-peach-soft); --profile-base: var(--profile-peach-base); --profile-ink: var(--profile-peach-ink); --profile-line: var(--profile-peach-line); --profile-track: var(--profile-peach-track); --profile-wash: var(--profile-peach-wash); }
+.oc-profile--teal { --profile-soft: var(--profile-teal-soft); --profile-base: var(--profile-teal-base); --profile-ink: var(--profile-teal-ink); --profile-line: var(--profile-teal-line); --profile-track: var(--profile-teal-track); --profile-wash: var(--profile-teal-wash); }
+.oc-profile--sand { --profile-soft: var(--profile-sand-soft); --profile-base: var(--profile-sand-base); --profile-ink: var(--profile-sand-ink); --profile-line: var(--profile-sand-line); --profile-track: var(--profile-sand-track); --profile-wash: var(--profile-sand-wash); }
+
+
+@layer base {
+  html { font-size: var(--root-size); }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--body-font);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-body);
+    line-height: var(--line-height-body);
+    text-rendering: optimizeLegibility;
+  }
+
+  html {
+    scrollbar-color: var(--border-strong) var(--background);
+  }
+
+  a {
+    color: var(--primary);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--heading-font);
+    font-variation-settings: var(--heading-variation);
+    font-weight: var(--font-weight-heading);
+    letter-spacing: var(--letter-spacing-heading);
+    line-height: var(--line-height-heading);
+    text-wrap: balance;
+  }
+
+  h1 { font-size: var(--font-size-page); }
+  h2 { font-size: var(--font-size-section); }
+  h3 { font-size: var(--font-size-task); }
+
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    accent-color: var(--primary);
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: var(--attention-soft);
+    color: var(--foreground);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+}

@@ -1,0 +1,16 @@
+.oc-profile-avatar {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 3px solid var(--profile-base, var(--border-strong));
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--profile-ink, var(--foreground));
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-weight: 700;
+  line-height: 1;
+}
+.oc-profile-avatar--small { width: 2.25rem; height: 2.25rem; font-size: 0.9rem; }
+.oc-profile-avatar--medium { width: 3rem; height: 3rem; font-size: 1.1rem; }
+.oc-profile-avatar--large { width: 4rem; height: 4rem; font-size: 1.35rem; }

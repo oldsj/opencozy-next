@@ -1,0 +1,2 @@
+.oc-points-badge { display: inline-flex; min-height: 1.75rem; align-items: center; gap: 0.25rem; padding: 3px 0.5625rem; border-radius: var(--pill-radius); background: var(--attention-soft); color: var(--attention-ink); font-size: var(--font-size-meta); white-space: nowrap; }
+.oc-points-badge span { font-size: var(--font-size-meta); }
