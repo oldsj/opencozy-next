@@ -307,6 +307,18 @@ describe('screen time', () => {
     expect(screen.getByRole('timer')).toHaveTextContent('Time’s up');
   });
 
+  it('a countdown is marked low from five minutes, or from lowAt', () => {
+    const { rerender } = render(<Countdown seconds={301} />);
+    expect(screen.getByRole('timer')).not.toHaveClass('oc-countdown--low');
+    rerender(<Countdown seconds={300} />);
+    expect(screen.getByRole('timer')).toHaveClass('oc-countdown--low');
+    rerender(<Countdown seconds={500} lowAt={600} size="hero" />);
+    expect(screen.getByRole('timer')).toHaveClass('oc-countdown--low', 'oc-countdown--hero');
+    rerender(<Countdown seconds={0} />);
+    expect(screen.getByRole('timer')).toHaveClass('oc-countdown--ended');
+    expect(screen.getByRole('timer')).not.toHaveClass('oc-countdown--low');
+  });
+
   it('draws a QR code from its module matrix, with a quiet zone and a name', () => {
     render(
       <QrCode

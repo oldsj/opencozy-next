@@ -7,3 +7,21 @@
   font-weight: var(--font-weight-heading);
   line-height: 1.1;
 }
+
+.oc-countdown--hero {
+  display: block;
+  font-family: var(--heading-font);
+  font-variation-settings: var(--heading-variation);
+  font-size: var(--font-size-clock);
+  font-weight: var(--font-weight-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  line-height: 1;
+}
+
+/* Low and ended: stronger weight everywhere; on its own (large, hero) it also takes the attention ink. */
+.oc-countdown--low,
+.oc-countdown--ended { font-weight: 700; }
+.oc-countdown--large.oc-countdown--low,
+.oc-countdown--large.oc-countdown--ended,
+.oc-countdown--hero.oc-countdown--low,
+.oc-countdown--hero.oc-countdown--ended { color: var(--attention-ink); }
