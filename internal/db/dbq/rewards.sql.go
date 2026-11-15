@@ -31,10 +31,26 @@ func (q *Queries) ArchiveReward(ctx context.Context, arg ArchiveRewardParams) (i
 	return result.RowsAffected(), nil
 }
 
+const cancelRedemption = `-- name: CancelRedemption :exec
+UPDATE redemption SET state = 'cancelled', cancelled_at = $3, version = version + 1
+WHERE household_id = $1 AND id = $2
+`
+
+type CancelRedemptionParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+	Now         *time.Time
+}
+
+func (q *Queries) CancelRedemption(ctx context.Context, arg CancelRedemptionParams) error {
+	_, err := q.db.Exec(ctx, cancelRedemption, arg.HouseholdID, arg.ID, arg.Now)
+	return err
+}
+
 const createRedemption = `-- name: CreateRedemption :one
 INSERT INTO redemption (household_id, child_id, reward_id, title, cost, minutes, state)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, household_id, child_id, reward_id, title, cost, minutes, state, ledger_id, created_at
+RETURNING id, household_id, child_id, reward_id, title, cost, minutes, state, ledger_id, created_at, version, fulfilled_at, cancelled_at
 `
 
 type CreateRedemptionParams struct {
@@ -69,6 +85,9 @@ func (q *Queries) CreateRedemption(ctx context.Context, arg CreateRedemptionPara
 		&i.State,
 		&i.LedgerID,
 		&i.CreatedAt,
+		&i.Version,
+		&i.FulfilledAt,
+		&i.CancelledAt,
 	)
 	return i, err
 }
@@ -116,7 +135,7 @@ func (q *Queries) CreateRedemptionApproval(ctx context.Context, arg CreateRedemp
 }
 
 const createReward = `-- name: CreateReward :one
-INSERT INTO reward (household_id, title, cost, kind, minutes) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, title, cost, kind, minutes, available, archived_at, created_at
+INSERT INTO reward (household_id, title, cost, kind, minutes) VALUES ($1, $2, $3, $4, $5) RETURNING id, household_id, title, cost, kind, minutes, available, archived_at, created_at, version
 `
 
 type CreateRewardParams struct {
@@ -146,12 +165,29 @@ func (q *Queries) CreateReward(ctx context.Context, arg CreateRewardParams) (Rew
 		&i.Available,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
+const fulfilRedemption = `-- name: FulfilRedemption :exec
+UPDATE redemption SET state = 'fulfilled', fulfilled_at = $3, version = version + 1
+WHERE household_id = $1 AND id = $2
+`
+
+type FulfilRedemptionParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+	Now         *time.Time
+}
+
+func (q *Queries) FulfilRedemption(ctx context.Context, arg FulfilRedemptionParams) error {
+	_, err := q.db.Exec(ctx, fulfilRedemption, arg.HouseholdID, arg.ID, arg.Now)
+	return err
+}
+
 const getLiveReward = `-- name: GetLiveReward :one
-SELECT id, household_id, title, cost, kind, minutes, available, archived_at, created_at FROM reward WHERE household_id = $1 AND id = $2 AND archived_at IS NULL
+SELECT id, household_id, title, cost, kind, minutes, available, archived_at, created_at, version FROM reward WHERE household_id = $1 AND id = $2 AND archived_at IS NULL
 `
 
 type GetLiveRewardParams struct {
@@ -172,12 +208,144 @@ func (q *Queries) GetLiveReward(ctx context.Context, arg GetLiveRewardParams) (R
 		&i.Available,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
+const getRedemptionRow = `-- name: GetRedemptionRow :one
+SELECT r.id, r.household_id, r.child_id, r.reward_id, r.title, r.cost, r.minutes, r.state, r.ledger_id, r.created_at, r.version, r.fulfilled_at, r.cancelled_at, c.name AS child_name, c.color AS child_color,
+       COALESCE((SELECT sum(l.delta) FROM point_ledger l
+                 WHERE l.household_id = r.household_id AND l.reverses_id = r.ledger_id AND l.kind = 'refund'), 0)::bigint AS refunded_points
+FROM redemption r
+JOIN child c ON c.household_id = r.household_id AND c.id = r.child_id
+WHERE r.household_id = $1 AND r.id = $2
+`
+
+type GetRedemptionRowParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+}
+
+type GetRedemptionRowRow struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	ChildID        uuid.UUID
+	RewardID       uuid.UUID
+	Title          string
+	Cost           int32
+	Minutes        pgtype.Int4
+	State          string
+	LedgerID       *uuid.UUID
+	CreatedAt      time.Time
+	Version        int32
+	FulfilledAt    *time.Time
+	CancelledAt    *time.Time
+	ChildName      string
+	ChildColor     string
+	RefundedPoints int64
+}
+
+func (q *Queries) GetRedemptionRow(ctx context.Context, arg GetRedemptionRowParams) (GetRedemptionRowRow, error) {
+	row := q.db.QueryRow(ctx, getRedemptionRow, arg.HouseholdID, arg.ID)
+	var i GetRedemptionRowRow
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.ChildID,
+		&i.RewardID,
+		&i.Title,
+		&i.Cost,
+		&i.Minutes,
+		&i.State,
+		&i.LedgerID,
+		&i.CreatedAt,
+		&i.Version,
+		&i.FulfilledAt,
+		&i.CancelledAt,
+		&i.ChildName,
+		&i.ChildColor,
+		&i.RefundedPoints,
+	)
+	return i, err
+}
+
+const listRedemptions = `-- name: ListRedemptions :many
+SELECT r.id, r.household_id, r.child_id, r.reward_id, r.title, r.cost, r.minutes, r.state, r.ledger_id, r.created_at, r.version, r.fulfilled_at, r.cancelled_at, c.name AS child_name, c.color AS child_color,
+       COALESCE((SELECT sum(l.delta) FROM point_ledger l
+                 WHERE l.household_id = r.household_id AND l.reverses_id = r.ledger_id AND l.kind = 'refund'), 0)::bigint AS refunded_points
+FROM redemption r
+JOIN child c ON c.household_id = r.household_id AND c.id = r.child_id
+WHERE r.household_id = $1
+  AND ($2::text IS NULL OR r.state = $2::text)
+ORDER BY r.created_at DESC, r.id DESC
+LIMIT 200
+`
+
+type ListRedemptionsParams struct {
+	HouseholdID uuid.UUID
+	State       *string
+}
+
+type ListRedemptionsRow struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	ChildID        uuid.UUID
+	RewardID       uuid.UUID
+	Title          string
+	Cost           int32
+	Minutes        pgtype.Int4
+	State          string
+	LedgerID       *uuid.UUID
+	CreatedAt      time.Time
+	Version        int32
+	FulfilledAt    *time.Time
+	CancelledAt    *time.Time
+	ChildName      string
+	ChildColor     string
+	RefundedPoints int64
+}
+
+// What adults see: the newest first, with the points that came back.
+func (q *Queries) ListRedemptions(ctx context.Context, arg ListRedemptionsParams) ([]ListRedemptionsRow, error) {
+	rows, err := q.db.Query(ctx, listRedemptions, arg.HouseholdID, arg.State)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRedemptionsRow{}
+	for rows.Next() {
+		var i ListRedemptionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.ChildID,
+			&i.RewardID,
+			&i.Title,
+			&i.Cost,
+			&i.Minutes,
+			&i.State,
+			&i.LedgerID,
+			&i.CreatedAt,
+			&i.Version,
+			&i.FulfilledAt,
+			&i.CancelledAt,
+			&i.ChildName,
+			&i.ChildColor,
+			&i.RefundedPoints,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRewards = `-- name: ListRewards :many
-SELECT id, household_id, title, cost, kind, minutes, available, archived_at, created_at FROM reward WHERE household_id = $1 AND archived_at IS NULL ORDER BY cost, title, id
+SELECT id, household_id, title, cost, kind, minutes, available, archived_at, created_at, version FROM reward WHERE household_id = $1 AND archived_at IS NULL ORDER BY cost, title, id
 `
 
 func (q *Queries) ListRewards(ctx context.Context, householdID uuid.UUID) ([]Reward, error) {
@@ -199,6 +367,7 @@ func (q *Queries) ListRewards(ctx context.Context, householdID uuid.UUID) ([]Rew
 			&i.Available,
 			&i.ArchivedAt,
 			&i.CreatedAt,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -211,7 +380,7 @@ func (q *Queries) ListRewards(ctx context.Context, householdID uuid.UUID) ([]Rew
 }
 
 const lockRedemption = `-- name: LockRedemption :one
-SELECT id, household_id, child_id, reward_id, title, cost, minutes, state, ledger_id, created_at FROM redemption WHERE household_id = $1 AND id = $2 FOR UPDATE
+SELECT id, household_id, child_id, reward_id, title, cost, minutes, state, ledger_id, created_at, version, fulfilled_at, cancelled_at FROM redemption WHERE household_id = $1 AND id = $2 FOR UPDATE
 `
 
 type LockRedemptionParams struct {
@@ -233,6 +402,9 @@ func (q *Queries) LockRedemption(ctx context.Context, arg LockRedemptionParams) 
 		&i.State,
 		&i.LedgerID,
 		&i.CreatedAt,
+		&i.Version,
+		&i.FulfilledAt,
+		&i.CancelledAt,
 	)
 	return i, err
 }
@@ -253,7 +425,7 @@ func (q *Queries) SetRedemptionLedger(ctx context.Context, arg SetRedemptionLedg
 }
 
 const setRedemptionState = `-- name: SetRedemptionState :exec
-UPDATE redemption SET state = $3 WHERE household_id = $1 AND id = $2
+UPDATE redemption SET state = $3, version = version + 1 WHERE household_id = $1 AND id = $2
 `
 
 type SetRedemptionStateParams struct {
@@ -265,4 +437,48 @@ type SetRedemptionStateParams struct {
 func (q *Queries) SetRedemptionState(ctx context.Context, arg SetRedemptionStateParams) error {
 	_, err := q.db.Exec(ctx, setRedemptionState, arg.HouseholdID, arg.ID, arg.State)
 	return err
+}
+
+const updateReward = `-- name: UpdateReward :one
+UPDATE reward SET title = $3, cost = $4, kind = $5, minutes = $6, available = $7, version = version + 1
+WHERE household_id = $1 AND id = $2 AND archived_at IS NULL AND version = $8
+RETURNING id, household_id, title, cost, kind, minutes, available, archived_at, created_at, version
+`
+
+type UpdateRewardParams struct {
+	HouseholdID     uuid.UUID
+	ID              uuid.UUID
+	Title           string
+	Cost            int32
+	Kind            string
+	Minutes         pgtype.Int4
+	Available       bool
+	ExpectedVersion int32
+}
+
+func (q *Queries) UpdateReward(ctx context.Context, arg UpdateRewardParams) (Reward, error) {
+	row := q.db.QueryRow(ctx, updateReward,
+		arg.HouseholdID,
+		arg.ID,
+		arg.Title,
+		arg.Cost,
+		arg.Kind,
+		arg.Minutes,
+		arg.Available,
+		arg.ExpectedVersion,
+	)
+	var i Reward
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.Title,
+		&i.Cost,
+		&i.Kind,
+		&i.Minutes,
+		&i.Available,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.Version,
+	)
+	return i, err
 }

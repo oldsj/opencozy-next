@@ -90,6 +90,17 @@ var ErrNoChild = errors.New("command: no such child")
 // LockChildren locks live children of the household, in id order, so every command takes child
 // locks in the same order. Call it at most once, before Now.
 func (c *Cmd) LockChildren(ctx context.Context, ids ...uuid.UUID) error {
+	return c.lockChildren(ctx, false, ids)
+}
+
+// LockChildrenAny is LockChildren for settling what a child already spent, such as refunding a
+// cancelled reward: an archived child of the household is locked too, so an adult can still
+// undo. Anything that earns or spends new points uses LockChildren.
+func (c *Cmd) LockChildrenAny(ctx context.Context, ids ...uuid.UUID) error {
+	return c.lockChildren(ctx, true, ids)
+}
+
+func (c *Cmd) lockChildren(ctx context.Context, archived bool, ids []uuid.UUID) error {
 	if !c.now.IsZero() {
 		return errors.New("command: lock taken after Now")
 	}
@@ -97,7 +108,13 @@ func (c *Cmd) LockChildren(ctx context.Context, ids ...uuid.UUID) error {
 	slices.SortFunc(ids, func(a, b uuid.UUID) int { return bytes.Compare(a[:], b[:]) })
 	ids = slices.Compact(ids)
 	for _, id := range ids {
-		if _, err := c.Q.LockLiveChild(ctx, dbq.LockLiveChildParams{HouseholdID: c.householdID, ID: id}); errors.Is(err, pgx.ErrNoRows) {
+		var err error
+		if archived {
+			_, err = c.Q.LockAnyChild(ctx, dbq.LockAnyChildParams{HouseholdID: c.householdID, ID: id})
+		} else {
+			_, err = c.Q.LockLiveChild(ctx, dbq.LockLiveChildParams{HouseholdID: c.householdID, ID: id})
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNoChild
 		} else if err != nil {
 			return err

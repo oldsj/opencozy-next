@@ -112,6 +112,22 @@ func (q *Queries) ListChildren(ctx context.Context, arg ListChildrenParams) ([]C
 	return items, nil
 }
 
+const lockAnyChild = `-- name: LockAnyChild :one
+SELECT id FROM child WHERE household_id = $1 AND id = $2 FOR UPDATE
+`
+
+type LockAnyChildParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+}
+
+func (q *Queries) LockAnyChild(ctx context.Context, arg LockAnyChildParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockAnyChild, arg.HouseholdID, arg.ID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const lockLiveChild = `-- name: LockLiveChild :one
 SELECT id FROM child WHERE household_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE
 `

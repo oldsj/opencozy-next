@@ -23,3 +23,6 @@ RETURNING *;
 
 -- name: LockLiveChild :one
 SELECT id FROM child WHERE household_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE;
+
+-- name: LockAnyChild :one
+SELECT id FROM child WHERE household_id = $1 AND id = $2 FOR UPDATE;

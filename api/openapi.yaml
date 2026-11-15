@@ -442,6 +442,69 @@ paths:
           $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateHousehold
+      summary: Rename the household or change its time zone (the household day follows it)
+      tags:
+        - household
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - expectedVersion
+              minProperties: 2
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                  pattern: \S
+                timeZone:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  description: An IANA zone name (`time_zone_unknown` otherwise)
+                expectedVersion:
+                  $ref: '#/components/schemas/Version'
+            example:
+              name: The Rivera household
+              timeZone: America/New_York
+              expectedVersion: 2
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: '`version_conflict`: it changed since `expectedVersion`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
   /children:
     get:
       operationId: listChildren
@@ -1554,6 +1617,62 @@ paths:
         default:
           $ref: '#/components/responses/Error'
   /rewards/{rewardId}:
+    put:
+      operationId: updateReward
+      summary: Edit a reward, or hide it from children
+      tags:
+        - rewards
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: rewardId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewardEdit'
+            example:
+              title: 30 min of iPad
+              cost: 20
+              kind: screen_time
+              minutes: 30
+              available: true
+              expectedVersion: 1
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reward'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`version_conflict`: it changed since `expectedVersion`; fetch it again'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
     delete:
       operationId: archiveReward
       summary: Remove a reward from now on (history stays)
@@ -1640,6 +1759,158 @@ paths:
           $ref: '#/components/responses/TooLarge'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /redemptions:
+    get:
+      operationId: listRedemptions
+      summary: Rewards asked for, newest first (at most 200)
+      tags:
+        - rewards
+      x-actors:
+        - adult
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RedemptionStatus'
+      responses:
+        '200':
+          description: The redemptions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - redemptions
+                properties:
+                  redemptions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RedemptionRow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /redemptions/{redemptionId}/fulfil:
+    post:
+      operationId: fulfilRedemption
+      summary: Mark an approved reward as given
+      tags:
+        - rewards
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: redemptionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - expectedVersion
+              properties:
+                expectedVersion:
+                  $ref: '#/components/schemas/Version'
+            example:
+              expectedVersion: 2
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedemptionRow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`version_conflict`, or `not_approved` (only an approved reward is given)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
+  /redemptions/{redemptionId}/cancel:
+    post:
+      operationId: cancelRedemption
+      summary: Cancel an approved reward, or the unused rest of given screen time, and give the points back
+      tags:
+        - rewards
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: redemptionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - expectedVersion
+              properties:
+                expectedVersion:
+                  $ref: '#/components/schemas/Version'
+                reason:
+                  type: string
+                  maxLength: 200
+            example:
+              expectedVersion: 2
+              reason: Changed our plans
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedemptionRow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`version_conflict`; `not_cancellable` (pending, rejected, cancelled, or a given item); `already_used` (all of the screen time was used)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
         default:
           $ref: '#/components/responses/Error'
   /inbox:
@@ -1825,6 +2096,61 @@ paths:
         default:
           $ref: '#/components/responses/Error'
   /chores/{choreId}:
+    put:
+      operationId: updateChore
+      summary: Edit a chore; a new child takes it from today (earned points stay)
+      tags:
+        - chores
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: choreId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreEdit'
+            example:
+              childId: 0190f0e0-0000-7000-8000-000000000001
+              title: Feed the cat
+              points: 4
+              days: []
+              expectedVersion: 3
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chore'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`version_conflict`: it changed since `expectedVersion`; fetch it again'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
     delete:
       operationId: archiveChore
       summary: Remove a chore from now on (history stays)
@@ -1919,6 +2245,65 @@ paths:
         default:
           $ref: '#/components/responses/Error'
   /routines/{routineId}:
+    put:
+      operationId: updateRoutine
+      summary: Edit a routine and its steps; steps sent with their id keep it
+      tags:
+        - chores
+      x-actors:
+        - adult
+      x-command: true
+      x-body-limit: 8192
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: routineId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutineEdit'
+            example:
+              childId: 0190f0e0-0000-7000-8000-000000000001
+              title: Morning
+              points: 3
+              days: []
+              steps:
+                - id: 0190f0e0-0000-7000-8000-000000000010
+                  title: Make the bed
+                - title: Brush teeth
+              expectedVersion: 4
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Routine'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: '`version_conflict`: it changed since `expectedVersion`; fetch it again'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
     delete:
       operationId: archiveRoutine
       summary: Remove a routine from now on (history stays)
@@ -2950,12 +3335,18 @@ components:
     Id:
       type: string
       format: uuid
+    Version:
+      type: integer
+      minimum: 1
+      maximum: 2147483647
+      description: Counts saves; send it back as expectedVersion to save over exactly this one
     Household:
       type: object
       required:
         - id
         - name
         - timeZone
+        - version
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -2966,6 +3357,8 @@ components:
           description: IANA zone name; the household day follows it
           examples:
             - Europe/Amsterdam
+        version:
+          $ref: '#/components/schemas/Version'
     Me:
       type: object
       required:
@@ -3552,6 +3945,7 @@ components:
         - cost
         - kind
         - available
+        - version
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -3568,6 +3962,8 @@ components:
           type: integer
         available:
           type: boolean
+        version:
+          $ref: '#/components/schemas/Version'
     Rewards:
       type: object
       required:
@@ -3606,6 +4002,45 @@ components:
           minimum: 1
           maximum: 1440
           description: Required for screen_time, refused otherwise
+    RewardEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - cost
+        - kind
+        - available
+        - expectedVersion
+      properties:
+        title:
+          $ref: '#/components/schemas/Title'
+        cost:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        kind:
+          type: string
+          enum:
+            - item
+            - screen_time
+        minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: Required for screen_time, refused otherwise
+        available:
+          type: boolean
+          description: false hides it from children
+        expectedVersion:
+          $ref: '#/components/schemas/Version'
+    RedemptionStatus:
+      type: string
+      enum:
+        - pending
+        - approved
+        - fulfilled
+        - rejected
+        - cancelled
     Redemption:
       type: object
       required:
@@ -3615,11 +4050,63 @@ components:
         id:
           $ref: '#/components/schemas/Id'
         status:
+          $ref: '#/components/schemas/RedemptionStatus'
+    RedemptionChild:
+      type: object
+      required:
+        - id
+        - name
+        - color
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
           type: string
-          enum:
-            - pending
-            - approved
-            - rejected
+        color:
+          $ref: '#/components/schemas/ProfileColor'
+    RedemptionRow:
+      type: object
+      description: A redemption as an adult sees it. approved is waiting to be given; fulfilled has been given.
+      required:
+        - id
+        - child
+        - title
+        - cost
+        - status
+        - requestedAt
+        - refundedPoints
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        child:
+          $ref: '#/components/schemas/RedemptionChild'
+        title:
+          type: string
+        cost:
+          type: integer
+        status:
+          $ref: '#/components/schemas/RedemptionStatus'
+        requestedAt:
+          type: string
+          format: date-time
+        fulfilledAt:
+          type: string
+          format: date-time
+        cancelledAt:
+          type: string
+          format: date-time
+        minutes:
+          type: integer
+          description: Screen time bought
+        usedMinutes:
+          type: integer
+          description: Screen time used so far (from slice 8; absent until then)
+        refundedPoints:
+          type: integer
+          description: Points given back (a rejection or a cancellation)
+        version:
+          $ref: '#/components/schemas/Version'
     InboxItem:
       type: object
       required:
@@ -3701,6 +4188,7 @@ components:
         - title
         - points
         - days
+        - version
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -3712,6 +4200,8 @@ components:
           type: integer
         days:
           $ref: '#/components/schemas/Days'
+        version:
+          $ref: '#/components/schemas/Version'
     Points:
       type: integer
       minimum: 0
@@ -3732,6 +4222,26 @@ components:
           $ref: '#/components/schemas/Points'
         days:
           $ref: '#/components/schemas/Days'
+    ChoreEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - childId
+        - title
+        - points
+        - days
+        - expectedVersion
+      properties:
+        childId:
+          $ref: '#/components/schemas/Id'
+        title:
+          $ref: '#/components/schemas/Title'
+        points:
+          $ref: '#/components/schemas/Points'
+        days:
+          $ref: '#/components/schemas/Days'
+        expectedVersion:
+          $ref: '#/components/schemas/Version'
     Routine:
       type: object
       required:
@@ -3741,6 +4251,7 @@ components:
         - points
         - days
         - steps
+        - version
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -3764,6 +4275,8 @@ components:
                 $ref: '#/components/schemas/Id'
               title:
                 type: string
+        version:
+          $ref: '#/components/schemas/Version'
     NewRoutine:
       type: object
       additionalProperties: false
@@ -3787,6 +4300,42 @@ components:
           maxItems: 20
           items:
             $ref: '#/components/schemas/Title'
+    RoutineEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - childId
+        - title
+        - points
+        - days
+        - steps
+        - expectedVersion
+      properties:
+        childId:
+          $ref: '#/components/schemas/Id'
+        title:
+          $ref: '#/components/schemas/Title'
+        points:
+          $ref: '#/components/schemas/Points'
+        days:
+          $ref: '#/components/schemas/Days'
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: In order. A step with the id of one of this routine's steps keeps it (a tick today stays); one without is new; any left out are removed.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - title
+            properties:
+              id:
+                $ref: '#/components/schemas/Id'
+              title:
+                $ref: '#/components/schemas/Title'
+        expectedVersion:
+          $ref: '#/components/schemas/Version'
     MealSlot:
       type: string
       enum:

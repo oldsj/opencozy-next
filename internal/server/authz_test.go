@@ -73,6 +73,7 @@ func TestAuthzMatrix(t *testing.T) {
 				}
 				u = strings.ReplaceAll(u, "{entryId}", h.entry.String())
 				u = strings.ReplaceAll(u, "{rewardId}", h.reward.String())
+				u = strings.ReplaceAll(u, "{redemptionId}", h.redemption.String())
 				u = strings.ReplaceAll(u, "{eventId}", h.event.String())
 				u = strings.ReplaceAll(u, "{calendarId}", h.calendar.String())
 				u = strings.ReplaceAll(u, "{ruleId}", h.rule.String())

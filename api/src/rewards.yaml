@@ -52,6 +52,54 @@ rewards:
       default:
         $ref: common.yaml#/responses/Error
 reward:
+  put:
+    operationId: updateReward
+    summary: Edit a reward, or hide it from children
+    tags: [rewards]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: rewardId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/RewardEdit'
+          example: { title: 30 min of iPad, cost: 20, kind: screen_time, minutes: 30, available: true, expectedVersion: 1 }
+    responses:
+      '200':
+        description: Saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/Reward'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: '`version_conflict`: it changed since `expectedVersion`; fetch it again'
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
   delete:
     operationId: archiveReward
     summary: Remove a reward from now on (history stays)
@@ -132,6 +180,147 @@ redemptions:
       default:
         $ref: common.yaml#/responses/Error
 
+adultRedemptions:
+  get:
+    operationId: listRedemptions
+    summary: Rewards asked for, newest first (at most 200)
+    tags: [rewards]
+    x-actors: [adult]
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/schemas/RedemptionStatus'
+    responses:
+      '200':
+        description: The redemptions
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [redemptions]
+              properties:
+                redemptions:
+                  type: array
+                  items:
+                    $ref: '#/schemas/RedemptionRow'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+fulfil:
+  post:
+    operationId: fulfilRedemption
+    summary: Mark an approved reward as given
+    tags: [rewards]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: redemptionId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion:
+                $ref: common.yaml#/schemas/Version
+          example: { expectedVersion: 2 }
+    responses:
+      '200':
+        description: Done
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/RedemptionRow'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: '`version_conflict`, or `not_approved` (only an approved reward is given)'
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+cancel:
+  post:
+    operationId: cancelRedemption
+    summary: Cancel an approved reward, or the unused rest of given screen time, and give the points back
+    tags: [rewards]
+    x-actors: [adult]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - name: redemptionId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion:
+                $ref: common.yaml#/schemas/Version
+              reason:
+                type: string
+                maxLength: 200
+          example: { expectedVersion: 2, reason: Changed our plans }
+    responses:
+      '200':
+        description: Done
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/RedemptionRow'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: '`version_conflict`; `not_cancellable` (pending, rejected, cancelled, or a given item); `already_used` (all of the screen time was used)'
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+
 schemas:
   Rewards:
     type: object
@@ -160,9 +349,33 @@ schemas:
         minimum: 1
         maximum: 1440
         description: Required for screen_time, refused otherwise
+  RewardEdit:
+    type: object
+    additionalProperties: false
+    required: [title, cost, kind, available, expectedVersion]
+    properties:
+      title:
+        $ref: chores.yaml#/schemas/Title
+      cost:
+        type: integer
+        minimum: 1
+        maximum: 100000
+      kind:
+        type: string
+        enum: [item, screen_time]
+      minutes:
+        type: integer
+        minimum: 1
+        maximum: 1440
+        description: Required for screen_time, refused otherwise
+      available:
+        type: boolean
+        description: false hides it from children
+      expectedVersion:
+        $ref: common.yaml#/schemas/Version
   Reward:
     type: object
-    required: [id, title, cost, kind, available]
+    required: [id, title, cost, kind, available, version]
     properties:
       id:
         $ref: common.yaml#/schemas/Id
@@ -177,6 +390,56 @@ schemas:
         type: integer
       available:
         type: boolean
+      version:
+        $ref: common.yaml#/schemas/Version
+  RedemptionStatus:
+    type: string
+    enum: [pending, approved, fulfilled, rejected, cancelled]
+  RedemptionChild:
+    type: object
+    required: [id, name, color]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      name:
+        type: string
+      color:
+        $ref: children.yaml#/schemas/ProfileColor
+  RedemptionRow:
+    type: object
+    description: A redemption as an adult sees it. approved is waiting to be given; fulfilled has been given.
+    required: [id, child, title, cost, status, requestedAt, refundedPoints, version]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      child:
+        $ref: '#/schemas/RedemptionChild'
+      title:
+        type: string
+      cost:
+        type: integer
+      status:
+        $ref: '#/schemas/RedemptionStatus'
+      requestedAt:
+        type: string
+        format: date-time
+      fulfilledAt:
+        type: string
+        format: date-time
+      cancelledAt:
+        type: string
+        format: date-time
+      minutes:
+        type: integer
+        description: Screen time bought
+      usedMinutes:
+        type: integer
+        description: Screen time used so far (from slice 8; absent until then)
+      refundedPoints:
+        type: integer
+        description: Points given back (a rejection or a cancellation)
+      version:
+        $ref: common.yaml#/schemas/Version
   Redemption:
     type: object
     required: [id, status]
@@ -184,5 +447,4 @@ schemas:
       id:
         $ref: common.yaml#/schemas/Id
       status:
-        type: string
-        enum: [pending, approved, rejected]
+        $ref: '#/schemas/RedemptionStatus'
