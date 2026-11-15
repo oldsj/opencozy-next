@@ -33,7 +33,7 @@ import {
 } from './fixtures-meals';
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
-import { me, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
+import { me, methods, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
 import {
   catalogErrorText,
   catalogRewards,
@@ -1379,7 +1379,7 @@ export function TvOpen() {
  * Account (slices 10 and 11): how you sign in, and where you're signed in. Passkeys are named so you
  * can tell them apart; phones are listed so a lost one can be signed out from here.
  */
-export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
+export function Account({ link = oidcLink, provider = methods.oidc?.name }: { link?: OidcLink | null; provider?: string | undefined }) {
   return (
     <ManageShell nav={settingsNav('/manage/account')}>
       <PageHeader title="Account" description={`Signed in as ${me.email}.`} />
@@ -1415,6 +1415,7 @@ export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
           ))}
         </List>
       </Section>
+      {(link !== null || provider !== undefined) && (
       <Section title="Single sign-on" description="Your password and passkeys keep working either way.">
         {link ? (
           <List>
@@ -1431,10 +1432,11 @@ export function Account({ link = oidcLink }: { link?: OidcLink | null }) {
           </List>
         ) : (
           <p className="m-0 text-muted-foreground">
-            Not linked. Choose “Sign in with Pocket ID” on the sign-in page once; it links when Pocket ID confirms {me.email}.
+            Not linked. Choose “Sign in with {provider}” on the sign-in page once; it links when {provider} confirms {me.email}.
           </p>
         )}
       </Section>
+      )}
       <Section title="Phones" count={phoneSessions.length} description="The OpenCozy app on your phone. Each stays signed in for 90 days.">
         <List>
           {phoneSessions.map((ps) => (
@@ -1534,9 +1536,9 @@ export function SsoUnlink() {
         open
         onCancel={noop}
         onConfirm={noop}
-        title="Unlink Pocket ID?"
-        description="“Sign in with Pocket ID” stops working for you until you use it again. Your password and passkeys keep working."
-        confirmLabel="Unlink Pocket ID"
+        title={`Unlink ${oidcLink.providerName}?`}
+        description={`“Sign in with ${oidcLink.providerName}” stops working for you until you use it again. Your password and passkeys keep working.`}
+        confirmLabel={`Unlink ${oidcLink.providerName}`}
         tone="danger"
       />
     </>
