@@ -23,6 +23,8 @@ import { DisplaysPage } from './routes/displays';
 import { DeviceExpiredPage, KidPage } from './routes/kid';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
+import { ConnectionsPage } from './routes/connections';
+import { LearningPage } from './routes/learning';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -50,6 +52,8 @@ const nav = [
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
   { to: '/displays', label: 'Displays' },
+  { to: '/learning', label: 'Learning' },
+  { to: '/connections', label: 'Connections' },
   { to: '/devices', label: 'Devices' },
 ] as const;
 
@@ -218,6 +222,32 @@ const rewardsRoute = createRoute({
   component: RewardsPage,
 });
 
+// Manage: services, assistants and learning apps, each with its own key.
+const connectionsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/connections',
+  staticData: { title: 'Connections' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: ConnectionsPage,
+});
+
+// Manage: learning award rules and players.
+const learningRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/learning',
+  staticData: { title: 'Learning' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: LearningPage,
+});
+
 // Manage: the children's iPads and phones.
 const devicesRoute = createRoute({
   getParentRoute: () => pageRoute,
@@ -254,7 +284,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, devicesRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, connectionsRoute, learningRoute, devicesRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

@@ -1,5 +1,5 @@
 // @dsCard group="Layout"
-import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, Countdown, QrCode, qrModulesFromRows, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
+import { pointsLabel, Button, ButtonLink, CheckCircle, ConfirmDialog, DayPicker, Countdown, QrCode, qrModulesFromRows, ChoiceGroup, Input, Notice, SegmentedControl, Tag, List, ListRow, ManageNav, ManageShell, PageHeader, ProfileAvatar, Section, Sheet, Textarea } from '../../src';
 import {
   calendarErrorText,
   calendars,
@@ -34,21 +34,58 @@ import {
 import { awardRules, learningErrorText, learningLinks, providerNames, type AwardRule } from './fixtures-learning';
 import { adaHours, DEFAULT_LOCK_MESSAGE, LOCK_MESSAGE_MAX, webFilter } from './fixtures-screentime';
 import { me, oidcLink, passkeys, phoneSessions, type OidcLink } from './fixtures-account';
+import {
+  catalogErrorText,
+  catalogRewards,
+  chores,
+  daysLabel,
+  household,
+  kids as catalogKids,
+  redemptions,
+  refundFor,
+  routines,
+  timeZones,
+  type RedemptionRow,
+} from './fixtures-catalog';
 import { manageGroups } from './fixtures-manage';
 import { durationLabels, tvs, type Tv } from './fixtures-tv';
 
+/** Chores by child: what each is worth and on which days. Edit changes or reassigns; archive keeps history. */
 export function Chores() {
   return (
     <ManageShell
       nav={<ManageNav groups={manageGroups('/manage/chores')} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />}
     >
       <PageHeader title="Chores" description="What each child can do for points." actions={<Button variant="primary">Add chore</Button>} />
-      <Section title="Every day">
-        <List>
-          <ListRow title="Feed the cat" meta="Ezra · 4 points · needs approval" trailing={<Button variant="quiet">Edit</Button>} />
-          <ListRow title="Tidy the hallway" meta="Ada, Noor · 5 points" trailing={<Button variant="quiet">Edit</Button>} />
-        </List>
-      </Section>
+      {catalogKids.map((kid) => {
+        const mine = chores.filter((c) => c.childId === kid.id);
+        if (mine.length === 0) return null;
+        return (
+          <Section key={kid.id} title={kid.name} count={mine.length}>
+            <List>
+              {mine.map((c) => (
+                <ListRow
+                  key={c.id}
+                  stackOnNarrow
+                  leading={<ProfileAvatar name={kid.name} color={kid.color} size="small" aria-hidden="true" />}
+                  title={c.title}
+                  meta={`${pointsLabel(c.points)} · ${daysLabel(c.days)}`}
+                  trailing={
+                    <>
+                      <Button variant="quiet" aria-label={`Edit ${c.title}`}>
+                        Edit
+                      </Button>
+                      <Button variant="quiet" aria-label={`Archive ${c.title}`}>
+                        Archive…
+                      </Button>
+                    </>
+                  }
+                />
+              ))}
+            </List>
+          </Section>
+        );
+      })}
     </ManageShell>
   );
 }
@@ -1520,5 +1557,309 @@ export function PhoneSignOut() {
         tone="danger"
       />
     </>
+  );
+}
+
+/**
+ * Editing a chore, including giving it to another child. A change applies from today: points already
+ * earned stay where they are. A stale version shows the newer one instead of overwriting it.
+ */
+export function ChoreEdit({ conflict = false }: { conflict?: boolean }) {
+  return (
+    <>
+      <Chores />
+      <Sheet
+        open
+        onClose={noop}
+        title="Edit Tidy the hallway"
+        description="Changes apply from today. Points already earned stay."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          {conflict && <Notice tone="attention">{catalogErrorText.version_conflict}</Notice>}
+          <Input label="Chore" defaultValue="Tidy the hallway" maxLength={80} required />
+          <SegmentedControl label="Whose chore" value="c3" onChange={noop} options={catalogKids.map((k) => ({ value: k.id, label: k.name }))} />
+          <p className="m-0 text-muted-foreground">Moving it to Noor: it leaves Ada’s list today and shows on Noor’s.</p>
+          <Input label="Points" type="number" inputMode="numeric" min={0} max={1000} defaultValue={5} />
+          <Section title="Days">
+            <DayPicker label="Days for Tidy the hallway" value={[1, 3, 5]} onChange={noop} />
+          </Section>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function ChoreEditConflict() {
+  return <ChoreEdit conflict />;
+}
+
+/** Routines: a list of steps that earns its points when every step is checked. */
+export function Routines() {
+  return (
+    <ManageShell
+      nav={<ManageNav groups={manageGroups('/manage/routines')} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />}
+    >
+      <PageHeader title="Routines" description="Steps a child checks off, worth points when all are done." actions={<Button variant="primary">Add routine</Button>} />
+      <List>
+        {routines.map((r) => {
+          const kid = catalogKids.find((k) => k.id === r.childId);
+          return (
+            <ListRow
+              key={r.id}
+              stackOnNarrow
+              leading={kid ? <ProfileAvatar name={kid.name} color={kid.color} size="small" aria-hidden="true" /> : undefined}
+              title={`${kid?.name ?? 'A child'}’s ${r.title.toLowerCase()} routine`}
+              meta={`${String(r.steps.length)} steps · ${pointsLabel(r.points)} · ${daysLabel(r.days)}`}
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Edit ${r.title} for ${kid?.name ?? 'a child'}`}>
+                    Edit
+                  </Button>
+                  <Button variant="quiet" aria-label={`Archive ${r.title} for ${kid?.name ?? 'a child'}`}>
+                    Archive…
+                  </Button>
+                </>
+              }
+            />
+          );
+        })}
+      </List>
+    </ManageShell>
+  );
+}
+
+/** Editing a routine: its steps in order (up to 20), moved with buttons, not dragging. */
+export function RoutineEdit() {
+  const r = routines[0];
+  if (!r) return null;
+  return (
+    <>
+      <Routines />
+      <Sheet
+        open
+        onClose={noop}
+        title="Edit Ada’s morning routine"
+        description="Changes apply from today. Steps already checked today stay checked."
+        footer={
+          <>
+            <Button>Cancel</Button>
+            <Button variant="primary">Save</Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          <Input label="Routine" defaultValue={r.title} maxLength={80} required />
+          <SegmentedControl label="Whose routine" value={r.childId} onChange={noop} options={catalogKids.map((k) => ({ value: k.id, label: k.name }))} />
+          <Input label="Points when every step is done" type="number" inputMode="numeric" min={0} max={1000} defaultValue={r.points} />
+          <Section title="Days">
+            <DayPicker label="Days for the morning routine" value={r.days} onChange={noop} />
+          </Section>
+          <Section title="Steps" count={r.steps.length} actions={<Button>Add a step</Button>}>
+            <List>
+              {r.steps.map((step, i) => (
+                <ListRow
+                  key={step.id}
+                  title={<Input label={`Step ${String(i + 1)}`} defaultValue={step.title} maxLength={80} />}
+                  trailing={
+                    <>
+                      <Button variant="quiet" disabled={i === 0} aria-label={`Move ${step.title} up`}>
+                        Up
+                      </Button>
+                      <Button variant="quiet" disabled={i === r.steps.length - 1} aria-label={`Move ${step.title} down`}>
+                        Down
+                      </Button>
+                      <Button variant="quiet" disabled={r.steps.length === 1} aria-label={`Remove ${step.title}`}>
+                        Remove
+                      </Button>
+                    </>
+                  }
+                />
+              ))}
+            </List>
+          </Section>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+/** Rewards: what they cost, and whether children can choose them now. Edit uses RewardScreenTime's form. */
+export function Rewards() {
+  return (
+    <ManageShell
+      nav={<ManageNav groups={manageGroups('/manage/rewards')} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />}
+    >
+      <PageHeader
+        title="Rewards"
+        description="What points buy."
+        actions={
+          <>
+            <ButtonLink href="#redemptions">Chosen rewards</ButtonLink>
+            <Button variant="primary">Add reward</Button>
+          </>
+        }
+      />
+      <List>
+        {catalogRewards.map((r) => (
+          <ListRow
+            key={r.id}
+            stackOnNarrow
+            muted={!r.available}
+            title={r.title}
+            meta={
+              <>
+                {r.kind === 'screen_time' && <Tag tone="info">{`${String(r.minutes ?? 0)} min of iPad`}</Tag>}{' '}
+                {[pointsLabel(r.cost), r.available ? null : 'hidden from children'].filter(Boolean).join(' · ')}
+              </>
+            }
+            trailing={
+              <>
+                <Button variant="quiet" aria-label={`Edit ${r.title}`}>
+                  Edit
+                </Button>
+                <Button variant="quiet" aria-label={`Archive ${r.title}`}>
+                  Archive…
+                </Button>
+              </>
+            }
+          />
+        ))}
+      </List>
+    </ManageShell>
+  );
+}
+
+function redemptionMeta(r: RedemptionRow): string {
+  const used = r.minutes === undefined ? null : `${String(r.usedMinutes ?? 0)} of ${String(r.minutes)} min used`;
+  const refunded = r.refundedPoints === undefined ? null : `${pointsLabel(r.refundedPoints)} back`;
+  return [r.child.name, pointsLabel(r.cost), r.requestedAt, used, refunded].filter(Boolean).join(' · ');
+}
+
+/**
+ * Chosen rewards: what to give, what was given, what was cancelled. Cancelling refunds the points,
+ * or, for screen time, the share not used yet.
+ */
+export function Redemptions() {
+  const toGive = redemptions.filter((r) => r.status === 'approved');
+  const given = redemptions.filter((r) => r.status === 'fulfilled');
+  const cancelled = redemptions.filter((r) => r.status === 'cancelled');
+  const avatar = (r: RedemptionRow) => <ProfileAvatar name={r.child.name} color={r.child.color} size="small" aria-hidden="true" />;
+  return (
+    <ManageShell
+      nav={<ManageNav groups={manageGroups('/manage/rewards')} shortcut="/manage/inbox" back={{ href: '/today', label: 'Back to family' }} />}
+    >
+      <PageHeader title="Chosen rewards" description="Approved rewards to give, and what’s been given." />
+      <Section title="To give" count={toGive.length}>
+        <List>
+          {toGive.map((r) => (
+            <ListRow
+              key={r.id}
+              stackOnNarrow
+              leading={avatar(r)}
+              title={r.title}
+              meta={redemptionMeta(r)}
+              trailing={
+                <>
+                  <Button variant="quiet" aria-label={`Cancel ${r.title} for ${r.child.name} and refund`}>
+                    Cancel and refund…
+                  </Button>
+                  <Button variant="primary" aria-label={`Mark ${r.title} as given to ${r.child.name}`}>
+                    Given
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </List>
+      </Section>
+      <Section title="Given" count={given.length}>
+        <List>
+          {given.map((r) => {
+            const back = refundFor(r);
+            const canCancel = r.minutes !== undefined && (r.usedMinutes ?? 0) < r.minutes;
+            return (
+              <ListRow
+                key={r.id}
+                stackOnNarrow
+                leading={avatar(r)}
+                title={r.title}
+                meta={redemptionMeta(r)}
+                trailing={
+                  canCancel ? (
+                    <Button variant="quiet" aria-label={`Cancel the rest of ${r.title} for ${r.child.name}, ${pointsLabel(back)} back`}>
+                      Cancel the rest…
+                    </Button>
+                  ) : undefined
+                }
+              />
+            );
+          })}
+        </List>
+      </Section>
+      <Section title="Cancelled" count={cancelled.length}>
+        <List>
+          {cancelled.map((r) => (
+            <ListRow key={r.id} muted leading={avatar(r)} title={r.title} meta={redemptionMeta(r)} />
+          ))}
+        </List>
+      </Section>
+    </ManageShell>
+  );
+}
+
+/** Cancelling screen time that's partly used: the unused share comes back, rounded down. */
+export function RedemptionCancel() {
+  const r = redemptions[1];
+  if (!r) return null;
+  const back = refundFor(r);
+  return (
+    <>
+      <Redemptions />
+      <ConfirmDialog
+        open
+        onCancel={noop}
+        onConfirm={noop}
+        title={`Cancel the rest of Noor’s ${r.title}?`}
+        description={`Noor has used ${String(r.usedMinutes ?? 0)} of ${String(r.minutes ?? 0)} minutes. The ${String((r.minutes ?? 0) - (r.usedMinutes ?? 0))} minutes left are removed and Noor gets ${pointsLabel(back)} back. Time already running keeps going.`}
+        confirmLabel={`Cancel and refund ${pointsLabel(back)}`}
+        cancelLabel="Keep it"
+        tone="danger"
+      />
+    </>
+  );
+}
+
+/** Household settings: the name everyone sees, and the time zone the household day follows. */
+export function HouseholdSettings() {
+  return (
+    <ManageShell nav={settingsNav('/manage/household')}>
+      <PageHeader title="Household" />
+      <form className="grid max-w-xl gap-6" onSubmit={(e) => { e.preventDefault(); }}>
+        <Input label="Name" defaultValue={household.name} maxLength={80} hint="On the wall display and the children’s screens." required />
+        <Input
+          label="Time zone"
+          list="time-zones"
+          defaultValue={household.timeZone}
+          hint="The household day starts at midnight here: chores reset, and allowed hours and TV open hours follow it."
+          required
+        />
+        <datalist id="time-zones">
+          {timeZones.map((z) => (
+            <option key={z} value={z} />
+          ))}
+        </datalist>
+        <div>
+          <Button variant="primary" type="submit">
+            Save
+          </Button>
+        </div>
+      </form>
+    </ManageShell>
   );
 }
