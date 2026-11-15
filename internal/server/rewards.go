@@ -18,7 +18,7 @@ import (
 var (
 	errRewardUnavailable = apiError("reward_unavailable", "That reward isn't available right now.")
 	errNotEnoughPoints   = apiError("not_enough_points", "Not enough points for that yet.")
-	errMinutes           = apiError("minutes_mismatch", "Screen time needs minutes; other rewards take none.")
+	errMinutes           = apiError("minutes_mismatch", "Give minutes for iPad time, and none for other rewards.")
 )
 
 func toReward(r dbq.Reward) api.Reward {

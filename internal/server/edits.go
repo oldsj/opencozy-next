@@ -19,7 +19,7 @@ import (
 // Editing what adults manage. Every save names the version it was made from; a stale one gets
 // 409 version_conflict instead of overwriting someone else's change.
 
-var errNoSuchChildToAssign = apiError("no_such_child", "Choose a child of this household.")
+var errNoSuchChildToAssign = apiError("no_such_child", "That child isn’t in the household any more. Choose someone else.")
 
 // lockForEdit locks the children an edit touches (the current one and a new one), after
 // checking the new one is live. Locks come before the command's clock.
@@ -151,7 +151,7 @@ func (s *Server) UpdateRoutine(ctx context.Context, req api.UpdateRoutineRequest
 			continue
 		}
 		if !mine[*st.Id] || seen[*st.Id] {
-			return unprocessable("no_such_step", "A step doesn't belong to this routine. Reload and try again."), nil
+			return unprocessable("no_such_step", "A step was removed while you were editing. Check the routine and save again."), nil
 		}
 		seen[*st.Id] = true
 	}
@@ -184,7 +184,7 @@ func (s *Server) UpdateReward(ctx context.Context, req api.UpdateRewardRequestOb
 	a, cmd, b := mustActor(ctx), mustCmd(ctx), req.Body
 	screen := b.Kind == api.RewardEditKindScreenTime
 	if screen != (b.Minutes != nil) {
-		return api.UpdateReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(apiError("minutes_mismatch", "Screen time needs its minutes; other rewards have none."))}, nil
+		return api.UpdateReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(apiError("minutes_mismatch", "Give minutes for iPad time, and none for other rewards."))}, nil
 	}
 	var minutes pgtype.Int4
 	if b.Minutes != nil {
@@ -247,8 +247,8 @@ func lockRedemption(ctx context.Context, cmd *command.Cmd, id uuid.UUID, expecte
 	} else if err != nil {
 		return dbq.Redemption{}, 0, err
 	}
-	// An archived child's redemptions can still be settled.
-	if err := cmd.LockChildren(ctx, peek.ChildID); err != nil && !errors.Is(err, command.ErrNoChild) {
+	// An archived child's redemptions can still be given or cancelled (with its refund).
+	if err := cmd.LockChildrenAny(ctx, peek.ChildID); err != nil {
 		return dbq.Redemption{}, 0, err
 	}
 	red, err := cmd.Q.LockRedemption(ctx, dbq.LockRedemptionParams{HouseholdID: h, ID: id})
@@ -279,9 +279,9 @@ func (s *Server) FulfilRedemption(ctx context.Context, req api.FulfilRedemptionR
 	case status == 404:
 		return api.FulfilRedemption404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
 	case status == 409:
-		return api.FulfilRedemption409JSONResponse(apiError("version_conflict", "Someone changed this meanwhile. Reload and try again.")), nil
+		return api.FulfilRedemption409JSONResponse(apiError("version_conflict", "Someone else changed this while you were editing. It now shows their version; check it and save again.")), nil
 	case red.State != "approved":
-		return api.FulfilRedemption409JSONResponse(apiError("not_approved", "Only a reward an adult said yes to can be given.")), nil
+		return api.FulfilRedemption409JSONResponse(apiError("not_approved", "Only an approved reward can be marked as given.")), nil
 	}
 	now, err := cmd.Now(ctx)
 	if err != nil {
@@ -315,7 +315,7 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 	case status == 404:
 		return api.CancelRedemption404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
 	case status == 409:
-		return refuse("version_conflict", "Someone changed this meanwhile. Reload and try again."), nil
+		return refuse("version_conflict", "Someone else changed this while you were editing. It now shows their version; check it and save again."), nil
 	}
 	refund := red.Cost
 	switch {
@@ -327,7 +327,7 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 			return refuse("already_used", "That iPad time has already been used, so there’s nothing to refund."), nil
 		}
 	default:
-		return refuse("not_cancellable", "Only a reward that hasn't been given, or screen time not yet used, can be cancelled."), nil
+		return refuse("not_cancellable", "This reward has already been given or cancelled."), nil
 	}
 	now, err := cmd.Now(ctx)
 	if err != nil {
@@ -370,7 +370,7 @@ func (s *Server) UpdateHousehold(ctx context.Context, req api.UpdateHouseholdReq
 	}
 	h, err := cmd.Q.UpdateHousehold(ctx, dbq.UpdateHouseholdParams{ID: a.HouseholdID, Name: name, TimeZone: zone, ExpectedVersion: int32(b.ExpectedVersion)}) //nolint:gosec // bounded by the spec
 	if errors.Is(err, pgx.ErrNoRows) {
-		return api.UpdateHousehold409JSONResponse(apiError("version_conflict", "Someone changed the household meanwhile. Reload and try again.")), nil
+		return api.UpdateHousehold409JSONResponse(apiError("version_conflict", "Someone else changed this while you were editing. It now shows their version; check it and save again.")), nil
 	} else if err != nil {
 		return nil, err
 	}

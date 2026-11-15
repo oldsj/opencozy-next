@@ -157,6 +157,22 @@ func TestEditRewardsAndRedemptions(t *testing.T) {
 	if got := list(""); len(got) != 2 {
 		t.Errorf("all: %d", len(got))
 	}
+	// An archived child's approved reward can still be cancelled, with its points back.
+	r = e.send(adult, "POST", "/api/children/"+h.child1.String()+"/redemptions", map[string]any{"rewardId": h.reward})
+	if r.status != 201 {
+		t.Fatalf("redeem again: %d %s", r.status, r.raw)
+	}
+	archivedID := r.body["id"].(string)
+	e.exec(`UPDATE child SET archived_at = now() WHERE id = $1`, h.child1)
+	r = e.send(adult, "POST", "/api/redemptions/"+archivedID+"/cancel", map[string]any{"expectedVersion": 1})
+	if r.status != 200 || r.body["refundedPoints"] != float64(3) {
+		t.Fatalf("cancel for an archived child: %d %s", r.status, r.raw)
+	}
+	var bal int
+	if err := e.owner.QueryRow(t.Context(), `SELECT coalesce(sum(delta), 0) FROM point_ledger WHERE child_id = $1`, h.child1).Scan(&bal); err != nil || float64(bal) != before {
+		t.Errorf("archived child's balance after the refund: %d %v, want %v", bal, err, before)
+	}
+	e.exec(`UPDATE child SET archived_at = NULL WHERE id = $1`, h.child1)
 	// Another household sees none of them.
 	if r := e.send(e.house("b", nil).actors["adult"], "POST", "/api/redemptions/"+id+"/cancel", map[string]any{"expectedVersion": 3}); r.status != 404 {
 		t.Errorf("another household's redemption: %d", r.status)
