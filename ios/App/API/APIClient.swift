@@ -133,7 +133,7 @@ struct DevicePairRequest: Encodable, Equatable, Sendable {
     /// Proof of possession: base64url (no padding) raw r||s signature by the new key
     /// over `proofMessage`. Required by the server.
     var proof: String = ""
-    /// `ipad` or `iphone`.
+    /// `ios` (see `DevicePlatform`).
     var platform: String
     /// 1 to 80 characters.
     var name: String

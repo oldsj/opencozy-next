@@ -51,6 +51,14 @@ xcodebuild -project OpenCozy.xcodeproj -scheme OpenCozy \
   CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= test
 ```
 
+Against a local development server (never a real installation), `LocalServerTests` pairs with
+the app's own client, signs requests and opens the kid view. Make a pairing in Manage → Devices
+(or `POST /api/devices/pairings`) and pass its QR payload; without it the suite is skipped:
+
+```sh
+TEST_RUNNER_OPENCOZY_E2E_PAIRING='opencozy-pair:v1?origin=http%3A%2F%2F127.0.0.1%3A8080&token=…' ios/scripts/ci.sh
+```
+
 The tests use ad-hoc simulator signing rather than `CODE_SIGNING_ALLOWED=NO`, because an unsigned test host can't use the Keychain, which the PIN, pairing and parent-session tests need.
 
 ### Signing
