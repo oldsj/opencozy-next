@@ -17,9 +17,6 @@ func TestLoadDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AllowSignup {
-		t.Error("signup must be off by default")
-	}
 	if cfg.ListenAddr != ":8080" {
 		t.Errorf("ListenAddr = %q", cfg.ListenAddr)
 	}
@@ -41,5 +38,21 @@ func TestLoadValidatesTTL(t *testing.T) {
 	t.Setenv("SESSION_TTL", "1s")
 	if _, err := Load(); err == nil {
 		t.Fatal("SESSION_TTL=1s accepted")
+	}
+}
+
+func TestLoadNeedsRuntimeRoleWithMigrationURL(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://app:p@localhost/app")
+	t.Setenv("MIGRATION_DATABASE_URL", "postgres://owner:p@localhost/app")
+	if _, err := Load(); err == nil {
+		t.Fatal("MIGRATION_DATABASE_URL without DATABASE_RUNTIME_ROLE was accepted")
+	}
+	t.Setenv("DATABASE_RUNTIME_ROLE", "app")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MigrationURL() != "postgres://owner:p@localhost/app" {
+		t.Errorf("MigrationURL = %q", cfg.MigrationURL())
 	}
 }

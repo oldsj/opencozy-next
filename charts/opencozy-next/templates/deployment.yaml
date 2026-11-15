@@ -44,6 +44,29 @@ spec:
           matchLabelKeys:
             - pod-template-hash
       {{- end }}
+      initContainers:
+        - name: migrate
+          image: {{ printf "%s@%s" .Values.image.repository (required "image.digest is required" .Values.image.digest) | quote }}
+          imagePullPolicy: IfNotPresent
+          args: [migrate]
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- include "app.dbEnv" (dict "root" . "ca" $ca "serve" false) | nindent 12 }}
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if $ca }}
+          volumeMounts:
+            - name: db-ca
+              mountPath: /etc/db-ca
+              readOnly: true
+          {{- end }}
       containers:
         - name: app
           image: {{ printf "%s@%s" .Values.image.repository (required "image.digest is required" .Values.image.digest) | quote }}
@@ -58,8 +81,6 @@ spec:
               value: ":8080"
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
-            - name: ALLOW_SIGNUP
-              value: {{ .Values.config.allowSignup | quote }}
             - name: SESSION_TTL
               value: {{ .Values.config.sessionTTL | quote }}
             - name: AUTH_RATE_PER_MINUTE
@@ -68,18 +89,10 @@ spec:
             - name: TRUSTED_PROXIES
               value: {{ . | quote }}
             {{- end }}
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "app.dbSecret" . | quote }}
-                  key: {{ .Values.database.urlKey | quote }}
-            {{- if $ca }}
-            # pgx reads these libpq variables: TLS, with the server's certificate and name checked.
-            - name: PGSSLMODE
-              value: verify-full
-            - name: PGSSLROOTCERT
-              value: /etc/db-ca/ca.crt
-            {{- end }}
+            # Migrations run in the init container.
+            - name: MIGRATE_ON_START
+              value: "false"
+            {{- include "app.dbEnv" (dict "root" . "ca" $ca "serve" true) | nindent 12 }}
             {{- with include "app.egressEnv" . | trim }}{{ . | nindent 12 }}{{ end }}
             {{- range .Values.secrets.env }}
             - name: {{ .name | quote }}

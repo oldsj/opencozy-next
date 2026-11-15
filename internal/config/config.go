@@ -19,21 +19,25 @@ import (
 
 // Config is the server's configuration. Secrets have no defaults: a missing one stops startup.
 type Config struct {
-	// DatabaseURL is a libpq URL or DSN. Secret.
+	// DatabaseURL is a libpq URL or DSN for the runtime role, which only reads and writes rows.
+	// Secret.
 	DatabaseURL string `env:"DATABASE_URL,required,notEmpty"`
+	// MigrationDatabaseURL is the URL of the role that owns the schema and runs migrations.
+	// Empty means DatabaseURL does both (development). Secret.
+	MigrationDatabaseURL string `env:"MIGRATION_DATABASE_URL"`
+	// DatabaseRuntimeRole is the runtime role's name. Migrations grant it row access to the
+	// application's tables and nothing on goose's. Required with MigrationDatabaseURL.
+	DatabaseRuntimeRole string `env:"DATABASE_RUNTIME_ROLE"`
 	// ListenAddr is where the HTTP server listens.
 	ListenAddr string `env:"LISTEN_ADDR" envDefault:":8080"`
 	// LogLevel is debug, info, warn or error.
 	LogLevel slog.Level `env:"LOG_LEVEL" envDefault:"info"`
-	// AllowSignup lets anyone create an account. Off by default: turn it on to create the
-	// first account, then off again for a private app.
-	AllowSignup bool `env:"ALLOW_SIGNUP" envDefault:"false"`
 	// SessionTTL is how long a sign-in lasts.
 	SessionTTL time.Duration `env:"SESSION_TTL" envDefault:"720h"`
 	// TrustedProxies are the CIDRs of reverse proxies whose X-Forwarded-For is believed, for
 	// the client address used by rate limiting. Empty means use the TCP peer address.
 	TrustedProxies []netip.Prefix `env:"TRUSTED_PROXIES" envSeparator:","`
-	// AuthRatePerMinute is the sign-in and sign-up attempts allowed per client address.
+	// AuthRatePerMinute is the sign-in and password-confirm attempts allowed per client address.
 	AuthRatePerMinute int `env:"AUTH_RATE_PER_MINUTE" envDefault:"10"`
 	// MigrateOnStart applies database migrations before serving.
 	MigrateOnStart bool `env:"MIGRATE_ON_START" envDefault:"true"`
@@ -70,6 +74,12 @@ func (c Config) validate() error {
 	if strings.Contains(c.DatabaseURL, "sslmode=disable") && !isLocalDatabase(c.DatabaseURL) {
 		errs = append(errs, errors.New("DATABASE_URL: sslmode=disable is only allowed for localhost"))
 	}
+	if strings.Contains(c.MigrationDatabaseURL, "sslmode=disable") && !isLocalDatabase(c.MigrationDatabaseURL) {
+		errs = append(errs, errors.New("MIGRATION_DATABASE_URL: sslmode=disable is only allowed for localhost"))
+	}
+	if c.MigrationDatabaseURL != "" && c.DatabaseRuntimeRole == "" {
+		errs = append(errs, errors.New("DATABASE_RUNTIME_ROLE is required with MIGRATION_DATABASE_URL"))
+	}
 	if len(errs) > 0 {
 		return fmt.Errorf("config: %w", errors.Join(errs...))
 	}
@@ -79,6 +89,14 @@ func (c Config) validate() error {
 func isLocalDatabase(url string) bool {
 	return strings.Contains(url, "@localhost") || strings.Contains(url, "@127.0.0.1") ||
 		strings.Contains(url, "host=localhost") || strings.Contains(url, "host=127.0.0.1")
+}
+
+// MigrationURL is the URL migrations run with.
+func (c Config) MigrationURL() string {
+	if c.MigrationDatabaseURL != "" {
+		return c.MigrationDatabaseURL
+	}
+	return c.DatabaseURL
 }
 
 // TestDatabaseURL is the admin URL of a disposable PostgreSQL server for integration tests.

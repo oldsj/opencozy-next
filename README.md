@@ -36,7 +36,8 @@ make dev     # Postgres in Docker, Go API with hot reload on :8080, Vite on http
 make ci      # everything CI runs
 ```
 
-`make dev` copies `.env.example` to `.env` (sign-up on, local database).
+`make dev` copies `.env.example` to `.env` (local database). Create the first adult with
+`go run ./cmd/app bootstrap-owner -household … -time-zone … -email … -name …` (password on stdin).
 
 ## Deploy
 

@@ -4,3 +4,6 @@ rules:
   info-license: off
   # Servers is the relative /api prefix, not a host.
   no-server-example.com: off
+  # Authorization is declared with x-actors on each operation (see the spec's description and
+  # internal/authz), not with OpenAPI security requirements.
+  security-defined: off

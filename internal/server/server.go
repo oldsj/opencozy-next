@@ -15,15 +15,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	nethttpmiddleware "github.com/oapi-codegen/nethttp-middleware"
 
+	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/api"
+	"github.com/oldsj/opencozy-next/internal/authz"
+	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/config"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/httpx"
 	"github.com/oldsj/opencozy-next/web"
 )
-
-// MaxBodyBytes caps every API request body.
-const MaxBodyBytes = 1 << 20
 
 // Server holds what the handlers need.
 type Server struct {
@@ -31,6 +31,9 @@ type Server struct {
 	log      *slog.Logger
 	pool     *pgxpool.Pool
 	q        *dbq.Queries
+	actors   actor.Resolver
+	table    *authz.Table
+	runner   command.Runner
 	draining atomic.Bool
 }
 
@@ -38,7 +41,8 @@ var _ api.StrictServerInterface = (*Server)(nil)
 
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
-	return &Server{cfg: cfg, log: log, pool: pool, q: dbq.New(pool)}
+	q := dbq.New(pool)
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}}
 }
 
 // Drain makes /readyz fail, so the load balancer stops sending traffic before shutdown.
@@ -56,7 +60,8 @@ func (s *Server) Handler() (http.Handler, error) {
 	app.Handle("/", web.Handler(web.Dist()))
 
 	// Go's CSRF defence: refuses cross-origin unsafe requests using Sec-Fetch-Site and Origin.
-	// Together with SameSite=Lax cookies this needs no tokens.
+	// Together with SameSite=Lax cookies this needs no tokens. Bearer requests carry no cookies,
+	// and native clients send neither header, so they pass.
 	csrf := http.NewCrossOriginProtection()
 	csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "cross_origin", "Cross-origin request refused.")
@@ -90,6 +95,9 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// apiHandler runs every API request through, in order: the route's policy (deny by default),
+// the body cap, rate limits, authentication, the Idempotency-Key check for commands, the request
+// validator, authorization, the command runner, and only then the handler. Authentication comes before anything parses the body.
 func (s *Server) apiHandler() (http.Handler, error) {
 	spec, err := api.GetSpec()
 	if err != nil {
@@ -99,23 +107,23 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	// kin-openapi checks only the formats it is told about.
 	openapi3.DefineStringFormatValidator("email", openapi3.NewRegexpFormatValidator(openapi3.FormatOfStringForEmail))
 
+	if s.table, err = authz.New(spec); err != nil {
+		return nil, err
+	}
+
 	validator := nethttpmiddleware.OapiRequestValidatorWithOptions(spec, &nethttpmiddleware.Options{
 		DoNotValidateServers: true,
-		Options: openapi3filter.Options{
-			// Operations that declare the session scheme need a signed-in user; sessionUser
-			// has already looked the cookie up.
-			AuthenticationFunc: func(ctx context.Context, in *openapi3filter.AuthenticationInput) error {
-				if _, ok := userFrom(in.RequestValidationInput.Request.Context()); !ok {
-					return errors.New("not signed in")
-				}
-				return nil
-			},
-		},
+		// Who may call an operation is x-actors (internal/authz), not OpenAPI security.
+		Options:              openapi3filter.Options{AuthenticationFunc: openapi3filter.NoopAuthenticationFunc},
 		ErrorHandlerWithOpts: s.validationError,
 	})
 
 	strict := api.NewStrictHandlerWithOptions(s, nil, api.StrictHTTPServerOptions{
-		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			if tooLarge(err) {
+				writeTooLarge(w)
+				return
+			}
 			httpx.WriteError(w, http.StatusBadRequest, "bad_request", "The request body could not be read.")
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
@@ -129,7 +137,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	limitAuth := func(next http.Handler) http.Handler {
 		limited := limiter.Middleware(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost && (r.URL.Path == "/auth/login" || r.URL.Path == "/auth/signup") {
+			if r.Method == http.MethodPost && (r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm") {
 				limited.ServeHTTP(w, r)
 				return
 			}
@@ -139,10 +147,14 @@ func (s *Server) apiHandler() (http.Handler, error) {
 
 	return httpx.Chain(handler,
 		noStore,
-		httpx.MaxBody(MaxBodyBytes),
+		s.route,
+		bodyCap,
 		limitAuth,
-		s.sessionUser,
+		s.authenticate,
+		requireKey,
 		validator,
+		s.authorize,
+		s.commands,
 	), nil
 }
 
@@ -154,10 +166,9 @@ func noStore(next http.Handler) http.Handler {
 }
 
 func (s *Server) validationError(_ context.Context, err error, w http.ResponseWriter, _ *http.Request, opts nethttpmiddleware.ErrorHandlerOpts) {
-	var secErr *openapi3filter.SecurityRequirementsError
 	switch {
-	case errors.As(err, &secErr):
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "Sign in to continue.")
+	case tooLarge(err):
+		writeTooLarge(w)
 	case opts.MatchedRoute == nil && opts.StatusCode == http.StatusNotFound:
 		httpx.WriteError(w, http.StatusNotFound, "not_found", "No such endpoint.")
 	case opts.StatusCode == http.StatusMethodNotAllowed:
@@ -165,6 +176,15 @@ func (s *Server) validationError(_ context.Context, err error, w http.ResponseWr
 	default:
 		httpx.WriteError(w, http.StatusBadRequest, "invalid_request", validationMessage(err))
 	}
+}
+
+func tooLarge(err error) bool {
+	var mb *http.MaxBytesError
+	return errors.As(err, &mb)
+}
+
+func writeTooLarge(w http.ResponseWriter) {
+	httpx.WriteError(w, http.StatusRequestEntityTooLarge, "too_large", "The request body is too large.")
 }
 
 // validationMessage keeps the first line of the validator's message, which names the field and

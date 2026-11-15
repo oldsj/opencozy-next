@@ -41,3 +41,41 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | 
 {{- printf "%s-secrets" (include "app.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Database env for a container. The owner URL (database.urlKey) migrates. With
+database.runtime.role, serving uses the runtime role's URL and migrations grant it row access.
+Args: root, ca (the CA Secret name or ""), serve (true for the app container).
+*/}}
+{{- define "app.dbEnv" -}}
+{{- $v := .root.Values.database -}}
+{{- if $v.runtime.role }}
+- name: DATABASE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ required "database.runtime.existingSecret is required with database.runtime.role" $v.runtime.existingSecret | quote }}
+      key: {{ $v.runtime.urlKey | quote }}
+- name: DATABASE_RUNTIME_ROLE
+  value: {{ $v.runtime.role | quote }}
+{{- if not .serve }}
+- name: MIGRATION_DATABASE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "app.dbSecret" .root | quote }}
+      key: {{ $v.urlKey | quote }}
+{{- end }}
+{{- else }}
+- name: DATABASE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "app.dbSecret" .root | quote }}
+      key: {{ $v.urlKey | quote }}
+{{- end }}
+{{- if .ca }}
+# pgx reads these libpq variables: TLS, with the server's certificate and name checked.
+- name: PGSSLMODE
+  value: verify-full
+- name: PGSSLROOTCERT
+  value: /etc/db-ca/ca.crt
+{{- end }}
+{{- end -}}

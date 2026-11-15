@@ -84,9 +84,6 @@
             "error"
           ]
         },
-        "allowSignup": {
-          "type": "boolean"
-        },
         "sessionTTL": {
           "type": "string",
           "pattern": "^[0-9]+(h|m)$"
@@ -145,6 +142,22 @@
         },
         "caSecret": {
           "type": "string"
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "type": "string"
+            },
+            "existingSecret": {
+              "type": "string"
+            },
+            "urlKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },

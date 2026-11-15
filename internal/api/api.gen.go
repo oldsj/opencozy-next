@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -22,6 +23,68 @@ import (
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for CredentialKind.
+const (
+	CredentialKindAssistant CredentialKind = "assistant"
+	CredentialKindService   CredentialKind = "service"
+)
+
+// Valid indicates whether the value is a known member of the CredentialKind enum.
+func (e CredentialKind) Valid() bool {
+	switch e {
+	case CredentialKindAssistant:
+		return true
+	case CredentialKindService:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateCredentialJSONBodyKind.
+const (
+	CreateCredentialJSONBodyKindAssistant CreateCredentialJSONBodyKind = "assistant"
+	CreateCredentialJSONBodyKindService   CreateCredentialJSONBodyKind = "service"
+)
+
+// Valid indicates whether the value is a known member of the CreateCredentialJSONBodyKind enum.
+func (e CreateCredentialJSONBodyKind) Valid() bool {
+	switch e {
+	case CreateCredentialJSONBodyKindAssistant:
+		return true
+	case CreateCredentialJSONBodyKindService:
+		return true
+	default:
+		return false
+	}
+}
+
+// Child defines model for Child.
+type Child struct {
+	Archived bool   `json:"archived"`
+	Id       Id     `json:"id"`
+	Name     string `json:"name"`
+	Version  int    `json:"version"`
+}
+
+// ChildName defines model for ChildName.
+type ChildName = string
+
+// Credential defines model for Credential.
+type Credential struct {
+	AllChildren bool           `json:"allChildren"`
+	ChildIds    []Id           `json:"childIds"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	ExpiresAt   *time.Time     `json:"expiresAt,omitempty"`
+	Id          Id             `json:"id"`
+	Kind        CredentialKind `json:"kind"`
+	Name        string         `json:"name"`
+	Scopes      []string       `json:"scopes"`
+}
+
+// CredentialKind defines model for Credential.Kind.
+type CredentialKind string
 
 // Credentials defines model for Credentials.
 type Credentials struct {
@@ -45,26 +108,32 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
-// Note defines model for Note.
-type Note struct {
-	Body      string             `json:"body"`
-	CreatedAt time.Time          `json:"createdAt"`
-	Id        openapi_types.UUID `json:"id"`
-	Title     string             `json:"title"`
-	UpdatedAt time.Time          `json:"updatedAt"`
+// Household defines model for Household.
+type Household struct {
+	Id   Id     `json:"id"`
+	Name string `json:"name"`
+
+	// TimeZone IANA zone name; the household day follows it
+	//
+	// Examples: Europe/Amsterdam
+	TimeZone string `json:"timeZone"`
 }
 
-// NoteInput defines model for NoteInput.
-type NoteInput struct {
-	Body  string `json:"body"`
-	Title string `json:"title"`
+// Id defines model for Id.
+type Id = openapi_types.UUID
+
+// Me defines model for Me.
+type Me struct {
+	Adult struct {
+		Email string `json:"email"`
+		Id    Id     `json:"id"`
+		Name  string `json:"name"`
+	} `json:"adult"`
+	Household Household `json:"household"`
 }
 
-// User defines model for User.
-type User struct {
-	Email string             `json:"email"`
-	Id    openapi_types.UUID `json:"id"`
-}
+// IdempotencyKey defines model for IdempotencyKey.
+type IdempotencyKey = string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
@@ -78,50 +147,136 @@ type Forbidden = Error
 // NotFound defines model for NotFound.
 type NotFound = Error
 
+// TooLarge defines model for TooLarge.
+type TooLarge = Error
+
 // TooManyRequests defines model for TooManyRequests.
 type TooManyRequests = Error
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// UnprocessableEntity defines model for UnprocessableEntity.
+type UnprocessableEntity = Error
+
+// ConfirmSignInJSONBody defines parameters for ConfirmSignIn.
+type ConfirmSignInJSONBody struct {
+	Password string `json:"password"`
+}
+
+// ListChildrenParams defines parameters for ListChildren.
+type ListChildrenParams struct {
+	IncludeArchived *bool `form:"includeArchived,omitempty" json:"includeArchived,omitempty"`
+}
+
+// CreateChildJSONBody defines parameters for CreateChild.
+type CreateChildJSONBody struct {
+	Name ChildName `json:"name"`
+}
+
+// CreateChildParams defines parameters for CreateChild.
+type CreateChildParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateChildJSONBody defines parameters for UpdateChild.
+type UpdateChildJSONBody struct {
+	Archived        bool      `json:"archived"`
+	ExpectedVersion int       `json:"expectedVersion"`
+	Name            ChildName `json:"name"`
+}
+
+// UpdateChildParams defines parameters for UpdateChild.
+type UpdateChildParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateCredentialJSONBody defines parameters for CreateCredential.
+type CreateCredentialJSONBody struct {
+	AllChildren *bool                        `json:"allChildren,omitempty"`
+	ChildIds    *[]Id                        `json:"childIds,omitempty"`
+	Kind        CreateCredentialJSONBodyKind `json:"kind"`
+	Name        string                       `json:"name"`
+	Scopes      []string                     `json:"scopes"`
+}
+
+// CreateCredentialParams defines parameters for CreateCredential.
+type CreateCredentialParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateCredentialJSONBodyKind defines parameters for CreateCredential.
+type CreateCredentialJSONBodyKind string
+
+// RevokeCredentialParams defines parameters for RevokeCredential.
+type RevokeCredentialParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ConfirmSignInJSONRequestBody defines body for ConfirmSignIn for application/json ContentType.
+type ConfirmSignInJSONRequestBody ConfirmSignInJSONBody
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = Credentials
 
-// SignupJSONRequestBody defines body for Signup for application/json ContentType.
-type SignupJSONRequestBody = Credentials
+// CreateChildJSONRequestBody defines body for CreateChild for application/json ContentType.
+type CreateChildJSONRequestBody CreateChildJSONBody
 
-// CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
-type CreateNoteJSONRequestBody = NoteInput
+// UpdateChildJSONRequestBody defines body for UpdateChild for application/json ContentType.
+type UpdateChildJSONRequestBody UpdateChildJSONBody
 
-// UpdateNoteJSONRequestBody defines body for UpdateNote for application/json ContentType.
-type UpdateNoteJSONRequestBody = NoteInput
+// CreateCredentialJSONRequestBody defines body for CreateCredential for application/json ContentType.
+type CreateCredentialJSONRequestBody CreateCredentialJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Login Sign in
+	// ConfirmSignIn Enter the password again, for operations that need a recent sign-in
+	// (POST /auth/confirm)
+	ConfirmSignIn(w http.ResponseWriter, r *http.Request)
+	// Login Sign in with email and password
 	// (POST /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
 	// Logout Sign out and end the session
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
-	// GetMe The signed-in user
+	// GetMe The signed-in adult and their household
 	// (GET /auth/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
-	// Signup Create an account and sign in
-	// (POST /auth/signup)
-	Signup(w http.ResponseWriter, r *http.Request)
-	// ListNotes List notes, newest first
-	// (GET /notes)
-	ListNotes(w http.ResponseWriter, r *http.Request)
-	// CreateNote Create a note
-	// (POST /notes)
-	CreateNote(w http.ResponseWriter, r *http.Request)
-	// DeleteNote Delete a note
-	// (DELETE /notes/{noteId})
-	DeleteNote(w http.ResponseWriter, r *http.Request, noteId openapi_types.UUID)
-	// UpdateNote Replace a note's title and body
-	// (PUT /notes/{noteId})
-	UpdateNote(w http.ResponseWriter, r *http.Request, noteId openapi_types.UUID)
+	// ListChildren The children the caller may act for
+	// (GET /children)
+	ListChildren(w http.ResponseWriter, r *http.Request, params ListChildrenParams)
+	// CreateChild Add a child
+	// (POST /children)
+	CreateChild(w http.ResponseWriter, r *http.Request, params CreateChildParams)
+	// GetChild One child
+	// (GET /children/{childId})
+	GetChild(w http.ResponseWriter, r *http.Request, childId Id)
+	// UpdateChild Rename a child, or archive or restore them
+	// (PATCH /children/{childId})
+	UpdateChild(w http.ResponseWriter, r *http.Request, childId Id, params UpdateChildParams)
+	// GetOwnCredential The calling service or assistant credential
+	// (GET /credential)
+	GetOwnCredential(w http.ResponseWriter, r *http.Request)
+	// ListCredentials The household's live service and assistant credentials
+	// (GET /credentials)
+	ListCredentials(w http.ResponseWriter, r *http.Request)
+	// CreateCredential Issue a service or assistant credential
+	// (POST /credentials)
+	CreateCredential(w http.ResponseWriter, r *http.Request, params CreateCredentialParams)
+	// RevokeCredential Revoke a credential; it stops working at once
+	// (DELETE /credentials/{credentialId})
+	RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id, params RevokeCredentialParams)
+	// GetHousehold The caller's household
+	// (GET /household)
+	GetHousehold(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -132,6 +287,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ConfirmSignIn operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmSignIn(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmSignIn(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
@@ -175,65 +344,30 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
-// Signup operation middleware
-func (siw *ServerInterfaceWrapper) Signup(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Signup(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListNotes operation middleware
-func (siw *ServerInterfaceWrapper) ListNotes(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListNotes(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateNote operation middleware
-func (siw *ServerInterfaceWrapper) CreateNote(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateNote(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteNote operation middleware
-func (siw *ServerInterfaceWrapper) DeleteNote(w http.ResponseWriter, r *http.Request) {
+// ListChildren operation middleware
+func (siw *ServerInterfaceWrapper) ListChildren(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
-	// ------------- Path parameter "noteId" -------------
-	var noteId openapi_types.UUID
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListChildrenParams
 
-	err = runtime.BindStyledParameterWithOptions("simple", "noteId", r.PathValue("noteId"), &noteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	// ------------- Optional query parameter "includeArchived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "includeArchived", r.URL.Query(), &params.IncludeArchived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "noteId", Err: err})
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "includeArchived"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "includeArchived", Err: err})
+		}
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteNote(w, r, noteId)
+		siw.Handler.ListChildren(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -243,23 +377,263 @@ func (siw *ServerInterfaceWrapper) DeleteNote(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateNote operation middleware
-func (siw *ServerInterfaceWrapper) UpdateNote(w http.ResponseWriter, r *http.Request) {
+// CreateChild operation middleware
+func (siw *ServerInterfaceWrapper) CreateChild(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
-	// ------------- Path parameter "noteId" -------------
-	var noteId openapi_types.UUID
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateChildParams
 
-	err = runtime.BindStyledParameterWithOptions("simple", "noteId", r.PathValue("noteId"), &noteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "noteId", Err: err})
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateNote(w, r, noteId)
+		siw.Handler.CreateChild(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChild operation middleware
+func (siw *ServerInterfaceWrapper) GetChild(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "childId" -------------
+	var childId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childId", r.PathValue("childId"), &childId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChild(w, r, childId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateChild operation middleware
+func (siw *ServerInterfaceWrapper) UpdateChild(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "childId" -------------
+	var childId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childId", r.PathValue("childId"), &childId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateChildParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateChild(w, r, childId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOwnCredential operation middleware
+func (siw *ServerInterfaceWrapper) GetOwnCredential(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOwnCredential(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCredentials operation middleware
+func (siw *ServerInterfaceWrapper) ListCredentials(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCredentials(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCredential operation middleware
+func (siw *ServerInterfaceWrapper) CreateCredential(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateCredentialParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCredential(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeCredential operation middleware
+func (siw *ServerInterfaceWrapper) RevokeCredential(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "credentialId" -------------
+	var credentialId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "credentialId", r.PathValue("credentialId"), &credentialId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "credentialId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeCredentialParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeCredential(w, r, credentialId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetHousehold operation middleware
+func (siw *ServerInterfaceWrapper) GetHousehold(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetHousehold(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -389,14 +763,19 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/signup", wrapper.Signup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/login", wrapper.Login)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/me", wrapper.GetMe)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/notes", wrapper.ListNotes)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/notes", wrapper.CreateNote)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/notes/{noteId}", wrapper.DeleteNote)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/notes/{noteId}", wrapper.UpdateNote)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/confirm", wrapper.ConfirmSignIn)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/household", wrapper.GetHousehold)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/children", wrapper.ListChildren)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/children", wrapper.CreateChild)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/children/{childId}", wrapper.GetChild)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/children/{childId}", wrapper.UpdateChild)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/credentials", wrapper.ListCredentials)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/credentials", wrapper.CreateCredential)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/credentials/{credentialId}", wrapper.RevokeCredential)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/credential", wrapper.GetOwnCredential)
 
 	return m
 }
@@ -411,9 +790,102 @@ type ForbiddenJSONResponse Error
 
 type NotFoundJSONResponse Error
 
+type TooLargeJSONResponse Error
+
 type TooManyRequestsJSONResponse Error
 
 type UnauthorizedJSONResponse Error
+
+type UnprocessableEntityJSONResponse Error
+
+type ConfirmSignInRequestObject struct {
+	Body *ConfirmSignInJSONRequestBody
+}
+
+type ConfirmSignInResponseObject interface {
+	VisitConfirmSignInResponse(w http.ResponseWriter) error
+}
+
+type ConfirmSignIn204Response struct {
+}
+
+func (response ConfirmSignIn204Response) VisitConfirmSignInResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ConfirmSignIn400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ConfirmSignIn400JSONResponse) VisitConfirmSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmSignIn401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ConfirmSignIn401JSONResponse) VisitConfirmSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmSignIn403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ConfirmSignIn403JSONResponse) VisitConfirmSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmSignIn429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response ConfirmSignIn429JSONResponse) VisitConfirmSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmSignIndefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ConfirmSignIndefaultJSONResponse) VisitConfirmSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
@@ -428,7 +900,7 @@ type Login200ResponseHeaders struct {
 }
 
 type Login200JSONResponse struct {
-	Body    User
+	Body    Me
 	Headers Login200ResponseHeaders
 }
 
@@ -471,6 +943,20 @@ func (response Login401JSONResponse) VisitLoginResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response Login413JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -567,7 +1053,7 @@ type GetMeResponseObject interface {
 	VisitGetMeResponse(w http.ResponseWriter) error
 }
 
-type GetMe200JSONResponse User
+type GetMe200JSONResponse Me
 
 func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
 
@@ -595,6 +1081,20 @@ func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	return err
 }
 
+type GetMe403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetMe403JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMedefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
@@ -612,41 +1112,33 @@ func (response GetMedefaultJSONResponse) VisitGetMeResponse(w http.ResponseWrite
 	return err
 }
 
-type SignupRequestObject struct {
-	Body *SignupJSONRequestBody
+type ListChildrenRequestObject struct {
+	Params ListChildrenParams
 }
 
-type SignupResponseObject interface {
-	VisitSignupResponse(w http.ResponseWriter) error
+type ListChildrenResponseObject interface {
+	VisitListChildrenResponse(w http.ResponseWriter) error
 }
 
-type Signup201ResponseHeaders struct {
-	SetCookie *string
+type ListChildren200JSONResponse struct {
+	Items []Child `json:"items"`
 }
 
-type Signup201JSONResponse struct {
-	Body    User
-	Headers Signup201ResponseHeaders
-}
-
-func (response Signup201JSONResponse) VisitSignupResponse(w http.ResponseWriter) error {
+func (response ListChildren200JSONResponse) VisitListChildrenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if response.Headers.SetCookie != nil {
-		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
-	}
-	w.WriteHeader(201)
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
 
-type Signup400JSONResponse struct{ BadRequestJSONResponse }
+type ListChildren400JSONResponse struct{ BadRequestJSONResponse }
 
-func (response Signup400JSONResponse) VisitSignupResponse(w http.ResponseWriter) error {
+func (response ListChildren400JSONResponse) VisitListChildrenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -658,9 +1150,23 @@ func (response Signup400JSONResponse) VisitSignupResponse(w http.ResponseWriter)
 	return err
 }
 
-type Signup403JSONResponse struct{ ForbiddenJSONResponse }
+type ListChildren401JSONResponse struct{ UnauthorizedJSONResponse }
 
-func (response Signup403JSONResponse) VisitSignupResponse(w http.ResponseWriter) error {
+func (response ListChildren401JSONResponse) VisitListChildrenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChildren403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListChildren403JSONResponse) VisitListChildrenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -672,40 +1178,12 @@ func (response Signup403JSONResponse) VisitSignupResponse(w http.ResponseWriter)
 	return err
 }
 
-type Signup409JSONResponse struct{ ConflictJSONResponse }
-
-func (response Signup409JSONResponse) VisitSignupResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type Signup429JSONResponse struct{ TooManyRequestsJSONResponse }
-
-func (response Signup429JSONResponse) VisitSignupResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SignupdefaultJSONResponse struct {
+type ListChildrendefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response SignupdefaultJSONResponse) VisitSignupResponse(w http.ResponseWriter) error {
+func (response ListChildrendefaultJSONResponse) VisitListChildrenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -717,71 +1195,18 @@ func (response SignupdefaultJSONResponse) VisitSignupResponse(w http.ResponseWri
 	return err
 }
 
-type ListNotesRequestObject struct {
+type CreateChildRequestObject struct {
+	Params CreateChildParams
+	Body   *CreateChildJSONRequestBody
 }
 
-type ListNotesResponseObject interface {
-	VisitListNotesResponse(w http.ResponseWriter) error
+type CreateChildResponseObject interface {
+	VisitCreateChildResponse(w http.ResponseWriter) error
 }
 
-type ListNotes200JSONResponse struct {
-	Items []Note `json:"items"`
-}
+type CreateChild201JSONResponse Child
 
-func (response ListNotes200JSONResponse) VisitListNotesResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListNotes401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response ListNotes401JSONResponse) VisitListNotesResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListNotesdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response ListNotesdefaultJSONResponse) VisitListNotesResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateNoteRequestObject struct {
-	Body *CreateNoteJSONRequestBody
-}
-
-type CreateNoteResponseObject interface {
-	VisitCreateNoteResponse(w http.ResponseWriter) error
-}
-
-type CreateNote201JSONResponse Note
-
-func (response CreateNote201JSONResponse) VisitCreateNoteResponse(w http.ResponseWriter) error {
+func (response CreateChild201JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -793,9 +1218,9 @@ func (response CreateNote201JSONResponse) VisitCreateNoteResponse(w http.Respons
 	return err
 }
 
-type CreateNote400JSONResponse struct{ BadRequestJSONResponse }
+type CreateChild400JSONResponse struct{ BadRequestJSONResponse }
 
-func (response CreateNote400JSONResponse) VisitCreateNoteResponse(w http.ResponseWriter) error {
+func (response CreateChild400JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -807,56 +1232,9 @@ func (response CreateNote400JSONResponse) VisitCreateNoteResponse(w http.Respons
 	return err
 }
 
-type CreateNote401JSONResponse struct{ UnauthorizedJSONResponse }
+type CreateChild401JSONResponse struct{ UnauthorizedJSONResponse }
 
-func (response CreateNote401JSONResponse) VisitCreateNoteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type CreateNotedefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response CreateNotedefaultJSONResponse) VisitCreateNoteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteNoteRequestObject struct {
-	NoteId openapi_types.UUID `json:"noteId"`
-}
-
-type DeleteNoteResponseObject interface {
-	VisitDeleteNoteResponse(w http.ResponseWriter) error
-}
-
-type DeleteNote204Response struct {
-}
-
-func (response DeleteNote204Response) VisitDeleteNoteResponse(w http.ResponseWriter) error {
-	w.WriteHeader(204)
-	return nil
-}
-
-type DeleteNote401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response DeleteNote401JSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+func (response CreateChild401JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -868,26 +1246,56 @@ func (response DeleteNote401JSONResponse) VisitDeleteNoteResponse(w http.Respons
 	return err
 }
 
-type DeleteNote404JSONResponse struct{ NotFoundJSONResponse }
+type CreateChild403JSONResponse struct{ ForbiddenJSONResponse }
 
-func (response DeleteNote404JSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+func (response CreateChild403JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
 
-type DeleteNotedefaultJSONResponse struct {
+type CreateChild409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateChild409JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChild422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateChild422JSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChilddefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteNotedefaultJSONResponse) VisitDeleteNoteResponse(w http.ResponseWriter) error {
+func (response CreateChilddefaultJSONResponse) VisitCreateChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -899,18 +1307,17 @@ func (response DeleteNotedefaultJSONResponse) VisitDeleteNoteResponse(w http.Res
 	return err
 }
 
-type UpdateNoteRequestObject struct {
-	NoteId openapi_types.UUID `json:"noteId"`
-	Body   *UpdateNoteJSONRequestBody
+type GetChildRequestObject struct {
+	ChildId Id `json:"childId"`
 }
 
-type UpdateNoteResponseObject interface {
-	VisitUpdateNoteResponse(w http.ResponseWriter) error
+type GetChildResponseObject interface {
+	VisitGetChildResponse(w http.ResponseWriter) error
 }
 
-type UpdateNote200JSONResponse Note
+type GetChild200JSONResponse Child
 
-func (response UpdateNote200JSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+func (response GetChild200JSONResponse) VisitGetChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -922,23 +1329,9 @@ func (response UpdateNote200JSONResponse) VisitUpdateNoteResponse(w http.Respons
 	return err
 }
 
-type UpdateNote400JSONResponse struct{ BadRequestJSONResponse }
+type GetChild401JSONResponse struct{ UnauthorizedJSONResponse }
 
-func (response UpdateNote400JSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpdateNote401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response UpdateNote401JSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+func (response GetChild401JSONResponse) VisitGetChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -950,9 +1343,23 @@ func (response UpdateNote401JSONResponse) VisitUpdateNoteResponse(w http.Respons
 	return err
 }
 
-type UpdateNote404JSONResponse struct{ NotFoundJSONResponse }
+type GetChild403JSONResponse struct{ ForbiddenJSONResponse }
 
-func (response UpdateNote404JSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+func (response GetChild403JSONResponse) VisitGetChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChild404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetChild404JSONResponse) VisitGetChildResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -964,12 +1371,548 @@ func (response UpdateNote404JSONResponse) VisitUpdateNoteResponse(w http.Respons
 	return err
 }
 
-type UpdateNotedefaultJSONResponse struct {
+type GetChilddefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response UpdateNotedefaultJSONResponse) VisitUpdateNoteResponse(w http.ResponseWriter) error {
+func (response GetChilddefaultJSONResponse) VisitGetChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChildRequestObject struct {
+	ChildId Id `json:"childId"`
+	Params  UpdateChildParams
+	Body    *UpdateChildJSONRequestBody
+}
+
+type UpdateChildResponseObject interface {
+	VisitUpdateChildResponse(w http.ResponseWriter) error
+}
+
+type UpdateChild200JSONResponse Child
+
+func (response UpdateChild200JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateChild400JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateChild401JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateChild403JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateChild404JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateChild409JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChild422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response UpdateChild422JSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChilddefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateChilddefaultJSONResponse) VisitUpdateChildResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOwnCredentialRequestObject struct {
+}
+
+type GetOwnCredentialResponseObject interface {
+	VisitGetOwnCredentialResponse(w http.ResponseWriter) error
+}
+
+type GetOwnCredential200JSONResponse Credential
+
+func (response GetOwnCredential200JSONResponse) VisitGetOwnCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOwnCredential401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetOwnCredential401JSONResponse) VisitGetOwnCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOwnCredential403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetOwnCredential403JSONResponse) VisitGetOwnCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOwnCredentialdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetOwnCredentialdefaultJSONResponse) VisitGetOwnCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCredentialsRequestObject struct {
+}
+
+type ListCredentialsResponseObject interface {
+	VisitListCredentialsResponse(w http.ResponseWriter) error
+}
+
+type ListCredentials200JSONResponse struct {
+	Items []Credential `json:"items"`
+}
+
+func (response ListCredentials200JSONResponse) VisitListCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCredentials401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListCredentials401JSONResponse) VisitListCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCredentials403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListCredentials403JSONResponse) VisitListCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCredentialsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListCredentialsdefaultJSONResponse) VisitListCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredentialRequestObject struct {
+	Params CreateCredentialParams
+	Body   *CreateCredentialJSONRequestBody
+}
+
+type CreateCredentialResponseObject interface {
+	VisitCreateCredentialResponse(w http.ResponseWriter) error
+}
+
+type CreateCredential201JSONResponse struct {
+	Credential Credential `json:"credential"`
+
+	// Secret Shown once
+	Secret string `json:"secret"`
+}
+
+func (response CreateCredential201JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredential400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateCredential400JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredential401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateCredential401JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredential403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateCredential403JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredential409JSONResponse Error
+
+func (response CreateCredential409JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredential422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateCredential422JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCredentialdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateCredentialdefaultJSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeCredentialRequestObject struct {
+	CredentialId Id `json:"credentialId"`
+	Params       RevokeCredentialParams
+}
+
+type RevokeCredentialResponseObject interface {
+	VisitRevokeCredentialResponse(w http.ResponseWriter) error
+}
+
+type RevokeCredential204Response struct {
+}
+
+func (response RevokeCredential204Response) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeCredential401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RevokeCredential401JSONResponse) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeCredential403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RevokeCredential403JSONResponse) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeCredential404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RevokeCredential404JSONResponse) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeCredential422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RevokeCredential422JSONResponse) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeCredentialdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RevokeCredentialdefaultJSONResponse) VisitRevokeCredentialResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHouseholdRequestObject struct {
+}
+
+type GetHouseholdResponseObject interface {
+	VisitGetHouseholdResponse(w http.ResponseWriter) error
+}
+
+type GetHousehold200JSONResponse Household
+
+func (response GetHousehold200JSONResponse) VisitGetHouseholdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHousehold401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetHousehold401JSONResponse) VisitGetHouseholdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHousehold403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetHousehold403JSONResponse) VisitGetHouseholdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHouseholddefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetHouseholddefaultJSONResponse) VisitGetHouseholdResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -983,30 +1926,45 @@ func (response UpdateNotedefaultJSONResponse) VisitUpdateNoteResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// Login Sign in
+	// ConfirmSignIn Enter the password again, for operations that need a recent sign-in
+	// (POST /auth/confirm)
+	ConfirmSignIn(ctx context.Context, request ConfirmSignInRequestObject) (ConfirmSignInResponseObject, error)
+	// Login Sign in with email and password
 	// (POST /auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
 	// Logout Sign out and end the session
 	// (POST /auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
-	// GetMe The signed-in user
+	// GetMe The signed-in adult and their household
 	// (GET /auth/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
-	// Signup Create an account and sign in
-	// (POST /auth/signup)
-	Signup(ctx context.Context, request SignupRequestObject) (SignupResponseObject, error)
-	// ListNotes List notes, newest first
-	// (GET /notes)
-	ListNotes(ctx context.Context, request ListNotesRequestObject) (ListNotesResponseObject, error)
-	// CreateNote Create a note
-	// (POST /notes)
-	CreateNote(ctx context.Context, request CreateNoteRequestObject) (CreateNoteResponseObject, error)
-	// DeleteNote Delete a note
-	// (DELETE /notes/{noteId})
-	DeleteNote(ctx context.Context, request DeleteNoteRequestObject) (DeleteNoteResponseObject, error)
-	// UpdateNote Replace a note's title and body
-	// (PUT /notes/{noteId})
-	UpdateNote(ctx context.Context, request UpdateNoteRequestObject) (UpdateNoteResponseObject, error)
+	// ListChildren The children the caller may act for
+	// (GET /children)
+	ListChildren(ctx context.Context, request ListChildrenRequestObject) (ListChildrenResponseObject, error)
+	// CreateChild Add a child
+	// (POST /children)
+	CreateChild(ctx context.Context, request CreateChildRequestObject) (CreateChildResponseObject, error)
+	// GetChild One child
+	// (GET /children/{childId})
+	GetChild(ctx context.Context, request GetChildRequestObject) (GetChildResponseObject, error)
+	// UpdateChild Rename a child, or archive or restore them
+	// (PATCH /children/{childId})
+	UpdateChild(ctx context.Context, request UpdateChildRequestObject) (UpdateChildResponseObject, error)
+	// GetOwnCredential The calling service or assistant credential
+	// (GET /credential)
+	GetOwnCredential(ctx context.Context, request GetOwnCredentialRequestObject) (GetOwnCredentialResponseObject, error)
+	// ListCredentials The household's live service and assistant credentials
+	// (GET /credentials)
+	ListCredentials(ctx context.Context, request ListCredentialsRequestObject) (ListCredentialsResponseObject, error)
+	// CreateCredential Issue a service or assistant credential
+	// (POST /credentials)
+	CreateCredential(ctx context.Context, request CreateCredentialRequestObject) (CreateCredentialResponseObject, error)
+	// RevokeCredential Revoke a credential; it stops working at once
+	// (DELETE /credentials/{credentialId})
+	RevokeCredential(ctx context.Context, request RevokeCredentialRequestObject) (RevokeCredentialResponseObject, error)
+	// GetHousehold The caller's household
+	// (GET /household)
+	GetHousehold(ctx context.Context, request GetHouseholdRequestObject) (GetHouseholdResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1046,6 +2004,37 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ConfirmSignIn operation middleware
+func (sh *strictHandler) ConfirmSignIn(w http.ResponseWriter, r *http.Request) {
+	var request ConfirmSignInRequestObject
+
+	var body ConfirmSignInJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmSignIn(ctx, request.(ConfirmSignInRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmSignIn")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmSignInResponseObject); ok {
+		if err := validResponse.VisitConfirmSignInResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Login operation middleware
@@ -1127,11 +2116,39 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Signup operation middleware
-func (sh *strictHandler) Signup(w http.ResponseWriter, r *http.Request) {
-	var request SignupRequestObject
+// ListChildren operation middleware
+func (sh *strictHandler) ListChildren(w http.ResponseWriter, r *http.Request, params ListChildrenParams) {
+	var request ListChildrenRequestObject
 
-	var body SignupJSONRequestBody
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListChildren(ctx, request.(ListChildrenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListChildren")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListChildrenResponseObject); ok {
+		if err := validResponse.VisitListChildrenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateChild operation middleware
+func (sh *strictHandler) CreateChild(w http.ResponseWriter, r *http.Request, params CreateChildParams) {
+	var request CreateChildRequestObject
+
+	request.Params = params
+
+	var body CreateChildJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -1139,18 +2156,18 @@ func (sh *strictHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.Signup(ctx, request.(SignupRequestObject))
+		return sh.ssi.CreateChild(ctx, request.(CreateChildRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "Signup")
+		handler = middleware(handler, "CreateChild")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SignupResponseObject); ok {
-		if err := validResponse.VisitSignupResponse(w); err != nil {
+	} else if validResponse, ok := response.(CreateChildResponseObject); ok {
+		if err := validResponse.VisitCreateChildResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1158,23 +2175,25 @@ func (sh *strictHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListNotes operation middleware
-func (sh *strictHandler) ListNotes(w http.ResponseWriter, r *http.Request) {
-	var request ListNotesRequestObject
+// GetChild operation middleware
+func (sh *strictHandler) GetChild(w http.ResponseWriter, r *http.Request, childId Id) {
+	var request GetChildRequestObject
+
+	request.ChildId = childId
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListNotes(ctx, request.(ListNotesRequestObject))
+		return sh.ssi.GetChild(ctx, request.(GetChildRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListNotes")
+		handler = middleware(handler, "GetChild")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListNotesResponseObject); ok {
-		if err := validResponse.VisitListNotesResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetChildResponseObject); ok {
+		if err := validResponse.VisitGetChildResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1182,11 +2201,14 @@ func (sh *strictHandler) ListNotes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// CreateNote operation middleware
-func (sh *strictHandler) CreateNote(w http.ResponseWriter, r *http.Request) {
-	var request CreateNoteRequestObject
+// UpdateChild operation middleware
+func (sh *strictHandler) UpdateChild(w http.ResponseWriter, r *http.Request, childId Id, params UpdateChildParams) {
+	var request UpdateChildRequestObject
 
-	var body CreateNoteJSONRequestBody
+	request.ChildId = childId
+	request.Params = params
+
+	var body UpdateChildJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -1194,18 +2216,18 @@ func (sh *strictHandler) CreateNote(w http.ResponseWriter, r *http.Request) {
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateNote(ctx, request.(CreateNoteRequestObject))
+		return sh.ssi.UpdateChild(ctx, request.(UpdateChildRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateNote")
+		handler = middleware(handler, "UpdateChild")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateNoteResponseObject); ok {
-		if err := validResponse.VisitCreateNoteResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateChildResponseObject); ok {
+		if err := validResponse.VisitUpdateChildResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1213,25 +2235,23 @@ func (sh *strictHandler) CreateNote(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// DeleteNote operation middleware
-func (sh *strictHandler) DeleteNote(w http.ResponseWriter, r *http.Request, noteId openapi_types.UUID) {
-	var request DeleteNoteRequestObject
-
-	request.NoteId = noteId
+// GetOwnCredential operation middleware
+func (sh *strictHandler) GetOwnCredential(w http.ResponseWriter, r *http.Request) {
+	var request GetOwnCredentialRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteNote(ctx, request.(DeleteNoteRequestObject))
+		return sh.ssi.GetOwnCredential(ctx, request.(GetOwnCredentialRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteNote")
+		handler = middleware(handler, "GetOwnCredential")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteNoteResponseObject); ok {
-		if err := validResponse.VisitDeleteNoteResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetOwnCredentialResponseObject); ok {
+		if err := validResponse.VisitGetOwnCredentialResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1239,13 +2259,37 @@ func (sh *strictHandler) DeleteNote(w http.ResponseWriter, r *http.Request, note
 	}
 }
 
-// UpdateNote operation middleware
-func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, noteId openapi_types.UUID) {
-	var request UpdateNoteRequestObject
+// ListCredentials operation middleware
+func (sh *strictHandler) ListCredentials(w http.ResponseWriter, r *http.Request) {
+	var request ListCredentialsRequestObject
 
-	request.NoteId = noteId
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCredentials(ctx, request.(ListCredentialsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCredentials")
+	}
 
-	var body UpdateNoteJSONRequestBody
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCredentialsResponseObject); ok {
+		if err := validResponse.VisitListCredentialsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCredential operation middleware
+func (sh *strictHandler) CreateCredential(w http.ResponseWriter, r *http.Request, params CreateCredentialParams) {
+	var request CreateCredentialRequestObject
+
+	request.Params = params
+
+	var body CreateCredentialJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -1253,18 +2297,69 @@ func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, note
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateNote(ctx, request.(UpdateNoteRequestObject))
+		return sh.ssi.CreateCredential(ctx, request.(CreateCredentialRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateNote")
+		handler = middleware(handler, "CreateCredential")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateNoteResponseObject); ok {
-		if err := validResponse.VisitUpdateNoteResponse(w); err != nil {
+	} else if validResponse, ok := response.(CreateCredentialResponseObject); ok {
+		if err := validResponse.VisitCreateCredentialResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeCredential operation middleware
+func (sh *strictHandler) RevokeCredential(w http.ResponseWriter, r *http.Request, credentialId Id, params RevokeCredentialParams) {
+	var request RevokeCredentialRequestObject
+
+	request.CredentialId = credentialId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeCredential(ctx, request.(RevokeCredentialRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeCredential")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeCredentialResponseObject); ok {
+		if err := validResponse.VisitRevokeCredentialResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetHousehold operation middleware
+func (sh *strictHandler) GetHousehold(w http.ResponseWriter, r *http.Request) {
+	var request GetHouseholdRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetHousehold(ctx, request.(GetHouseholdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetHousehold")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetHouseholdResponseObject); ok {
+		if err := validResponse.VisitGetHouseholdResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1277,34 +2372,59 @@ func (sh *strictHandler) UpdateNote(w http.ResponseWriter, r *http.Request, note
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

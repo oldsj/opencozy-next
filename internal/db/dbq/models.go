@@ -10,25 +10,91 @@ import (
 	"github.com/google/uuid"
 )
 
-type Note struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Title     string
-	Body      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+type Adult struct {
+	ID                 uuid.UUID
+	HouseholdID        uuid.UUID
+	Email              string
+	Name               string
+	PasswordHash       *string
+	PasswordScheme     *string
+	WebauthnUserHandle []byte
+	RemovedAt          *time.Time
+	CreatedAt          time.Time
 }
 
-type Session struct {
-	TokenHash []byte
-	UserID    uuid.UUID
-	CreatedAt time.Time
-	ExpiresAt time.Time
+type AdultSession struct {
+	TokenHash       []byte
+	AdultID         uuid.UUID
+	AuthenticatedAt time.Time
+	CreatedAt       time.Time
+	ExpiresAt       time.Time
 }
 
-type User struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-	CreatedAt    time.Time
+type Child struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Name        string
+	ArchivedAt  *time.Time
+	Version     int32
+	CreatedAt   time.Time
+}
+
+type CommandLog struct {
+	HouseholdID    uuid.UUID
+	IdempotencyKey string
+	RequestHash    []byte
+	Status         int32
+	ContentType    string
+	Body           []byte
+	CreatedAt      time.Time
+}
+
+type Credential struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Kind        string
+	Name        string
+	TokenHash   []byte
+	Scopes      []string
+	AllChildren bool
+	AdultID     *uuid.UUID
+	CreatedAt   time.Time
+	ExpiresAt   *time.Time
+	RevokedAt   *time.Time
+}
+
+type CredentialChild struct {
+	HouseholdID  uuid.UUID
+	CredentialID uuid.UUID
+	ChildID      uuid.UUID
+}
+
+type Display struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Name        string
+	Scopes      []string
+	TokenHash   []byte
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	RevokedAt   *time.Time
+}
+
+type Household struct {
+	ID         uuid.UUID
+	Name       string
+	TimeZone   string
+	ArchivedAt *time.Time
+	CreatedAt  time.Time
+}
+
+type PhoneSession struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	AdultID     uuid.UUID
+	Name        string
+	TokenHash   []byte
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	RevokedAt   *time.Time
 }
