@@ -143,6 +143,7 @@ type house struct {
 	reward                            uuid.UUID // costs 3
 	calendar, event                   uuid.UUID // an ICS calendar shown on displays, with one event
 	passkey                           uuid.UUID // the adult's only passkey
+	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
 	actors                            map[string]cred
 }
 
@@ -211,6 +212,8 @@ func (e *env) house(label string, scopes []string) house {
 	series := e.id(`INSERT INTO calendar_series (household_id, source_id, uid, recurring) VALUES ($1, $2, 'picture-day@example.test', false) RETURNING id`, h.id, h.calendar)
 	h.event = e.id(`INSERT INTO calendar_event (household_id, source_id, series_id, recurrence_key, all_day, start_date, end_date, title, status)
 		VALUES ($1, $2, $3, 'single', true, '2026-09-16', '2026-09-17', 'Picture day', 'confirmed') RETURNING id`, h.id, h.calendar, series)
+	h.rule = e.id(`INSERT INTO award_rule (household_id, activity_key, points, daily_limit) VALUES ($1, 'build_house', 5, 20) RETURNING id`, h.id)
+	h.link = e.id(`INSERT INTO learning_link (household_id, child_id, provider, external_id) VALUES ($1, $2, 'minecraft', 'Builder_42') RETURNING id`, h.id, h.child1)
 	h.recipe = e.id(`INSERT INTO recipe (household_id, title, servings) VALUES ($1, 'Soup', 2) RETURNING id`, h.id)
 	h.screen = e.id(`INSERT INTO display (household_id, name, scopes, expires_at)
 		VALUES ($1, 'Spare', '{today}', now() + interval '1 day') RETURNING id`, h.id)
@@ -244,9 +247,13 @@ func (e *env) house(label string, scopes []string) house {
 		}
 		return cred{bearer: tok}, id
 	}
-	h.actors["service-all"], _ = credential("service", scopes, true, nil, "")
+	var withRule [2]uuid.UUID
+	h.actors["service-all"], withRule[0] = credential("service", scopes, true, nil, "")
 	h.actors["service-none"], _ = credential("service", []string{"nothing:needed"}, true, nil, "")
-	h.actors["service-child1"], _ = credential("service", scopes, false, []uuid.UUID{h.child1}, "")
+	h.actors["service-child1"], withRule[1] = credential("service", scopes, false, []uuid.UUID{h.child1}, "")
+	for _, id := range withRule {
+		e.exec(`INSERT INTO credential_award_rule (household_id, credential_id, rule_id) VALUES ($1, $2, $3)`, h.id, id, h.rule)
+	}
 	h.actors["assistant"], _ = credential("assistant", scopes, true, nil, "")
 	h.actors["revoked"], _ = credential("service", scopes, true, nil, "revoked_at = now()")
 	h.actors["expired"], _ = credential("service", scopes, true, nil, "expires_at = now() - interval '1 minute'")

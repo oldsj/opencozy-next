@@ -27,20 +27,21 @@ public struct ShieldContent: Codable, Equatable, Sendable {
 public enum ShieldAsk: String, Codable, Sendable {
     /// Waiting for a parent.
     case pending
-    /// A parent said no (shown for an hour).
+    /// A parent said no (shown for an hour). The server refuses a new ask for 5 minutes.
     case declined
 }
 
-/// Composes the shield subtitle. Pure, so it is unit tested.
+/// Composes the shield subtitle. Pure, so it is unit tested. The words match the kid
+/// view (/kid) in the web app's design system: sentence case, "min", times like 7:30 PM.
 public enum ShieldText {
     /// Shown before the first sync, and whenever the stored message is blank.
-    /// Matches the server default (src/lib/server/household.ts).
+    /// Matches the server's default lock message (GET /api/device `household.lockMessage`).
     public static let defaultMessage = "Earn time on the chore board, then spend your points in OpenCozy."
 
-    /// The lock message, then when screen time opens (while allowed hours are
-    /// closed), then the banked time (while it can be used now), then a
-    /// request for more time. `queued` is a request made on this shield that
-    /// the app has not sent yet; `canOpenApp` whether the shield's button opens it.
+    /// The lock message, then when screen time starts (while allowed hours are
+    /// closed), then either where a request for more time stands or, with none, the
+    /// banked time. `queued` is a request made on this shield that the app has not
+    /// sent yet; `canOpenApp` whether the shield's button opens it.
     public static func subtitle(_ content: ShieldContent?, now: Date, queued: Bool = false, canOpenApp: Bool = true,
                                 timeZone: TimeZone = .current, locale: Locale = Locale(identifier: "en_US")) -> String {
         let message = content?.message.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -50,14 +51,15 @@ public enum ShieldText {
             // opening has passed says nothing about hours.
             let closed = content.opensAt.map { $0 > now } ?? false
             if let opensAt = content.opensAt, closed {
-                lines.append("Screen time opens at \(clock(opensAt, timeZone: timeZone, locale: locale))\(dayWord(opensAt, now: now, timeZone: timeZone)).")
+                lines.append("Screen time starts at \(clock(opensAt, timeZone: timeZone, locale: locale))\(dayWord(opensAt, now: now, timeZone: timeZone)).")
             }
             let minutes = content.bankedSeconds / 60
-            if minutes > 0 {
+            if minutes > 0, askLine(content.ask, queued: queued, canOpenApp: canOpenApp) == nil {
                 let saved = "You have \(minutes) min saved."
                 lines.append(closed ? saved : "\(saved) Open OpenCozy to use it.")
             }
         }
+        // The ask status takes the saved line's place while it applies.
         if let line = askLine(content?.ask, queued: queued, canOpenApp: canOpenApp) { lines.append(line) }
         return lines.joined(separator: "\n\n")
     }
@@ -65,13 +67,15 @@ public enum ShieldText {
     /// A request made here and not sent yet comes first: without the 26.5
     /// button the child has to open OpenCozy to send it.
     static func askLine(_ ask: ShieldAsk?, queued: Bool, canOpenApp: Bool) -> String? {
-        if queued { return canOpenApp ? "You asked a parent for more time." : "Open OpenCozy to send your request for more time." }
+        if queued { return canOpenApp ? pendingLine : "Open OpenCozy to send it." }
         switch ask {
-        case .pending: return "You asked a parent for more time. Waiting for an answer."
-        case .declined: return "A parent said not right now."
+        case .pending: return pendingLine
+        case .declined: return "A parent said not right now. You can ask again in a few minutes."
         case nil: return nil
         }
     }
+
+    static let pendingLine = "You asked a parent for more time. Waiting for an answer."
 
     /// The secondary button: asking again while one is pending is harmless.
     public static func askButton(_ ask: ShieldAsk?, queued: Bool) -> String {

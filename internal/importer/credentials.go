@@ -16,7 +16,7 @@ import (
 // slice that adds it (pending), so a credential is never imported with less, or more, access
 // than it had. Each domain slice adds its scopes.
 var (
-	serviceScopes   = map[string]string{"children:read": "children:read"}
+	serviceScopes   = map[string]string{"children:read": "children:read", "external:award": "learning:award"}
 	assistantScopes = map[string]string{}
 )
 
@@ -24,7 +24,7 @@ var (
 // The old secrets are prefix + 43 base64url characters stored as hex SHA-256, which is exactly
 // the new format, so imported secrets keep working. A service credential keeps exactly its old
 // children; one with none keeps none. An assistant acts for its adult, for all children, as
-// before. last_used_at is not carried; the award rules wait on the learning slice.
+// before. last_used_at is not carried; importLearning carries the award rules.
 func importCredentials(ctx context.Context, x *run) error {
 	x.r.columnsRead("service_credential", "household_id", "id", "name", "credential_hash", "scopes", "created_at", "revoked_at")
 	x.r.columnsRead("service_credential_child", "household_id", "credential_id", "child_id")

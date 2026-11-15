@@ -165,7 +165,7 @@ struct PairingFlowTests {
         let (sentOrigin, request) = try #require(await recorder.requests.first)
         #expect(sentOrigin == origin)
         #expect(request.token == token && request.code == nil)
-        #expect(request.platform == "ipad" || request.platform == "iphone")
+        #expect(request.platform == "ios")
         #expect(request.name == "Robin's tablet")
         let point = try #require(Data(base64Encoded: request.publicKey))
         #expect(point.count == 65 && point.first == 0x04)
@@ -218,7 +218,7 @@ struct PairingFlowTests {
     }
 
     @Test func codeRequestOmitsToken() throws {
-        let request = DevicePairRequest(token: nil, code: "ABCD-EFGH", publicKey: "BA==", platform: "ipad", name: "x")
+        let request = DevicePairRequest(token: nil, code: "ABCD-EFGH", publicKey: "BA==", platform: "ios", name: "x")
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any]
         #expect(json?.keys.sorted() == ["code", "name", "platform", "proof", "publicKey"])
     }
@@ -249,7 +249,7 @@ struct UnassignedDeviceTests {
     @Test func deviceWithoutAChildIsLocked() async {
         let model = AppModel(preview: UnassignedAPI())
         await model.refresh()
-        #expect(model.accessProblem == AppModel.SetupError.noChild.localizedDescription)
+        #expect(model.accessProblem == AppModel.reconnectMessage)
         #expect(model.unlockedUntil == nil)
         #expect(model.childId == nil)
     }

@@ -28,7 +28,7 @@ The OpenCozy server is the source of truth for the unlock window, the device's c
 | `App/Parent/` | Parent role: server address, the web view, the notification session (password or passkey), push payloads and notification actions. |
 | `Shared/` | Unlock state in the App Group, shield logic, schedule planning. Compiled into the app and all three extensions. |
 | `Monitor/` | DeviceActivityMonitor extension. Re-applies the shield when a window ends. |
-| `ShieldConfiguration/` | Custom shield: "*App* is locked", the household's lock message (Manage → Devices), when screen time opens and the banked time, from the last sync (`Shared/ShieldText.swift`). |
+| `ShieldConfiguration/` | Custom shield: "*App* is locked", the household's lock message (Manage → Devices), when screen time starts, and the banked time or where an ask for more time stands, from the last sync (`Shared/ShieldText.swift`; the words match the kid view). |
 | `ShieldAction/` | Shield buttons. **One more minute** (once per lock after a window) lifts the shield for 60 seconds offline and queues the event for the next sync; otherwise **OK** closes the app. **Ask for more time** queues a request in the App Group (this extension can't sign requests); on iOS 26.5 and later it also opens this app, which sends it at once, and earlier the next sync sends it. Shares the App Group and `Shared/`. |
 | `Tests/` | Swift Testing unit tests and their fictional fixtures. |
 | `Design/AppIcon.svg` | Source of the app icon (logo A). The command to re-render the PNG is in the file. |
@@ -51,6 +51,14 @@ xcodebuild -project OpenCozy.xcodeproj -scheme OpenCozy \
 xcodebuild -project OpenCozy.xcodeproj -scheme OpenCozy \
   -destination 'platform=iOS Simulator,name=<an installed iPhone simulator>' \
   CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= test
+```
+
+Against a local development server (never a real installation), `LocalServerTests` pairs with
+the app's own client, signs requests and opens the kid view. Make a pairing in Manage → Devices
+(or `POST /api/devices/pairings`) and pass its QR payload; without it the suite is skipped:
+
+```sh
+TEST_RUNNER_OPENCOZY_E2E_PAIRING='opencozy-pair:v1?origin=http%3A%2F%2F127.0.0.1%3A8080&token=…' ios/scripts/ci.sh
 ```
 
 The tests use ad-hoc simulator signing rather than `CODE_SIGNING_ALLOWED=NO`, because an unsigned test host can't use the Keychain, which the PIN, pairing and parent-session tests need.

@@ -5,17 +5,18 @@ import Testing
 /// The kid app against this server's devices contract (api/src/devices.yaml, slice 7).
 struct DevicesWireTests {
     static let deviceSelf = #"""
-    { "device": { "id": "0195f2d4-0000-7000-8000-0000000000d1", "name": "Robin's iPad", "platform": "ipad",
+    { "device": { "id": "0195f2d4-0000-7000-8000-0000000000d1", "name": "Robin's iPad", "platform": "ios",
                   "child": { "id": "0195f2d4-0000-7000-8000-0000000000c1", "name": "Robin", "color": "sky" },
                   "pairedAt": "2026-11-15T10:00:00Z", "lastSeenAt": "2026-11-15T10:05:00.123Z" },
-      "household": { "id": "0195f2d4-0000-7000-8000-0000000000a1", "name": "The Example House",
+      "household": { "id": "0195f2d4-0000-7000-8000-0000000000a1", "name": "The Example House", "timeZone": "America/Chicago",
                      "lockMessage": "Earn time on the chore board, then spend your points in OpenCozy." },
       "serverTime": "2026-11-15T10:05:01Z" }
     """#
 
     @Test func deviceSelfDecodes() throws {
         let info = try APITransport.decode(DeviceInfo.self, from: Data(Self.deviceSelf.utf8))
-        #expect(info.device.platform == "ipad")
+        #expect(info.device.platform == "ios")
+        #expect(info.household.timeZone == "America/Chicago")
         #expect(info.device.childId == "0195f2d4-0000-7000-8000-0000000000c1")
         #expect(info.device.childName == "Robin")
         #expect(info.household.lockMessage.hasPrefix("Earn time"))
@@ -33,15 +34,14 @@ struct DevicesWireTests {
     }
 
     @Test func pairRequestUsesContractFields() throws {
-        let request = DevicePairRequest(token: "t", code: nil, publicKey: "BA==", platform: "iphone", name: "Robin's iPhone")
+        let request = DevicePairRequest(token: "t", code: nil, publicKey: "BA==", platform: "ios", name: "Robin's iPhone")
         let json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
         #expect(json.keys.sorted() == ["name", "platform", "proof", "publicKey", "token"])
         #expect(json["name"] as? String == "Robin's iPhone")
     }
 
-    @Test func platformFollowsTheIdiom() {
-        #expect(DevicePlatform.current(idiom: .pad) == "ipad")
-        #expect(DevicePlatform.current(idiom: .phone) == "iphone")
+    @Test func platformIsIOS() {
+        #expect(DevicePlatform.current == "ios")
     }
 
     @Test func errorMessageFromEitherBody() {

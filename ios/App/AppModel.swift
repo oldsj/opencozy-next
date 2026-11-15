@@ -253,11 +253,17 @@ final class AppModel {
         applyScreenTime(screen, receivedAt: receivedAt, childId: childId)
     }
 
+    /// What a revoked, unassigned or refused device says (the kid view's words).
+    static var reconnectMessage: String {
+        let device = UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"
+        return "Ask an adult to check this \(device). It needs to be connected to OpenCozy again."
+    }
+
     /// A revoked or unassigned device (401) or lost permission (403) locks at once
     /// instead of letting the stored window run on.
     private func handleRejection(_ error: Error) {
         if error as? SetupError == .noChild {
-            accessProblem = SetupError.noChild.localizedDescription
+            accessProblem = Self.reconnectMessage
             unlockedUntil = nil
             if !isPreview {
                 lockOutcome = lock.lockNow()
@@ -265,10 +271,8 @@ final class AppModel {
             }
             return
         }
-        guard case APIError.server(let status, let message) = error, status == 401 || status == 403 else { return }
-        accessProblem = status == 401
-            ? "OpenCozy doesn't recognise this device any more, or it isn't assigned to a child. A parent can check Manage → Devices, or pair it again."
-            : "This device isn't allowed to do that (\(message)). A parent needs to check Manage → Devices."
+        guard case APIError.server(let status, _) = error, status == 401 || status == 403 else { return }
+        accessProblem = Self.reconnectMessage
         unlockedUntil = nil
         if !isPreview {
             lockOutcome = lock.lockNow()
@@ -356,7 +360,7 @@ final class AppModel {
         var errorDescription: String? {
             switch self {
             case .invalidPairingCode: "That isn't an OpenCozy pairing code. In OpenCozy, open Manage → Devices → Pair a device."
-            case .noChild: "This device isn't assigned to a child. A parent can assign it in OpenCozy under Manage → Devices."
+            case .noChild: "Ask an adult to check this device. It needs to be connected to OpenCozy again."
             }
         }
     }
@@ -368,7 +372,7 @@ final class AppModel {
         let (key, blob) = try config.keys.generate()
         let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
         var request = DevicePairRequest(publicKey: key.publicKeyX963.base64EncodedString(),
-                                        platform: DevicePlatform.current(idiom: UIDevice.current.userInterfaceIdiom),
+                                        platform: DevicePlatform.current,
                                         name: name.isEmpty ? "Child's device" : name)
         switch input {
         case .token(_, let token): request.token = token
