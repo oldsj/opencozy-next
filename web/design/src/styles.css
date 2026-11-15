@@ -18,6 +18,7 @@
 @import './components/app-frame.css';
 @import './components/button.css';
 @import './components/check-circle.css';
+@import './components/choice-group.css';
 @import './components/coming-later-tile.css';
 @import './components/confirm-dialog.css';
 @import './components/countdown.css';

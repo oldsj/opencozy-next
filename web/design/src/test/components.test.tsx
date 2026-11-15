@@ -7,6 +7,7 @@ import {
   AppFrame,
   Button,
   ButtonLink,
+  ChoiceGroup,
   CodeInput,
   ManageNav,
   ConnectionBanner,
@@ -440,5 +441,23 @@ describe('manage navigation', () => {
     expect(within(nav).getAllByLabelText('3 waiting').length).toBeGreaterThan(0);
     expect(within(nav).getAllByRole('link', { name: /Inbox/ })).toHaveLength(2);
     expect(within(nav).getByRole('button', { name: 'Menu' })).toBeInTheDocument();
+  });
+});
+
+describe('slice two: inbox', () => {
+  it('a choice group answers with one tap, speaks full names, and locks while sending', async () => {
+    const chosen: string[] = [];
+    const choices = [
+      { value: 'parents', label: 'Parents', variant: 'primary' as const },
+      { value: 'ezra', label: 'Ezra', detail: 'no time', disabled: true },
+      { value: 'ada', label: 'Ada', detail: '25 min' },
+    ];
+    const { rerender } = render(<ChoiceGroup label="Who’s watching?" choices={choices} onChoose={(v) => chosen.push(v)} />);
+    expect(screen.getByRole('group', { name: 'Who’s watching?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ezra no time' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Ada 25 min' }));
+    expect(chosen).toEqual(['ada']);
+    rerender(<ChoiceGroup label="Who’s watching?" choices={choices} onChoose={(v) => chosen.push(v)} busy />);
+    for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled();
   });
 });
