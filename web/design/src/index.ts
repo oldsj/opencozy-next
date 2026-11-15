@@ -55,6 +55,8 @@ export { RewardTile } from './components/RewardTile';
 export type { RewardTileProps } from './components/RewardTile';
 export { Section } from './components/Section';
 export type { SectionProps } from './components/Section';
+export { DayPicker } from './components/DayPicker';
+export type { DayPickerProps } from './components/DayPicker';
 export { SegmentedControl } from './components/SegmentedControl';
 export type { SegmentedControlProps, SegmentedOption } from './components/SegmentedControl';
 export { Sheet } from './components/Sheet';
