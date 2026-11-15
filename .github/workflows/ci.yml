@@ -136,9 +136,14 @@ jobs:
           exit 1
         shell: bash
       # `make e2e` without its Compose database reset (the service above is a fresh app_e2e), spelled
-      # out here. Keep in step with the build and e2e targets.
+      # out here. Keep in step with the build-e2e and e2e targets.
       - run: pnpm --dir web build
-      - run: CGO_ENABLED=0 go build -tags embedweb -trimpath -o bin/app ./cmd/app
+      # An e2e build: its calendar client may reach 127.0.0.1, where the tests serve a fixture feed.
+      - run: CGO_ENABLED=0 go build -tags embedweb,e2e -trimpath -o bin/app ./cmd/app
+      - name: The release check refuses this e2e binary
+        run: "! scripts/check-release-binary.sh bin/app"
+      - name: The e2e build opens only the calendar client's 127.0.0.1 and ::1
+        run: go test -tags e2e -run TestE2EBuild ./internal/egress/
       - run: pnpm exec playwright test
         working-directory: web
         env:
@@ -249,6 +254,26 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Before pushing: the binary in the release image must be a release build (no e2e tag), read
+      # from its own build info.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: opencozy-release-check
+          cache-from: type=gha
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: The release image's binary is a release build
+        run: |
+          cid=$(docker create opencozy-release-check)
+          docker cp "$cid:/app" ./release-app
+          docker rm "$cid"
+          scripts/check-release-binary.sh ./release-app
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .

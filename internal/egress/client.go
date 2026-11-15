@@ -26,6 +26,9 @@ var (
 	ErrTooLarge = errors.New("egress: response too large")
 )
 
+// CalendarClient is the calendar feed client's name.
+const CalendarClient = "ics"
+
 // FeedPorts are the ports a calendar feed may use (design §10).
 var FeedPorts = []uint16{80, 443, 8080, 8443}
 
@@ -148,7 +151,9 @@ type dialer struct {
 	net   net.Dialer
 }
 
-func (d *dialer) allowed(a netip.Addr) bool { return IsPublic(a) || inAny(d.private, a) }
+func (d *dialer) allowed(a netip.Addr) bool {
+	return IsPublic(a) || inAny(d.private, a) || e2eLoopback(d.name, a)
+}
 
 func (d *dialer) refuse(format string, args ...any) error {
 	return fmt.Errorf("%w (%s): %s", ErrRefused, d.name, fmt.Sprintf(format, args...))
