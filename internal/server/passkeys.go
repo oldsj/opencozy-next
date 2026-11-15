@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/oldsj/opencozy-next/internal/api"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
@@ -60,7 +61,14 @@ func (u passkeyUser) WebAuthnName() string                       { return u.adul
 func (u passkeyUser) WebAuthnDisplayName() string                { return u.adult.Name }
 func (u passkeyUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 
-func toWebAuthnCredential(p dbq.Passkey) webauthn.Credential {
+// toWebAuthnCredential converts a stored passkey. asserted is the backup-eligible flag of the
+// assertion being checked, adopted when the stored one is unknown (an imported passkey before its
+// first sign-in); the signature check then vouches for it, and usePasskey records it.
+func toWebAuthnCredential(p dbq.Passkey, asserted *bool) webauthn.Credential {
+	eligible := p.BackupEligible.Bool
+	if !p.BackupEligible.Valid && asserted != nil {
+		eligible = *asserted
+	}
 	transports := make([]protocol.AuthenticatorTransport, len(p.Transports))
 	for i, t := range p.Transports {
 		transports[i] = protocol.AuthenticatorTransport(t)
@@ -70,19 +78,19 @@ func toWebAuthnCredential(p dbq.Passkey) webauthn.Credential {
 		PublicKey:       p.PublicKey,
 		AttestationType: p.AttestationType,
 		Transport:       transports,
-		Flags:           webauthn.CredentialFlags{UserPresent: true, UserVerified: true, BackupEligible: p.BackupEligible, BackupState: p.BackedUp},
+		Flags:           webauthn.CredentialFlags{UserPresent: true, UserVerified: true, BackupEligible: eligible, BackupState: p.BackedUp},
 		Authenticator:   webauthn.Authenticator{AAGUID: p.Aaguid, SignCount: uint32(p.SignCount)}, //nolint:gosec // the column is 0..2^32-1
 	}
 }
 
-func (s *Server) passkeyUser(ctx context.Context, a dbq.Adult) (passkeyUser, []dbq.Passkey, error) {
+func (s *Server) passkeyUser(ctx context.Context, a dbq.Adult, asserted *bool) (passkeyUser, []dbq.Passkey, error) {
 	rows, err := s.q.ListPasskeys(ctx, dbq.ListPasskeysParams{HouseholdID: a.HouseholdID, AdultID: a.ID})
 	if err != nil {
 		return passkeyUser{}, nil, err
 	}
 	u := passkeyUser{adult: a}
 	for _, p := range rows {
-		u.creds = append(u.creds, toWebAuthnCredential(p))
+		u.creds = append(u.creds, toWebAuthnCredential(p, asserted))
 	}
 	return u, rows, nil
 }
@@ -128,6 +136,12 @@ func (s *Server) takeCeremony(ctx context.Context, id uuid.UUID, purpose string,
 	return session, true, nil
 }
 
+// eligibleFlag is the assertion's backup-eligible flag.
+func eligibleFlag(parsed *protocol.ParsedCredentialAssertionData) *bool {
+	be := parsed.Response.AuthenticatorData.Flags.HasBackupEligible()
+	return &be
+}
+
 func parseAssertion(credential map[string]any) (*protocol.ParsedCredentialAssertionData, error) {
 	j, err := json.Marshal(credential)
 	if err != nil {
@@ -143,7 +157,9 @@ func (s *Server) usePasskey(ctx context.Context, c *webauthn.Credential) (bool, 
 		s.log.WarnContext(ctx, "passkey sign counter went backwards; refused")
 		return false, nil
 	}
-	return true, s.q.UsePasskey(ctx, dbq.UsePasskeyParams{CredentialID: c.ID, SignCount: int64(c.Authenticator.SignCount), BackedUp: c.Flags.BackupState})
+	return true, s.q.UsePasskey(ctx, dbq.UsePasskeyParams{
+		CredentialID: c.ID, SignCount: int64(c.Authenticator.SignCount), BackedUp: c.Flags.BackupState, BackupEligible: c.Flags.BackupEligible,
+	})
 }
 
 // PasskeySignInOptions starts a sign-in with any of the household's passkeys.
@@ -184,7 +200,7 @@ func (s *Server) PasskeySignIn(ctx context.Context, req api.PasskeySignInRequest
 			return nil, err
 		}
 		adult = a
-		u, _, err := s.passkeyUser(ctx, a)
+		u, _, err := s.passkeyUser(ctx, a, eligibleFlag(parsed))
 		return u, err
 	}, session, parsed)
 	if err != nil || user == nil {
@@ -215,7 +231,7 @@ func (s *Server) PasskeyConfirmOptions(ctx context.Context, _ api.PasskeyConfirm
 	if err != nil {
 		return nil, err
 	}
-	user, _, err := s.passkeyUser(ctx, adult)
+	user, _, err := s.passkeyUser(ctx, adult, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -248,13 +264,13 @@ func (s *Server) PasskeyConfirm(ctx context.Context, req api.PasskeyConfirmReque
 	if err != nil {
 		return nil, err
 	}
-	user, _, err := s.passkeyUser(ctx, adult)
-	if err != nil {
-		return nil, err
-	}
 	parsed, err := parseAssertion(req.Body.Credential)
 	if err != nil {
 		return refused, nil //nolint:nilerr // an unreadable response is a refusal
+	}
+	user, _, err := s.passkeyUser(ctx, adult, eligibleFlag(parsed))
+	if err != nil {
+		return nil, err
 	}
 	cred, err := s.wa.ValidateLogin(user, session, parsed)
 	if err != nil {
@@ -302,7 +318,7 @@ func (s *Server) PasskeyRegistrationOptions(ctx context.Context, _ api.PasskeyRe
 	if err != nil {
 		return nil, err
 	}
-	user, _, err := s.passkeyUser(ctx, adult)
+	user, _, err := s.passkeyUser(ctx, adult, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +353,7 @@ func (s *Server) AddPasskey(ctx context.Context, req api.AddPasskeyRequestObject
 	if err != nil {
 		return nil, err
 	}
-	user, rows, err := s.passkeyUser(ctx, adult)
+	user, rows, err := s.passkeyUser(ctx, adult, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +383,7 @@ func (s *Server) AddPasskey(ctx context.Context, req api.AddPasskeyRequestObject
 	p, err := s.q.CreatePasskey(ctx, dbq.CreatePasskeyParams{
 		HouseholdID: adult.HouseholdID, AdultID: adult.ID, CredentialID: cred.ID, PublicKey: cred.PublicKey,
 		AttestationType: cred.AttestationType, Aaguid: aaguid(cred.Authenticator.AAGUID), SignCount: int64(cred.Authenticator.SignCount),
-		Transports: transports, BackupEligible: cred.Flags.BackupEligible, BackedUp: cred.Flags.BackupState, Name: req.Body.Name,
+		Transports: transports, BackupEligible: pgtype.Bool{Bool: cred.Flags.BackupEligible, Valid: true}, BackedUp: cred.Flags.BackupState, Name: req.Body.Name,
 	})
 	if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return api.AddPasskey409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(apiError("passkey_exists", "That passkey is already added."))}, nil
@@ -386,25 +402,32 @@ func aaguid(b []byte) []byte {
 }
 
 // RemovePasskey removes one of the adult's passkeys, unless it is their only way to sign in.
+// The adult's row is locked first, so two removals at once can't both pass the guard.
 func (s *Server) RemovePasskey(ctx context.Context, req api.RemovePasskeyRequestObject) (api.RemovePasskeyResponseObject, error) {
 	a := mustActor(ctx)
-	adult, err := s.q.GetAdult(ctx, dbq.GetAdultParams{HouseholdID: a.HouseholdID, ID: a.AdultID})
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.q.ListPasskeys(ctx, dbq.ListPasskeysParams{HouseholdID: a.HouseholdID, AdultID: a.AdultID})
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+	adult, err := q.LockAdult(ctx, dbq.LockAdultParams{HouseholdID: a.HouseholdID, ID: a.AdultID})
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.ListPasskeys(ctx, dbq.ListPasskeysParams{HouseholdID: a.HouseholdID, AdultID: a.AdultID})
 	if err != nil {
 		return nil, err
 	}
 	if adult.PasswordHash == nil && len(rows) == 1 && rows[0].ID == req.PasskeyId {
 		return api.RemovePasskey409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(apiError("last_sign_in", "This is your only way to sign in. Add another passkey or a password first."))}, nil
 	}
-	n, err := s.q.DeletePasskey(ctx, dbq.DeletePasskeyParams{ID: req.PasskeyId, HouseholdID: a.HouseholdID, AdultID: a.AdultID})
+	n, err := q.DeletePasskey(ctx, dbq.DeletePasskeyParams{ID: req.PasskeyId, HouseholdID: a.HouseholdID, AdultID: a.AdultID})
 	if err != nil {
 		return nil, err
 	}
 	if n == 0 {
 		return api.RemovePasskey404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
 	}
-	return api.RemovePasskey204Response{}, nil
+	return api.RemovePasskey204Response{}, tx.Commit(ctx)
 }

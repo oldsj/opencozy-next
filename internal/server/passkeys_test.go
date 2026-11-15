@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -219,5 +220,67 @@ func TestPasskeysOff(t *testing.T) {
 	e := newEnv(t, nil)
 	if r := e.send(cred{}, http.MethodPost, "/api/auth/passkey/options", nil); r.status != 404 || r.code() != "passkeys_off" {
 		t.Fatalf("%d %s", r.status, r.raw)
+	}
+}
+
+// addPasskey adds key for h's adult and returns the passkey's id.
+func addPasskey(t *testing.T, e *env, h house, key *authenticator, name string) string {
+	t.Helper()
+	ch, opts := options(t, e.send(h.actors["adult"], http.MethodPost, "/api/auth/passkeys/options", nil))
+	r := e.send(h.actors["adult"], http.MethodPost, "/api/auth/passkeys", map[string]any{"challengeId": ch, "name": name, "credential": key.create(opts)})
+	if r.status != 201 {
+		t.Fatalf("add: %d %s", r.status, r.raw)
+	}
+	return r.body["id"].(string)
+}
+
+func signInWith(e *env, key *authenticator) resp {
+	ch, opts := options(e.t, e.send(cred{}, http.MethodPost, "/api/auth/passkey/options", nil))
+	return e.send(cred{}, http.MethodPost, "/api/auth/passkey", map[string]any{"challengeId": ch, "credential": key.get(opts)})
+}
+
+func TestPasskeyFollowUps(t *testing.T) {
+	e := newEnv(t, withPasskeys)
+	h := e.house("a", e.srv.table.Scopes())
+	e.exec(`DELETE FROM passkey WHERE adult_id = $1`, h.adult) // start without the fixture's
+	key := newAuthenticator(t)
+	addPasskey(t, e, h, key, "Tablet")
+
+	// An imported passkey's backup eligibility is unknown until its first sign-in records it.
+	e.exec(`UPDATE passkey SET backup_eligible = NULL WHERE adult_id = $1 AND name = 'Tablet'`, h.adult)
+	if r := signInWith(e, key); r.status != 200 {
+		t.Fatalf("unknown eligibility: %d %s", r.status, r.raw)
+	}
+	var eligible *bool
+	if err := e.owner.QueryRow(t.Context(), `SELECT backup_eligible FROM passkey WHERE adult_id = $1 AND name = 'Tablet'`, h.adult).Scan(&eligible); err != nil || eligible == nil || !*eligible {
+		t.Fatalf("eligibility not recorded: %v %v", eligible, err)
+	}
+
+	// Two removals at once can't leave a password-less adult with no passkey.
+	e.exec(`DELETE FROM passkey WHERE adult_id = $1 AND name <> 'Tablet'`, h.adult)
+	second := addPasskey(t, e, h, newAuthenticator(t), "Phone")
+	var first string
+	if err := e.owner.QueryRow(t.Context(), `SELECT id::text FROM passkey WHERE adult_id = $1 AND name = 'Tablet'`, h.adult).Scan(&first); err != nil {
+		t.Fatal(err)
+	}
+	codes := make(chan int, 2)
+	var wg sync.WaitGroup
+	for _, id := range []string{first, second} {
+		wg.Go(func() { codes <- e.send(h.actors["adult"], http.MethodDelete, "/api/auth/passkeys/"+id, nil).status })
+	}
+	wg.Wait()
+	close(codes)
+	got := map[int]int{}
+	for c := range codes {
+		got[c]++
+	}
+	if got[204] != 1 || got[409] != 1 {
+		t.Fatalf("concurrent removals: %v", got)
+	}
+
+	// An archived household can't sign in with a passkey, as with a password.
+	e.exec(`UPDATE household SET archived_at = now() WHERE id = $1`, h.id)
+	if r := signInWith(e, key); r.status != 401 {
+		t.Fatalf("archived household: %d %s", r.status, r.raw)
 	}
 }
