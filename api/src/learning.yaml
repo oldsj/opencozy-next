@@ -1,0 +1,405 @@
+rules:
+  get:
+    operationId: listAwardRules
+    summary: Award rules, the points a learning app's activities are worth
+    tags: [learning]
+    x-actors: [adult, phone]
+    parameters:
+      - name: archived
+        in: query
+        description: Include archived rules
+        schema:
+          type: boolean
+          default: false
+    responses:
+      '200':
+        description: Rules by activity
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules]
+              properties:
+                rules:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: '#/schemas/AwardRule'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: createAwardRule
+    summary: Add an award rule
+    tags: [learning]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewAwardRule'
+          example: { activityKey: build_house, points: 5, dailyLimit: 20 }
+    responses:
+      '201':
+        description: Added
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/AwardRule'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '409':
+        description: rule_exists, another live rule has this activity
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+rule:
+  parameters:
+    - name: ruleId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  put:
+    operationId: updateAwardRule
+    summary: Change or archive an award rule
+    description: >-
+      Archiving is final: an archived rule awards nothing more and can't be changed; its past
+      awards keep it. Add a new rule to start again.
+    tags: [learning]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/AwardRuleEdit'
+          example: { activityKey: build_house, points: 5, dailyLimit: 25, archived: false, expectedVersion: 1 }
+    responses:
+      '200':
+        description: Changed
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/AwardRule'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: version_conflict (changed meanwhile), rule_archived, or rule_exists
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+links:
+  get:
+    operationId: listLearningLinks
+    summary: Children's linked learning-app accounts
+    tags: [learning]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: Live links of live children
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [links]
+              properties:
+                links:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: '#/schemas/LearningLink'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  post:
+    operationId: linkLearner
+    summary: Link a child to their learning-app account
+    tags: [learning]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/NewLearningLink'
+          example: { childId: 0190a1b2-0000-7000-8000-000000000001, provider: minecraft, externalId: Builder_42 }
+    responses:
+      '201':
+        description: Linked
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/LearningLink'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: link_exists, the account is linked to a child already
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+link:
+  parameters:
+    - name: linkId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  delete:
+    operationId: unlinkLearner
+    summary: Unlink an account; its awards stay
+    tags: [learning]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    responses:
+      '204':
+        description: Unlinked
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+awards:
+  post:
+    operationId: awardLearning
+    summary: Award points for a learning activity
+    description: >-
+      For a learning app's service credential. The linked account picks the child, and the live
+      rule for the activity sets the points, up to the rule's daily limit per child (household
+      day). Each sourceEventId pays at most once, forever: sending it again with the same account
+      and activity returns the award (200); with anything else, 409. Send the same UUID as the
+      Idempotency-Key.
+    tags: [learning]
+    x-actors: [service]
+    x-scopes: ['learning:award']
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/LearningActivity'
+          example: { sourceEventId: 0190a1b2-0000-7000-8000-0000000000aa, externalId: Builder_42, activityKey: build_house }
+    responses:
+      '200':
+        description: Already awarded for this event
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/LearningAward'
+      '201':
+        description: Awarded
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/LearningAward'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        description: The credential may not act for this child or award with this rule
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '404':
+        description: unknown_learner (no live link) or unknown_activity (no live rule)
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '409':
+        description: daily_limit_reached, child_archived, or event_reused (this event was awarded for another account or activity)
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  ActivityKey:
+    type: string
+    minLength: 1
+    maxLength: 160
+    pattern: '^\S(.*\S)?$'
+  AwardPoints:
+    type: integer
+    minimum: 1
+    maximum: 1000000
+  AwardRule:
+    type: object
+    required: [id, activityKey, points, dailyLimit, version, archived]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      activityKey:
+        type: string
+      points:
+        type: integer
+      dailyLimit:
+        type: integer
+        description: The most points the rule gives one child in a household day
+      version:
+        type: integer
+      archived:
+        type: boolean
+  NewAwardRule:
+    type: object
+    additionalProperties: false
+    required: [activityKey, points, dailyLimit]
+    properties:
+      activityKey:
+        $ref: '#/schemas/ActivityKey'
+      points:
+        $ref: '#/schemas/AwardPoints'
+      dailyLimit:
+        $ref: '#/schemas/AwardPoints'
+  AwardRuleEdit:
+    type: object
+    additionalProperties: false
+    required: [activityKey, points, dailyLimit, archived, expectedVersion]
+    properties:
+      activityKey:
+        $ref: '#/schemas/ActivityKey'
+      points:
+        $ref: '#/schemas/AwardPoints'
+      dailyLimit:
+        $ref: '#/schemas/AwardPoints'
+      archived:
+        type: boolean
+      expectedVersion:
+        type: integer
+        minimum: 1
+        maximum: 2147483647
+  Provider:
+    type: string
+    pattern: '^[a-z][a-z0-9_-]{0,79}$'
+  ExternalId:
+    type: string
+    minLength: 1
+    maxLength: 255
+    pattern: '^\S(.*\S)?$'
+  LearningLink:
+    type: object
+    required: [id, childId, provider, externalId, linkedAt]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      childId:
+        $ref: common.yaml#/schemas/Id
+      provider:
+        type: string
+      externalId:
+        type: string
+      linkedAt:
+        type: string
+        format: date-time
+  NewLearningLink:
+    type: object
+    additionalProperties: false
+    required: [childId, provider, externalId]
+    properties:
+      childId:
+        $ref: common.yaml#/schemas/Id
+      provider:
+        $ref: '#/schemas/Provider'
+      externalId:
+        $ref: '#/schemas/ExternalId'
+  LearningActivity:
+    type: object
+    additionalProperties: false
+    required: [sourceEventId, externalId, activityKey]
+    properties:
+      sourceEventId:
+        $ref: common.yaml#/schemas/Id
+      provider:
+        $ref: '#/schemas/Provider'
+        description: The learning app; minecraft when left out
+      externalId:
+        $ref: '#/schemas/ExternalId'
+      activityKey:
+        $ref: '#/schemas/ActivityKey'
+  LearningAward:
+    type: object
+    required: [id, sourceEventId, childId, activityKey, points, ruleVersion, balance]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      sourceEventId:
+        $ref: common.yaml#/schemas/Id
+      childId:
+        $ref: common.yaml#/schemas/Id
+      activityKey:
+        type: string
+      points:
+        type: integer
+      ruleVersion:
+        type: integer
+      balance:
+        type: integer
+        format: int64
+        description: The child's balance now
