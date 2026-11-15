@@ -8,6 +8,7 @@ struct ParentStore: Sendable {
     private static let tokenAccount = "parent-session.v1"
     private static let webHandoffOffKey = "parent.webHandoffOff.v1"
     private static let phoneNameKey = "parent.phoneName.v1"
+    private static let sessionIdKey = "parent.sessionId.v1"
 
     var keychain = Keychain()
     var defaultsSuite: String?
@@ -33,6 +34,14 @@ struct ParentStore: Sendable {
         nonmutating set { defaults.set(newValue, forKey: Self.webHandoffOffKey) }
     }
 
+    /// This phone session's id (not a secret): part of every decision's
+    /// idempotency key, so it must be known even on a cold launch from a
+    /// notification action, before the session is loaded.
+    var sessionId: String? {
+        get { defaults.string(forKey: Self.sessionIdKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.sessionIdKey) }
+    }
+
     var token: String? {
         get { keychain.string(for: Self.tokenAccount) }
         nonmutating set { keychain.set(newValue, for: Self.tokenAccount) }
@@ -49,7 +58,9 @@ final class ParentModel {
     /// The OpenCozy server the web view opens.
     private(set) var origin: URL?
     private(set) var household: HouseholdInfo?
-    private(set) var session: ParentSessionInfo?
+    private(set) var session: ParentSessionInfo? {
+        didSet { store.sessionId = session?.id }
+    }
     private(set) var approvals: [InboxItem] = []
     private(set) var pendingCount = 0
     private(set) var isLoading = false
@@ -293,17 +304,35 @@ final class ParentModel {
         case failed
     }
 
-    /// The idempotency key is stable per item and decision, so a retried request, or
-    /// the same notification action delivered twice, replays the first answer.
-    nonisolated static func idempotencyKey(_ id: String, _ decision: ApprovalDecision) -> String {
-        "\(id.lowercased()):\(decision == .approve ? "approve" : "reject")"
+    /// The idempotency key is stable per phone session, item and decision, so a
+    /// retried request, or the same notification action delivered twice, replays the
+    /// first answer. Keys are per household and tied to the caller, so the session id
+    /// keeps a second parent's tap on the same item from reusing the first parent's
+    /// key (422 `idempotency_key_reused`); that parent gets 409 `already_decided`.
+    nonisolated static func idempotencyKey(session: String, _ id: String, _ decision: ApprovalDecision) -> String {
+        "\(session.lowercased()):\(id.lowercased()):\(decision == .approve ? "approve" : "reject")"
+    }
+
+    /// The session id for the key: in memory, else stored, else asked of the server.
+    private func sessionIdForKey(_ api: any ParentAPI) async throws -> String {
+        if let id = session?.id ?? store.sessionId { return id }
+        let info = try await api.session()
+        session = info.session
+        household = info.household
+        return info.session.id
     }
 
     private func decide(_ id: String, decision: ApprovalDecision, retries: Int) async -> Outcome {
         guard let api, !busy.contains(id) else { return .failed }
         busy.insert(id)
         defer { busy.remove(id) }
-        let key = Self.idempotencyKey(id, decision)
+        let key: String
+        do {
+            key = Self.idempotencyKey(session: try await sessionIdForKey(api), id, decision)
+        } catch {
+            handle(error)
+            return .failed
+        }
         var attempt = 0
         while true {
             do {

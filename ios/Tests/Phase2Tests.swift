@@ -107,12 +107,16 @@ struct ParentWireTests {
         #expect(decision == Decision(id: "x", state: .rejected))
     }
 
-    @Test func idempotencyKeyIsStablePerItemAndDecision() {
-        let id = "0B9E2F4A-6C1D-4E8B-9A37-5F2D8C1E6B40"
-        #expect(ParentModel.idempotencyKey(id, .approve) == "0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40:approve")
-        #expect(ParentModel.idempotencyKey(id, .reject) == "0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40:reject")
+    @Test func idempotencyKeyIsPerSessionItemAndDecision() {
+        let session = "7C2D9E10-4A3B-4C5D-8E6F-0A1B2C3D4E5F", id = "0B9E2F4A-6C1D-4E8B-9A37-5F2D8C1E6B40"
+        let approve = ParentModel.idempotencyKey(session: session, id, .approve)
+        #expect(approve == "7c2d9e10-4a3b-4c5d-8e6f-0a1b2c3d4e5f:0b9e2f4a-6c1d-4e8b-9a37-5f2d8c1e6b40:approve")
+        #expect(ParentModel.idempotencyKey(session: session, id, .reject).hasSuffix(":reject"))
+        // Another parent's phone deciding the same item uses a different key.
+        #expect(ParentModel.idempotencyKey(session: "0d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a", id, .approve) != approve)
         // The contract allows 1-128 printable ASCII characters.
-        #expect(ParentModel.idempotencyKey(id, .approve).allSatisfy { $0.isASCII && !$0.isWhitespace })
+        #expect(approve.count <= 128)
+        #expect(approve.allSatisfy { $0.isASCII && !$0.isWhitespace })
     }
 
     @Test func inboxPathOnlyTakesUUIDs() {
@@ -242,23 +246,37 @@ struct ParentModelTests {
         #expect(await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
         let (id, key) = try #require(await server.approves.first)
         #expect(id == "a")
-        #expect(key == "a:approve")
+        #expect(key == "s:a:approve")
         #expect(model.approvals.isEmpty)
         #expect(model.pendingCount == 0)
     }
 
 
+    /// A notification action can cold-launch the app before the session loads.
+    @Test func coldLaunchActionUsesTheStoredSessionIdOrAsks() async throws {
+        let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5), Self.approval("b", minutesAgo: 4)])
+        #expect(model.store.sessionId == "s")
+        let relaunched = ParentModel(store: model.store, makeAPI: { _, t in FakeParentAPI(server: server, token: t) }, notifier: .none)
+        #expect(relaunched.session == nil)
+        #expect(await relaunched.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
+        model.store.sessionId = nil
+        let forgetful = ParentModel(store: model.store, makeAPI: { _, t in FakeParentAPI(server: server, token: t) }, notifier: .none)
+        #expect(await forgetful.handleAction(.approve, push: ApprovalPush(approvalId: "b", event: .pending(version: 1))) == .done)
+        #expect(await server.approves.map(\.key) == ["s:a:approve", "s:b:approve"])
+        #expect(model.store.sessionId == "s")
+    }
+
     @Test func rejectFromANotificationHasNoReason() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
         #expect(await server.rejects.map(\.request.reason) == [nil])
-        #expect(await server.rejects.map(\.key) == ["a:reject"])
+        #expect(await server.rejects.map(\.key) == ["s:a:reject"])
     }
 
     @Test func conflictFromAnotherParentRemovesTheItem() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         // Meanwhile the other parent approved it, so the next list is empty.
-        _ = try await server.approve("a", key: "a:approve")
+        _ = try await server.approve("a", key: "other-session:a:approve")
         #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .alreadyHandled)
         #expect(model.approvals.isEmpty)
         #expect(model.errorMessage == "Someone already decided this one.")
@@ -314,7 +332,7 @@ struct ParentModelTests {
         #expect(ok == .done)
         let approves = await server.approves
         #expect(approves.count == 2)
-        #expect(approves.map(\.key) == ["a:approve", "a:approve"])
+        #expect(approves.map(\.key) == ["s:a:approve", "s:a:approve"])
     }
 
     @Test func resolvedPushIsNotAnAction() async {

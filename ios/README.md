@@ -12,8 +12,8 @@ The OpenCozy server is the source of truth for the unlock window, the device's c
 > server's (`/api/v1/screen-time`, `/api/v1/device/...`) until slice 8: this server answers them
 > 404, so the device stays locked and keeps "One more minute" and "Ask for more time" queued
 > without reporting a failed sync. The parent's device approves and rejects through this server's
-> inbox (`/api/inbox`, an `Idempotency-Key` of `<item id>:approve|reject`, and a 409 shown as
-> Already handled), but signs in, keeps its phone session and registers for pushes on
+> inbox (`/api/inbox`, an `Idempotency-Key` of `<phone session id>:<item id>:approve|reject`,
+> and a 409 shown as Already handled), but signs in, keeps its phone session and registers for pushes on
 > `/api/v1/parent/...` until slices 10 and 11, so it can't sign in here yet.
 
 ## Layout
