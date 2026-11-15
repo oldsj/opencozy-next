@@ -499,6 +499,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/meals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The meal plan for the household week containing a date
+         * @description A week runs Monday to Sunday, in the household's time zone. Without `week`, it is the
+         *     current week. At most one meal per slot per day.
+         */
+        get: operations["getMealWeek"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meals/{date}/{slot}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+                slot: components["schemas"]["MealSlot"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Plan a meal, or change the planned one
+         * @description `expectedVersion` is 0 when the slot is empty, and otherwise the planned meal's version, so
+         *     two adults can't overwrite each other unseen.
+         */
+        put: operations["setMeal"];
+        post?: never;
+        /** Clear a planned meal */
+        delete: operations["clearMeal"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's recipes, by title */
+        get: operations["listRecipes"];
+        put?: never;
+        /** Add a recipe */
+        post: operations["createRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recipes/{recipeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** One recipe, to cook from or edit */
+        get: operations["getRecipe"];
+        /**
+         * Edit a recipe, or archive or restore it
+         * @description Planned meals keep an archived recipe.
+         */
+        put: operations["updateRecipe"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -711,6 +798,69 @@ export interface components {
             points: components["schemas"]["Points"];
             days?: components["schemas"]["Days"];
             steps: components["schemas"]["Title"][];
+        };
+        /** @enum {string} */
+        MealSlot: "breakfast" | "lunch" | "dinner";
+        Meal: {
+            id: components["schemas"]["Id"];
+            slot: components["schemas"]["MealSlot"];
+            /** @description The recipe's title when recipeId is set */
+            title: string;
+            recipeId?: components["schemas"]["Id"];
+            note?: string;
+            version: number;
+        };
+        MealDay: {
+            /** Format: date */
+            date: string;
+            meals: components["schemas"]["Meal"][];
+        };
+        MealWeek: {
+            /** Format: date */
+            weekStart: string;
+            days: components["schemas"]["MealDay"][];
+        };
+        "Title-2": string;
+        /** @description Exactly one of recipeId and title. */
+        SetMeal: {
+            recipeId?: components["schemas"]["Id"];
+            title?: components["schemas"]["Title-2"];
+            note?: string;
+            expectedVersion: number;
+        };
+        RecipeSummary: {
+            id: components["schemas"]["Id"];
+            title: string;
+            servings: number;
+            archived: boolean;
+        };
+        RecipeList: {
+            recipes: components["schemas"]["RecipeSummary"][];
+        };
+        Ingredients: string[];
+        Steps: string[];
+        NewRecipe: {
+            title: components["schemas"]["Title-2"];
+            servings: number;
+            ingredients: components["schemas"]["Ingredients"];
+            steps: components["schemas"]["Steps"];
+        };
+        Recipe: {
+            id: components["schemas"]["Id"];
+            title: string;
+            servings: number;
+            archived: boolean;
+            ingredients: string[];
+            steps: string[];
+            version: number;
+        };
+        RecipeEdit: {
+            title: components["schemas"]["Title-2"];
+            servings: number;
+            ingredients: components["schemas"]["Ingredients"];
+            steps: components["schemas"]["Steps"];
+            archived: boolean;
+            expectedVersion: number;
         };
     };
     responses: {
@@ -1909,6 +2059,274 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            default: components["responses"]["Error"];
+        };
+    };
+    getMealWeek: {
+        parameters: {
+            query?: {
+                /** @description Any date in the week */
+                week?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The week, seven days */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealWeek"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setMeal: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                date: string;
+                slot: components["schemas"]["MealSlot"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "title": "Leftovers",
+                 *       "note": "Finish the soup.",
+                 *       "expectedVersion": 0
+                 *     }
+                 */
+                "application/json": components["schemas"]["SetMeal"];
+            };
+        };
+        responses: {
+            /** @description Planned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Meal"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    clearMeal: {
+        parameters: {
+            query: {
+                expectedVersion: number;
+            };
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                date: string;
+                slot: components["schemas"]["MealSlot"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listRecipes: {
+        parameters: {
+            query?: {
+                /** @description Include archived recipes */
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recipes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createRecipe: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "title": "Lentil soup",
+                 *       "servings": 4,
+                 *       "ingredients": [
+                 *         "1 cup red lentils",
+                 *         "1 onion"
+                 *       ],
+                 *       "steps": [
+                 *         "Soften the onion.",
+                 *         "Add the lentils and simmer."
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewRecipe"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recipe */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateRecipe: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                recipeId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "title": "Lentil soup",
+                 *       "servings": 6,
+                 *       "ingredients": [
+                 *         "1 cup red lentils"
+                 *       ],
+                 *       "steps": [
+                 *         "Simmer."
+                 *       ],
+                 *       "archived": false,
+                 *       "expectedVersion": 1
+                 *     }
+                 */
+                "application/json": components["schemas"]["RecipeEdit"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };

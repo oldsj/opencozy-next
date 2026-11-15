@@ -31,6 +31,8 @@ tags:
     description: Service and assistant credentials
   - name: live
     description: Live updates over a WebSocket
+  - name: meals
+    description: Recipes and the meal plan
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -88,6 +90,14 @@ paths:
     $ref: chores.yaml#/routine
   /live:
     $ref: live.yaml#/live
+  /meals:
+    $ref: meals.yaml#/week
+  /meals/{date}/{slot}:
+    $ref: meals.yaml#/slot
+  /recipes:
+    $ref: meals.yaml#/recipes
+  /recipes/{recipeId}:
+    $ref: meals.yaml#/recipe
 
 components:
   securitySchemes:

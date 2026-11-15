@@ -138,13 +138,14 @@ type house struct {
 	screen                            uuid.UUID // a display to unpair (not one of the actors)
 	chore, routine, step              uuid.UUID // child1's, on every day
 	approval                          uuid.UUID // child1's chore on an earlier day, waiting
+	recipe                            uuid.UUID
 	entry                             uuid.UUID // an award of 5 points to child1
 	actors                            map[string]cred
 }
 
 // actorNames are the actors every house has. Kinds are what Policy.Check compares.
 var actorNames = []string{
-	"adult", "adult-stale", "phone", "display-today", "display-none",
+	"adult", "adult-stale", "phone", "display-today", "display-meals", "display-none",
 	"service-all", "service-none", "service-child1", "assistant",
 	"revoked", "malformed", "expired", "none",
 }
@@ -155,7 +156,7 @@ func actorKind(name string) (actor.Kind, bool) {
 		return actor.Adult, true
 	case "phone":
 		return actor.Phone, true
-	case "display-today", "display-none":
+	case "display-today", "display-meals", "display-none":
 		return actor.Display, true
 	case "service-all", "service-none", "service-child1":
 		return actor.Service, true
@@ -199,7 +200,9 @@ func (e *env) house(label string, scopes []string) house {
 		return cred{cookie: &http.Cookie{Name: actor.DisplayCookie, Value: tok}}
 	}
 	h.actors["display-today"] = display([]string{"today"})
+	h.actors["display-meals"] = display([]string{"meals"})
 	h.actors["display-none"] = display([]string{})
+	h.recipe = e.id(`INSERT INTO recipe (household_id, title, servings) VALUES ($1, 'Soup', 2) RETURNING id`, h.id)
 	h.screen = e.id(`INSERT INTO display (household_id, name, scopes, expires_at)
 		VALUES ($1, 'Spare', '{today}', now() + interval '1 day') RETURNING id`, h.id)
 	h.chore = e.id(`INSERT INTO chore (household_id, child_id, title, points) VALUES ($1, $2, 'Feed the cat', 4) RETURNING id`, h.id, h.child1)

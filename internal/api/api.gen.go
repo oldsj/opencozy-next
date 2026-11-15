@@ -135,6 +135,27 @@ func (e InboxItemKind) Valid() bool {
 	}
 }
 
+// Defines values for MealSlot.
+const (
+	Breakfast MealSlot = "breakfast"
+	Dinner    MealSlot = "dinner"
+	Lunch     MealSlot = "lunch"
+)
+
+// Valid indicates whether the value is a known member of the MealSlot enum.
+func (e MealSlot) Valid() bool {
+	switch e {
+	case Breakfast:
+		return true
+	case Dinner:
+		return true
+	case Lunch:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PairingWaitStatus.
 const (
 	Waiting PairingWaitStatus = "waiting"
@@ -393,6 +414,9 @@ type InboxItem struct {
 // InboxItemKind defines model for InboxItem.Kind.
 type InboxItemKind string
 
+// Ingredients defines model for Ingredients.
+type Ingredients = []string
+
 // Me defines model for Me.
 type Me struct {
 	Adult struct {
@@ -401,6 +425,33 @@ type Me struct {
 		Name  string `json:"name"`
 	} `json:"adult"`
 	Household Household `json:"household"`
+}
+
+// Meal defines model for Meal.
+type Meal struct {
+	Id       Id       `json:"id"`
+	Note     *string  `json:"note,omitempty"`
+	RecipeId *Id      `json:"recipeId,omitempty"`
+	Slot     MealSlot `json:"slot"`
+
+	// Title The recipe's title when recipeId is set
+	Title   string `json:"title"`
+	Version int    `json:"version"`
+}
+
+// MealDay defines model for MealDay.
+type MealDay struct {
+	Date  openapi_types.Date `json:"date"`
+	Meals []Meal             `json:"meals"`
+}
+
+// MealSlot defines model for MealSlot.
+type MealSlot string
+
+// MealWeek defines model for MealWeek.
+type MealWeek struct {
+	Days      []MealDay          `json:"days"`
+	WeekStart openapi_types.Date `json:"weekStart"`
 }
 
 // NewChore defines model for NewChore.
@@ -418,6 +469,14 @@ type NewDisplay struct {
 	Code   string         `json:"code"`
 	Name   string         `json:"name"`
 	Scopes []DisplayScope `json:"scopes"`
+}
+
+// NewRecipe defines model for NewRecipe.
+type NewRecipe struct {
+	Ingredients Ingredients `json:"ingredients"`
+	Servings    int         `json:"servings"`
+	Steps       Steps       `json:"steps"`
+	Title       Title2      `json:"title"`
 }
 
 // NewRoutine defines model for NewRoutine.
@@ -454,6 +513,40 @@ type Points = int
 // ProfileColor defines model for ProfileColor.
 type ProfileColor string
 
+// Recipe defines model for Recipe.
+type Recipe struct {
+	Archived    bool     `json:"archived"`
+	Id          Id       `json:"id"`
+	Ingredients []string `json:"ingredients"`
+	Servings    int      `json:"servings"`
+	Steps       []string `json:"steps"`
+	Title       string   `json:"title"`
+	Version     int      `json:"version"`
+}
+
+// RecipeEdit defines model for RecipeEdit.
+type RecipeEdit struct {
+	Archived        bool        `json:"archived"`
+	ExpectedVersion int         `json:"expectedVersion"`
+	Ingredients     Ingredients `json:"ingredients"`
+	Servings        int         `json:"servings"`
+	Steps           Steps       `json:"steps"`
+	Title           Title2      `json:"title"`
+}
+
+// RecipeList defines model for RecipeList.
+type RecipeList struct {
+	Recipes []RecipeSummary `json:"recipes"`
+}
+
+// RecipeSummary defines model for RecipeSummary.
+type RecipeSummary struct {
+	Archived bool   `json:"archived"`
+	Id       Id     `json:"id"`
+	Servings int    `json:"servings"`
+	Title    string `json:"title"`
+}
+
 // Routine defines model for Routine.
 type Routine struct {
 	ChildId Id `json:"childId"`
@@ -469,8 +562,22 @@ type Routine struct {
 	Title string `json:"title"`
 }
 
+// SetMeal Exactly one of recipeId and title.
+type SetMeal struct {
+	ExpectedVersion int     `json:"expectedVersion"`
+	Note            *string `json:"note,omitempty"`
+	RecipeId        *Id     `json:"recipeId,omitempty"`
+	Title           *Title2 `json:"title,omitempty"`
+}
+
+// Steps defines model for Steps.
+type Steps = []string
+
 // Title defines model for Title.
 type Title = string
+
+// Title2 defines model for Title-2.
+type Title2 = string
 
 // Today defines model for Today.
 type Today struct {
@@ -672,6 +779,28 @@ type RejectInboxItemParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// GetMealWeekParams defines parameters for GetMealWeek.
+type GetMealWeekParams struct {
+	// Week Any date in the week
+	Week *openapi_types.Date `form:"week,omitempty" json:"week,omitempty"`
+}
+
+// ClearMealParams defines parameters for ClearMeal.
+type ClearMealParams struct {
+	ExpectedVersion int `form:"expectedVersion" json:"expectedVersion"`
+
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// SetMealParams defines parameters for SetMeal.
+type SetMealParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ReversePointsJSONBody defines parameters for ReversePoints.
 type ReversePointsJSONBody struct {
 	Reason *string `json:"reason,omitempty"`
@@ -679,6 +808,26 @@ type ReversePointsJSONBody struct {
 
 // ReversePointsParams defines parameters for ReversePoints.
 type ReversePointsParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ListRecipesParams defines parameters for ListRecipes.
+type ListRecipesParams struct {
+	// Archived Include archived recipes
+	Archived *bool `form:"archived,omitempty" json:"archived,omitempty"`
+}
+
+// CreateRecipeParams defines parameters for CreateRecipe.
+type CreateRecipeParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateRecipeParams defines parameters for UpdateRecipe.
+type UpdateRecipeParams struct {
 	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
 	// same body, gets the first answer (for 30 days) instead of doing it again.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -739,8 +888,17 @@ type ApproveInboxItemJSONRequestBody = ApproveInboxItemJSONBody
 // RejectInboxItemJSONRequestBody defines body for RejectInboxItem for application/json ContentType.
 type RejectInboxItemJSONRequestBody RejectInboxItemJSONBody
 
+// SetMealJSONRequestBody defines body for SetMeal for application/json ContentType.
+type SetMealJSONRequestBody = SetMeal
+
 // ReversePointsJSONRequestBody defines body for ReversePoints for application/json ContentType.
 type ReversePointsJSONRequestBody ReversePointsJSONBody
+
+// CreateRecipeJSONRequestBody defines body for CreateRecipe for application/json ContentType.
+type CreateRecipeJSONRequestBody = NewRecipe
+
+// UpdateRecipeJSONRequestBody defines body for UpdateRecipe for application/json ContentType.
+type UpdateRecipeJSONRequestBody = RecipeEdit
 
 // CreateRoutineJSONRequestBody defines body for CreateRoutine for application/json ContentType.
 type CreateRoutineJSONRequestBody = NewRoutine
@@ -825,9 +983,30 @@ type ServerInterface interface {
 	// OpenLive Live updates (WebSocket)
 	// (GET /live)
 	OpenLive(w http.ResponseWriter, r *http.Request)
+	// GetMealWeek The meal plan for the household week containing a date
+	// (GET /meals)
+	GetMealWeek(w http.ResponseWriter, r *http.Request, params GetMealWeekParams)
+	// ClearMeal Clear a planned meal
+	// (DELETE /meals/{date}/{slot})
+	ClearMeal(w http.ResponseWriter, r *http.Request, date openapi_types.Date, slot MealSlot, params ClearMealParams)
+	// SetMeal Plan a meal, or change the planned one
+	// (PUT /meals/{date}/{slot})
+	SetMeal(w http.ResponseWriter, r *http.Request, date openapi_types.Date, slot MealSlot, params SetMealParams)
 	// ReversePoints Take back the points of an award (a chore done by mistake)
 	// (POST /points/{entryId}/reverse)
 	ReversePoints(w http.ResponseWriter, r *http.Request, entryId Id, params ReversePointsParams)
+	// ListRecipes The household's recipes, by title
+	// (GET /recipes)
+	ListRecipes(w http.ResponseWriter, r *http.Request, params ListRecipesParams)
+	// CreateRecipe Add a recipe
+	// (POST /recipes)
+	CreateRecipe(w http.ResponseWriter, r *http.Request, params CreateRecipeParams)
+	// GetRecipe One recipe, to cook from or edit
+	// (GET /recipes/{recipeId})
+	GetRecipe(w http.ResponseWriter, r *http.Request, recipeId Id)
+	// UpdateRecipe Edit a recipe, or archive or restore it
+	// (PUT /recipes/{recipeId})
+	UpdateRecipe(w http.ResponseWriter, r *http.Request, recipeId Id, params UpdateRecipeParams)
 	// ListRoutines The household's routines
 	// (GET /routines)
 	ListRoutines(w http.ResponseWriter, r *http.Request)
@@ -1649,6 +1828,178 @@ func (siw *ServerInterfaceWrapper) OpenLive(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// GetMealWeek operation middleware
+func (siw *ServerInterfaceWrapper) GetMealWeek(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMealWeekParams
+
+	// ------------- Optional query parameter "week" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "week", r.URL.Query(), &params.Week, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "week"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "week", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMealWeek(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClearMeal operation middleware
+func (siw *ServerInterfaceWrapper) ClearMeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", r.PathValue("date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "date", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "slot" -------------
+	var slot MealSlot
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slot", r.PathValue("slot"), &slot, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slot", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ClearMealParams
+
+	// ------------- Required query parameter "expectedVersion" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "expectedVersion", r.URL.Query(), &params.ExpectedVersion, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "expectedVersion"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expectedVersion", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearMeal(w, r, date, slot, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetMeal operation middleware
+func (siw *ServerInterfaceWrapper) SetMeal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", r.PathValue("date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "date", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "slot" -------------
+	var slot MealSlot
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slot", r.PathValue("slot"), &slot, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slot", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetMealParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetMeal(w, r, date, slot, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReversePoints operation middleware
 func (siw *ServerInterfaceWrapper) ReversePoints(w http.ResponseWriter, r *http.Request) {
 
@@ -1694,6 +2045,164 @@ func (siw *ServerInterfaceWrapper) ReversePoints(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReversePoints(w, r, entryId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRecipes operation middleware
+func (siw *ServerInterfaceWrapper) ListRecipes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRecipesParams
+
+	// ------------- Optional query parameter "archived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "archived", r.URL.Query(), &params.Archived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "archived"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "archived", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRecipes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRecipe operation middleware
+func (siw *ServerInterfaceWrapper) CreateRecipe(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateRecipeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRecipe(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRecipe operation middleware
+func (siw *ServerInterfaceWrapper) GetRecipe(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "recipeId" -------------
+	var recipeId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "recipeId", r.PathValue("recipeId"), &recipeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "recipeId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRecipe(w, r, recipeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateRecipe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRecipe(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "recipeId" -------------
+	var recipeId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "recipeId", r.PathValue("recipeId"), &recipeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "recipeId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateRecipeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateRecipe(w, r, recipeId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2100,6 +2609,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/routines", wrapper.CreateRoutine)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/routines/{routineId}", wrapper.ArchiveRoutine)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/live", wrapper.OpenLive)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/meals", wrapper.GetMealWeek)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/meals/{date}/{slot}", wrapper.ClearMeal)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/meals/{date}/{slot}", wrapper.SetMeal)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/recipes", wrapper.ListRecipes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/recipes", wrapper.CreateRecipe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/recipes/{recipeId}", wrapper.GetRecipe)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/recipes/{recipeId}", wrapper.UpdateRecipe)
 
 	return m
 }
@@ -4360,6 +4876,350 @@ func (response OpenLivedefaultJSONResponse) VisitOpenLiveResponse(w http.Respons
 	return err
 }
 
+type GetMealWeekRequestObject struct {
+	Params GetMealWeekParams
+}
+
+type GetMealWeekResponseObject interface {
+	VisitGetMealWeekResponse(w http.ResponseWriter) error
+}
+
+type GetMealWeek200JSONResponse MealWeek
+
+func (response GetMealWeek200JSONResponse) VisitGetMealWeekResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMealWeek400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetMealWeek400JSONResponse) VisitGetMealWeekResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMealWeek401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetMealWeek401JSONResponse) VisitGetMealWeekResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMealWeek403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetMealWeek403JSONResponse) VisitGetMealWeekResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMealWeekdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetMealWeekdefaultJSONResponse) VisitGetMealWeekResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMealRequestObject struct {
+	Date   openapi_types.Date `json:"date"`
+	Slot   MealSlot           `json:"slot"`
+	Params ClearMealParams
+}
+
+type ClearMealResponseObject interface {
+	VisitClearMealResponse(w http.ResponseWriter) error
+}
+
+type ClearMeal204Response struct {
+}
+
+func (response ClearMeal204Response) VisitClearMealResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ClearMeal400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ClearMeal400JSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMeal401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ClearMeal401JSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMeal403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ClearMeal403JSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMeal404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ClearMeal404JSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMeal409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ClearMeal409JSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMeal422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ClearMeal422JSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearMealdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ClearMealdefaultJSONResponse) VisitClearMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMealRequestObject struct {
+	Date   openapi_types.Date `json:"date"`
+	Slot   MealSlot           `json:"slot"`
+	Params SetMealParams
+	Body   *SetMealJSONRequestBody
+}
+
+type SetMealResponseObject interface {
+	VisitSetMealResponse(w http.ResponseWriter) error
+}
+
+type SetMeal200JSONResponse Meal
+
+func (response SetMeal200JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetMeal400JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SetMeal401JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response SetMeal403JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetMeal404JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal409JSONResponse struct{ ConflictJSONResponse }
+
+func (response SetMeal409JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response SetMeal413JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMeal422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response SetMeal422JSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetMealdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SetMealdefaultJSONResponse) VisitSetMealResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ReversePointsRequestObject struct {
 	EntryId Id `json:"entryId"`
 	Params  ReversePointsParams
@@ -4476,6 +5336,421 @@ type ReversePointsdefaultJSONResponse struct {
 }
 
 func (response ReversePointsdefaultJSONResponse) VisitReversePointsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRecipesRequestObject struct {
+	Params ListRecipesParams
+}
+
+type ListRecipesResponseObject interface {
+	VisitListRecipesResponse(w http.ResponseWriter) error
+}
+
+type ListRecipes200JSONResponse RecipeList
+
+func (response ListRecipes200JSONResponse) VisitListRecipesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRecipes400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListRecipes400JSONResponse) VisitListRecipesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRecipes401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListRecipes401JSONResponse) VisitListRecipesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRecipes403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListRecipes403JSONResponse) VisitListRecipesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRecipesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListRecipesdefaultJSONResponse) VisitListRecipesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipeRequestObject struct {
+	Params CreateRecipeParams
+	Body   *CreateRecipeJSONRequestBody
+}
+
+type CreateRecipeResponseObject interface {
+	VisitCreateRecipeResponse(w http.ResponseWriter) error
+}
+
+type CreateRecipe201JSONResponse Recipe
+
+func (response CreateRecipe201JSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipe400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateRecipe400JSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipe401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateRecipe401JSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipe403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateRecipe403JSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipe413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response CreateRecipe413JSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipe422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateRecipe422JSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRecipedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateRecipedefaultJSONResponse) VisitCreateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecipeRequestObject struct {
+	RecipeId Id `json:"recipeId"`
+}
+
+type GetRecipeResponseObject interface {
+	VisitGetRecipeResponse(w http.ResponseWriter) error
+}
+
+type GetRecipe200JSONResponse Recipe
+
+func (response GetRecipe200JSONResponse) VisitGetRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecipe401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetRecipe401JSONResponse) VisitGetRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecipe403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetRecipe403JSONResponse) VisitGetRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecipe404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRecipe404JSONResponse) VisitGetRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecipedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetRecipedefaultJSONResponse) VisitGetRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipeRequestObject struct {
+	RecipeId Id `json:"recipeId"`
+	Params   UpdateRecipeParams
+	Body     *UpdateRecipeJSONRequestBody
+}
+
+type UpdateRecipeResponseObject interface {
+	VisitUpdateRecipeResponse(w http.ResponseWriter) error
+}
+
+type UpdateRecipe200JSONResponse Recipe
+
+func (response UpdateRecipe200JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateRecipe400JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateRecipe401JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateRecipe403JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateRecipe404JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateRecipe409JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response UpdateRecipe413JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipe422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response UpdateRecipe422JSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRecipedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateRecipedefaultJSONResponse) VisitUpdateRecipeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -5100,9 +6375,30 @@ type StrictServerInterface interface {
 	// OpenLive Live updates (WebSocket)
 	// (GET /live)
 	OpenLive(ctx context.Context, request OpenLiveRequestObject) (OpenLiveResponseObject, error)
+	// GetMealWeek The meal plan for the household week containing a date
+	// (GET /meals)
+	GetMealWeek(ctx context.Context, request GetMealWeekRequestObject) (GetMealWeekResponseObject, error)
+	// ClearMeal Clear a planned meal
+	// (DELETE /meals/{date}/{slot})
+	ClearMeal(ctx context.Context, request ClearMealRequestObject) (ClearMealResponseObject, error)
+	// SetMeal Plan a meal, or change the planned one
+	// (PUT /meals/{date}/{slot})
+	SetMeal(ctx context.Context, request SetMealRequestObject) (SetMealResponseObject, error)
 	// ReversePoints Take back the points of an award (a chore done by mistake)
 	// (POST /points/{entryId}/reverse)
 	ReversePoints(ctx context.Context, request ReversePointsRequestObject) (ReversePointsResponseObject, error)
+	// ListRecipes The household's recipes, by title
+	// (GET /recipes)
+	ListRecipes(ctx context.Context, request ListRecipesRequestObject) (ListRecipesResponseObject, error)
+	// CreateRecipe Add a recipe
+	// (POST /recipes)
+	CreateRecipe(ctx context.Context, request CreateRecipeRequestObject) (CreateRecipeResponseObject, error)
+	// GetRecipe One recipe, to cook from or edit
+	// (GET /recipes/{recipeId})
+	GetRecipe(ctx context.Context, request GetRecipeRequestObject) (GetRecipeResponseObject, error)
+	// UpdateRecipe Edit a recipe, or archive or restore it
+	// (PUT /recipes/{recipeId})
+	UpdateRecipe(ctx context.Context, request UpdateRecipeRequestObject) (UpdateRecipeResponseObject, error)
 	// ListRoutines The household's routines
 	// (GET /routines)
 	ListRoutines(ctx context.Context, request ListRoutinesRequestObject) (ListRoutinesResponseObject, error)
@@ -5883,6 +7179,95 @@ func (sh *strictHandler) OpenLive(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetMealWeek operation middleware
+func (sh *strictHandler) GetMealWeek(w http.ResponseWriter, r *http.Request, params GetMealWeekParams) {
+	var request GetMealWeekRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMealWeek(ctx, request.(GetMealWeekRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMealWeek")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMealWeekResponseObject); ok {
+		if err := validResponse.VisitGetMealWeekResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ClearMeal operation middleware
+func (sh *strictHandler) ClearMeal(w http.ResponseWriter, r *http.Request, date openapi_types.Date, slot MealSlot, params ClearMealParams) {
+	var request ClearMealRequestObject
+
+	request.Date = date
+	request.Slot = slot
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClearMeal(ctx, request.(ClearMealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClearMeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClearMealResponseObject); ok {
+		if err := validResponse.VisitClearMealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetMeal operation middleware
+func (sh *strictHandler) SetMeal(w http.ResponseWriter, r *http.Request, date openapi_types.Date, slot MealSlot, params SetMealParams) {
+	var request SetMealRequestObject
+
+	request.Date = date
+	request.Slot = slot
+	request.Params = params
+
+	var body SetMealJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetMeal(ctx, request.(SetMealRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetMeal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetMealResponseObject); ok {
+		if err := validResponse.VisitSetMealResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ReversePoints operation middleware
 func (sh *strictHandler) ReversePoints(w http.ResponseWriter, r *http.Request, entryId Id, params ReversePointsParams) {
 	var request ReversePointsRequestObject
@@ -5910,6 +7295,125 @@ func (sh *strictHandler) ReversePoints(w http.ResponseWriter, r *http.Request, e
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReversePointsResponseObject); ok {
 		if err := validResponse.VisitReversePointsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRecipes operation middleware
+func (sh *strictHandler) ListRecipes(w http.ResponseWriter, r *http.Request, params ListRecipesParams) {
+	var request ListRecipesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRecipes(ctx, request.(ListRecipesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRecipes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRecipesResponseObject); ok {
+		if err := validResponse.VisitListRecipesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRecipe operation middleware
+func (sh *strictHandler) CreateRecipe(w http.ResponseWriter, r *http.Request, params CreateRecipeParams) {
+	var request CreateRecipeRequestObject
+
+	request.Params = params
+
+	var body CreateRecipeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRecipe(ctx, request.(CreateRecipeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRecipe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRecipeResponseObject); ok {
+		if err := validResponse.VisitCreateRecipeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRecipe operation middleware
+func (sh *strictHandler) GetRecipe(w http.ResponseWriter, r *http.Request, recipeId Id) {
+	var request GetRecipeRequestObject
+
+	request.RecipeId = recipeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRecipe(ctx, request.(GetRecipeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRecipe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRecipeResponseObject); ok {
+		if err := validResponse.VisitGetRecipeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateRecipe operation middleware
+func (sh *strictHandler) UpdateRecipe(w http.ResponseWriter, r *http.Request, recipeId Id, params UpdateRecipeParams) {
+	var request UpdateRecipeRequestObject
+
+	request.RecipeId = recipeId
+	request.Params = params
+
+	var body UpdateRecipeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateRecipe(ctx, request.(UpdateRecipeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateRecipe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateRecipeResponseObject); ok {
+		if err := validResponse.VisitUpdateRecipeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -6085,109 +7589,127 @@ func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"q07IZ379/vr/BgA=",
+	"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",
+	"V19OjE/q5uPN/wwA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

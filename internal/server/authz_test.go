@@ -65,6 +65,12 @@ func TestAuthzMatrix(t *testing.T) {
 				u = strings.ReplaceAll(u, "{routineId}", h.routine.String())
 				u = strings.ReplaceAll(u, "{stepId}", h.step.String())
 				u = strings.ReplaceAll(u, "{itemId}", h.approval.String())
+				u = strings.ReplaceAll(u, "{recipeId}", h.recipe.String())
+				u = strings.ReplaceAll(u, "{date}", "2026-09-16")
+				u = strings.ReplaceAll(u, "{slot}", "dinner")
+				if op == "DELETE /meals/{date}/{slot}" {
+					u += "?expectedVersion=1" // a required query parameter
+				}
 				u = strings.ReplaceAll(u, "{entryId}", h.entry.String())
 				return "/api" + u
 			}
@@ -115,14 +121,17 @@ func TestAuthzMatrix(t *testing.T) {
 			}
 
 			// 2. Household B's allowed actors against household A's ids: 404, nothing changed.
+			// A path without an id ({date}/{slot}) names B's own row, so only "nothing of A's
+			// changed" applies.
 			if !p.Public && strings.Contains(path, "{") {
+				ids := strings.Contains(path, "Id}")
 				before := e.fingerprint(a.id)
 				for _, name := range actorNames {
 					kind, live := actorKind(name)
 					if !live || !allowed(p, name, kind) || (p.RecentAuth && name == "adult-stale") {
 						continue
 					}
-					if r := e.send(b.actors[name], method, url(a, a.child1), body()); r.status != 404 {
+					if r := e.send(b.actors[name], method, url(a, a.child1), body()); ids && r.status != 404 {
 						t.Errorf("household B %s on A's ids: want 404, got %d %s", name, r.status, r.raw)
 					}
 				}
@@ -156,6 +165,20 @@ func allowed(p authz.Policy, name string, kind actor.Kind) bool {
 		return len(p.Scopes) == 0
 	case "display-none":
 		return false // a display with no scopes reaches nothing
+	case "display-today":
+		return displayHas(p, "today")
+	case "display-meals":
+		return displayHas(p, "meals")
+	}
+	return true
+}
+
+// displayHas: a display holding only scope reaches the operation.
+func displayHas(p authz.Policy, scope string) bool {
+	for _, s := range p.DisplayScopes {
+		if s != scope {
+			return false
+		}
 	}
 	return true
 }
