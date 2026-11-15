@@ -49,7 +49,7 @@ type Options struct {
 	// not attempt it otherwise.
 	HTTP2 bool
 	// TLS is an optional base TLS configuration (client certificates, extra roots). It is
-	// cloned, and its minimum version raised to TLS 1.2.
+	// cloned, and its minimum version raised to TLS 1.2. InsecureSkipVerify is refused.
 	TLS *tls.Config
 }
 
@@ -73,6 +73,10 @@ func build(o Options, allowOverride func(netip.Addr) bool) (*http.Client, error)
 		return nil, fmt.Errorf("egress %s: MaxResponseBytes is required", o.Name)
 	case o.MaxRedirects < 0:
 		return nil, fmt.Errorf("egress %s: MaxRedirects must not be negative", o.Name)
+	}
+	if o.TLS != nil && o.TLS.InsecureSkipVerify {
+		// A self-signed server gets extra roots (TLS.RootCAs) or a pin, never no checks.
+		return nil, fmt.Errorf("egress %s: TLS.InsecureSkipVerify is not allowed", o.Name)
 	}
 	for _, p := range o.PrivateCIDRs {
 		if err := checkPrivatePrefix(p); err != nil {

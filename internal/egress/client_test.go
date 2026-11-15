@@ -115,6 +115,7 @@ func TestNewChecksOptions(t *testing.T) {
 		"no cap":      {Name: "x", Timeout: time.Second},
 		"bad private": {Name: "x", Timeout: time.Second, MaxResponseBytes: 1, PrivateCIDRs: []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")}},
 		"wide":        {Name: "x", Timeout: time.Second, MaxResponseBytes: 1, PrivateCIDRs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/7")}},
+		"insecure":    {Name: "x", Timeout: time.Second, MaxResponseBytes: 1, TLS: &tls.Config{InsecureSkipVerify: true}}, //nolint:gosec // the case under test
 	} {
 		if _, err := New(o); err == nil {
 			t.Errorf("%s: New accepted %+v", name, o)
@@ -354,4 +355,16 @@ func TestOIDCAndOAuth2UseEgress(t *testing.T) {
 	}
 	// The exchange may reuse discovery's connection, so it adds no dial; that it succeeded with
 	// http.DefaultTransport failing every request shows it used the egress client.
+}
+
+// Certificates are always checked: a server whose root the client does not trust is refused,
+// and there is no way to turn the check off (TestNewChecksOptions, "insecure").
+func TestVerifiesCertificates(t *testing.T) {
+	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	defer s.Close()
+	c, _ := testClient(t, Options{Ports: []uint16{serverPort(t, s)}})
+	var unknown x509.UnknownAuthorityError
+	if err := try(t, c, s.URL); !errors.As(err, &unknown) {
+		t.Fatalf("err = %v, want an unknown-authority error", err)
+	}
 }

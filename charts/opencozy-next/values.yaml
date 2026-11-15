@@ -117,9 +117,13 @@ resources:
 # same: public addresses on ports 80, 443, 8080 and 8443, and each private allowlist on its
 # ports. Each list of CIDRs is also passed to the app, which refuses to start on anything but
 # RFC 1918 or ULA ranges. Integration secrets need OPENCOZY_SECRET_KEYS in secrets.env, e.g.
-# `- name: OPENCOZY_SECRET_KEYS` / `key: secret-keys`.
+# `- name: OPENCOZY_SECRET_KEYS` / `key: secret-keys`. ipBlock peers match pod addresses, not
+# Service IPs on most CNIs: for a Home Assistant or OIDC issuer inside the cluster, allow it with
+# a selector in networkPolicy.extraEgress instead.
 egress:
-  internet: true
+  # Off until an integration needs the internet: an install with none reaches DNS and the
+  # database only.
+  internet: false
   homeAssistant:
     cidrs: []
     ports: [8123]

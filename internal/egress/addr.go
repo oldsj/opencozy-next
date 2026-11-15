@@ -3,6 +3,10 @@
 // the dialer, so a DNS answer cannot change between the check and the connection; there is no
 // proxy; redirects are refused unless a client opts in, and then each hop is checked again; and
 // response bodies are capped after decompression.
+//
+// Errors name the host and the addresses it resolved to, for logs. Callers must map them to a
+// fixed error code before anything reaches a user, or a form that takes a URL (a calendar feed)
+// becomes a way to probe internal DNS.
 package egress
 
 import (
