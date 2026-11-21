@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -60,7 +61,7 @@ func importChildren(ctx context.Context, x *run) error {
 	if err != nil {
 		return safe(err)
 	}
-	var n, hours int64
+	var n, hours, partial int64
 	for rows.Next() {
 		var (
 			household, id  uuid.UUID
@@ -72,6 +73,12 @@ func importChildren(ctx context.Context, x *run) error {
 		)
 		if err := rows.Scan(&household, &id, &name, &color, &created, &archived, &snStart, &snEnd, &weStart, &weEnd); err != nil {
 			return safe(err)
+		}
+		// The old check let a rule with one to three times missing through; both apps read it as
+		// no rule, and the new check refuses it. Carry it as none, and say how many.
+		if set := countSet(snStart, snEnd, weStart, weEnd); set > 0 && set < 4 {
+			snStart, snEnd, weStart, weEnd = nil, nil, nil, nil
+			partial++
 		}
 		if _, err := x.dst.Exec(ctx, `INSERT INTO child (household_id, id, name, color, created_at, archived_at,
 			school_night_start, school_night_end, weekend_start, weekend_end) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -94,7 +101,21 @@ func importChildren(ctx context.Context, x *run) error {
 		return safe(err)
 	}
 	x.r.check("children with allowed hours", hours, got)
+	if partial > 0 {
+		x.r.note("child", fmt.Sprintf("%d with partly set allowed hours, carried as none (any time)", partial))
+	}
 	return nil
+}
+
+// countSet counts the times that are set.
+func countSet(times ...*int32) int {
+	n := 0
+	for _, t := range times {
+		if t != nil {
+			n++
+		}
+	}
+	return n
 }
 
 // reconcile records an old table carried one row to one row: want rows were written.

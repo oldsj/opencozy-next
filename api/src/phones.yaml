@@ -1,0 +1,434 @@
+# Parent phones (slice 11, design §3 and §8). The iOS parent app signs in with a passkey or a
+# password and gets an `ocp_` bearer session for 90 days, one per phone. It registers the phone's
+# APNs token on that session to hear about things waiting for a parent. Adults see and sign out
+# phones in Manage. A kid device registers its own APNs token with a signed request.
+signIn:
+  post:
+    operationId: phoneSignIn
+    summary: Sign a parent phone in with an email and password
+    description: The token is in this response only. Every failure is the same 401.
+    tags: [phones]
+    x-actors: [public]
+    x-body-limit: 4096
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [email, password, deviceName]
+            properties:
+              email:
+                type: string
+                format: email
+                maxLength: 254
+              password:
+                type: string
+                minLength: 1
+                maxLength: 256
+              deviceName:
+                $ref: '#/schemas/PhoneName'
+          example: { email: alex@example.test, password: correct horse battery staple, deviceName: Alex's iPhone }
+    responses:
+      '201':
+        description: Signed in
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PhoneSignedIn'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+passkeySignIn:
+  post:
+    operationId: phoneSignInWithPasskey
+    summary: Sign a parent phone in with a passkey
+    description: |
+      Start with `POST /auth/passkey/options`, then send the authenticator's response here with
+      the phone's name. The token is in this response only.
+    tags: [phones]
+    x-actors: [public]
+    x-body-limit: 16384
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [challengeId, credential, deviceName]
+            properties:
+              challengeId:
+                $ref: common.yaml#/schemas/Id
+              credential:
+                type: object
+                additionalProperties: true
+                description: PublicKeyCredential.toJSON()
+              deviceName:
+                $ref: '#/schemas/PhoneName'
+          example: { challengeId: 0195f2d4-0000-7000-8000-000000000000, credential: {}, deviceName: Alex's iPhone }
+    responses:
+      '201':
+        description: Signed in
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PhoneSignedIn'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error
+self:
+  get:
+    operationId: getPhoneSession
+    summary: This phone's session
+    tags: [phones]
+    x-actors: [phone]
+    responses:
+      '200':
+        description: The session, its adult and household
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PhoneSelf'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  delete:
+    operationId: phoneSignOut
+    summary: Sign this phone out; its token stops working and it gets no more pushes
+    tags: [phones]
+    x-actors: [phone]
+    responses:
+      '204':
+        description: Signed out
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+phonePush:
+  put:
+    operationId: registerPhonePush
+    summary: Register this phone's APNs token
+    description: A token is one app install, so it moves here from any other phone session or device that had it.
+    tags: [phones]
+    x-actors: [phone]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/PushRegistration'
+          example: { token: 0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9, environment: production }
+    responses:
+      '200':
+        description: Registered
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PushRegistered'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+  delete:
+    operationId: unregisterPhonePush
+    summary: Stop pushes to this phone (it stays signed in)
+    tags: [phones]
+    x-actors: [phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    responses:
+      '204':
+        description: No more pushes
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+phones:
+  get:
+    operationId: listPhoneSessions
+    summary: The household's signed-in parent phones
+    tags: [phones]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: Phones, oldest first
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/schemas/PhoneSession'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+phone:
+  parameters:
+    - name: phoneSessionId
+      in: path
+      required: true
+      schema:
+        $ref: common.yaml#/schemas/Id
+  delete:
+    operationId: revokePhoneSession
+    summary: Sign a parent phone out; it stops working at once
+    tags: [phones]
+    x-actors: [adult, phone]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    responses:
+      '204':
+        description: Signed out
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+devicePush:
+  put:
+    operationId: registerDevicePush
+    summary: Register this kid device's APNs token
+    description: Pushes go to the device's current child. A token moves here from any other device or phone session that had it.
+    tags: [devices]
+    x-actors: [device]
+    x-command: true
+    x-body-limit: 1024
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/PushRegistration'
+          example: { token: 0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9, environment: production }
+    responses:
+      '200':
+        description: Registered
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PushRegistered'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+  delete:
+    operationId: unregisterDevicePush
+    summary: Stop pushes to this kid device
+    tags: [devices]
+    x-actors: [device]
+    x-command: true
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    responses:
+      '204':
+        description: No more pushes
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+pushMute:
+  get:
+    operationId: getPushMute
+    summary: Whether your phone alerts are paused
+    tags: [phones]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: Your alerts
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PushMute'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  put:
+    operationId: setPushMute
+    summary: Pause your phone alerts until a time, or turn them back on
+    description: |
+      While paused, your phones get no alerts; silent updates (an answered item leaving, the
+      badge) still arrive, and other adults and the children's devices are unaffected. Alerts
+      come back on their own at that time. At most 90 days ahead.
+    tags: [phones]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 256
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [until]
+            properties:
+              until:
+                description: When alerts come back; null turns them back on now
+                type: [string, 'null']
+                format: date-time
+          example: { until: '2026-12-01T08:00:00Z' }
+    responses:
+      '200':
+        description: Your alerts
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/PushMute'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+
+schemas:
+  PushMute:
+    type: object
+    required: [mutedUntil]
+    properties:
+      mutedUntil:
+        description: Alerts are paused until then; null when they are on
+        type: [string, 'null']
+        format: date-time
+  PhoneName:
+    type: string
+    minLength: 1
+    maxLength: 80
+    description: What the phone is called in Manage, e.g. "Alex's iPhone"
+  PhoneSession:
+    type: object
+    required: [id, adultId, adultName, name, createdAt, expiresAt, lastUsedAt, pushRegistered, current]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      adultId:
+        $ref: common.yaml#/schemas/Id
+      adultName:
+        type: string
+      name:
+        type: string
+      createdAt:
+        type: string
+        format: date-time
+      expiresAt:
+        type: string
+        format: date-time
+      lastUsedAt:
+        description: Coarse (within 5 minutes); null until first used
+        type: [string, 'null']
+        format: date-time
+      pushRegistered:
+        description: The phone gets pushes
+        type: boolean
+      current:
+        description: This is the phone making the request
+        type: boolean
+  PhoneSignedIn:
+    type: object
+    required: [token, session, me]
+    properties:
+      token:
+        description: The `ocp_` bearer secret; shown once
+        type: string
+      session:
+        $ref: '#/schemas/PhoneSession'
+      me:
+        $ref: auth.yaml#/schemas/Me
+  PhoneSelf:
+    type: object
+    required: [session, me, pushMutedUntil]
+    properties:
+      session:
+        $ref: '#/schemas/PhoneSession'
+      me:
+        $ref: auth.yaml#/schemas/Me
+      pushMutedUntil:
+        description: While in the future, this adult's phones get no alerts (silent updates still arrive)
+        type: [string, 'null']
+        format: date-time
+  PushRegistration:
+    type: object
+    additionalProperties: false
+    required: [token, environment]
+    properties:
+      token:
+        description: The APNs device token in hex
+        type: string
+        pattern: '^[A-Fa-f0-9]{64,200}$'
+      environment:
+        description: The APNs environment the app was built for
+        type: string
+        enum: [development, production]
+  PushRegistered:
+    type: object
+    required: [environment, registeredAt]
+    properties:
+      environment:
+        type: string
+        enum: [development, production]
+      registeredAt:
+        type: string
+        format: date-time

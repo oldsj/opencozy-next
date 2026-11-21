@@ -117,7 +117,7 @@ func (q *Queries) DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (i
 }
 
 const getAdultByUserHandle = `-- name: GetAdultByUserHandle :one
-SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at FROM adult a
+SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at, a.push_muted_until FROM adult a
 JOIN household h ON h.id = a.household_id
 WHERE a.webauthn_user_handle = $1 AND a.removed_at IS NULL AND h.archived_at IS NULL
 `
@@ -136,6 +136,7 @@ func (q *Queries) GetAdultByUserHandle(ctx context.Context, webauthnUserHandle [
 		&i.WebauthnUserHandle,
 		&i.RemovedAt,
 		&i.CreatedAt,
+		&i.PushMutedUntil,
 	)
 	return i, err
 }
@@ -185,7 +186,7 @@ func (q *Queries) ListPasskeys(ctx context.Context, arg ListPasskeysParams) ([]P
 }
 
 const lockAdult = `-- name: LockAdult :one
-SELECT id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL FOR UPDATE
+SELECT id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at, push_muted_until FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL FOR UPDATE
 `
 
 type LockAdultParams struct {
@@ -207,6 +208,7 @@ func (q *Queries) LockAdult(ctx context.Context, arg LockAdultParams) (Adult, er
 		&i.WebauthnUserHandle,
 		&i.RemovedAt,
 		&i.CreatedAt,
+		&i.PushMutedUntil,
 	)
 	return i, err
 }

@@ -171,13 +171,17 @@ func (s *Server) RedeemReward(ctx context.Context, req api.RedeemRewardRequestOb
 		}); err != nil {
 			return nil, err
 		}
-		if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+		if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 			return nil, err
 		}
 	case !adult:
-		if _, err := cmd.Q.CreateRedemptionApproval(ctx, dbq.CreateRedemptionApprovalParams{
+		ap, err := cmd.Q.CreateRedemptionApproval(ctx, dbq.CreateRedemptionApprovalParams{
 			HouseholdID: a.HouseholdID, ChildID: req.ChildId, RedemptionID: &red.ID, Title: r.Title, Points: r.Cost,
-		}); err != nil {
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := s.pushPending(ctx, cmd, ap, ap.CreatedAt); err != nil {
 			return nil, err
 		}
 	}

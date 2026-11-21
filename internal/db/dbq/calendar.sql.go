@@ -48,7 +48,7 @@ func (q *Queries) CalendarFeedTaken(ctx context.Context, arg CalendarFeedTakenPa
 const claimDueFeeds = `-- name: ClaimDueFeeds :many
 WITH due AS (
     SELECT s.id FROM calendar_source s
-    WHERE s.provider = 'ics' AND s.next_sync_at <= now()
+    WHERE s.provider IN ('ics', 'google') AND s.next_sync_at <= now()
     ORDER BY s.next_sync_at
     LIMIT $1
     FOR UPDATE SKIP LOCKED
@@ -56,19 +56,23 @@ WITH due AS (
 UPDATE calendar_source s SET next_sync_at = now() + interval '10 minutes', last_attempt_at = now()
 FROM due, household h
 WHERE s.id = due.id AND h.id = s.household_id
-RETURNING s.id, s.household_id, s.feed_url, s.http_etag, s.http_last_modified, s.feed_hash, s.window_start,
-    h.time_zone
+RETURNING s.id, s.household_id, s.provider, s.feed_url, s.http_etag, s.http_last_modified, s.feed_hash, s.window_start,
+    s.google_connection_id, s.google_calendar_id, s.google_sync_token, h.time_zone
 `
 
 type ClaimDueFeedsRow struct {
-	ID               uuid.UUID
-	HouseholdID      uuid.UUID
-	FeedUrl          *string
-	HttpEtag         *string
-	HttpLastModified *string
-	FeedHash         *string
-	WindowStart      pgtype.Date
-	TimeZone         string
+	ID                 uuid.UUID
+	HouseholdID        uuid.UUID
+	Provider           string
+	FeedUrl            *string
+	HttpEtag           *string
+	HttpLastModified   *string
+	FeedHash           *string
+	WindowStart        pgtype.Date
+	GoogleConnectionID *uuid.UUID
+	GoogleCalendarID   *string
+	GoogleSyncToken    *string
+	TimeZone           string
 }
 
 // Sync. ClaimDueFeeds pushes next_sync_at forward before the fetch, so a second run (or a
@@ -85,11 +89,15 @@ func (q *Queries) ClaimDueFeeds(ctx context.Context, limit int32) ([]ClaimDueFee
 		if err := rows.Scan(
 			&i.ID,
 			&i.HouseholdID,
+			&i.Provider,
 			&i.FeedUrl,
 			&i.HttpEtag,
 			&i.HttpLastModified,
 			&i.FeedHash,
 			&i.WindowStart,
+			&i.GoogleConnectionID,
+			&i.GoogleCalendarID,
+			&i.GoogleSyncToken,
 			&i.TimeZone,
 		); err != nil {
 			return nil, err
@@ -141,7 +149,7 @@ func (q *Queries) CountLiveChildren(ctx context.Context, arg CountLiveChildrenPa
 const createCalendarSource = `-- name: CreateCalendarSource :one
 INSERT INTO calendar_source (id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac)
 VALUES ($1, $2, 'ics', $3, $4, $5, $6, $7)
-RETURNING id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start
+RETURNING id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start, google_connection_id, google_calendar_id, google_sync_token
 `
 
 type CreateCalendarSourceParams struct {
@@ -185,6 +193,9 @@ func (q *Queries) CreateCalendarSource(ctx context.Context, arg CreateCalendarSo
 		&i.HttpLastModified,
 		&i.FeedHash,
 		&i.WindowStart,
+		&i.GoogleConnectionID,
+		&i.GoogleCalendarID,
+		&i.GoogleSyncToken,
 	)
 	return i, err
 }
@@ -359,7 +370,7 @@ func (q *Queries) GetCalendarEvent(ctx context.Context, arg GetCalendarEventPara
 }
 
 const getCalendarSource = `-- name: GetCalendarSource :one
-SELECT id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start FROM calendar_source WHERE household_id = $1 AND id = $2
+SELECT id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start, google_connection_id, google_calendar_id, google_sync_token FROM calendar_source WHERE household_id = $1 AND id = $2
 `
 
 type GetCalendarSourceParams struct {
@@ -390,6 +401,9 @@ func (q *Queries) GetCalendarSource(ctx context.Context, arg GetCalendarSourcePa
 		&i.HttpLastModified,
 		&i.FeedHash,
 		&i.WindowStart,
+		&i.GoogleConnectionID,
+		&i.GoogleCalendarID,
+		&i.GoogleSyncToken,
 	)
 	return i, err
 }
@@ -517,7 +531,7 @@ func (q *Queries) ListCalendarEvents(ctx context.Context, arg ListCalendarEvents
 }
 
 const listCalendarSources = `-- name: ListCalendarSources :many
-SELECT id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start FROM calendar_source WHERE household_id = $1 ORDER BY lower(name), id
+SELECT id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start, google_connection_id, google_calendar_id, google_sync_token FROM calendar_source WHERE household_id = $1 ORDER BY lower(name), id
 `
 
 func (q *Queries) ListCalendarSources(ctx context.Context, householdID uuid.UUID) ([]CalendarSource, error) {
@@ -549,6 +563,9 @@ func (q *Queries) ListCalendarSources(ctx context.Context, householdID uuid.UUID
 			&i.HttpLastModified,
 			&i.FeedHash,
 			&i.WindowStart,
+			&i.GoogleConnectionID,
+			&i.GoogleCalendarID,
+			&i.GoogleSyncToken,
 		); err != nil {
 			return nil, err
 		}
@@ -652,7 +669,7 @@ func (q *Queries) SetFeedURL(ctx context.Context, arg SetFeedURLParams) error {
 const updateCalendarSource = `-- name: UpdateCalendarSource :one
 UPDATE calendar_source SET name = $3, color = $4, show_on_display = $5, version = version + 1
 WHERE household_id = $1 AND id = $2 AND version = $6
-RETURNING id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start
+RETURNING id, household_id, provider, name, color, show_on_display, feed_url, feed_url_mac, version, created_at, next_sync_at, last_attempt_at, last_success_at, error_code, consecutive_failures, http_etag, http_last_modified, feed_hash, window_start, google_connection_id, google_calendar_id, google_sync_token
 `
 
 type UpdateCalendarSourceParams struct {
@@ -694,6 +711,9 @@ func (q *Queries) UpdateCalendarSource(ctx context.Context, arg UpdateCalendarSo
 		&i.HttpLastModified,
 		&i.FeedHash,
 		&i.WindowStart,
+		&i.GoogleConnectionID,
+		&i.GoogleCalendarID,
+		&i.GoogleSyncToken,
 	)
 	return i, err
 }

@@ -5,6 +5,9 @@ import {
   calendars,
   clock,
   eventDetail,
+  googleAccounts,
+  googleChoices,
+  googleOutcomeText,
   kids,
   providerLabels,
   type CalendarSource,
@@ -430,11 +433,16 @@ function CalendarRow({ source }: { source: CalendarSource }) {
   );
 }
 
-/** Calendar settings: each source, its sync state and a sentence for any error; never the feed URL. */
-export function Calendars() {
+/**
+ * Calendar settings: each source, its sync state and a sentence for any error; never the feed URL.
+ * Google accounts are listed once each: choose its calendars, sign in again, or disconnect. Coming
+ * back from Google shows one sentence for anything but success.
+ */
+export function Calendars({ outcome }: { outcome?: keyof typeof googleOutcomeText }) {
   return (
     <ManageShell nav={mealsNav('/manage/calendars')}>
       <PageHeader title="Calendars" description="Choose which ones show on the wall display." />
+      {outcome && <Notice tone="attention">{googleOutcomeText[outcome]}</Notice>}
       <Notice tone="attention" title="2 calendars need attention">
         School hasn’t updated since yesterday, and Sports needs you to sign in again.
       </Notice>
@@ -442,6 +450,32 @@ export function Calendars() {
         <List>
           {calendars.map((source) => (
             <CalendarRow key={source.id} source={source} />
+          ))}
+        </List>
+      </Section>
+      <Section title="Google accounts" count={googleAccounts.length}>
+        <List>
+          {googleAccounts.map((a) => (
+            <ListRow
+              key={a.id}
+              stackOnNarrow
+              title={a.email}
+              meta={a.needsReconnect ? 'Google stopped accepting this sign-in. Its calendars keep their events until you sign in again.' : `${String(a.calendars)} calendars followed`}
+              trailing={
+                <>
+                  {a.needsReconnect ? (
+                    <Button variant="primary" aria-label={`Sign in again: ${a.email}`}>
+                      Sign in again
+                    </Button>
+                  ) : (
+                    <Button aria-label={`Choose calendars from ${a.email}`}>Choose calendars</Button>
+                  )}
+                  <Button variant="quiet" aria-label={`Disconnect ${a.email}`}>
+                    Disconnect…
+                  </Button>
+                </>
+              }
+            />
           ))}
         </List>
       </Section>
@@ -454,6 +488,32 @@ export function Calendars() {
       </Section>
     </ManageShell>
   );
+}
+
+/** Back from Google, or "Choose calendars": one tap follows a calendar (on the wall display, the next colour). Remove one from its Edit sheet. */
+export function CalendarGoogleChoose() {
+  return (
+    <>
+      <Calendars />
+      <Sheet open onClose={noop} title="Choose calendars" description="From parent@example.test. Followed calendars show on the wall display; change that from Edit." footer={<Button>Done</Button>}>
+        <List aria-label="Google calendars">
+          {googleChoices.map((c) => (
+            <ListRow
+              key={c.googleId}
+              title={c.name}
+              meta={c.primary ? 'Main calendar' : undefined}
+              trailing={c.calendarId ? <Tag tone="positive">Following</Tag> : <Button aria-label={`Follow ${c.name}`}>Follow</Button>}
+            />
+          ))}
+        </List>
+      </Sheet>
+    </>
+  );
+}
+
+/** Back from Google without a connection: one sentence on the Calendars page. */
+export function CalendarGoogleDeclined() {
+  return <Calendars outcome="scope_missing" />;
 }
 
 /** Adding an ICS link: the address is write-only and shows only as set afterwards. */

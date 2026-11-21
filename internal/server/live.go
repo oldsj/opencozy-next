@@ -19,9 +19,13 @@ func (s *Server) StartLive(ctx context.Context) {
 	l := listen.New(s.pool, s.log, live.Channel, push.Channel)
 	hub := live.NewHub(s.log)
 	s.live.Store(hub)
+	s.pushNotes = l.C(push.Channel)
 	go l.Run(ctx)
 	go hub.Run(ctx, l.C(live.Channel))
 }
+
+// PushNotes wakes the push sender on NOTIFY push_outbox. Nil before StartLive.
+func (s *Server) PushNotes() <-chan listen.Note { return s.pushNotes }
 
 // serveLive answers openLive after the whole middleware chain (route policy, authentication,
 // validation, authorization) has run; the strict handler cannot hijack the connection.

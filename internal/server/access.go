@@ -105,6 +105,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			writeUnauthorized(w)
 			return
 		case ok:
+			s.touchPhone(r.Context(), a)
 			r = r.WithContext(actor.With(r.Context(), a))
 		}
 		next.ServeHTTP(w, r)

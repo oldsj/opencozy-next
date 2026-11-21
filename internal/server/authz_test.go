@@ -81,11 +81,13 @@ func TestAuthzMatrix(t *testing.T) {
 				switch op {
 				case "GET /calendar":
 					u += "?from=2026-09-14&to=2026-09-21"
-				case "DELETE /calendars/{calendarId}":
+				case "DELETE /calendars/{calendarId}", "DELETE /calendar/google/connections/{connectionId}":
 					u += "?expectedVersion=1"
 				}
+				u = strings.ReplaceAll(u, "{connectionId}", h.google.String())
 				u = strings.ReplaceAll(u, "{passkeyId}", h.passkey.String())
 				u = strings.ReplaceAll(u, "{deviceId}", h.device.String())
+				u = strings.ReplaceAll(u, "{phoneSessionId}", h.phone.String())
 				u = strings.ReplaceAll(u, "{tvId}", h.tv.String())
 				u = strings.ReplaceAll(u, "{promptId}", h.prompt.String())
 				u = strings.ReplaceAll(u, "{creditId}", h.credit.String())
