@@ -13,12 +13,18 @@ type Kind = Credential['kind'];
 type NewCredential = paths['/credentials']['post']['requestBody']['content']['application/json'];
 
 const LEARNING = 'learning:award';
+// Scopes only a home server or automation may hold, never an assistant.
+const SERVICE_ONLY = new Set([LEARNING, 'tv:gate', 'tv:report']);
 
 // What each scope lets a connection do, in words for adults.
 const scopeLabels: Record<string, string> = {
   'household:read': 'See the household’s name and settings',
   'children:read': 'See the children, their points and their day',
   [LEARNING]: 'Give points for learning, by your award rules',
+  'tv:gate': 'Let gated TVs online (your router)',
+  'tv:report': 'Report TVs turning on and off (Home Assistant)',
+  'screentime:read': 'See the children’s iPad time',
+  'games:gate': 'Open game websites only while a child’s iPad time runs (a router)',
 };
 
 const kindLabels: Record<Kind, { label: string; detail: string }> = {
@@ -96,7 +102,7 @@ export function ConnectionsPage() {
 
   const submit = (e: SyntheticEvent) => {
     e.preventDefault();
-    const usable = scopes.filter((s) => kind === 'service' || s !== LEARNING);
+    const usable = scopes.filter((s) => kind === 'service' || !SERVICE_ONLY.has(s));
     issue({
       kind,
       name: name.trim(),
@@ -164,7 +170,7 @@ export function ConnectionsPage() {
           <SegmentedControl
             label="Kind"
             value={kind}
-            onChange={(k) => { setKind(k); if (k === 'assistant') setScopes((s) => s.filter((x) => x !== LEARNING)); }}
+            onChange={(k) => { setKind(k); if (k === 'assistant') setScopes((s) => s.filter((x) => !SERVICE_ONLY.has(x))); }}
             options={[
               { value: 'service', label: kindLabels.service.label },
               { value: 'assistant', label: kindLabels.assistant.label },
@@ -175,7 +181,7 @@ export function ConnectionsPage() {
           <Section title="It can">
             <List>
               {Object.entries(scopeLabels)
-                .filter(([scope]) => kind === 'service' || scope !== LEARNING)
+                .filter(([scope]) => kind === 'service' || !SERVICE_ONLY.has(scope))
                 .map(([scope, label]) => (
                   <ListRow
                     key={scope}

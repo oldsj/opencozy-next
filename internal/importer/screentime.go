@@ -14,9 +14,16 @@ import (
 //
 //	personal_credit        -> screen_time_credit (source redemption, or grant / time_request when
 //	                          the redemption was a parent's grant or a "yes"; seconds, used_seconds)
+//
+// A parent's grant and a "yes" were redemptions in the old app too: cost_snapshot 0, reward_id
+// NULL, no ledger row (a "yes" is named by time_request.redemption_id). They are NOT carried as
+// redemption rows: each becomes only its credit, with source grant or time_request, redemption_id
+// NULL and granted_by the adult who gave it. Carried as redemptions they would show up in the
+// rewards list and cancelling one would fail (it has no ledger row to refund). Here a parent takes
+// back such time with forfeitScreenTimeCredit.
+//
 //	screen_time_grant      -> screen_time_window (same id; credit by redemption_id)
 //	screen_time_grant_cut  -> screen_time_cut (window_id = grant_id; cut_by mapped to the adult)
-//	screen_time_event      -> screen_time_event (same id; device_id)
 //	time_request           -> time_request (credit by redemption_id) and, while pending, its
 //	                          time_request approval
 //
@@ -26,7 +33,6 @@ var screenTimeTables = []struct{ table, waits string }{
 	{"personal_credit", "redemptions"},
 	{"screen_time_grant", "redemptions"},
 	{"screen_time_grant_cut", "redemptions"},
-	{"screen_time_event", "devices"},
 	{"time_request", "devices and redemptions"},
 }
 

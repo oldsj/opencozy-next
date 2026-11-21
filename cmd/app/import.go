@@ -13,7 +13,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/importer/oldsecret"
 )
 
-// runImport is `app import`: copy the old app (e717170) from a restored backup into this new,
+// runImport is `app import`: copy the old app (d7fead8) from a restored backup into this new,
 // empty installation, in one transaction (design §12). It migrates first, as the schema owner.
 func runImport(ctx context.Context, cfg config.Config, log *slog.Logger, args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("import", flag.ContinueOnError)

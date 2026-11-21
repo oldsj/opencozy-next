@@ -33,12 +33,19 @@ func (s *Server) GetInbox(ctx context.Context, _ api.GetInboxRequestObject) (api
 	}
 	out := api.Inbox{Items: make([]api.InboxItem, len(rows))}
 	for i, r := range rows {
-		it := api.InboxItem{Id: r.ID, Kind: api.InboxItemKind(r.Kind), Title: r.Title, SubmittedAt: r.CreatedAt}
+		it := api.InboxItem{Id: r.ID, Kind: api.InboxItemKind(r.Kind), Title: r.Title, SubmittedAt: r.CreatedAt.UTC()}
 		it.Child.Id, it.Child.Name, it.Child.Color = r.ChildID, r.ChildName, api.ProfileColor(r.ChildColor)
 		if r.Points > 0 {
 			it.Points = ptr(int(r.Points))
 		}
 		out.Items[i] = it
+	}
+	snap, err := s.tvRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if out.Tvs, err = snap.Asking(ctx); err != nil {
+		return nil, err
 	}
 	return api.GetInbox200JSONResponse(out), nil
 }

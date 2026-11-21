@@ -104,3 +104,48 @@ func TestLoadValidatesApple(t *testing.T) {
 		t.Fatalf("passkeys only: %v push=%v", err, c.PushEnabled())
 	}
 }
+
+func TestLoadValidatesOIDC(t *testing.T) {
+	full := map[string]string{
+		"DATABASE_URL": "postgres://u:p@localhost/app", "PUBLIC_ORIGIN": "https://cozy.example.test",
+		"OIDC_ISSUER": "https://id.example.test", "OIDC_CLIENT_ID": "opencozy", "OIDC_CLIENT_SECRET": "fixture-secret",
+	}
+	set := func(over map[string]string) {
+		for k, v := range full {
+			t.Setenv(k, v)
+		}
+		for k, v := range over {
+			t.Setenv(k, v)
+		}
+	}
+	set(nil)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.OIDCEnabled() || cfg.OIDCName != "single sign-on" {
+		t.Errorf("enabled %v, name %q", cfg.OIDCEnabled(), cfg.OIDCName)
+	}
+	set(map[string]string{"OIDC_ISSUER": "", "OIDC_CLIENT_ID": "", "OIDC_CLIENT_SECRET": "", "PUBLIC_ORIGIN": ""})
+	if cfg, err := Load(); err != nil || cfg.OIDCEnabled() {
+		t.Errorf("none set: %v, enabled %v", err, cfg.OIDCEnabled())
+	}
+	for name, over := range map[string]map[string]string{
+		"no secret":        {"OIDC_CLIENT_SECRET": ""},
+		"only the issuer":  {"OIDC_CLIENT_ID": "", "OIDC_CLIENT_SECRET": ""},
+		"http issuer":      {"OIDC_ISSUER": "http://id.example.test"},
+		"loopback http":    {"OIDC_ISSUER": "http://127.0.0.1:9000"},
+		"query":            {"OIDC_ISSUER": "https://id.example.test/?x=1"},
+		"fragment":         {"OIDC_ISSUER": "https://id.example.test/#x"},
+		"user":             {"OIDC_ISSUER": "https://u@id.example.test"},
+		"not a URL":        {"OIDC_ISSUER": "not a url"},
+		"no public origin": {"PUBLIC_ORIGIN": ""},
+		"long name":        {"OIDC_NAME": "a name far too long to fit on the sign-in button"},
+		"spaced client":    {"OIDC_CLIENT_ID": " opencozy"},
+	} {
+		set(over)
+		if _, err := Load(); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}

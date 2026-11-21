@@ -117,6 +117,24 @@
         "publicOrigin": {
           "type": "string",
           "pattern": "^(https://[^/?#@]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)?$"
+        },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "pattern": "^(https://[^?#@\\s]+)?$"
+            },
+            "clientId": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
         }
       }
     },

@@ -132,7 +132,7 @@ redemptions:
       The points are spent at once. Asked for on a display, it waits for an adult, who approves it
       or says no (and the points come back); asked for by an adult, it is approved at once.
       Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked
-      for the child to start later. TV time is 422 `tv_not_ready` until the TV gate arrives.
+      for the child to start later (TV time on a TV, when they watch).
     tags: [rewards]
     x-actors: [adult, phone, display, device-web]
     x-display-scopes: [today]
@@ -271,6 +271,10 @@ cancel:
   post:
     operationId: cancelRedemption
     summary: Cancel an approved reward, or the unused rest of given screen time, and give the points back
+    description: >
+      iPad time refunds the unused share of its cost, rounded down: 409 `already_used` when none is
+      left, `no_credit` when OpenCozy has no record of the time (so it can't tell how much was
+      used).
     tags: [rewards]
     x-actors: [adult]
     x-command: true

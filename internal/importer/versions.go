@@ -1,6 +1,6 @@
 package importer
 
-// oldMigrations is the old app's schema_migrations at e717170: each version and the SHA-256 of
+// oldMigrations is the old app's schema_migrations at d7fead8: each version and the SHA-256 of
 // its file. The importer refuses a source whose history differs in any way.
 var oldMigrations = []oldMigration{
 	{"0000_check_functions", "29f4517fd5bd34a9fd68865221c5ac7aff288ae614a63177ce6419993360f41c"},
@@ -48,4 +48,5 @@ var oldMigrations = []oldMigration{
 	{"0042_household_web_filter", "4033b1db0c57bf8ab0299caaf19bc0de685aaf80b4f64cac099330d310d2f153"},
 	{"0043_screen_time_grant_cuts", "25f0de5d3f46b69d27ff0175e15856679d936fa16fb4bb3367f86686b0038fd6"},
 	{"0044_screen_time_grant_cut_guards", "92287594438b41bbf9ae2b84022684af5eea7911d4b0e7ff4c33f10b93245fe5"},
+	{"0045_parent_push_mute", "2ec04f32e0b2d1682fa3b92ffe498adffcc7450ed44f2cf14e8ce701c92dd0da"},
 }

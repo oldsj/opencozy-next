@@ -53,6 +53,12 @@ var (
 	ErrNothingToEnd = errors.New("screentime: nothing to end")
 	// ErrAllUsed means a redemption's time has all been spent, so cancelling it gives nothing back.
 	ErrAllUsed = errors.New("screentime: all used")
+	// ErrNoCredit means a screen-time redemption has no iPad credit, so what was used is unknown.
+	ErrNoCredit = errors.New("screentime: no credit for the redemption")
+	// ErrRewardCredit refuses taking back a reward's time directly: cancel the reward instead.
+	ErrRewardCredit = errors.New("screentime: a reward's credit")
+	// ErrNothingLeft means a credit is all used.
+	ErrNothingLeft = errors.New("screentime: nothing left")
 )
 
 // ErrClosed refuses a child's own spending outside their allowed hours.
@@ -407,8 +413,12 @@ func End(ctx context.Context, c *command.Cmd, child uuid.UUID, scope Scope, refu
 	return out, nil
 }
 
-// refundable is false for a credit whose redemption was cancelled: its rest stays forfeited.
+// refundable is false for a credit whose redemption was cancelled, or that a parent took back: its
+// rest stays forfeited.
 func refundable(ctx context.Context, q *dbq.Queries, h uuid.UUID, cr dbq.ScreenTimeCredit) (bool, error) {
+	if cr.ForfeitedAt != nil {
+		return false, nil
+	}
 	if cr.RedemptionID == nil {
 		return true, nil
 	}
@@ -426,8 +436,9 @@ func CancelRedemption(ctx context.Context, c *command.Cmd, redemptionID uuid.UUI
 	h := c.HouseholdID()
 	cr, err := c.Q.CreditForRedemption(ctx, dbq.CreditForRedemptionParams{HouseholdID: h, RedemptionID: &redemptionID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Bought before screen time was banked here: nothing was spent through OpenCozy.
-		return cost, nil
+		// No record of how much was used (an imported redemption whose credit wasn't carried, or
+		// another screen's): fail closed rather than refund time that may have been watched.
+		return 0, ErrNoCredit
 	} else if err != nil {
 		return 0, err
 	}
@@ -445,4 +456,33 @@ func CancelRedemption(ctx context.Context, c *command.Cmd, redemptionID uuid.UUI
 		return 0, err
 	}
 	return refund, nil
+}
+
+// Forfeit takes back the unused rest of a parent's grant or "yes" (the child locked by the caller)
+// and returns how many seconds went. A reward's credit is refused (ErrRewardCredit: cancel the
+// reward, which refunds its points); ErrNothingLeft when it is all used; pgx.ErrNoRows when the
+// child has no such credit.
+func Forfeit(ctx context.Context, c *command.Cmd, child, credit uuid.UUID, by uuid.UUID) (int32, error) {
+	if !c.Holds(child) {
+		return 0, ErrNotLocked
+	}
+	h := c.HouseholdID()
+	cr, err := c.Q.LockCredit(ctx, dbq.LockCreditParams{HouseholdID: h, ChildID: child, ID: credit})
+	if err != nil {
+		return 0, err
+	}
+	switch {
+	case cr.Source == SourceRedemption:
+		return 0, ErrRewardCredit
+	case cr.UsedSeconds >= cr.Seconds:
+		return 0, ErrNothingLeft
+	}
+	now, err := c.Now(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if err := c.Q.ForfeitCredit(ctx, dbq.ForfeitCreditParams{HouseholdID: h, ID: cr.ID, ForfeitedBy: &by, Now: &now}); err != nil {
+		return 0, err
+	}
+	return cr.Seconds - cr.UsedSeconds, nil
 }
