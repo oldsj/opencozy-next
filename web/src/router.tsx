@@ -29,6 +29,7 @@ import { CalendarEventPage, CalendarPage, CalendarsPage } from './routes/calenda
 import { googleOutcomes, type GoogleOutcome } from './routes/calendar-google';
 import { ConnectionsPage } from './routes/connections';
 import { LearningPage } from './routes/learning';
+import { TvsPage } from './routes/tvs';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -53,6 +54,7 @@ const nav = [
   { to: '/inbox', label: 'Inbox' },
   { to: '/chores', label: 'Chores' },
   { to: '/rewards', label: 'Rewards' },
+  { to: '/tvs', label: 'TVs' },
   { to: '/calendar', label: 'Calendar' },
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
@@ -327,6 +329,19 @@ const learningRoute = createRoute({
   component: LearningPage,
 });
 
+// Manage: the TVs, who is watching, and opening them.
+const tvsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/tvs',
+  staticData: { title: 'TVs' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: TvsPage,
+});
+
 // Manage: the children's iPads and phones.
 const devicesRoute = createRoute({
   getParentRoute: () => pageRoute,
@@ -363,7 +378,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, householdRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, householdRoute, tvsRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

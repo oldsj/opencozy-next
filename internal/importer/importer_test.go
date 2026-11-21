@@ -129,14 +129,19 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"chore_award_reversal":          "ok",
 		"chore_active_award":            "ok",
 		"external_award":                "ok",
-		"chore_definition":              "pending", // chores, routines, approvals and rewards wait on their importers
+		"chore_definition":              "ok",
+		"chore_occurrence":              "ok",
+		"routine_definition":            "ok",
+		"routine_occurrence":            "ok",
+		"completion_approval":           "ok",
+		"reward":                        "pending", // rewards wait on their importer
 		"reward_redemption":             "pending",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine", "fixture-sync-token", "Piano", "Family", "1001"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine", "Bed not made", "Water the plants", "fixture-sync-token", "Piano", "Family", "1001"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -144,7 +149,8 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	if !strings.Contains(out, "1 open sessions dropped") || !strings.Contains(out, "power and router attempts forgotten") {
 		t.Errorf("the report doesn't count the dropped TV sessions or forgotten power:\n%s", out)
 	}
-	if !strings.Contains(out, "approvals:read (1)") || !strings.Contains(out, "1 without a household") {
+	if !strings.Contains(out, "approvals:read (1)") || !strings.Contains(out, "1 without a household") ||
+		!strings.Contains(out, "1 with partly set allowed hours, carried as none") {
 		t.Errorf("missing notes:\n%s", out)
 	}
 }
