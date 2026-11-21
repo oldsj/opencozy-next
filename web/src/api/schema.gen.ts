@@ -629,6 +629,189 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/device/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this kid device's APNs token
+         * @description Pushes go to the device's current child. A token moves here from any other device or phone session that had it.
+         */
+        put: operations["registerDevicePush"];
+        post?: never;
+        /** Stop pushes to this kid device */
+        delete: operations["unregisterDevicePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in with an email and password
+         * @description The token is in this response only. Every failure is the same 401.
+         */
+        post: operations["phoneSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in with a passkey
+         * @description Start with `POST /auth/passkey/options`, then send the authenticator's response here with
+         *     the phone's name. The token is in this response only.
+         */
+        post: operations["phoneSignInWithPasskey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in from the web sign-in in its app
+         * @description The iOS app sends its web view's session cookie natively, after the parent signs in there,
+         *     so they sign in once. Needs a recent sign-in. The token is in this response only. A request
+         *     from a web page (`Sec-Fetch-Site` other than `none`) is refused with 403 `use_the_app`, so
+         *     page script can't read a phone token.
+         */
+        post: operations["phoneSignInFromWeb"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This phone's session */
+        get: operations["getPhoneSession"];
+        put?: never;
+        post?: never;
+        /** Sign this phone out; its token stops working and it gets no more pushes */
+        delete: operations["phoneSignOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/session/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this phone's APNs token
+         * @description A token is one app install, so it moves here from any other phone session or device that had it.
+         */
+        put: operations["registerPhonePush"];
+        post?: never;
+        /** Stop pushes to this phone (it stays signed in) */
+        delete: operations["unregisterPhonePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's signed-in parent phones */
+        get: operations["listPhoneSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether your phone alerts are paused */
+        get: operations["getPushMute"];
+        /**
+         * Pause your phone alerts until a time, or turn them back on
+         * @description While paused, your phones get no alerts; silent updates (an answered item leaving, the
+         *     badge) still arrive, and other adults and the children's devices are unaffected. Alerts
+         *     come back on their own at that time. At most 90 days ahead.
+         */
+        put: operations["setPushMute"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phones/{phoneSessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phoneSessionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Sign a parent phone out; it stops working at once */
+        delete: operations["revokePhoneSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/today": {
         parameters: {
             query?: never;
@@ -1398,6 +1581,129 @@ export interface paths {
         patch: operations["updateCalendar"];
         trace?: never;
     };
+    "/calendar/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start connecting a Google account
+         * @description Returns Google's consent page to open in this browser. Google sends the adult back to
+         *     `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
+         *     within ten minutes. 422 `not_configured` when this server has no Google client
+         *     (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+         *     (`too_many`), since connecting an account that is already connected must still work.
+         */
+        post: operations["connectGoogle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Google sends the adult back after consent
+         * @description Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
+         *     `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
+         *     calendar permission was unticked), `expired` (no such connect for this adult, or used or
+         *     older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+         *     token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+         *     connected replaces its token and clears "reconnect needed".
+         */
+        get: operations["googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Google accounts this household has connected
+         * @description Tokens are never returned. `enabled` is false when this server has no Google client.
+         */
+        get: operations["listGoogleConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect a Google account, with every calendar followed through it
+         * @description Deletes the account's token and stops following its calendars, with their events and who
+         *     they were for. After the change commits, the server asks Google to revoke the token (best
+         *     effort). Google revokes the whole grant, so the same Google account connected in another
+         *     household on this server has to be connected again there.
+         */
+        delete: operations["disconnectGoogle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The calendars a connected Google account can read
+         * @description Asks Google. 422 `reconnect_needed` when Google no longer accepts the account's token;
+         *     502 `google_unavailable` when Google could not be reached.
+         */
+        get: operations["listGoogleCalendars"];
+        put?: never;
+        /**
+         * Follow one of a connected account's calendars
+         * @description The first refresh runs within a minute. 409 `calendar_exists` when the household already
+         *     follows it; 422 `too_many_calendars` past 50, `reconnect_needed` when the account must be
+         *     connected again.
+         */
+        post: operations["followGoogleCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/learning/rules": {
         parameters: {
             query?: never;
@@ -2074,6 +2380,64 @@ export interface components {
             platform: components["schemas"]["Platform"];
             name: components["schemas"]["DeviceName"];
         };
+        PushRegistration: {
+            /** @description The APNs device token in hex */
+            token: string;
+            /**
+             * @description The APNs environment the app was built for
+             * @enum {string}
+             */
+            environment: "development" | "production";
+        };
+        PushRegistered: {
+            /** @enum {string} */
+            environment: "development" | "production";
+            /** Format: date-time */
+            registeredAt: string;
+        };
+        /** @description What the phone is called in Manage, e.g. "Alex's iPhone" */
+        PhoneName: string;
+        PhoneSession: {
+            id: components["schemas"]["Id"];
+            adultId: components["schemas"]["Id"];
+            adultName: string;
+            name: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description Coarse (within 5 minutes); null until first used
+             */
+            lastUsedAt: string | null;
+            /** @description The phone gets pushes */
+            pushRegistered: boolean;
+            /** @description This is the phone making the request */
+            current: boolean;
+        };
+        PhoneSignedIn: {
+            /** @description The `ocp_` bearer secret; shown once */
+            token: string;
+            session: components["schemas"]["PhoneSession"];
+            me: components["schemas"]["Me"];
+        };
+        PhoneSelf: {
+            session: components["schemas"]["PhoneSession"];
+            me: components["schemas"]["Me"];
+            /**
+             * Format: date-time
+             * @description While in the future, this adult's phones get no alerts (silent updates still arrive)
+             */
+            pushMutedUntil: string | null;
+        };
+        PushMute: {
+            /**
+             * Format: date-time
+             * @description Alerts are paused until then; null when they are on
+             */
+            mutedUntil: string | null;
+        };
         TodayItem: {
             id: components["schemas"]["Id"];
             title: string;
@@ -2701,6 +3065,8 @@ export interface components {
             /** Format: date-time */
             lastSyncAt?: string;
             error?: components["schemas"]["CalendarErrorCode"];
+            /** @description For a Google calendar, the account it is followed through */
+            googleConnectionId?: components["schemas"]["Id"];
             version: number;
         };
         CalendarList: {
@@ -2719,6 +3085,39 @@ export interface components {
             color: components["schemas"]["ProfileColor"];
             showOnDisplay: boolean;
             expectedVersion: number;
+        };
+        GoogleConnectStart: {
+            /** @description Google's consent page; open it in this browser tab. */
+            authorizeUrl: string;
+        };
+        GoogleConnection: {
+            id: components["schemas"]["Id"];
+            email: string;
+            /** @description Google no longer accepts the token; connect the account again. */
+            needsReconnect: boolean;
+            /** @description How many of its calendars the household follows */
+            calendars: number;
+            version: number;
+        };
+        GoogleConnectionList: {
+            enabled: boolean;
+            connections: components["schemas"]["GoogleConnection"][];
+        };
+        GoogleCalendar: {
+            googleId: string;
+            name: string;
+            primary: boolean;
+            /** @description Set when the household follows it */
+            calendarId?: components["schemas"]["Id"];
+        };
+        GoogleCalendarList: {
+            calendars: components["schemas"]["GoogleCalendar"][];
+        };
+        NewGoogleCalendar: {
+            googleId: string;
+            name: components["schemas"]["CalendarName"];
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
         };
         AwardRule: {
             id: components["schemas"]["Id"];
@@ -3060,6 +3459,7 @@ export interface components {
         IdempotencyKey: string;
         ItemId: components["schemas"]["Id"];
         ChildId: components["schemas"]["Id"];
+        ConnectionId: components["schemas"]["Id"];
         TvId: components["schemas"]["Id"];
     };
     requestBodies: never;
@@ -4436,6 +4836,430 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    registerDevicePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "token": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+                 *       "environment": "production"
+                 *     }
+                 */
+                "application/json": components["schemas"]["PushRegistration"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRegistered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unregisterDevicePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No more pushes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "email": "alex@example.test",
+                 *       "password": "correct horse battery staple",
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    password: string;
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignInWithPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "challengeId": "0195f2d4-0000-7000-8000-000000000000",
+                 *       "credential": {},
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    challengeId: components["schemas"]["Id"];
+                    /** @description PublicKeyCredential.toJSON() */
+                    credential: {
+                        [key: string]: unknown;
+                    };
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignInFromWeb: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPhoneSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session, its adult and household */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSelf"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    registerPhonePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "token": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+                 *       "environment": "production"
+                 *     }
+                 */
+                "application/json": components["schemas"]["PushRegistration"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRegistered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unregisterPhonePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No more pushes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listPhoneSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phones, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PhoneSession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPushMute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushMute"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setPushMute: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "until": "2026-12-01T08:00:00Z"
+                 *     }
+                 */
+                "application/json": {
+                    /**
+                     * Format: date-time
+                     * @description When alerts come back; null turns them back on now
+                     */
+                    until: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Your alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushMute"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    revokePhoneSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                phoneSessionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             default: components["responses"]["Error"];
         };
     };
@@ -6437,6 +7261,199 @@ export interface operations {
         responses: {
             /** @description Updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSource"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    connectGoogle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open authorizeUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectStart"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    googleCallback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the calendars screen */
+            303: {
+                headers: {
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accounts, by address */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectionList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    disconnectGoogle: {
+        parameters: {
+            query: {
+                expectedVersion: number;
+            };
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account's calendars */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleCalendarList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    followGoogleCalendar: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "googleId": "family@group.calendar.example.test",
+                 *       "name": "Family",
+                 *       "color": "sky",
+                 *       "showOnDisplay": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewGoogleCalendar"];
+            };
+        };
+        responses: {
+            /** @description Following */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

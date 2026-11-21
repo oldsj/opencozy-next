@@ -232,6 +232,10 @@ final class AppModel {
     private func childChanged() {
         unlockedUntil = nil
         if !isPreview { lockOutcome = lock.update(unlockedUntil: nil) }
+        // What the previous child did on the shield isn't the new child's to send.
+        lock.store.pendingEvents = []
+        lock.store.queuedTimeRequest = nil
+        lock.store.shieldContent = nil
     }
 
     /// Fetches and applies screen time, ignoring a response older than one already
@@ -301,7 +305,8 @@ final class AppModel {
             bankedSeconds: screen.bankedSeconds,
             opensAt: hours?.open == false ? local(hours?.opensAt) : nil,
             closesAt: hours?.open == true ? local(hours?.closesAt) : nil,
-            ask: screen.timeRequest.flatMap { $0.state == .pending ? .pending : $0.state == .declined ? .declined : nil })
+            ask: screen.timeRequest.flatMap { $0.state == .pending ? .pending : $0.state == .declined ? .declined : nil },
+            runsUntil: screen.isCapped ? local(screen.unlockedUntil) : nil)
     }
 
     /// The window only counts as open if the shield is actually lifted.

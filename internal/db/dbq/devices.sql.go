@@ -356,7 +356,7 @@ func (q *Queries) RecordDeviceNonce(ctx context.Context, arg RecordDeviceNoncePa
 }
 
 const revokeDevice = `-- name: RevokeDevice :execrows
-UPDATE device SET revoked_at = $3
+UPDATE device SET revoked_at = $3, push_token = NULL, push_environment = NULL, push_registered_at = NULL
 WHERE household_id = $1 AND id = $2 AND revoked_at IS NULL
 `
 

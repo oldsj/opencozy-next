@@ -53,11 +53,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUser
             await kid.refresh()
             return .newData
         }
-        if roles.role == .parent, let time = TimePush(userInfo: userInfo) {
-            await parent.handleResolvedTimePush(time)
-            await parent.refresh()
-            return .newData
-        }
         guard roles.role == .parent, let push = ApprovalPush(userInfo: userInfo) else { return .noData }
         // Background push (content-available): clear a resolved item's notification
         // first, since the refresh needs the home network.
@@ -73,11 +68,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUser
             await kid.refresh()
             return [.banner, .sound, .list]
         }
-        if roles.role == .parent, let time = TimePush(userInfo: notification.request.content.userInfo) {
-            await parent.handleResolvedTimePush(time)
-            await parent.refresh()
-            return time.version == nil ? [.badge] : [.banner, .sound, .badge, .list]
-        }
         guard roles.role == .parent, let push = ApprovalPush(userInfo: notification.request.content.userInfo) else { return [] }
         await parent.handleResolvedPush(push)
         await parent.refresh()
@@ -89,13 +79,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUser
             await kid.refresh()
             return
         }
-        if roles.role == .parent, let time = TimePush(userInfo: response.notification.request.content.userInfo) {
-            if let choice = TimeChoice(rawValue: response.actionIdentifier) { await parent.handleTimeAction(choice, push: time) }
-            else { await parent.refresh() }
-            return
-        }
         guard roles.role == .parent, let push = ApprovalPush(userInfo: response.notification.request.content.userInfo) else { return }
-        if let decision = ApprovalDecision(rawValue: response.actionIdentifier) {
+        if let choice = TimeChoice(rawValue: response.actionIdentifier) {
+            await parent.handleTimeAction(choice, push: push)
+        } else if let decision = ApprovalDecision(rawValue: response.actionIdentifier) {
             await parent.handleAction(decision, push: push)
         } else {
             await parent.refresh()
