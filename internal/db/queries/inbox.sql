@@ -16,6 +16,6 @@ SELECT * FROM approval WHERE household_id = $1 AND id = $2 FOR UPDATE;
 
 -- name: DecideApproval :one
 UPDATE approval
-SET state = $3, reason = sqlc.narg(reason), decided_at = @now, decided_by = $4, version = version + 1
+SET state = $3, reason = sqlc.narg(reason), decided_at = @now, decided_by = $4, decided_via = sqlc.narg(decided_via), version = version + 1
 WHERE household_id = $1 AND id = $2 AND state = 'pending'
 RETURNING *;

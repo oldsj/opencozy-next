@@ -1,0 +1,62 @@
+mcp:
+  post:
+    operationId: callMcp
+    summary: Model Context Protocol (Streamable HTTP, stateless, JSON answers)
+    description: >
+      One JSON-RPC message per request: `initialize`, `tools/list`, `tools/call`, `ping`, or a
+      notification (answered 202 with no body). Only an assistant credential (`oca_` bearer) may
+      call it; cookies never do. `tools/list` shows only the tools the credential's scopes allow.
+      Each tool runs one operation of this API as the credential's adult, with that operation's
+      rules: a tool that changes something takes a `requestId` (a UUID, sent as its
+      Idempotency-Key), so a retry with the same `requestId` and arguments gets the recorded
+      answer. A tool's error is a result with `isError` and
+      `structuredContent.error {code, status, message}`. There are no sessions and no event
+      stream; GET and DELETE are 405. Rate limited per address and per credential.
+    tags: [mcp]
+    x-actors: [assistant]
+    x-scopes: []
+    x-body-limit: 65536
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            description: A JSON-RPC 2.0 request or notification
+            type: object
+            required: [jsonrpc, method]
+            properties:
+              jsonrpc:
+                type: string
+                const: '2.0'
+              id:
+                oneOf:
+                  - type: string
+                    maxLength: 128
+                  - type: integer
+              method:
+                type: string
+                maxLength: 64
+              params:
+                type: object
+          example: { jsonrpc: '2.0', id: 1, method: tools/list }
+    responses:
+      '200':
+        description: The JSON-RPC response
+        content:
+          application/json:
+            schema:
+              type: object
+      '202':
+        description: A notification, accepted
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      default:
+        $ref: common.yaml#/responses/Error

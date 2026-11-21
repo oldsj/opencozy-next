@@ -55,6 +55,7 @@ type Approval struct {
 	CreatedAt     time.Time
 	RedemptionID  *uuid.UUID
 	TimeRequestID *uuid.UUID
+	DecidedVia    *uuid.UUID
 }
 
 type AwardRule struct {
@@ -505,6 +506,7 @@ type ScreenTimeCredit struct {
 	ForfeitedAt      *time.Time
 	ForfeitedBy      *uuid.UUID
 	ForfeitedSeconds pgtype.Int4
+	GrantedVia       *uuid.UUID
 }
 
 type ScreenTimeCut struct {

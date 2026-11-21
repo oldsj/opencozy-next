@@ -106,7 +106,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"auth_account":                  "ok",
 		"service_credential":            "ok",
 		"service_credential_child":      "ok",
-		"assistant_credential":          "pending", // approvals:read has no new name yet
+		"assistant_credential":          "ok",
 		"gated_tv":                      "ok",
 		"gated_tv_mac":                  "ok",
 		"tv_session":                    "ok",
@@ -149,7 +149,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	if !strings.Contains(out, "1 open sessions dropped") || !strings.Contains(out, "power and router attempts forgotten") {
 		t.Errorf("the report doesn't count the dropped TV sessions or forgotten power:\n%s", out)
 	}
-	if !strings.Contains(out, "approvals:read (1)") || !strings.Contains(out, "1 without a household") ||
+	if !strings.Contains(out, "1 without a household") || // the assistant imports since slice 12: no pending scope note
 		!strings.Contains(out, "1 with partly set allowed hours, carried as none") {
 		t.Errorf("missing notes:\n%s", out)
 	}
@@ -228,6 +228,14 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		FROM credential c JOIN credential_award_rule cr ON cr.credential_id = c.id JOIN award_rule r ON r.id = cr.rule_id
 		WHERE c.id = '0190a000-0000-7000-8000-0000000000d3'`).Scan(&learning); err != nil || learning != "{learning:award} build_house 2" {
 		t.Errorf("learning credential: %q %v", learning, err)
+	}
+	// The assistant keeps what it could do: its opt-in scope under the new name, and the reads
+	// the old app always gave it, for every child.
+	var assistant string
+	if err := target.Owner.QueryRow(ctx, `SELECT scopes::text || ' ' || all_children::text FROM credential
+		WHERE id = '0190a000-0000-7000-8000-0000000000e1' AND kind = 'assistant' AND adult_id IS NOT NULL`).Scan(&assistant); err != nil ||
+		assistant != "{children:read,household:read,inbox:read,points:read,rewards:read,screentime:read,today:read} true" {
+		t.Errorf("assistant credential: %q %v", assistant, err)
 	}
 	var archivedRules, unlinked, live int
 	if err := target.Owner.QueryRow(ctx, `SELECT (SELECT count(*) FROM award_rule WHERE archived_at IS NOT NULL),

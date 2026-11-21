@@ -18,6 +18,7 @@ import {
   issued,
   kindLabels as credentialKinds,
   scopeLabels,
+  kindScopes,
   type Credential,
 } from './fixtures-credentials';
 import { devices, offer, platformLabels, type Device } from './fixtures-devices';
@@ -592,8 +593,9 @@ export function Credentials() {
  * Issuing a credential: what kind, a name, what it may do and for which children. Award rules
  * appear only when "Give points for learning" is picked. Needs a sign-in within 10 minutes.
  */
-export function CredentialIssue({ learning = false, signIn = false }: { learning?: boolean; signIn?: boolean }) {
-  const picked = learning ? ['learning:award'] : ['children:read'];
+export function CredentialIssue({ learning = false, signIn = false, assistant = false }: { learning?: boolean; signIn?: boolean; assistant?: boolean }) {
+  const kind = assistant ? 'assistant' : 'service';
+  const picked = learning ? ['learning:award'] : assistant ? ['today:read', 'inbox:read'] : ['children:read'];
   const live = awardRules.filter((r) => !r.archived);
   return (
     <>
@@ -620,19 +622,19 @@ export function CredentialIssue({ learning = false, signIn = false }: { learning
           )}
           <SegmentedControl
             label="Kind"
-            value="service"
+            value={kind}
             onChange={noop}
             options={[
               { value: 'service', label: credentialKinds.service.label },
               { value: 'assistant', label: credentialKinds.assistant.label },
             ]}
           />
-          <p className="m-0 text-muted-foreground">{credentialKinds.service.detail}</p>
-          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue={learning ? 'Minecraft server' : 'Router'} required />
+          <p className="m-0 text-muted-foreground">{credentialKinds[kind].detail}</p>
+          <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} defaultValue={learning ? 'Minecraft server' : assistant ? 'Desktop assistant' : 'Router'} required />
           <Section title="It can">
             <List>
-              {Object.entries(scopeLabels).map(([scope, label]) => (
-                <ListRow key={scope} title={label} meta={scope} trailing={<CheckCircle checked={picked.includes(scope)} label={label} />} />
+              {kindScopes[kind].map((scope) => (
+                <ListRow key={scope} title={scopeLabels[scope] ?? scope} meta={scope} trailing={<CheckCircle checked={picked.includes(scope)} label={scopeLabels[scope] ?? scope} />} />
               ))}
             </List>
           </Section>
@@ -645,6 +647,9 @@ export function CredentialIssue({ learning = false, signIn = false }: { learning
               </List>
             </Section>
           )}
+          {assistant ? (
+            <p className="m-0 text-muted-foreground">It acts as you, for every child. What it does shows as yours, through this assistant.</p>
+          ) : (
           <SegmentedControl
             label="For"
             value={learning ? 'some' : 'all'}
@@ -654,6 +659,7 @@ export function CredentialIssue({ learning = false, signIn = false }: { learning
               { value: 'some', label: 'Choose children' },
             ]}
           />
+          )}
           {learning && (
             <List>
               {householdChildren
@@ -677,6 +683,11 @@ export function CredentialIssue({ learning = false, signIn = false }: { learning
 /** A learning service: points by award rules, for chosen children. */
 export function CredentialIssueLearning() {
   return <CredentialIssue learning />;
+}
+
+/** An assistant (MCP): its own scopes, and always every child, since it acts as the adult. */
+export function CredentialIssueAssistant() {
+  return <CredentialIssue assistant />;
 }
 
 /** The last sign-in is more than 10 minutes old (recent_auth_required): sign in again, then create. */
