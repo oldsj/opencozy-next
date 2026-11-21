@@ -30,14 +30,19 @@ const scopeLabels: Record<string, string> = {
   'calendar:read': 'See the family calendar',
   'meals:read': 'See the meal plan',
   'screentime:grant': 'Give and end iPad time as you',
+  'tv:read': 'See the TVs, who is watching and TV history',
+  'tv:manage': 'Add, edit and remove TVs',
+  'tv:control': 'Let TVs online, turn them off, open and close them, as you',
+  'tv:gate': 'Let TVs online only while they may be (a router)',
+  'tv:report': 'Report TVs trying to go online and their power (Home Assistant, a router)',
 };
 
 // Which scopes each kind is offered. An assistant acts as its adult, for every child.
 const kindScopes: Record<Kind, string[]> = {
-  service: ['household:read', 'children:read', 'screentime:read', LEARNING, 'games:gate'],
+  service: ['household:read', 'children:read', 'screentime:read', LEARNING, 'games:gate', 'tv:gate', 'tv:report'],
   assistant: [
     'household:read', 'children:read', 'today:read', 'today:complete', 'inbox:read', 'inbox:decide',
-    'points:read', 'rewards:read', 'calendar:read', 'meals:read', 'screentime:read', 'screentime:grant',
+    'points:read', 'rewards:read', 'calendar:read', 'meals:read', 'screentime:read', 'screentime:grant', 'tv:read', 'tv:manage', 'tv:control',
   ],
 };
 

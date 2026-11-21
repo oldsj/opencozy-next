@@ -16,11 +16,12 @@ import (
 // slice that adds it (pending), so a credential is never imported with less, or more, access
 // than it had. Each domain slice adds its scopes.
 var (
-	serviceScopes = map[string]string{"children:read": "children:read", "external:award": "learning:award", "games:gate": "games:gate", "screentime:read": "screentime:read"}
-	// The old assistant's opt-in scopes. Its tv:* scopes wait for the TV slice's tools.
+	serviceScopes = map[string]string{"children:read": "children:read", "external:award": "learning:award", "games:gate": "games:gate", "screentime:read": "screentime:read", "tv:gate": "tv:gate", "tv:report": "tv:report"}
+	// The old assistant's opt-in scopes and their new names.
 	assistantScopes = map[string]string{
 		"approvals:read": "inbox:read", "approvals:write": "inbox:decide",
 		"chores:log": "today:complete", "screen-time:grant": "screentime:grant",
+		"tv:read": "tv:read", "tv:manage": "tv:manage", "tv:control": "tv:control",
 	}
 	// The old assistant could always read the household's children, chores, routines, points,
 	// history, rewards and screen time; the new one needs these scopes for that.

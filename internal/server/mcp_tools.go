@@ -7,9 +7,6 @@ package server
 // in x-scopes, then add a line here; TestMCPToolsMatchTheirOperations checks the pairing.
 //
 // Not yet here, on purpose:
-//   - TODO(slice 9, TV gate #56): get_tvs, allow_tv, end_tv_session, open_tvs / extend_tvs /
-//     close_tvs. When the TV operations merge, give them `assistant` with tv:read / tv:control
-//     and add their lines. Until then no TV tool exists (none pretends to work).
 //   - Redeeming, undoing points, fulfilling or cancelling redemptions, and managing children,
 //     chores, rewards, devices, the household or credentials stay with the adult's own sign-in.
 
@@ -41,6 +38,17 @@ var mcpTools = []mcpTool{
 	{"get_screen_time", "getScreenTime", "A child's iPad time: what is banked, what is running or queued, and their allowed hours now."},
 	{"grant_screen_time", "grantScreenTime", "Give a child iPad time as the parent. It is banked until they use it, unless started now."},
 	{"end_screen_time", "endScreenTime", "End a child's iPad time early; the iPad locks again."},
+	{"list_tvs", "listTvs", "Every TV with its state (online, who is watching, open until), and each child's TV time."},
+	{"list_tv_sessions", "tvHistory", "Recent TV sessions and who opened which TV."},
+	{"add_tv", "createTv", "Add a TV to the gate, with its network MACs."},
+	{"update_tv", "updateTv", "Edit a TV: its name, room, MACs or open hours."},
+	{"remove_tv", "removeTv", "Remove a TV from the gate."},
+	{"allow_tv", "startTvSession", "Let a TV online for the parents or for a child (on that child's TV time). Confirm with the parent first unless they clearly asked."},
+	{"end_tv_session", "endTvSession", "Turn a TV off now: end its session."},
+	{"answer_whos_watching", "answerTvPrompt", "Answer a TV's \"Who's watching?\": the parents, a child, or no one."},
+	{"open_tvs", "openTvs", "Open TVs for the parents for 1 hour, 2 hours or all day. Confirm with the parent first unless they clearly asked."},
+	{"extend_tvs", "extendTvs", "Keep open TVs open an hour longer."},
+	{"close_tvs", "closeTvs", "Close TVs a parent opened, now."},
 }
 
 const mcpInstructions = `OpenCozy tools for a parent's assistant. You act as the parent who made this credential: what you
@@ -49,4 +57,4 @@ Never pass a household: it comes from the credential. Identify children by ID fr
 repeat), and items by ID from the latest read. Every tool that changes something needs a requestId: a new
 UUID for each intended action. If an answer is lost, retry with the same requestId and arguments to get the
 recorded outcome without doing it twice. Confirm with the parent before approving or rejecting anything they
-did not clearly ask for. Errors come back as structuredContent.error {code, status, message}.`
+did not clearly ask for, and before letting a TV online. Errors come back as structuredContent.error {code, status, message}.`

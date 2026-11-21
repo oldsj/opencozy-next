@@ -92,7 +92,7 @@ grant:
     description: >
       Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at
       once, after anything already queued and regardless of allowed hours. TV time (`target: tv`)
-      arrives with the TV gate; until then it is 422 `tv_not_ready`.
+      is added to the child's TV time, spent when they watch a TV; `startNow` is 422 with it.
     tags: [screentime]
     x-actors: [adult, phone, assistant]
     x-scopes: [screentime:grant]
@@ -702,6 +702,9 @@ schemas:
         $ref: '#/schemas/Spend'
       screenTime:
         $ref: '#/schemas/ScreenTime'
+      tv:
+        $ref: tvs.yaml#/schemas/ChildTv
+        description: "For TV time given (target tv), the child's TV time now"
   EndResult:
     type: object
     required: [scope, windows, cutSeconds, refundedSeconds, forfeitedSeconds, screenTime]

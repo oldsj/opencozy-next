@@ -58,6 +58,8 @@ tags:
     description: iPad screen time, allowed hours, time requests and blocked websites
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
+  - name: tvs
+    description: The TV gate - TVs, sessions, "Who's watching?", open hours, the router and Home Assistant
   - name: mcp
     description: The assistant's Model Context Protocol endpoint
 paths:
@@ -181,6 +183,168 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/methods:
+    get:
+      operationId: getSignInMethods
+      summary: How adults can sign in here, for the sign-in page
+      tags:
+        - auth
+      x-actors:
+        - public
+      responses:
+        '200':
+          description: The sign-in methods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignInMethods'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/oidc/start:
+    post:
+      operationId: startOidcSignIn
+      summary: Start signing in with the single sign-on provider
+      tags:
+        - auth
+      x-actors:
+        - public
+      x-body-limit: 1
+      responses:
+        '200':
+          description: Send the browser to `url`
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSignIn'
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - url
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: The provider can't be reached (`oidc_unavailable`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/callback/oidc:
+    get:
+      operationId: oidcCallback
+      summary: Where the provider sends the browser back; redirects to the app
+      description: |
+        Registered at the provider as `<PUBLIC_ORIGIN>/api/auth/callback/oidc`, the old app's path.
+        Every outcome is a 303: to `/` with a new session, or to `/login?error=<code>`.
+      tags:
+        - auth
+      x-actors:
+        - public
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+        - name: state
+          in: query
+          schema:
+            type: string
+            maxLength: 256
+        - name: iss
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+        - name: error
+          in: query
+          schema:
+            type: string
+            maxLength: 256
+        - name: __Host-oidc
+          in: cookie
+          schema:
+            type: string
+            maxLength: 256
+      responses:
+        '303':
+          description: Back to the app
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/oidc/link:
+    get:
+      operationId: getOidcLink
+      summary: Your single sign-on link, if you have one
+      tags:
+        - auth
+      x-actors:
+        - adult
+      responses:
+        '200':
+          description: The link, or null when there is none
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - link
+                properties:
+                  link:
+                    oneOf:
+                      - $ref: '#/components/schemas/OidcLink'
+                      - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: unlinkOidc
+      summary: Unlink your single sign-on account
+      description: |
+        Signing in with the provider stops working for you until you use it again, when it links
+        afresh by your verified email. Your password and passkeys keep working.
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-recent-auth: true
+      responses:
+        '204':
+          description: Unlinked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Error'
   /auth/passkey/options:
@@ -1723,7 +1887,7 @@ paths:
     post:
       operationId: redeemReward
       summary: Spend points on a reward
-      description: 'The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once. Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked for the child to start later. TV time is 422 `tv_not_ready` until the TV gate arrives.'
+      description: 'The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once. Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked for the child to start later (TV time on a TV, when they watch).'
       tags:
         - rewards
       x-actors:
@@ -2221,7 +2385,7 @@ paths:
       operationId: grantScreenTime
       summary: Give a child screen time
       description: |
-        Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at once, after anything already queued and regardless of allowed hours. TV time (`target: tv`) arrives with the TV gate; until then it is 422 `tv_not_ready`.
+        Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at once, after anything already queued and regardless of allowed hours. TV time (`target: tv`) is added to the child's TV time, spent when they watch a TV; `startNow` is 422 with it.
       tags:
         - screentime
       x-actors:
@@ -3951,6 +4115,839 @@ paths:
           $ref: '#/components/responses/TooLarge'
         default:
           $ref: '#/components/responses/Error'
+  /tvs:
+    get:
+      operationId: listTvs
+      summary: Every TV with its state, and each child's TV time
+      description: Each TV with its MACs, Home Assistant entity, power, open hours, whether it is open, its running session and its "Who's watching?" prompt; and each live child's TV time, as offered in "Turn on for…" and the prompt.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:read
+      responses:
+        '200':
+          description: The TVs, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createTv
+      summary: Add a TV
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:manage
+      x-command: true
+      x-body-limit: 2048
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewTv'
+            example:
+              name: Den TV
+              room: Den
+              macs:
+                - 02:00:5e:10:00:01
+              haEntityId: media_player.den_tv
+              openHours: null
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tv'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: mac_taken, entity_taken or too_many_tvs (50 at most)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/display:
+    get:
+      operationId: displayTvs
+      summary: The TVs as a wall display shows them
+      description: Names and state only, never MACs or entities. Parents sessions show no countdown.
+      tags:
+        - tvs
+      x-actors:
+        - display
+        - adult
+        - phone
+      x-display-scopes:
+        - tv
+      responses:
+        '200':
+          description: The TVs, by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisplayTvList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/history:
+    get:
+      operationId: tvHistory
+      summary: Recent TV sessions and who opened which TV
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:read
+      responses:
+        '200':
+          description: The latest 50 of each, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvHistory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/open:
+    post:
+      operationId: openTvs
+      summary: Open TVs for 1 hour, 2 hours or all day
+      description: Every TV, or the ones listed, is simply online until then, as in open hours. Opening a TV ends its session now (a child keeps the rest of their time) and withdraws its prompt. Opening an open TV replaces its end.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:control
+      x-command: true
+      x-body-limit: 4096
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenTvs'
+            example:
+              all: true
+              duration: 2h
+      responses:
+        '200':
+          $ref: '#/components/responses/Opened'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: no_tvs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/extend:
+    post:
+      operationId: extendTvs
+      summary: Keep open TVs open an hour longer
+      description: Adds an hour to TVs a parent opened (all of them, or the ones listed), at most 24 hours ahead.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:control
+      x-command: true
+      x-body-limit: 4096
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChosenTvs'
+            example:
+              all: true
+      responses:
+        '200':
+          $ref: '#/components/responses/Opened'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: not_open (no TV, or a listed one, is open by a parent) or open_limit (more than 24 hours ahead)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/close:
+    post:
+      operationId: closeTvs
+      summary: Close TVs a parent opened, now
+      description: They are gated again (open hours still keep a TV open inside them). A TV that isn't open is left as it is.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:control
+      x-command: true
+      x-body-limit: 4096
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChosenTvs'
+            example:
+              tvIds:
+                - 0190a1b2-0000-7000-8000-0000000000a1
+      responses:
+        '200':
+          $ref: '#/components/responses/Opened'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/{tvId}:
+    put:
+      operationId: updateTv
+      summary: Edit a TV
+      description: Replaces the name, room, MACs, Home Assistant entity and open hours. A new or cleared entity forgets the TV's power. Open hours that are open now end its session at once.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:manage
+      x-command: true
+      x-body-limit: 2048
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TvId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TvEdit'
+            example:
+              name: Den TV
+              room: Den
+              macs:
+                - 02:00:5e:10:00:01
+              haEntityId: null
+              openHours:
+                start: '21:00'
+                end: '07:00'
+              expectedVersion: 1
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tv'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: version_conflict, mac_taken or entity_taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: removeTv
+      summary: Remove a TV
+      description: Ends its session, withdraws its prompt and forgets its MACs, so the router stops listing it at once.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:manage
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TvId'
+      responses:
+        '204':
+          description: Removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/{tvId}/session:
+    post:
+      operationId: startTvSession
+      summary: Turn a TV on for parents or a child
+      description: Replaces the TV's running session and answers its prompt. A child's session spends their TV time, needs time left and their allowed hours, and ends when either runs out.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:control
+      x-command: true
+      x-body-limit: 256
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TvId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartTvSession'
+            example:
+              watcher: child
+              childId: 0190a1b2-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: The running session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StartConflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/{tvId}/session/end:
+    post:
+      operationId: endTvSession
+      summary: Turn a TV off now
+      description: Ends its running session (parent_ended); a TV with none is left as it is.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:control
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TvId'
+      responses:
+        '200':
+          description: The session that ended, if there was one
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndedTvSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/{tvId}/ask:
+    post:
+      operationId: askForTv
+      summary: Ask the parents to turn a TV on
+      description: Raises "Who's watching?" (a display never starts a session itself). A TV already on or open answers on. Asking again while it is asking keeps the one prompt and, at most every two minutes, reminds the parents.
+      tags:
+        - tvs
+      x-actors:
+        - display
+        - adult
+        - phone
+      x-display-scopes:
+        - tv
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TvId'
+      responses:
+        '200':
+          description: Where the TV stands
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvAsked'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tvs/{tvId}/done:
+    post:
+      operationId: doneWatching
+      summary: Done watching
+      description: Ends a TV's running session (done). A display or an adult ends any; a child's device only that child's own. It can only turn a TV off, never on.
+      tags:
+        - tvs
+      x-actors:
+        - display
+        - device
+        - device-web
+        - adult
+        - phone
+      x-display-scopes:
+        - tv
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TvId'
+      responses:
+        '200':
+          description: The session that ended, if there was one
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndedTvSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: not_your_session (a device, and someone else is watching)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tv-prompts/{promptId}/answer:
+    post:
+      operationId: answerTvPrompt
+      summary: Answer "Who's watching?"
+      description: 'Parents, a child (a session starts), or not now. The first answer wins: answering a prompt already answered, withdrawn or at another version is a 409.'
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+        - assistant
+      x-scopes:
+        - tv:control
+      x-command: true
+      x-body-limit: 256
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: promptId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TvPromptAnswer'
+            example:
+              expectedVersion: 1
+              answer: parents
+      responses:
+        '200':
+          description: Answered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvPromptAnswered'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: already_answered, prompt_withdrawn (the TV turned off or opened), version_conflict, tv_removed, or a reason the session can't start (as for startTvSession)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/tv:
+    get:
+      operationId: childTv
+      summary: A child's TV time, as the kid view shows it
+      description: Their time left and where it came from, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
+      tags:
+        - tvs
+      x-actors:
+        - device
+        - device-web
+        - adult
+        - phone
+      x-child-param: childId
+      parameters:
+        - $ref: '#/components/parameters/ChildId'
+      responses:
+        '200':
+          description: The child's TV time
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChildTv'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/tv/credits/{creditId}/forfeit:
+    post:
+      operationId: forfeitTvCredit
+      summary: Take back the unused rest of a parent's TV grant
+      description: |
+        The credit keeps what was already watched; the rest leaves the child's TV time, and a session left with none ends. A reward's TV time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+      x-child-param: childId
+      x-command: true
+      x-body-limit: 64
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ChildId'
+        - name: creditId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Taken back
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - forfeitedSeconds
+                  - tv
+                properties:
+                  forfeitedSeconds:
+                    type: integer
+                  tv:
+                    $ref: '#/components/schemas/ChildTv'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/tv/watch:
+    post:
+      operationId: watchTv
+      summary: Watch on a TV that is asking (the child's own device)
+      description: The child starts their own session, spending their TV time, on a TV asking "Who's watching?" with nobody on it. It answers the prompt as a parent choosing them would.
+      tags:
+        - tvs
+      x-actors:
+        - device
+        - device-web
+      x-child-param: childId
+      x-command: true
+      x-body-limit: 256
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ChildId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchTv'
+            example:
+              tvId: 0190a1b2-0000-7000-8000-0000000000a1
+      responses:
+        '200':
+          description: The child's session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: not_asking (the TV isn't asking), tv_on (someone already answered), or a reason the session can't start (as for startTvSession)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tv/allowances:
+    get:
+      operationId: tvAllowances
+      summary: Which TV MACs may be online, and for how long (the router)
+      description: 'Every MAC of a TV with a running session or that is open, with the seconds it may stay online: at most 300, so a router that loses the server closes TVs within five minutes. A session''s MACs drop out a minute before it ends (streaming apps keep playing from their buffer). Poll every few seconds.'
+      tags:
+        - tvs
+      x-actors:
+        - service
+      x-scopes:
+        - tv:gate
+      responses:
+        '200':
+          description: The allowances, by MAC
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvAllowances'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /tv/attempts:
+    post:
+      operationId: reportTvAttempts
+      summary: Blocked TVs trying to go online (the router)
+      description: 'The router reports MACs it blocked, at most once a minute each. OpenCozy decides whether that is a TV turning on worth asking about: a TV whose Home Assistant entity has reported asks only while it says on; one without asks once it has kept trying for three minutes. After "Not now" or a session ending it stays quiet for 30 minutes unless Home Assistant sees it turn on again. Each MAC''s result: requested (a prompt was raised), pending (already asking), open (on or open), suppressed, or unknown (no TV lists it). Send a new UUID as the Idempotency-Key each time.'
+      tags:
+        - tvs
+      x-actors:
+        - service
+      x-scopes:
+        - tv:gate
+      x-command: true
+      x-body-limit: 8192
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TvAttempts'
+            example:
+              attempts:
+                - mac: 02:00:5e:10:00:01
+                  lastSeenAt: '2026-11-21T16:12:00Z'
+      responses:
+        '200':
+          description: What OpenCozy made of each MAC
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvAttemptResults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /tv/power:
+    post:
+      operationId: reportTvPower
+      summary: A TV's power, from Home Assistant
+      description: Send the media_player's state and, when known, its last_changed. Turning on with nobody watching asks "Who's watching?"; off ends its session and withdraws its prompt; an open TV stays open either way. idle or paused unchanged for 15 minutes is unknown, not off. unavailable and unknown change nothing. Repeating a state changes nothing, so retries are safe; send a new UUID as the Idempotency-Key each time.
+      tags:
+        - tvs
+      x-actors:
+        - service
+      x-scopes:
+        - tv:report
+      x-command: true
+      x-body-limit: 1024
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TvPowerReport'
+            example:
+              entityId: media_player.den_tv
+              state: playing
+      responses:
+        '200':
+          description: Where the TV stands now
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TvPowerResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: unknown_entity (no TV has that entity)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
   /mcp:
     post:
       operationId: callMcp
@@ -4119,6 +5116,45 @@ components:
               type: string
         household:
           $ref: '#/components/schemas/Household'
+    OidcProvider:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+    SignInMethods:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeys
+        - oidc
+      properties:
+        passkeys:
+          type: boolean
+          description: Passkeys are set up on this server (WEBAUTHN_RP_ID)
+        oidc:
+          description: The single sign-on provider's button name ("Sign in with <name>"), or null when it isn't set up
+          oneOf:
+            - $ref: '#/components/schemas/OidcProvider'
+            - type: 'null'
+    OidcLink:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - linkedAt
+      properties:
+        email:
+          type: string
+          description: The email the provider confirmed when the link was made
+        linkedAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
     PasskeyOptions:
       type: object
       additionalProperties: false
@@ -5145,6 +6181,125 @@ components:
         clipped:
           type: boolean
           description: Allowed hours cut it short; the rest stays banked
+    TvCredit:
+      type: object
+      description: TV time with some left
+      required:
+        - id
+        - source
+        - minutes
+        - seconds
+        - usedSeconds
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        source:
+          type: string
+          enum:
+            - redemption
+            - grant
+          description: A reward bought with points, or a parent's grant
+        redemptionId:
+          $ref: '#/components/schemas/Id'
+        rewardTitle:
+          type: string
+        grantedBy:
+          type: string
+          description: The parent who gave it, by name
+        minutes:
+          type: integer
+          description: What it was given as
+        seconds:
+          type: integer
+          description: What it holds
+        usedSeconds:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    WaitingTv:
+      type: object
+      required:
+        - tvId
+        - tvName
+        - room
+      properties:
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        room:
+          type:
+            - string
+            - 'null'
+    Watching:
+      type: object
+      required:
+        - tvId
+        - tvName
+        - endsAt
+        - secondsRemaining
+        - endsWithHours
+      properties:
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        endsAt:
+          type: string
+          format: date-time
+        secondsRemaining:
+          type: integer
+        endsWithHours:
+          type: boolean
+    WindowStatus:
+      type: object
+      description: Open until closesAt, or closed until opensAt
+      required:
+        - open
+      properties:
+        open:
+          type: boolean
+        closesAt:
+          type: string
+          format: date-time
+        opensAt:
+          type: string
+          format: date-time
+    ChildTv:
+      type: object
+      required:
+        - serverTime
+        - secondsRemaining
+        - credits
+        - waiting
+        - watching
+        - hours
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        secondsRemaining:
+          type: integer
+        credits:
+          type: array
+          description: TV time with some left, oldest first (watched in this order)
+          items:
+            $ref: '#/components/schemas/TvCredit'
+        waiting:
+          type: array
+          description: TVs asking "Who's watching?" now with nobody on them, oldest first
+          items:
+            $ref: '#/components/schemas/WaitingTv'
+        watching:
+          oneOf:
+            - $ref: '#/components/schemas/Watching'
+            - type: 'null'
+        hours:
+          oneOf:
+            - $ref: '#/components/schemas/WindowStatus'
+            - type: 'null'
     SpendResult:
       type: object
       required:
@@ -5154,6 +6309,9 @@ components:
           $ref: '#/components/schemas/Spend'
         screenTime:
           $ref: '#/components/schemas/ScreenTime'
+        tv:
+          $ref: '#/components/schemas/ChildTv'
+          description: For TV time given (target tv), the child's TV time now
     EndResult:
       type: object
       required:
@@ -5945,6 +7103,769 @@ components:
           type: integer
           format: int64
           description: The child's balance now
+    TvPower:
+      type: string
+      enum:
+        - 'on'
+        - 'off'
+        - unknown
+    Clock-2:
+      type: string
+      description: HH:MM, household time
+      pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+    Weekday:
+      type: string
+      enum:
+        - sun
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+        - sat
+    OpenHours:
+      type: object
+      description: One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day.
+      additionalProperties: false
+      required:
+        - start
+        - end
+      properties:
+        start:
+          $ref: '#/components/schemas/Clock-2'
+        end:
+          $ref: '#/components/schemas/Clock-2'
+        days:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Weekday'
+    Tv:
+      type: object
+      required:
+        - id
+        - name
+        - room
+        - macs
+        - haEntityId
+        - power
+        - powerChangedAt
+        - openHours
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        room:
+          type:
+            - string
+            - 'null'
+        macs:
+          type: array
+          items:
+            type: string
+        haEntityId:
+          type:
+            - string
+            - 'null'
+        power:
+          $ref: '#/components/schemas/TvPower'
+        powerChangedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        openHours:
+          oneOf:
+            - $ref: '#/components/schemas/OpenHours'
+            - type: 'null'
+        version:
+          $ref: '#/components/schemas/Version'
+    TvSession:
+      type: object
+      required:
+        - id
+        - tvId
+        - tvName
+        - watcher
+        - childId
+        - childName
+        - startedAt
+        - endedAt
+        - endReason
+        - endsAt
+        - secondsRemaining
+        - endsWithHours
+        - watchedSeconds
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        watcher:
+          type: string
+          enum:
+            - parents
+            - child
+        childId:
+          oneOf:
+            - $ref: '#/components/schemas/Id'
+            - type: 'null'
+        childName:
+          type:
+            - string
+            - 'null'
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        endReason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - tv_off
+            - time_up
+            - parent_ended
+            - done
+            - open_hours
+            - parent_override
+            - null
+        endsAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: A running session's end at the latest (parents, the 4-hour safety cap)
+        secondsRemaining:
+          type:
+            - integer
+            - 'null'
+        endsWithHours:
+          type: boolean
+          description: The child's allowed hours end it before their time runs out
+        watchedSeconds:
+          type: integer
+    TvPrompt:
+      type: object
+      required:
+        - id
+        - version
+        - source
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        version:
+          $ref: '#/components/schemas/Version'
+        source:
+          type: string
+          enum:
+            - home_assistant
+            - router
+            - display
+            - adult
+        createdAt:
+          type: string
+          format: date-time
+    TvState:
+      description: A TV and where it stands now.
+      allOf:
+        - $ref: '#/components/schemas/Tv'
+        - type: object
+          required:
+            - open
+            - openClosesAt
+            - openUntil
+            - openReason
+            - openHoursNow
+            - session
+            - prompt
+          properties:
+            open:
+              type: boolean
+              description: Online without a session (open hours, or opened by a parent)
+            openClosesAt:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: When the open TV is gated again; null while gated
+            openUntil:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: A parent's "Open TVs" end, while one is active
+            openReason:
+              type:
+                - string
+                - 'null'
+              enum:
+                - open_hours
+                - parent
+                - null
+            openHoursNow:
+              oneOf:
+                - $ref: '#/components/schemas/WindowStatus'
+                - type: 'null'
+            session:
+              oneOf:
+                - $ref: '#/components/schemas/TvSession'
+                - type: 'null'
+            prompt:
+              oneOf:
+                - $ref: '#/components/schemas/TvPrompt'
+                - type: 'null'
+    TvChild:
+      type: object
+      description: A live child as "Turn on for…" and "Who's watching?" offer them.
+      required:
+        - childId
+        - name
+        - color
+        - tvSecondsRemaining
+        - watchingTvId
+        - hours
+        - canWatch
+        - canStartOwn
+      properties:
+        childId:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        color:
+          type: string
+        tvSecondsRemaining:
+          type: integer
+        watchingTvId:
+          oneOf:
+            - $ref: '#/components/schemas/Id'
+            - type: 'null'
+        hours:
+          description: The child's allowed hours now; null with no rule
+          oneOf:
+            - $ref: '#/components/schemas/WindowStatus'
+            - type: 'null'
+        canWatch:
+          type: boolean
+          description: Has TV time, is inside their hours and isn't watching another TV
+        canStartOwn:
+          type: boolean
+          description: canWatch, not watching, and has a paired device to start it from
+    TvList:
+      type: object
+      required:
+        - serverTime
+        - tvs
+        - children
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        tvs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvState'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvChild'
+    TvName:
+      type: string
+      minLength: 1
+      maxLength: 80
+      pattern: \S
+    Room:
+      type:
+        - string
+        - 'null'
+      minLength: 1
+      maxLength: 80
+      pattern: \S
+    Mac:
+      type: string
+      description: Lower case, colons (any case and dashes are accepted and normalized)
+      pattern: ^[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}$
+    Macs:
+      type: array
+      minItems: 1
+      maxItems: 8
+      uniqueItems: true
+      items:
+        $ref: '#/components/schemas/Mac'
+    EntityId:
+      type: string
+      pattern: ^[a-z0-9_]{1,64}[.][a-z0-9_]{1,190}$
+      maxLength: 255
+    NewTv:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - macs
+      properties:
+        name:
+          $ref: '#/components/schemas/TvName'
+        room:
+          $ref: '#/components/schemas/Room'
+        macs:
+          $ref: '#/components/schemas/Macs'
+        haEntityId:
+          oneOf:
+            - $ref: '#/components/schemas/EntityId'
+            - type: 'null'
+        openHours:
+          oneOf:
+            - $ref: '#/components/schemas/OpenHours'
+            - type: 'null'
+    DisplayTvSession:
+      type: object
+      description: Who is watching; a parents session has no countdown
+      required:
+        - watcher
+        - childId
+        - childName
+        - endsAt
+        - secondsRemaining
+      properties:
+        watcher:
+          type: string
+          enum:
+            - parents
+            - child
+        childId:
+          oneOf:
+            - $ref: '#/components/schemas/Id'
+            - type: 'null'
+        childName:
+          type:
+            - string
+            - 'null'
+        endsAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        secondsRemaining:
+          type:
+            - integer
+            - 'null'
+    DisplayTv:
+      type: object
+      required:
+        - id
+        - name
+        - room
+        - power
+        - asking
+        - openClosesAt
+        - openUntil
+        - session
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        room:
+          type:
+            - string
+            - 'null'
+        power:
+          $ref: '#/components/schemas/TvPower'
+        asking:
+          type: boolean
+        openClosesAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        openUntil:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        session:
+          oneOf:
+            - $ref: '#/components/schemas/DisplayTvSession'
+            - type: 'null'
+    DisplayTvList:
+      type: object
+      required:
+        - serverTime
+        - tvs
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        tvs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisplayTv'
+    TvOpening:
+      type: object
+      required:
+        - id
+        - at
+        - action
+        - tvId
+        - tvName
+        - until
+        - byName
+        - viaAssistant
+        - endedSessionId
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        at:
+          type: string
+          format: date-time
+        action:
+          type: string
+          enum:
+            - open
+            - extend
+            - close
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        until:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        byName:
+          type:
+            - string
+            - 'null'
+        viaAssistant:
+          type: boolean
+        endedSessionId:
+          oneOf:
+            - $ref: '#/components/schemas/Id'
+            - type: 'null'
+    TvHistory:
+      type: object
+      required:
+        - sessions
+        - openings
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvSession'
+        openings:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvOpening'
+    OpenTvs:
+      type: object
+      description: Every TV (all) or the ones listed, not both, for 1 hour, 2 hours or until midnight
+      additionalProperties: false
+      required:
+        - duration
+      properties:
+        all:
+          type: boolean
+        tvIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Id'
+        duration:
+          type: string
+          enum:
+            - 1h
+            - 2h
+            - all_day
+    OpenedTv:
+      type: object
+      required:
+        - id
+        - name
+        - openUntil
+        - openClosesAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        openUntil:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        openClosesAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    OpenedTvs:
+      type: object
+      required:
+        - serverTime
+        - tvs
+        - endedSessions
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        tvs:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenedTv'
+        endedSessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvSession'
+    ChosenTvs:
+      type: object
+      description: Every TV (all) or the ones listed, not both
+      additionalProperties: false
+      properties:
+        all:
+          type: boolean
+        tvIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Id'
+    TvEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - room
+        - macs
+        - haEntityId
+        - openHours
+        - expectedVersion
+      properties:
+        name:
+          $ref: '#/components/schemas/TvName'
+        room:
+          $ref: '#/components/schemas/Room'
+        macs:
+          $ref: '#/components/schemas/Macs'
+        haEntityId:
+          oneOf:
+            - $ref: '#/components/schemas/EntityId'
+            - type: 'null'
+        openHours:
+          oneOf:
+            - $ref: '#/components/schemas/OpenHours'
+            - type: 'null'
+        expectedVersion:
+          $ref: '#/components/schemas/Version'
+    StartTvSession:
+      type: object
+      additionalProperties: false
+      required:
+        - watcher
+      properties:
+        watcher:
+          type: string
+          enum:
+            - parents
+            - child
+        childId:
+          $ref: '#/components/schemas/Id'
+    EndedTvSession:
+      type: object
+      required:
+        - session
+      properties:
+        session:
+          oneOf:
+            - $ref: '#/components/schemas/TvSession'
+            - type: 'null'
+    TvAsked:
+      type: object
+      required:
+        - 'on'
+        - asking
+      properties:
+        'on':
+          type: boolean
+          description: Already on (a session) or open
+        asking:
+          type: boolean
+    TvPromptAnswer:
+      type: object
+      additionalProperties: false
+      required:
+        - expectedVersion
+        - answer
+      properties:
+        expectedVersion:
+          $ref: '#/components/schemas/Version'
+        answer:
+          type: string
+          enum:
+            - parents
+            - child
+            - not_now
+        childId:
+          $ref: '#/components/schemas/Id'
+    TvPromptAnswered:
+      type: object
+      required:
+        - prompt
+        - session
+      properties:
+        prompt:
+          type: object
+          required:
+            - id
+            - version
+            - state
+          properties:
+            id:
+              $ref: '#/components/schemas/Id'
+            version:
+              $ref: '#/components/schemas/Version'
+            state:
+              type: string
+              enum:
+                - answered
+                - dismissed
+        session:
+          oneOf:
+            - $ref: '#/components/schemas/TvSession'
+            - type: 'null'
+    WatchTv:
+      type: object
+      additionalProperties: false
+      required:
+        - tvId
+      properties:
+        tvId:
+          $ref: '#/components/schemas/Id'
+    TvAllowance:
+      type: object
+      required:
+        - mac
+        - secondsRemaining
+      properties:
+        mac:
+          type: string
+        secondsRemaining:
+          type: integer
+          minimum: 1
+          maximum: 300
+    TvAllowances:
+      type: object
+      required:
+        - serverTime
+        - allowances
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        allowances:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvAllowance'
+    TvAttempt:
+      type: object
+      additionalProperties: false
+      required:
+        - mac
+        - lastSeenAt
+      properties:
+        mac:
+          $ref: '#/components/schemas/Mac'
+        lastSeenAt:
+          type: string
+          format: date-time
+    TvAttempts:
+      type: object
+      additionalProperties: false
+      required:
+        - attempts
+      properties:
+        attempts:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/TvAttempt'
+    TvAttemptResult:
+      type: object
+      required:
+        - mac
+        - state
+      properties:
+        mac:
+          type: string
+        state:
+          type: string
+          enum:
+            - requested
+            - pending
+            - open
+            - suppressed
+            - unknown
+    TvAttemptResults:
+      type: object
+      required:
+        - serverTime
+        - results
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvAttemptResult'
+    TvPowerReport:
+      type: object
+      additionalProperties: false
+      required:
+        - entityId
+        - state
+      properties:
+        entityId:
+          $ref: '#/components/schemas/EntityId'
+        state:
+          type: string
+          maxLength: 32
+          pattern: ^[a-z_]{1,32}$
+          description: The media_player state (on, playing, buffering, idle, paused, off, standby, unavailable, …)
+        lastChanged:
+          type: string
+          format: date-time
+    TvPowerResult:
+      type: object
+      required:
+        - tvId
+        - power
+        - online
+        - asking
+      properties:
+        tvId:
+          $ref: '#/components/schemas/Id'
+        power:
+          $ref: '#/components/schemas/TvPower'
+        online:
+          type: boolean
+        asking:
+          type: boolean
   responses:
     Error:
       description: Unexpected error
@@ -6006,9 +7927,25 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Opened:
+      description: The TVs it changed, and any sessions opening ended
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OpenedTvs'
+    StartConflict:
+      description: tv_open (it's open, nobody needs to turn it on), child_unavailable, already_watching (another TV), no_tv_time, or outside_hours
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   headers:
     SetSession:
       description: Sets or clears the __Host-session cookie
+      schema:
+        type: string
+    SetSignIn:
+      description: Sets the __Host-oidc cookie that binds the sign-in to this browser (10 minutes; the callback clears it)
       schema:
         type: string
   parameters:
@@ -6032,6 +7969,12 @@ components:
         $ref: '#/components/schemas/Id'
     ChildId:
       name: childId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    TvId:
+      name: tvId
       in: path
       required: true
       schema:
