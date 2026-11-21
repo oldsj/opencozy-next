@@ -271,6 +271,12 @@ func TestValidationAndRouting(t *testing.T) {
 	if r := e.send(cred{}, "PUT", "/api/household", nil); r.status != 405 {
 		t.Errorf("unknown method: %d %s", r.status, r.raw)
 	}
+	// The previous server's API tells its apps to update, for any method.
+	for _, m := range []string{"GET", "POST", "PUT", "DELETE"} {
+		if r := e.send(cred{}, m, "/api/v1/device/time-requests", nil); r.status != 410 || r.code() != "update_app" {
+			t.Errorf("%s /api/v1: %d %s", m, r.status, r.raw)
+		}
+	}
 }
 
 // The body cap applies before authentication: an anonymous oversized body is a 413, never read.

@@ -183,6 +183,168 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
+  /auth/methods:
+    get:
+      operationId: getSignInMethods
+      summary: How adults can sign in here, for the sign-in page
+      tags:
+        - auth
+      x-actors:
+        - public
+      responses:
+        '200':
+          description: The sign-in methods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignInMethods'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/oidc/start:
+    post:
+      operationId: startOidcSignIn
+      summary: Start signing in with the single sign-on provider
+      tags:
+        - auth
+      x-actors:
+        - public
+      x-body-limit: 1
+      responses:
+        '200':
+          description: Send the browser to `url`
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetSignIn'
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - url
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: The provider can't be reached (`oidc_unavailable`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/callback/oidc:
+    get:
+      operationId: oidcCallback
+      summary: Where the provider sends the browser back; redirects to the app
+      description: |
+        Registered at the provider as `<PUBLIC_ORIGIN>/api/auth/callback/oidc`, the old app's path.
+        Every outcome is a 303: to `/` with a new session, or to `/login?error=<code>`.
+      tags:
+        - auth
+      x-actors:
+        - public
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+        - name: state
+          in: query
+          schema:
+            type: string
+            maxLength: 256
+        - name: iss
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+        - name: error
+          in: query
+          schema:
+            type: string
+            maxLength: 256
+        - name: __Host-oidc
+          in: cookie
+          schema:
+            type: string
+            maxLength: 256
+      responses:
+        '303':
+          description: Back to the app
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              $ref: '#/components/headers/SetSession'
+        default:
+          $ref: '#/components/responses/Error'
+  /auth/oidc/link:
+    get:
+      operationId: getOidcLink
+      summary: Your single sign-on link, if you have one
+      tags:
+        - auth
+      x-actors:
+        - adult
+      responses:
+        '200':
+          description: The link, or null when there is none
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - link
+                properties:
+                  link:
+                    oneOf:
+                      - $ref: '#/components/schemas/OidcLink'
+                      - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: unlinkOidc
+      summary: Unlink your single sign-on account
+      description: |
+        Signing in with the provider stops working for you until you use it again, when it links
+        afresh by your verified email. Your password and passkeys keep working.
+      tags:
+        - auth
+      x-actors:
+        - adult
+      x-recent-auth: true
+      responses:
+        '204':
+          description: Unlinked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
   /auth/passkey/options:
     post:
       operationId: passkeySignInOptions
@@ -4872,6 +5034,45 @@ components:
               type: string
         household:
           $ref: '#/components/schemas/Household'
+    OidcProvider:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+    SignInMethods:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeys
+        - oidc
+      properties:
+        passkeys:
+          type: boolean
+          description: Passkeys are set up on this server (WEBAUTHN_RP_ID)
+        oidc:
+          description: The single sign-on provider's button name ("Sign in with <name>"), or null when it isn't set up
+          oneOf:
+            - $ref: '#/components/schemas/OidcProvider'
+            - type: 'null'
+    OidcLink:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - linkedAt
+      properties:
+        email:
+          type: string
+          description: The email the provider confirmed when the link was made
+        linkedAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
     PasskeyOptions:
       type: object
       additionalProperties: false
@@ -7672,6 +7873,10 @@ components:
   headers:
     SetSession:
       description: Sets or clears the __Host-session cookie
+      schema:
+        type: string
+    SetSignIn:
+      description: Sets the __Host-oidc cookie that binds the sign-in to this browser (10 minutes; the callback clears it)
       schema:
         type: string
   parameters:

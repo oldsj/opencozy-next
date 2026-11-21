@@ -64,7 +64,7 @@ func (s *Server) Login(ctx context.Context, req api.LoginRequestObject) (api.Log
 	if err != nil {
 		return nil, err
 	}
-	cookie, err := s.startSession(ctx, a.ID)
+	cookie, err := s.startSession(ctx, a.ID, nil)
 	if err != nil {
 		return nil, err
 	}
