@@ -200,7 +200,7 @@ if [ "${#failures[@]}" != 0 ]; then
   exit 1
 fi
 if [ "${ALLOW_PENDING:-}" = 1 ]; then
-  echo "== Rehearsal passed with ALLOW_PENDING=1 (pending.sql left out): not yet the full rehearsal"
+  echo "== Rehearsal passed with ALLOW_PENDING=1 (complete.sql removed what the importer cannot map yet; pending.sql left out): not yet the full rehearsal"
 else
   echo "== Rehearsal passed"
 fi
