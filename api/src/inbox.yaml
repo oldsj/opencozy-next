@@ -3,7 +3,8 @@ inbox:
     operationId: getInbox
     summary: What waits for an adult's decision, oldest first
     tags: [inbox]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [inbox:read]
     responses:
       '200':
         description: The inbox
@@ -20,7 +21,8 @@ approve:
     operationId: approveInboxItem
     summary: Say yes; a completion's points land
     tags: [inbox]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [inbox:decide]
     x-command: true
     x-body-limit: 64
     parameters:
@@ -60,7 +62,8 @@ reject:
     operationId: rejectInboxItem
     summary: Send it back, with an optional reason the child sees
     tags: [inbox]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [inbox:decide]
     x-command: true
     x-body-limit: 1024
     parameters:
@@ -112,7 +115,8 @@ answer:
       without a choice is 422 `choice_required`; rejecting it is "no". 409 `already_decided`, or
       `already_until` when "all day" would add nothing.
     tags: [inbox]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [inbox:decide]
     x-command: true
     x-body-limit: 64
     parameters:

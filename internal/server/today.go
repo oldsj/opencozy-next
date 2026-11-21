@@ -244,7 +244,7 @@ func openOccurrence(ctx context.Context, cmd *command.Cmd, child, definition uui
 // finish ends today's occurrence. Done by a child (on a display), it waits for an adult's
 // approval; done by an adult, it is approved at once and the points land.
 func finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurrence, kind, title string, checked []uuid.UUID) (dbq.Occurrence, error) {
-	adult := a.Kind == actor.Adult || a.Kind == actor.Phone
+	adult := a.ActsAsAdult()
 	state := "pending"
 	if adult {
 		state = "complete"
@@ -256,7 +256,7 @@ func finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurr
 		return dbq.Occurrence{}, err
 	}
 	if adult {
-		return updated, award(ctx, cmd, a.AdultID, updated)
+		return updated, award(ctx, cmd, a, updated)
 	}
 	_, err = cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
 		HouseholdID: cmd.HouseholdID(), ChildID: occ.ChildID, Kind: kind, OccurrenceID: &occ.ID, Title: title, Points: occ.Points,

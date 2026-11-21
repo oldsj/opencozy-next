@@ -16,8 +16,15 @@ import (
 // slice that adds it (pending), so a credential is never imported with less, or more, access
 // than it had. Each domain slice adds its scopes.
 var (
-	serviceScopes   = map[string]string{"children:read": "children:read", "external:award": "learning:award", "games:gate": "games:gate", "screentime:read": "screentime:read"}
-	assistantScopes = map[string]string{}
+	serviceScopes = map[string]string{"children:read": "children:read", "external:award": "learning:award", "games:gate": "games:gate", "screentime:read": "screentime:read"}
+	// The old assistant's opt-in scopes. Its tv:* scopes wait for the TV slice's tools.
+	assistantScopes = map[string]string{
+		"approvals:read": "inbox:read", "approvals:write": "inbox:decide",
+		"chores:log": "today:complete", "screen-time:grant": "screentime:grant",
+	}
+	// The old assistant could always read the household's children, chores, routines, points,
+	// history, rewards and screen time; the new one needs these scopes for that.
+	assistantReads = []string{"children:read", "household:read", "points:read", "rewards:read", "screentime:read", "today:read"}
 )
 
 // importCredentials carries service (ocz_) and assistant (oca_) credentials with their IDs.
@@ -97,6 +104,7 @@ func importCredentials(ctx context.Context, x *run) error {
 	err = eachCredential(ctx, x, `SELECT household_id, id, user_id, name, credential_hash, scopes, created_at, revoked_at
 		FROM opencozy.assistant_credential ORDER BY household_id, id`, func(c oldCredential) error {
 		scopes, missing := mapScopes(c.scopes, assistantScopes)
+		scopes = slices.Compact(slices.Sorted(slices.Values(slices.Concat(scopes, assistantReads))))
 		if len(missing) > 0 {
 			for _, m := range missing {
 				waiting[m]++

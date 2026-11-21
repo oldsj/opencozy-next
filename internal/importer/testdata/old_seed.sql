@@ -30,7 +30,7 @@ UPDATE child SET school_night_start = 900, school_night_end = 1140, weekend_star
 WHERE id = '0190a000-0000-7000-8000-0000000000c1';
 
 -- One service credential whose scopes all have a new name, one that waits on a later slice
--- (tv:gate), and an assistant whose scope waits too.
+-- (tv:gate), and an assistant (approvals:read, carried since slice 12).
 INSERT INTO service_credential (household_id, id, name, credential_hash, scopes, created_at, revoked_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d1', 'Kitchen tablet', '93e227675412e705e32188b1bc512d6395f09714bb812c15c227138d4698e694', '{children:read}', '2026-01-05T08:00:00Z', NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d2', 'Router', '9371ba2ad122acad9ca87e0137ee9e81012832460f2e29443c413f311a29a105', '{tv:gate}', '2026-01-05T08:01:00Z', NULL);

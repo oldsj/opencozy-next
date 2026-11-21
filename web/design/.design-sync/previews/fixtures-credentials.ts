@@ -30,6 +30,26 @@ export const scopeLabels: Record<string, string> = {
   'household:read': 'See the household’s name and settings',
   'children:read': 'See the children, their points and their day',
   'learning:award': 'Give points for learning, by your award rules',
+  'screentime:read': 'See the children’s iPad time',
+  'games:gate': 'Open game websites only while a child’s iPad time runs (a router)',
+  'today:read': 'See today’s chores and routines',
+  'today:complete': 'Tick off chores and routine steps as you (points land at once)',
+  'inbox:read': 'See what waits for your decision',
+  'inbox:decide': 'Approve, send back and answer requests for you',
+  'points:read': 'See each child’s points history',
+  'rewards:read': 'See rewards and what the children redeemed',
+  'calendar:read': 'See the family calendar',
+  'meals:read': 'See the meal plan',
+  'screentime:grant': 'Give and end iPad time as you',
+};
+
+/** Which scopes each kind is offered. An assistant acts as you, for every child. */
+export const kindScopes: Record<CredentialKind, string[]> = {
+  service: ['household:read', 'children:read', 'screentime:read', 'learning:award', 'games:gate'],
+  assistant: [
+    'household:read', 'children:read', 'today:read', 'today:complete', 'inbox:read', 'inbox:decide',
+    'points:read', 'rewards:read', 'calendar:read', 'meals:read', 'screentime:read', 'screentime:grant',
+  ],
 };
 
 export const kindLabels: Record<CredentialKind, { label: string; detail: string }> = {

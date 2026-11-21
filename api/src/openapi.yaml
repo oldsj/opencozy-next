@@ -58,6 +58,8 @@ tags:
     description: iPad screen time, allowed hours, time requests and blocked websites
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
+  - name: mcp
+    description: The assistant's Model Context Protocol endpoint
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -207,6 +209,8 @@ paths:
     $ref: learning.yaml#/link
   /learning/awards:
     $ref: learning.yaml#/awards
+  /mcp:
+    $ref: mcp.yaml#/mcp
 
 components:
   securitySchemes:

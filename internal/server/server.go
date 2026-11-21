@@ -38,9 +38,13 @@ type Server struct {
 	q           *dbq.Queries
 	actors      actor.Resolver
 	table       *authz.Table
-	runner      command.Runner
-	draining    atomic.Bool
-	live        atomic.Pointer[live.Hub] // slice 0d: StartLive
+	// mcp is the assistant's tool catalog; apiChain is the whole API chain, which each MCP tool
+	// call runs through (internal/server/mcp.go).
+	mcp      *mcpCatalog
+	apiChain http.Handler
+	runner   command.Runner
+	draining atomic.Bool
+	live     atomic.Pointer[live.Hub] // slice 0d: StartLive
 	// calendarWake starts the calendar refresh early (slice 13a).
 	calendarWake chan struct{}
 	wa           *webauthn.WebAuthn // nil when passkeys are off
@@ -127,6 +131,9 @@ func (s *Server) apiHandler() (http.Handler, error) {
 	if s.table, err = authz.New(spec); err != nil {
 		return nil, err
 	}
+	if s.mcp, err = newMCPCatalog(spec, s.table); err != nil {
+		return nil, err
+	}
 
 	validator := nethttpmiddleware.OapiRequestValidatorWithOptions(spec, &nethttpmiddleware.Options{
 		DoNotValidateServers: true,
@@ -148,15 +155,24 @@ func (s *Server) apiHandler() (http.Handler, error) {
 			httpx.WriteError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
 		},
 	})
-	handler := api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseRouter: http.NewServeMux(), Middlewares: []api.MiddlewareFunc{sameRoute}})
+	generated := api.HandlerWithOptions(strict, api.StdHTTPServerOptions{BaseRouter: http.NewServeMux(), Middlewares: []api.MiddlewareFunc{sameRoute}})
+	mcpHandler := s.mcpHandler()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.EqualFold(routeFrom(r.Context()).policy.OperationID, mcpOp) {
+			mcpHandler.ServeHTTP(w, r)
+			return
+		}
+		generated.ServeHTTP(w, r)
+	})
 
 	// Sign-in and pairing have separate buckets: a display polling its pairing every few seconds
 	// must not use up the sign-in attempts of an adult at the same address.
 	limited := httpx.NewRateLimiter(s.cfg.AuthRatePerMinute).Middleware
 	pairing := httpx.NewRateLimiter(pairingRatePerMinute).Middleware
 	devicePairing := httpx.NewRateLimiter(devicePairRatePerMinute).Middleware
+	mcpPerAddress := httpx.NewRateLimiter(mcpRatePerMinute).Middleware
 	limitAuth := func(next http.Handler) http.Handler {
-		auth, pair, devicePair := limited(next), pairing(next), devicePairing(next)
+		auth, pair, devicePair, mcpLimit := limited(next), pairing(next), devicePairing(next), mcpPerAddress(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.Method != http.MethodPost:
@@ -167,13 +183,15 @@ func (s *Server) apiHandler() (http.Handler, error) {
 				pair.ServeHTTP(w, r)
 			case r.URL.Path == "/device/pair":
 				devicePair.ServeHTTP(w, r)
+			case r.URL.Path == "/mcp":
+				mcpLimit.ServeHTTP(w, r)
 			default:
 				next.ServeHTTP(w, r)
 			}
 		})
 	}
 
-	return httpx.Chain(handler,
+	s.apiChain = httpx.Chain(handler,
 		noStore,
 		s.route,
 		bodyCap,
@@ -184,7 +202,8 @@ func (s *Server) apiHandler() (http.Handler, error) {
 		s.authorize,
 		s.serveLive,
 		s.commands,
-	), nil
+	)
+	return s.apiChain, nil
 }
 
 func noStore(next http.Handler) http.Handler {

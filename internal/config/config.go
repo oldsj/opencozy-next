@@ -69,6 +69,10 @@ type Config struct {
 	// WebAuthnOrigins are the origins passkeys are used from, e.g. https://cozy.example.test.
 	// Required with WEBAUTHN_RP_ID.
 	WebAuthnOrigins []string `env:"WEBAUTHN_ORIGINS" envSeparator:","`
+
+	// Slice 12: MCPToken is the assistant credential (oca_) `app mcp` acts as over stdio. Only
+	// that command reads it; the server never does. Secret: no default.
+	MCPToken string `env:"OPENCOZY_MCP_TOKEN"`
 }
 
 // Load reads the environment and validates it.

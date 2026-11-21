@@ -100,7 +100,7 @@ func (q *Queries) CreateRedemption(ctx context.Context, arg CreateRedemptionPara
 const createRedemptionApproval = `-- name: CreateRedemptionApproval :one
 INSERT INTO approval (household_id, child_id, kind, redemption_id, title, points)
 VALUES ($1, $2, 'redemption', $3, $4, $5)
-RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id
+RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id, decided_via
 `
 
 type CreateRedemptionApprovalParams struct {
@@ -136,6 +136,7 @@ func (q *Queries) CreateRedemptionApproval(ctx context.Context, arg CreateRedemp
 		&i.CreatedAt,
 		&i.RedemptionID,
 		&i.TimeRequestID,
+		&i.DecidedVia,
 	)
 	return i, err
 }

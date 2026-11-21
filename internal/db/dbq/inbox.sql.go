@@ -14,9 +14,9 @@ import (
 
 const decideApproval = `-- name: DecideApproval :one
 UPDATE approval
-SET state = $3, reason = $5, decided_at = $6, decided_by = $4, version = version + 1
+SET state = $3, reason = $5, decided_at = $6, decided_by = $4, decided_via = $7, version = version + 1
 WHERE household_id = $1 AND id = $2 AND state = 'pending'
-RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id
+RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id, decided_via
 `
 
 type DecideApprovalParams struct {
@@ -26,6 +26,7 @@ type DecideApprovalParams struct {
 	DecidedBy   *uuid.UUID
 	Reason      *string
 	Now         *time.Time
+	DecidedVia  *uuid.UUID
 }
 
 func (q *Queries) DecideApproval(ctx context.Context, arg DecideApprovalParams) (Approval, error) {
@@ -36,6 +37,7 @@ func (q *Queries) DecideApproval(ctx context.Context, arg DecideApprovalParams) 
 		arg.DecidedBy,
 		arg.Reason,
 		arg.Now,
+		arg.DecidedVia,
 	)
 	var i Approval
 	err := row.Scan(
@@ -54,12 +56,13 @@ func (q *Queries) DecideApproval(ctx context.Context, arg DecideApprovalParams) 
 		&i.CreatedAt,
 		&i.RedemptionID,
 		&i.TimeRequestID,
+		&i.DecidedVia,
 	)
 	return i, err
 }
 
 const getApproval = `-- name: GetApproval :one
-SELECT id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id FROM approval WHERE household_id = $1 AND id = $2
+SELECT id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id, decided_via FROM approval WHERE household_id = $1 AND id = $2
 `
 
 type GetApprovalParams struct {
@@ -86,6 +89,7 @@ func (q *Queries) GetApproval(ctx context.Context, arg GetApprovalParams) (Appro
 		&i.CreatedAt,
 		&i.RedemptionID,
 		&i.TimeRequestID,
+		&i.DecidedVia,
 	)
 	return i, err
 }
@@ -142,7 +146,7 @@ func (q *Queries) ListPendingApprovals(ctx context.Context, householdID uuid.UUI
 }
 
 const lockApproval = `-- name: LockApproval :one
-SELECT id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id FROM approval WHERE household_id = $1 AND id = $2 FOR UPDATE
+SELECT id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id, decided_via FROM approval WHERE household_id = $1 AND id = $2 FOR UPDATE
 `
 
 type LockApprovalParams struct {
@@ -169,6 +173,7 @@ func (q *Queries) LockApproval(ctx context.Context, arg LockApprovalParams) (App
 		&i.CreatedAt,
 		&i.RedemptionID,
 		&i.TimeRequestID,
+		&i.DecidedVia,
 	)
 	return i, err
 }

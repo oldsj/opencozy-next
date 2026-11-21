@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/api"
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
@@ -41,13 +42,14 @@ func (s *Server) GetInbox(ctx context.Context, _ api.GetInboxRequestObject) (api
 	return api.GetInbox200JSONResponse(out), nil
 }
 
-// award pays an occurrence's points to its child, decided by the adult. Zero-point chores pay nothing.
-func award(ctx context.Context, cmd *command.Cmd, adult api.Id, occ dbq.Occurrence) error {
+// award pays an occurrence's points to its child, decided by the adult (or their assistant).
+// Zero-point chores pay nothing.
+func award(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurrence) error {
 	if occ.Points <= 0 {
 		return nil
 	}
 	_, err := ledger.Award(ctx, cmd, ledger.Entry{
-		Child: occ.ChildID, Points: occ.Points, SourceKind: SourceOccurrence, SourceID: occ.ID, AdultID: &adult,
+		Child: occ.ChildID, Points: occ.Points, SourceKind: SourceOccurrence, SourceID: occ.ID, AdultID: &a.AdultID, CredentialID: a.Via(),
 	})
 	return err
 }
@@ -141,7 +143,7 @@ func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemR
 		return nil, err
 	}
 	decided, err := cmd.Q.DecideApproval(ctx, dbq.DecideApprovalParams{
-		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: "approved", DecidedBy: &a.AdultID, Now: &now,
+		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: "approved", DecidedBy: &a.AdultID, DecidedVia: a.Via(), Now: &now,
 	})
 	if err != nil {
 		return nil, err
@@ -157,7 +159,7 @@ func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemR
 	}); err != nil {
 		return nil, err
 	}
-	if err := award(ctx, cmd, a.AdultID, *d.occ); err != nil {
+	if err := award(ctx, cmd, a, *d.occ); err != nil {
 		return nil, err
 	}
 	return api.ApproveInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateApproved}, nil
@@ -189,7 +191,7 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 		return nil, err
 	}
 	decided, err := cmd.Q.DecideApproval(ctx, dbq.DecideApprovalParams{
-		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: "rejected", Reason: req.Body.Reason, DecidedBy: &a.AdultID, Now: &now,
+		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: "rejected", Reason: req.Body.Reason, DecidedBy: &a.AdultID, DecidedVia: a.Via(), Now: &now,
 	})
 	if err != nil {
 		return nil, err
@@ -198,7 +200,7 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 		if err := cmd.Q.SetRedemptionState(ctx, dbq.SetRedemptionStateParams{HouseholdID: a.HouseholdID, ID: d.red.ID, State: "rejected"}); err != nil {
 			return nil, err
 		}
-		if _, err := ledger.Refund(ctx, cmd, *d.red.LedgerID, ledger.Entry{Points: d.red.Cost, AdultID: &a.AdultID, Note: req.Body.Reason}); err != nil {
+		if _, err := ledger.Refund(ctx, cmd, *d.red.LedgerID, ledger.Entry{Points: d.red.Cost, AdultID: &a.AdultID, CredentialID: a.Via(), Note: req.Body.Reason}); err != nil {
 			return nil, err
 		}
 		return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
@@ -228,7 +230,7 @@ func answerTimeRequest(ctx context.Context, cmd *command.Cmd, d *decision, choic
 		state = "rejected"
 	}
 	decided, err := cmd.Q.DecideApproval(ctx, dbq.DecideApprovalParams{
-		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: state, Reason: reason, DecidedBy: &a.AdultID, Now: &now,
+		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: state, Reason: reason, DecidedBy: &a.AdultID, DecidedVia: a.Via(), Now: &now,
 	})
 	if err != nil {
 		return dbq.Approval{}, dbq.TimeRequest{}, err

@@ -23,8 +23,8 @@ SELECT COALESCE(sum(seconds - used_seconds), 0)::bigint FROM screen_time_credit
 WHERE household_id = $1 AND child_id = $2 AND used_seconds < seconds;
 
 -- name: InsertCredit :one
-INSERT INTO screen_time_credit (household_id, child_id, source, redemption_id, granted_by, minutes, seconds, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, @now)
+INSERT INTO screen_time_credit (household_id, child_id, source, redemption_id, granted_by, granted_via, minutes, seconds, created_at)
+VALUES ($1, $2, $3, $4, $5, sqlc.narg(granted_via), $6, $7, @now)
 RETURNING *;
 
 -- name: SetCreditUsed :exec

@@ -104,7 +104,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"auth_account":                  "ok",
 		"service_credential":            "pending", // the router's tv:gate has no new name yet
 		"service_credential_child":      "pending",
-		"assistant_credential":          "pending",
+		"assistant_credential":          "ok",
 		"auth_session":                  "not carried",
 		"recipe":                        "ok",
 		"meal_plan_entry":               "ok",
@@ -204,6 +204,14 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		FROM credential c JOIN credential_award_rule cr ON cr.credential_id = c.id JOIN award_rule r ON r.id = cr.rule_id
 		WHERE c.id = '0190a000-0000-7000-8000-0000000000d3'`).Scan(&learning); err != nil || learning != "{learning:award} build_house 2" {
 		t.Errorf("learning credential: %q %v", learning, err)
+	}
+	// The assistant keeps what it could do: its opt-in scope under the new name, and the reads
+	// the old app always gave it, for every child.
+	var assistant string
+	if err := target.Owner.QueryRow(ctx, `SELECT scopes::text || ' ' || all_children::text FROM credential
+		WHERE id = '0190a000-0000-7000-8000-0000000000e1' AND kind = 'assistant' AND adult_id IS NOT NULL`).Scan(&assistant); err != nil ||
+		assistant != "{children:read,household:read,inbox:read,points:read,rewards:read,screentime:read,today:read} true" {
+		t.Errorf("assistant credential: %q %v", assistant, err)
 	}
 	var archivedRules, unlinked, live int
 	if err := target.Owner.QueryRow(ctx, `SELECT (SELECT count(*) FROM award_rule WHERE archived_at IS NOT NULL),

@@ -87,6 +87,13 @@ func (s *Server) CreateCredential(ctx context.Context, req api.CreateCredentialR
 	if all && len(childIDs) > 0 {
 		return bad("invalid_children", "Give either allChildren or childIds, not both.")
 	}
+	if req.Body.Kind == api.CreateCredentialJSONBodyKindAssistant {
+		// An assistant acts for its adult, who acts for every child.
+		if len(childIDs) > 0 {
+			return bad("invalid_children", "An assistant acts for every child, as its adult does.")
+		}
+		all = true
+	}
 	var ruleIDs []uuid.UUID
 	if req.Body.AwardRuleIds != nil {
 		ruleIDs = *req.Body.AwardRuleIds

@@ -21,11 +21,29 @@ const scopeLabels: Record<string, string> = {
   [LEARNING]: 'Give points for learning, by your award rules',
   'screentime:read': 'See the children’s iPad time',
   'games:gate': 'Open game websites only while a child’s iPad time runs (a router)',
+  'today:read': 'See today’s chores and routines',
+  'today:complete': 'Tick off chores and routine steps as you (points land at once)',
+  'inbox:read': 'See what waits for your decision',
+  'inbox:decide': 'Approve, send back and answer requests for you',
+  'points:read': 'See each child’s points history',
+  'rewards:read': 'See rewards and what the children redeemed',
+  'calendar:read': 'See the family calendar',
+  'meals:read': 'See the meal plan',
+  'screentime:grant': 'Give and end iPad time as you',
+};
+
+// Which scopes each kind is offered. An assistant acts as its adult, for every child.
+const kindScopes: Record<Kind, string[]> = {
+  service: ['household:read', 'children:read', 'screentime:read', LEARNING, 'games:gate'],
+  assistant: [
+    'household:read', 'children:read', 'today:read', 'today:complete', 'inbox:read', 'inbox:decide',
+    'points:read', 'rewards:read', 'calendar:read', 'meals:read', 'screentime:read', 'screentime:grant',
+  ],
 };
 
 const kindLabels: Record<Kind, { label: string; detail: string }> = {
   service: { label: 'Service', detail: 'A home server or automation, such as a router or a smart-home hub.' },
-  assistant: { label: 'Assistant', detail: 'An AI assistant that answers questions about the family’s day.' },
+  assistant: { label: 'Assistant', detail: 'An AI assistant (over MCP) that helps with the family’s day, as you.' },
 };
 
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -98,13 +116,14 @@ export function ConnectionsPage() {
 
   const submit = (e: SyntheticEvent) => {
     e.preventDefault();
-    const usable = scopes.filter((s) => kind === 'service' || s !== LEARNING);
+    const usable = scopes.filter((s) => kindScopes[kind].includes(s));
+    const everyone = all || kind === 'assistant';
     issue({
       kind,
       name: name.trim(),
       scopes: usable,
-      allChildren: all,
-      childIds: all ? [] : childIds,
+      allChildren: everyone,
+      childIds: everyone ? [] : childIds,
       ...(usable.includes(LEARNING) ? { awardRuleIds: ruleIds } : {}),
     });
   };
@@ -166,7 +185,7 @@ export function ConnectionsPage() {
           <SegmentedControl
             label="Kind"
             value={kind}
-            onChange={(k) => { setKind(k); if (k === 'assistant') setScopes((s) => s.filter((x) => x !== LEARNING)); }}
+            onChange={(k) => { setKind(k); setScopes((s) => s.filter((x) => kindScopes[k].includes(x))); }}
             options={[
               { value: 'service', label: kindLabels.service.label },
               { value: 'assistant', label: kindLabels.assistant.label },
@@ -176,16 +195,14 @@ export function ConnectionsPage() {
           <Input label="Name" hint="So you recognise it later, such as Router." maxLength={80} value={name} onChange={(e) => { setName(e.target.value); }} required />
           <Section title="It can">
             <List>
-              {Object.entries(scopeLabels)
-                .filter(([scope]) => kind === 'service' || scope !== LEARNING)
-                .map(([scope, label]) => (
-                  <ListRow
-                    key={scope}
-                    title={label}
-                    meta={scope}
-                    trailing={<CheckCircle checked={scopes.includes(scope)} label={label} onClick={() => { setScopes((s) => toggle(s, scope)); }} />}
-                  />
-                ))}
+              {kindScopes[kind].map((scope) => (
+                <ListRow
+                  key={scope}
+                  title={scopeLabels[scope] ?? scope}
+                  meta={scope}
+                  trailing={<CheckCircle checked={scopes.includes(scope)} label={scopeLabels[scope] ?? scope} onClick={() => { setScopes((s) => toggle(s, scope)); }} />}
+                />
+              ))}
             </List>
           </Section>
           {learning && (
@@ -206,6 +223,9 @@ export function ConnectionsPage() {
               )}
             </Section>
           )}
+          {kind === 'assistant' ? (
+            <p className="m-0 text-muted-foreground">It acts as you, for every child. What it does shows as yours, through this assistant.</p>
+          ) : (
           <SegmentedControl
             label="For"
             value={all ? 'all' : 'some'}
@@ -215,7 +235,8 @@ export function ConnectionsPage() {
               { value: 'some', label: 'Choose children' },
             ]}
           />
-          {!all && (
+          )}
+          {!all && kind !== 'assistant' && (
             <List aria-label="Children">
               {live.map((c) => (
                 <ListRow
