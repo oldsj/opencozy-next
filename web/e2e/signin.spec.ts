@@ -17,11 +17,11 @@ test('sign in, see the household, sign out', async ({ page }) => {
 
   await page.getByLabel('Email').fill(owner.email);
   await page.getByLabel('Password').fill('the wrong password');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('alert')).toHaveText('Wrong email or password.');
 
   await page.getByLabel('Password').fill(owner.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
   await page.reload();

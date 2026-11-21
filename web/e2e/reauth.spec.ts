@@ -13,7 +13,7 @@ test('pairing after the sign-in has gone stale asks for the password again', asy
   await adult.goto('/login');
   await adult.getByLabel('Email').fill(owner.email);
   await adult.getByLabel('Password').fill(owner.password);
-  await adult.getByRole('button', { name: 'Sign in' }).click();
+  await adult.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await expect(adult).toHaveTitle('Home · OpenCozy');
   await expect(adult.getByRole('navigation', { name: 'Main' })).toBeVisible();
@@ -40,7 +40,7 @@ test('a session that ends sends the adult to sign in, saying why', async ({ page
   await page.goto('/login');
   await page.getByLabel('Email').fill(owner.email);
   await page.getByLabel('Password').fill(owner.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await page.context().clearCookies(); // as if it expired, or was signed out elsewhere
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Inbox' }).click();
