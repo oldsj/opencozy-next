@@ -100,7 +100,8 @@ schemas:
         format: date-time
       kind:
         type: string
-        enum: [earned, reversed, redeemed, refunded]
+        enum: [earned, reversed, redeemed, refunded, one_more_minute]
+        description: one_more_minute is the child asking for one more minute on the locked iPad (no points)
       title:
         type: string
       points:
@@ -115,3 +116,6 @@ schemas:
       by:
         type: string
         description: The adult who decided it, by name
+      device:
+        type: string
+        description: The device it happened on, by name
