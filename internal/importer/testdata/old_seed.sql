@@ -26,8 +26,8 @@ INSERT INTO child (household_id, id, name, color, created_at, archived_at) VALUE
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c2', 'Rowan', 'sky', '2026-01-02T09:01:00Z', NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c3', 'Mika', 'sage', '2026-01-02T09:02:00Z', '2026-03-01T09:00:00Z');
 
--- One service credential whose scopes all have a new name, one that waits on a later slice
--- (tv:gate), and an assistant whose scope waits too.
+-- Two service credentials whose scopes all have a new name (the router's tv:gate since slice 9),
+-- and an assistant whose scope waits on a later slice.
 INSERT INTO service_credential (household_id, id, name, credential_hash, scopes, created_at, revoked_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d1', 'Kitchen tablet', '93e227675412e705e32188b1bc512d6395f09714bb812c15c227138d4698e694', '{children:read}', '2026-01-05T08:00:00Z', NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000d2', 'Router', '9371ba2ad122acad9ca87e0137ee9e81012832460f2e29443c413f311a29a105', '{tv:gate}', '2026-01-05T08:01:00Z', NULL);
@@ -81,3 +81,28 @@ INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, ve
 INSERT INTO calendar_assignment_person (household_id, assignment_id, child_id) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b5', '0190a000-0000-7000-8000-0000000000c1'),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b7', '0190a000-0000-7000-8000-0000000000c2');
+
+-- Slice 9: a TV with open hours and two MACs, a removed TV, two ended sessions (a child's
+-- started from her device, a parents one a parent ended by opening the TV), the opening and
+-- its close, an answered prompt (not carried), and TV time from a reward (waits for the
+-- rewards import).
+INSERT INTO gated_tv (household_id, id, name, created_at, archived_at, room, ha_entity_id, power, power_changed_at, attempts_since, last_attempt_at, open_start, open_end, open_until, open_days) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009a1', 'Den TV', '2026-01-10T08:00:00Z', NULL, 'Den', 'media_player.den_tv', 'off', '2026-01-11T20:00:00Z', NULL, NULL, 1260, 420, NULL, 62),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009a2', 'Old TV', '2026-01-10T08:01:00Z', '2026-01-12T08:00:00Z', NULL, NULL, 'unknown', NULL, '2026-01-11T09:00:00Z', '2026-01-11T09:02:00Z', NULL, NULL, NULL, NULL);
+INSERT INTO gated_tv_mac (household_id, tv_id, mac) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009a1', '02:00:5e:10:00:01'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009a1', '02:00:5e:10:00:02');
+INSERT INTO tv_session (household_id, id, tv_id, watcher, child_id, charged_seconds, started_at, ended_at, end_reason, started_by, ended_by, ends_by, warned_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009b1', '0190a000-0000-7000-8000-0000000009a1', 'child', '0190a000-0000-7000-8000-0000000000c1', 600, '2026-01-11T16:00:00Z', '2026-01-11T16:10:00Z', 'time_up', 'device:0190a000-0000-7000-8000-0000000009e1', NULL, '2026-01-11T18:00:00Z', '2026-01-11T16:05:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009b2', '0190a000-0000-7000-8000-0000000009a1', 'parents', NULL, 0, '2026-01-11T19:00:00Z', '2026-01-11T19:30:00Z', 'parent_override', 'fixtureOwnerUser01', 'fixtureOwnerUser01', NULL, NULL);
+INSERT INTO tv_open_event (household_id, id, tv_id, action, until, at, by, assistant_credential_id, ended_session_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009c1', '0190a000-0000-7000-8000-0000000009a1', 'open', '2026-01-11T21:30:00Z', '2026-01-11T19:30:00Z', 'fixtureOwnerUser01', NULL, '0190a000-0000-7000-8000-0000000009b2'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009c2', '0190a000-0000-7000-8000-0000000009a1', 'close', NULL, '2026-01-11T20:00:00Z', 'fixtureOwnerUser01', NULL, NULL);
+INSERT INTO tv_prompt (household_id, id, tv_id, source, state, version, created_at, decided_at, decided_by, session_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009d1', '0190a000-0000-7000-8000-0000000009a1', 'home_assistant', 'answered', 2, '2026-01-11T18:59:00Z', '2026-01-11T19:00:00Z', 'fixtureOwnerUser01', '0190a000-0000-7000-8000-0000000009b2');
+INSERT INTO reward (household_id, id, name, cost, version, created_at, archived_at, screen_time_minutes, screen_time_target) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009f1', 'TV time', 10, 1, '2026-01-10T08:00:00Z', NULL, 30, 'tv');
+INSERT INTO reward_redemption (household_id, id, reward_id, child_id, name_snapshot, cost_snapshot, reward_version, version, state, created_at, settled_at, screen_time_minutes_snapshot, screen_time_target_snapshot, fulfilled_at, refunded_points, device_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009f2', '0190a000-0000-7000-8000-0000000009f1', '0190a000-0000-7000-8000-0000000000c1', 'TV time', 10, 1, 2, 'fulfilled', '2026-01-11T15:00:00Z', '2026-01-11T15:01:00Z', 30, 'tv', '2026-01-11T15:01:00Z', NULL, NULL);
+INSERT INTO tv_credit (household_id, redemption_id, child_id, target, minutes, seconds, used_seconds, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000009f2', '0190a000-0000-7000-8000-0000000000c1', 'tv', 30, 1800, 600, '2026-01-11T15:01:00Z');

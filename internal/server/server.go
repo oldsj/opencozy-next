@@ -25,6 +25,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/httpx"
 	"github.com/oldsj/opencozy-next/internal/live"
+	"github.com/oldsj/opencozy-next/internal/tv"
 	"github.com/oldsj/opencozy-next/web"
 )
 
@@ -44,6 +45,8 @@ type Server struct {
 	// calendarWake starts the calendar refresh early (slice 13a).
 	calendarWake chan struct{}
 	wa           *webauthn.WebAuthn // nil when passkeys are off
+	// tv is the TV gate's rules (slice 9).
+	tv tv.Domain
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)

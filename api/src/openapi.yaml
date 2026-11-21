@@ -56,6 +56,8 @@ tags:
     description: Followed calendars, their events, and who they are for
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
+  - name: tvs
+    description: The TV gate - TVs, sessions, "Who's watching?", open hours, the router and Home Assistant
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -183,6 +185,40 @@ paths:
     $ref: learning.yaml#/link
   /learning/awards:
     $ref: learning.yaml#/awards
+  /tvs:
+    $ref: tvs.yaml#/tvs
+  /tvs/display:
+    $ref: tvs.yaml#/display
+  /tvs/history:
+    $ref: tvs.yaml#/history
+  /tvs/open:
+    $ref: tvs.yaml#/open
+  /tvs/extend:
+    $ref: tvs.yaml#/extend
+  /tvs/close:
+    $ref: tvs.yaml#/close
+  /tvs/{tvId}:
+    $ref: tvs.yaml#/tv
+  /tvs/{tvId}/session:
+    $ref: tvs.yaml#/session
+  /tvs/{tvId}/session/end:
+    $ref: tvs.yaml#/endSession
+  /tvs/{tvId}/ask:
+    $ref: tvs.yaml#/ask
+  /tvs/{tvId}/done:
+    $ref: tvs.yaml#/done
+  /tv-prompts/{promptId}/answer:
+    $ref: tvs.yaml#/answer
+  /children/{childId}/tv:
+    $ref: tvs.yaml#/childTv
+  /children/{childId}/tv/watch:
+    $ref: tvs.yaml#/watch
+  /tv/allowances:
+    $ref: tvs.yaml#/allowances
+  /tv/attempts:
+    $ref: tvs.yaml#/attempts
+  /tv/power:
+    $ref: tvs.yaml#/power
 
 components:
   securitySchemes:
