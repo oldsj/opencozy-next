@@ -469,6 +469,13 @@ func TestTVRewards(t *testing.T) {
 		t.Fatalf("cancel twice: %d %s", r.status, r.raw)
 	}
 
+	// TV time bought before it was kept here has no record of what was watched: no refund.
+	old := e.id(`INSERT INTO redemption (household_id, child_id, reward_id, title, cost, minutes, screen_time_target, state, fulfilled_at)
+		VALUES ($1, $2, $3, '30 min of TV', 6, 30, 'tv', 'fulfilled', now()) RETURNING id`, e.h.id, e.h.child1, reward)
+	if r := e.send(e.adult, "POST", "/api/redemptions/"+old.String()+"/cancel", map[string]any{"expectedVersion": 1}); r.status != 409 || r.code() != "no_credit" {
+		t.Fatalf("cancel without a credit: %d %s", r.status, r.raw)
+	}
+
 	// A parent gives TV time; outside the child's allowed hours it can't start.
 	if r := e.send(e.h.actors["phone"], "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv"}); r.status != 200 {
 		t.Fatalf("grant: %d %s", r.status, r.raw)
