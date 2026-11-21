@@ -99,3 +99,38 @@ RETURNING *;
 
 -- name: PendingApprovalForTimeRequest :one
 SELECT * FROM approval WHERE household_id = $1 AND time_request_id = $2 AND state = 'pending';
+
+-- name: OpenCredits :many
+-- The child's credits with time left, oldest first, with who gave each.
+SELECT k.id, k.source, k.redemption_id, r.title AS reward_title, k.granted_by, a.name AS granted_by_name,
+       k.minutes, k.seconds, k.used_seconds, k.created_at
+FROM screen_time_credit k
+LEFT JOIN redemption r ON r.household_id = k.household_id AND r.id = k.redemption_id
+LEFT JOIN adult a ON a.household_id = k.household_id AND a.id = k.granted_by
+WHERE k.household_id = $1 AND k.child_id = $2 AND k.used_seconds < k.seconds
+ORDER BY k.created_at, k.id;
+
+-- name: LockCredit :one
+SELECT * FROM screen_time_credit WHERE household_id = $1 AND child_id = $2 AND id = $3 FOR UPDATE;
+
+-- name: ForfeitCredit :exec
+UPDATE screen_time_credit
+SET seconds = used_seconds, forfeited_at = @now, forfeited_by = $3, forfeited_seconds = seconds - used_seconds
+WHERE household_id = $1 AND id = $2 AND used_seconds < seconds AND source <> 'redemption';
+
+-- name: ChildScreenTimeEvents :many
+-- A child's newest shield events, for their history, with the device's name.
+SELECT e.id, e.kind, e.occurred_at, d.name AS device_name
+FROM screen_time_event e
+LEFT JOIN device d ON d.household_id = e.household_id AND d.id = e.device_id
+WHERE e.household_id = $1 AND e.child_id = $2
+ORDER BY e.occurred_at DESC, e.id DESC
+LIMIT 200;
+
+-- name: GetWebFilter :one
+SELECT game_portal_domains, game_domains FROM household WHERE id = $1;
+
+-- name: SetWebFilter :one
+UPDATE household SET game_portal_domains = @game_portals::text[], game_domains = @games::text[]
+WHERE id = $1
+RETURNING game_portal_domains, game_domains;

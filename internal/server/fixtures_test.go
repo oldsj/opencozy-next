@@ -224,6 +224,7 @@ type house struct {
 	passkey                           uuid.UUID // the adult's only passkey
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
+	credit                            uuid.UUID // child1's iPad grant, all used (so no banked time)
 	actors                            map[string]cred
 }
 
@@ -321,6 +322,8 @@ func (e *env) house(label string, scopes []string) house {
 		VALUES ($1, $2, -3, 'redemption', 'redemption', $3) RETURNING id`, h.id, h.child1, h.redemption)
 	e.exec(`UPDATE redemption SET ledger_id = $2 WHERE id = $1`, h.redemption, spent)
 	h.passkey = e.id(`INSERT INTO passkey (household_id, adult_id, credential_id, public_key, backup_eligible, backed_up, name) VALUES ($1, $2, decode(md5(random()::text) || md5(random()::text), 'hex'), '\\x00', true, true, 'Laptop') RETURNING id`, h.id, h.adult)
+	h.credit = e.id(`INSERT INTO screen_time_credit (household_id, child_id, source, granted_by, minutes, seconds, used_seconds, created_at)
+		VALUES ($1, $2, 'grant', $3, 1, 60, 60, now() - interval '2 days') RETURNING id`, h.id, h.child1, h.adult)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)
 
 	credential := func(kind string, scopes []string, all bool, children []uuid.UUID, extra string) (cred, uuid.UUID) {

@@ -30,6 +30,53 @@ func (q *Queries) BankedSeconds(ctx context.Context, arg BankedSecondsParams) (i
 	return column_1, err
 }
 
+const childScreenTimeEvents = `-- name: ChildScreenTimeEvents :many
+SELECT e.id, e.kind, e.occurred_at, d.name AS device_name
+FROM screen_time_event e
+LEFT JOIN device d ON d.household_id = e.household_id AND d.id = e.device_id
+WHERE e.household_id = $1 AND e.child_id = $2
+ORDER BY e.occurred_at DESC, e.id DESC
+LIMIT 200
+`
+
+type ChildScreenTimeEventsParams struct {
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+}
+
+type ChildScreenTimeEventsRow struct {
+	ID         uuid.UUID
+	Kind       string
+	OccurredAt time.Time
+	DeviceName *string
+}
+
+// A child's newest shield events, for their history, with the device's name.
+func (q *Queries) ChildScreenTimeEvents(ctx context.Context, arg ChildScreenTimeEventsParams) ([]ChildScreenTimeEventsRow, error) {
+	rows, err := q.db.Query(ctx, childScreenTimeEvents, arg.HouseholdID, arg.ChildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ChildScreenTimeEventsRow{}
+	for rows.Next() {
+		var i ChildScreenTimeEventsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.OccurredAt,
+			&i.DeviceName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createTimeRequestApproval = `-- name: CreateTimeRequestApproval :one
 INSERT INTO approval (household_id, child_id, kind, time_request_id, title, points)
 VALUES ($1, $2, 'time_request', $3, $4, 0)
@@ -72,7 +119,7 @@ func (q *Queries) CreateTimeRequestApproval(ctx context.Context, arg CreateTimeR
 }
 
 const creditForRedemption = `-- name: CreditForRedemption :one
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at FROM screen_time_credit WHERE household_id = $1 AND redemption_id = $2
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit WHERE household_id = $1 AND redemption_id = $2
 `
 
 type CreditForRedemptionParams struct {
@@ -94,6 +141,9 @@ func (q *Queries) CreditForRedemption(ctx context.Context, arg CreditForRedempti
 		&i.Seconds,
 		&i.UsedSeconds,
 		&i.CreatedAt,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
 	)
 	return i, err
 }
@@ -145,6 +195,29 @@ func (q *Queries) DecideTimeRequest(ctx context.Context, arg DecideTimeRequestPa
 	return i, err
 }
 
+const forfeitCredit = `-- name: ForfeitCredit :exec
+UPDATE screen_time_credit
+SET seconds = used_seconds, forfeited_at = $4, forfeited_by = $3, forfeited_seconds = seconds - used_seconds
+WHERE household_id = $1 AND id = $2 AND used_seconds < seconds AND source <> 'redemption'
+`
+
+type ForfeitCreditParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+	ForfeitedBy *uuid.UUID
+	Now         *time.Time
+}
+
+func (q *Queries) ForfeitCredit(ctx context.Context, arg ForfeitCreditParams) error {
+	_, err := q.db.Exec(ctx, forfeitCredit,
+		arg.HouseholdID,
+		arg.ID,
+		arg.ForfeitedBy,
+		arg.Now,
+	)
+	return err
+}
+
 const getChildHours = `-- name: GetChildHours :one
 
 SELECT c.id, c.archived_at, c.school_night_start, c.school_night_end, c.weekend_start, c.weekend_end, h.time_zone
@@ -185,7 +258,7 @@ func (q *Queries) GetChildHours(ctx context.Context, arg GetChildHoursParams) (G
 }
 
 const getCredit = `-- name: GetCredit :one
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at FROM screen_time_credit WHERE household_id = $1 AND id = $2
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit WHERE household_id = $1 AND id = $2
 `
 
 type GetCreditParams struct {
@@ -207,14 +280,33 @@ func (q *Queries) GetCredit(ctx context.Context, arg GetCreditParams) (ScreenTim
 		&i.Seconds,
 		&i.UsedSeconds,
 		&i.CreatedAt,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
 	)
+	return i, err
+}
+
+const getWebFilter = `-- name: GetWebFilter :one
+SELECT game_portal_domains, game_domains FROM household WHERE id = $1
+`
+
+type GetWebFilterRow struct {
+	GamePortalDomains []string
+	GameDomains       []string
+}
+
+func (q *Queries) GetWebFilter(ctx context.Context, id uuid.UUID) (GetWebFilterRow, error) {
+	row := q.db.QueryRow(ctx, getWebFilter, id)
+	var i GetWebFilterRow
+	err := row.Scan(&i.GamePortalDomains, &i.GameDomains)
 	return i, err
 }
 
 const insertCredit = `-- name: InsertCredit :one
 INSERT INTO screen_time_credit (household_id, child_id, source, redemption_id, granted_by, minutes, seconds, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at
+RETURNING id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds
 `
 
 type InsertCreditParams struct {
@@ -251,6 +343,9 @@ func (q *Queries) InsertCredit(ctx context.Context, arg InsertCreditParams) (Scr
 		&i.Seconds,
 		&i.UsedSeconds,
 		&i.CreatedAt,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
 	)
 	return i, err
 }
@@ -420,6 +515,37 @@ func (q *Queries) LatestTimeRequest(ctx context.Context, arg LatestTimeRequestPa
 	return i, err
 }
 
+const lockCredit = `-- name: LockCredit :one
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit WHERE household_id = $1 AND child_id = $2 AND id = $3 FOR UPDATE
+`
+
+type LockCreditParams struct {
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	ID          uuid.UUID
+}
+
+func (q *Queries) LockCredit(ctx context.Context, arg LockCreditParams) (ScreenTimeCredit, error) {
+	row := q.db.QueryRow(ctx, lockCredit, arg.HouseholdID, arg.ChildID, arg.ID)
+	var i ScreenTimeCredit
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.ChildID,
+		&i.Source,
+		&i.RedemptionID,
+		&i.GrantedBy,
+		&i.Minutes,
+		&i.Seconds,
+		&i.UsedSeconds,
+		&i.CreatedAt,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
+	)
+	return i, err
+}
+
 const lockTimeRequest = `-- name: LockTimeRequest :one
 SELECT id, household_id, child_id, device_id, state, choice, asked_at, decided_at, decided_by, credit_id, granted_until, created_at FROM time_request WHERE household_id = $1 AND id = $2 FOR UPDATE
 `
@@ -447,6 +573,66 @@ func (q *Queries) LockTimeRequest(ctx context.Context, arg LockTimeRequestParams
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const openCredits = `-- name: OpenCredits :many
+SELECT k.id, k.source, k.redemption_id, r.title AS reward_title, k.granted_by, a.name AS granted_by_name,
+       k.minutes, k.seconds, k.used_seconds, k.created_at
+FROM screen_time_credit k
+LEFT JOIN redemption r ON r.household_id = k.household_id AND r.id = k.redemption_id
+LEFT JOIN adult a ON a.household_id = k.household_id AND a.id = k.granted_by
+WHERE k.household_id = $1 AND k.child_id = $2 AND k.used_seconds < k.seconds
+ORDER BY k.created_at, k.id
+`
+
+type OpenCreditsParams struct {
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+}
+
+type OpenCreditsRow struct {
+	ID            uuid.UUID
+	Source        string
+	RedemptionID  *uuid.UUID
+	RewardTitle   *string
+	GrantedBy     *uuid.UUID
+	GrantedByName *string
+	Minutes       int32
+	Seconds       int32
+	UsedSeconds   int32
+	CreatedAt     time.Time
+}
+
+// The child's credits with time left, oldest first, with who gave each.
+func (q *Queries) OpenCredits(ctx context.Context, arg OpenCreditsParams) ([]OpenCreditsRow, error) {
+	rows, err := q.db.Query(ctx, openCredits, arg.HouseholdID, arg.ChildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OpenCreditsRow{}
+	for rows.Next() {
+		var i OpenCreditsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Source,
+			&i.RedemptionID,
+			&i.RewardTitle,
+			&i.GrantedBy,
+			&i.GrantedByName,
+			&i.Minutes,
+			&i.Seconds,
+			&i.UsedSeconds,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const openWindows = `-- name: OpenWindows :many
@@ -628,8 +814,32 @@ func (q *Queries) SetCreditUsed(ctx context.Context, arg SetCreditUsedParams) er
 	return err
 }
 
+const setWebFilter = `-- name: SetWebFilter :one
+UPDATE household SET game_portal_domains = $2::text[], game_domains = $3::text[]
+WHERE id = $1
+RETURNING game_portal_domains, game_domains
+`
+
+type SetWebFilterParams struct {
+	ID          uuid.UUID
+	GamePortals []string
+	Games       []string
+}
+
+type SetWebFilterRow struct {
+	GamePortalDomains []string
+	GameDomains       []string
+}
+
+func (q *Queries) SetWebFilter(ctx context.Context, arg SetWebFilterParams) (SetWebFilterRow, error) {
+	row := q.db.QueryRow(ctx, setWebFilter, arg.ID, arg.GamePortals, arg.Games)
+	var i SetWebFilterRow
+	err := row.Scan(&i.GamePortalDomains, &i.GameDomains)
+	return i, err
+}
+
 const unspentCredits = `-- name: UnspentCredits :many
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at FROM screen_time_credit
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit
 WHERE household_id = $1 AND child_id = $2 AND used_seconds < seconds
 ORDER BY created_at, id
 `
@@ -660,6 +870,9 @@ func (q *Queries) UnspentCredits(ctx context.Context, arg UnspentCreditsParams) 
 			&i.Seconds,
 			&i.UsedSeconds,
 			&i.CreatedAt,
+			&i.ForfeitedAt,
+			&i.ForfeitedBy,
+			&i.ForfeitedSeconds,
 		); err != nil {
 			return nil, err
 		}

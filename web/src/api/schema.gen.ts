@@ -796,7 +796,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel an approved reward, or the unused rest of given screen time, and give the points back */
+        /**
+         * Cancel an approved reward, or the unused rest of given screen time, and give the points back
+         * @description iPad time refunds the unused share of its cost, rounded down: 409 `already_used` when none is left, `no_credit` when OpenCozy has no record of the time (so it can't tell how much was used).
+         */
         post: operations["cancelRedemption"];
         delete?: never;
         options?: never;
@@ -955,6 +958,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/children/{childId}/screen-time/credits/{creditId}/forfeit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back the unused rest of a parent's grant or "yes"
+         * @description The credit keeps what was already spent; the rest leaves the child's bank. Time already started or queued isn't touched (end it with `end`). A reward's time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+         */
+        post: operations["forfeitScreenTimeCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/children/{childId}/allowed-hours": {
         parameters: {
             query?: never;
@@ -1009,6 +1032,47 @@ export interface paths {
          * @description "One more minute", recorded by the app while it may have been offline and sent later, for this device's child. Each event is recorded once, `secondsAgo` before the server gets it (at most 7 days). `recorded` lists every accepted ID, including ones recorded before, so the app can drop them.
          */
         post: operations["recordScreenTimeEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/household/web-filter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's blocked websites */
+        get: operations["getWebFilter"];
+        /**
+         * Replace the household's blocked websites
+         * @description Names are tidied (spaces, capitals, a trailing dot and repeats go) and sorted. 422 `invalid_domain` for anything that isn't a website name like example.com, `too_many_domains` past 500 on a list, `on_both_lists` for a name on both. iPads apply them at their next sync; the router at its next ask.
+         */
+        put: operations["setWebFilter"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/allowances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The router's games gate
+         * @description Which of the credential's children have iPad time running now, and for how many more seconds: at most 300, so a router that loses the server blocks games again within five minutes. Children with none are left out. Nothing is spent here.
+         */
+        get: operations["getGamesAllowances"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1670,8 +1734,11 @@ export interface components {
             id: components["schemas"]["Id"];
             /** Format: date-time */
             at: string;
-            /** @enum {string} */
-            kind: "earned" | "reversed" | "redeemed" | "refunded";
+            /**
+             * @description one_more_minute is the child asking for one more minute on the locked iPad (no points)
+             * @enum {string}
+             */
+            kind: "earned" | "reversed" | "redeemed" | "refunded" | "one_more_minute";
             title: string;
             /** @description Signed; negative takes points away */
             points: number;
@@ -1680,6 +1747,8 @@ export interface components {
             reverses?: components["schemas"]["Id"];
             /** @description The adult who decided it, by name */
             by?: string;
+            /** @description The device it happened on, by name */
+            device?: string;
         };
         History: {
             /** Format: int64 */
@@ -1834,6 +1903,30 @@ export interface components {
             /** Format: date-time */
             opensAt?: string;
         };
+        /** @description Banked time with some left */
+        Credit: {
+            id: components["schemas"]["Id"];
+            /**
+             * @description A reward bought with points, a parent's grant, or a yes to "Ask for more time"
+             * @enum {string}
+             */
+            source: "redemption" | "grant" | "time_request";
+            redemptionId?: components["schemas"]["Id"];
+            rewardTitle?: string;
+            /** @description The parent who gave it, by name */
+            grantedBy?: string;
+            minutes: number;
+            /** @description What it holds */
+            seconds: number;
+            usedSeconds: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description Blocked websites: game portals always; games while the child has no iPad time running. Lowercase names; each covers its subdomains. */
+        WebFilter: {
+            gamePortals: string[];
+            games: string[];
+        };
         ScreenTime: {
             /** Format: date-time */
             serverTime: string;
@@ -1852,6 +1945,9 @@ export interface components {
             allowedHours?: components["schemas"]["AllowedHours"];
             hoursNow?: components["schemas"]["HoursNow"];
             timeRequest?: components["schemas"]["TimeRequest"];
+            /** @description Banked time with some left, oldest first (spent in this order) */
+            credits: components["schemas"]["Credit"][];
+            webFilter: components["schemas"]["WebFilter"];
         };
         Minutes: number;
         Spend: {
@@ -1883,6 +1979,11 @@ export interface components {
              */
             keptUntil?: string;
             screenTime: components["schemas"]["ScreenTime"];
+        };
+        Domains: string[];
+        WebFilterEdit: {
+            gamePortals: components["schemas"]["Domains"];
+            games: components["schemas"]["Domains"];
         };
         /** @description Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day. */
         Days: number[];
@@ -4431,6 +4532,50 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    forfeitScreenTimeCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+                creditId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {} */
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Taken back */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        forfeitedSeconds: number;
+                        screenTime: components["schemas"]["ScreenTime"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
     setAllowedHours: {
         parameters: {
             query?: never;
@@ -4587,6 +4732,105 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getWebFilter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Both lists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebFilter"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setWebFilter: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "gamePortals": [
+                 *         "games.example.test"
+                 *       ],
+                 *       "games": [
+                 *         "blocks.example.test"
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["WebFilterEdit"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebFilter"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getGamesAllowances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The allowances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        serverTime: string;
+                        allowances: {
+                            childId: components["schemas"]["Id"];
+                            secondsRemaining: number;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };

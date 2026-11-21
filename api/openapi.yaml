@@ -55,7 +55,7 @@ tags:
   - name: calendar
     description: Followed calendars, their events, and who they are for
   - name: screentime
-    description: iPad screen time, allowed hours and time requests
+    description: iPad screen time, allowed hours, time requests and blocked websites
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
 paths:
@@ -2021,6 +2021,8 @@ paths:
     post:
       operationId: cancelRedemption
       summary: Cancel an approved reward, or the unused rest of given screen time, and give the points back
+      description: |
+        iPad time refunds the unused share of its cost, rounded down: 409 `already_used` when none is left, `no_credit` when OpenCozy has no record of the time (so it can't tell how much was used).
       tags:
         - rewards
       x-actors:
@@ -2268,6 +2270,9 @@ paths:
         - phone
         - device
         - device-web
+        - service
+      x-scopes:
+        - screentime:read
       x-child-param: childId
       parameters:
         - $ref: '#/components/parameters/ChildId'
@@ -2443,6 +2448,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EndResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/screen-time/credits/{creditId}/forfeit:
+    post:
+      operationId: forfeitScreenTimeCredit
+      summary: Take back the unused rest of a parent's grant or "yes"
+      description: |
+        The credit keeps what was already spent; the rest leaves the child's bank. Time already started or queued isn't touched (end it with `end`). A reward's time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+      tags:
+        - screentime
+      x-actors:
+        - adult
+        - phone
+      x-child-param: childId
+      x-command: true
+      x-body-limit: 64
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ChildId'
+        - name: creditId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Taken back
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - forfeitedSeconds
+                  - screenTime
+                properties:
+                  forfeitedSeconds:
+                    type: integer
+                  screenTime:
+                    $ref: '#/components/schemas/ScreenTime'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2643,6 +2707,118 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '413':
           $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
+  /household/web-filter:
+    get:
+      operationId: getWebFilter
+      summary: The household's blocked websites
+      tags:
+        - screentime
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: Both lists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebFilter'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: setWebFilter
+      summary: Replace the household's blocked websites
+      description: |
+        Names are tidied (spaces, capitals, a trailing dot and repeats go) and sorted. 422 `invalid_domain` for anything that isn't a website name like example.com, `too_many_domains` past 500 on a list, `on_both_lists` for a name on both. iPads apply them at their next sync; the router at its next ask.
+      tags:
+        - screentime
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 65536
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebFilterEdit'
+            example:
+              gamePortals:
+                - games.example.test
+              games:
+                - blocks.example.test
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebFilter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /games/allowances:
+    get:
+      operationId: getGamesAllowances
+      summary: The router's games gate
+      description: |
+        Which of the credential's children have iPad time running now, and for how many more seconds: at most 300, so a router that loses the server blocks games again within five minutes. Children with none are left out. Nothing is spent here.
+      tags:
+        - screentime
+      x-actors:
+        - service
+      x-scopes:
+        - games:gate
+      responses:
+        '200':
+          description: The allowances
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - serverTime
+                  - allowances
+                properties:
+                  serverTime:
+                    type: string
+                    format: date-time
+                  allowances:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - childId
+                        - secondsRemaining
+                      properties:
+                        childId:
+                          $ref: '#/components/schemas/Id'
+                        secondsRemaining:
+                          type: integer
+                          minimum: 1
+                          maximum: 300
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
   /chores:
@@ -4567,6 +4743,8 @@ components:
             - reversed
             - redeemed
             - refunded
+            - one_more_minute
+          description: one_more_minute is the child asking for one more minute on the locked iPad (no points)
         title:
           type: string
         points:
@@ -4581,6 +4759,9 @@ components:
         by:
           type: string
           description: The adult who decided it, by name
+        device:
+          type: string
+          description: The device it happened on, by name
     History:
       type: object
       required:
@@ -4937,6 +5118,59 @@ components:
         opensAt:
           type: string
           format: date-time
+    Credit:
+      type: object
+      description: Banked time with some left
+      required:
+        - id
+        - source
+        - minutes
+        - seconds
+        - usedSeconds
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        source:
+          type: string
+          enum:
+            - redemption
+            - grant
+            - time_request
+          description: A reward bought with points, a parent's grant, or a yes to "Ask for more time"
+        redemptionId:
+          $ref: '#/components/schemas/Id'
+        rewardTitle:
+          type: string
+        grantedBy:
+          type: string
+          description: The parent who gave it, by name
+        minutes:
+          type: integer
+        seconds:
+          type: integer
+          description: What it holds
+        usedSeconds:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    WebFilter:
+      type: object
+      description: |
+        Blocked websites: game portals always; games while the child has no iPad time running. Lowercase names; each covers its subdomains.
+      required:
+        - gamePortals
+        - games
+      properties:
+        gamePortals:
+          type: array
+          items:
+            type: string
+        games:
+          type: array
+          items:
+            type: string
     ScreenTime:
       type: object
       required:
@@ -4945,6 +5179,8 @@ components:
         - bankedSeconds
         - allowanceSeconds
         - windows
+        - credits
+        - webFilter
       properties:
         serverTime:
           type: string
@@ -4974,6 +5210,13 @@ components:
           $ref: '#/components/schemas/HoursNow'
         timeRequest:
           $ref: '#/components/schemas/TimeRequest'
+        credits:
+          type: array
+          description: Banked time with some left, oldest first (spent in this order)
+          items:
+            $ref: '#/components/schemas/Credit'
+        webFilter:
+          $ref: '#/components/schemas/WebFilter'
     Minutes:
       type: integer
       minimum: 1
@@ -5039,6 +5282,23 @@ components:
           description: With `queued`, when the running window still ends
         screenTime:
           $ref: '#/components/schemas/ScreenTime'
+    Domains:
+      type: array
+      maxItems: 500
+      items:
+        type: string
+        maxLength: 300
+    WebFilterEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - gamePortals
+        - games
+      properties:
+        gamePortals:
+          $ref: '#/components/schemas/Domains'
+        games:
+          $ref: '#/components/schemas/Domains'
     Days:
       type: array
       description: Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.

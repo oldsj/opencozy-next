@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -19,11 +21,17 @@ var (
 )
 
 var historyKinds = map[string]api.HistoryEntryKind{
-	ledger.KindAward:      api.Earned,
-	ledger.KindReversal:   api.Reversed,
-	ledger.KindRedemption: api.Redeemed,
-	ledger.KindRefund:     api.Refunded,
+	ledger.KindAward:      api.HistoryEntryKindEarned,
+	ledger.KindReversal:   api.HistoryEntryKindReversed,
+	ledger.KindRedemption: api.HistoryEntryKindRedeemed,
+	ledger.KindRefund:     api.HistoryEntryKindRefunded,
 }
+
+// historyLimit is the most entries a history holds (ChildHistory's and ChildScreenTimeEvents' limit).
+const historyLimit = 200
+
+// screenTimeEventTitles names each shield event in a child's history.
+var screenTimeEventTitles = map[string]string{"one_more_minute": "Asked for one more minute"}
 
 func toHistoryEntry(r dbq.ChildHistoryRow) api.HistoryEntry {
 	return api.HistoryEntry{
@@ -48,10 +56,27 @@ func (s *Server) GetPointsHistory(ctx context.Context, req api.GetPointsHistoryR
 	if err != nil {
 		return nil, err
 	}
-	out := api.History{Balance: bal, Entries: make([]api.HistoryEntry, len(rows))}
-	for i, r := range rows {
-		out.Entries[i] = toHistoryEntry(r)
+	events, err := s.q.ChildScreenTimeEvents(ctx, dbq.ChildScreenTimeEventsParams{HouseholdID: h, ChildID: req.ChildId})
+	if err != nil {
+		return nil, err
 	}
+	out := api.History{Balance: bal, Entries: make([]api.HistoryEntry, 0, len(rows)+len(events))}
+	for _, r := range rows {
+		out.Entries = append(out.Entries, toHistoryEntry(r))
+	}
+	// Shield events aren't ledger entries: they join the newest 200 by time, worth no points.
+	for _, e := range events {
+		out.Entries = append(out.Entries, api.HistoryEntry{
+			Id: e.ID, At: e.OccurredAt, Kind: api.HistoryEntryKindOneMoreMinute, Title: screenTimeEventTitles[e.Kind], Device: e.DeviceName,
+		})
+	}
+	slices.SortStableFunc(out.Entries, func(a, b api.HistoryEntry) int {
+		if c := b.At.Compare(a.At); c != 0 {
+			return c
+		}
+		return bytes.Compare(b.Id[:], a.Id[:])
+	})
+	out.Entries = out.Entries[:min(len(out.Entries), historyLimit)]
 	return api.GetPointsHistory200JSONResponse(out), nil
 }
 

@@ -117,9 +117,24 @@ func screenTime(ctx context.Context, q *dbq.Queries, h, child uuid.UUID, now tim
 	if err != nil {
 		return api.ScreenTime{}, err
 	}
+	credits, err := q.OpenCredits(ctx, dbq.OpenCreditsParams{HouseholdID: h, ChildID: child})
+	if err != nil {
+		return api.ScreenTime{}, err
+	}
+	filter, err := webFilter(ctx, q, h)
+	if err != nil {
+		return api.ScreenTime{}, err
+	}
 	out := api.ScreenTime{
 		ServerTime: now.UTC(), ChildId: child, BankedSeconds: int(banked), Windows: make([]api.Window, len(ws)),
-		AllowedHours: toAllowedHours(rule.Hours),
+		AllowedHours: toAllowedHours(rule.Hours), WebFilter: filter,
+	}
+	out.Credits = make([]api.Credit, len(credits))
+	for i, c := range credits {
+		out.Credits[i] = api.Credit{
+			Id: c.ID, Source: api.CreditSource(c.Source), RedemptionId: c.RedemptionID, RewardTitle: c.RewardTitle, GrantedBy: c.GrantedByName,
+			Minutes: int(c.Minutes), Seconds: int(c.Seconds), UsedSeconds: int(c.UsedSeconds), CreatedAt: c.CreatedAt.UTC(),
+		}
 	}
 	for i, w := range ws {
 		out.Windows[i] = api.Window{Id: w.ID, StartsAt: w.StartsAt.UTC(), EndsAt: w.EndsAt.UTC()}
@@ -147,9 +162,9 @@ func toSpend(s screentime.Spent) *api.Spend {
 	return &api.Spend{Seconds: int(s.Seconds), StartsAt: s.StartsAt.UTC(), EndsAt: s.EndsAt.UTC(), Clipped: s.Clipped}
 }
 
-// childInitiated reports whether the caller is the child's own device (its spending is limited by
-// allowed hours).
-func childInitiated(a actor.Actor) bool { return a.Kind == actor.Device || a.Kind == actor.DeviceWeb }
+// childInitiated reports whether spending is the child's own, so limited by allowed hours.
+// Anyone but an adult counts as the child, so a caller added later is limited too.
+func childInitiated(a actor.Actor) bool { return a.Kind != actor.Adult && a.Kind != actor.Phone }
 
 // changed tells live clients the child's screen time (on Today) changed.
 func screenTimeChanged(ctx context.Context, cmd *command.Cmd, child uuid.UUID) error {
@@ -391,4 +406,41 @@ func (s *Server) RecordScreenTimeEvents(ctx context.Context, req api.RecordScree
 		out.Recorded = append(out.Recorded, e.Id)
 	}
 	return out, nil
+}
+
+// ForfeitScreenTimeCredit takes back the unused rest of a parent's grant or "yes".
+func (s *Server) ForfeitScreenTimeCredit(ctx context.Context, req api.ForfeitScreenTimeCreditRequestObject) (api.ForfeitScreenTimeCreditResponseObject, error) {
+	a, cmd := mustActor(ctx), mustCmd(ctx)
+	notFound := api.ForfeitScreenTimeCredit404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}
+	conflict := func(code, msg string) api.ForfeitScreenTimeCreditResponseObject {
+		return api.ForfeitScreenTimeCredit409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(apiError(code, msg))}
+	}
+	if err := cmd.LockChildren(ctx, req.ChildId); errors.Is(err, command.ErrNoChild) {
+		return notFound, nil
+	} else if err != nil {
+		return nil, err
+	}
+	now, err := cmd.Now(ctx)
+	if err != nil {
+		return nil, err
+	}
+	seconds, err := screentime.Forfeit(ctx, cmd, req.ChildId, req.CreditId, a.AdultID)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return notFound, nil
+	case errors.Is(err, screentime.ErrRewardCredit):
+		return conflict("cancel_the_reward", "This time was bought with points: cancel the reward to take it back and return the points."), nil
+	case errors.Is(err, screentime.ErrNothingLeft):
+		return conflict("nothing_left", "This time has all been used."), nil
+	case err != nil:
+		return nil, err
+	}
+	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+		return nil, err
+	}
+	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+	if err != nil {
+		return nil, err
+	}
+	return api.ForfeitScreenTimeCredit200JSONResponse{ForfeitedSeconds: int(seconds), ScreenTime: st}, nil
 }
