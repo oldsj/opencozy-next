@@ -55,7 +55,7 @@ tags:
   - name: calendar
     description: Followed calendars, their events, and who they are for
   - name: screentime
-    description: iPad screen time, allowed hours and time requests
+    description: iPad screen time, allowed hours, time requests and blocked websites
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
 
@@ -165,6 +165,10 @@ paths:
     $ref: screentime.yaml#/timeRequests
   /device/screen-time-events:
     $ref: screentime.yaml#/events
+  /household/web-filter:
+    $ref: screentime.yaml#/webFilter
+  /games/allowances:
+    $ref: screentime.yaml#/gamesAllowances
   /chores:
     $ref: chores.yaml#/chores
   /chores/{choreId}:

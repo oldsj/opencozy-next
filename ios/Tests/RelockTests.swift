@@ -116,15 +116,15 @@ struct ShieldEventUploadTests {
         let recorder: Recorder
         let accept: Bool
         func device() async throws -> DeviceInfo { try await FixtureAPI().device() }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
-            try await FixtureAPI().screenTime(target: target)
+        func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
+            try await FixtureAPI().screenTime(childId: childId)
         }
         func screenTimeEvents(_ events: [ScreenTimeEventUpload]) async throws -> Set<String> {
             await recorder.add(events)
             if !accept { throw APIError.notConfigured }
             return Set(events.map(\.id))
         }
-        func askForTime(requestId: String) async throws -> TimeRequestStatus {
+        func askForTime(childId: String, requestId: String) async throws -> TimeRequestStatus {
             await recorder.ask(requestId)
             if let askFailure { throw askFailure }
             return TimeRequestStatus(id: "00000000-0000-4000-8000-0000000000f0", state: .pending)
@@ -203,7 +203,7 @@ struct KidPushTokenTests {
     struct TokenAPI: OpenCozyAPI {
         let tokens: Tokens
         func device() async throws -> DeviceInfo { try await FixtureAPI().device() }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) { try await FixtureAPI().screenTime(target: target) }
+        func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) { try await FixtureAPI().screenTime(childId: childId) }
         func registerPushToken(_ request: PushTokenRequest) async throws { await tokens.add(request) }
     }
 

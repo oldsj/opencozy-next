@@ -99,7 +99,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                     "pending", // lock_message and the game domains wait on later slices
+		"household":                     "pending", // lock_message waits on the devices import
 		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
 		"household_owner":               "ok",
@@ -152,6 +152,12 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	q := dbq.New(target.Runtime)
 	keys := testKeys(t)
 
+	// Blocked websites come with their household.
+	var filter string
+	if err := target.Owner.QueryRow(ctx, `SELECT game_portal_domains::text || ' ' || game_domains::text FROM household`).Scan(&filter); err != nil ||
+		filter != "{games.example.test} {blocks.example.test,puzzles.example.test}" {
+		t.Errorf("web filter: %q %v", filter, err)
+	}
 	// Allowed hours come with their child; children without any stay without.
 	var hours string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || '=' || COALESCE(school_night_start || '-' || school_night_end || '/' || weekend_start || '-' || weekend_end, 'none'), ' ' ORDER BY name)
