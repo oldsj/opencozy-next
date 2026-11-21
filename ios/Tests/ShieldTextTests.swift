@@ -15,6 +15,17 @@ struct ShieldTextTests {
         #expect(ShieldText.subtitle(ShieldContent(message: "  "), now: now, timeZone: zone) == ShieldText.defaultMessage)
     }
 
+    /// Locked only at the allowance's cap: the window still runs on the server.
+    @Test func cappedLockSaysTimeIsStillRunning() {
+        let content = ShieldContent(message: "Locked.", bankedSeconds: 600, ask: .declined, runsUntil: date("2026-03-03T01:00:00Z"))
+        #expect(ShieldText.subtitle(content, now: now, timeZone: zone) == "Your time runs until 8:00 PM. Open OpenCozy to carry on.")
+        #expect(ShieldText.title(content, now: now, name: "Videos") == "Videos is paused")
+        // Once the window has ended, it's the usual lock.
+        let ended = ShieldContent(message: "Locked.", runsUntil: date("2026-03-03T00:00:00Z"))
+        #expect(ShieldText.subtitle(ended, now: now, timeZone: zone) == "Locked.")
+        #expect(ShieldText.title(ended, now: now, name: nil) == "Locked")
+    }
+
     @Test func showsTheHouseholdMessage() {
         #expect(ShieldText.subtitle(ShieldContent(message: "Read a book first."), now: now, timeZone: zone) == "Read a book first.")
     }
