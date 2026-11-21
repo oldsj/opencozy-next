@@ -375,8 +375,9 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	}
 }
 
-// TestOIDCLinksCarried: the old app's OIDC accounts become single sign-on links to OIDC_ISSUER,
-// for the adult who had them, keeping the subject. Without OIDC_ISSUER they are left behind
+// TestOIDCLinksCarried: the old app's OIDC accounts become single sign-on links to the issuer
+// named with --oidc-issuer, for the adult who had them, keeping the subject; the report names
+// the issuer and warns when OIDC_ISSUER is another. Without --oidc-issuer they are left behind
 // with a note, and the rest of the import is unaffected.
 func TestOIDCLinksCarried(t *testing.T) {
 	const issuer = "https://id.example.test"
@@ -389,8 +390,11 @@ func TestOIDCLinksCarried(t *testing.T) {
 
 	target := testdb.Open(t)
 	var out bytes.Buffer
-	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer}); err != nil {
+	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer, RuntimeOIDCIssuer: issuer}); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "1 OIDC links carried as subjects at https://id.example.test") || strings.Contains(out.String(), "WARNING") {
+		t.Errorf("the report doesn't name the issuer, or warns:\n%s", out.String())
 	}
 	if got := statuses(out.String())["auth_account"]; got != "ok" {
 		t.Errorf("auth_account %q\n%s", got, out.String())
@@ -421,13 +425,23 @@ func TestOIDCLinksCarried(t *testing.T) {
 		t.Errorf("links %+v, want %+v", links, want)
 	}
 
-	// Without OIDC_ISSUER: not carried, said so, and the import still reconciles.
+	// OIDC_ISSUER is another provider: carried (they are the old provider's subjects) with a warning.
+	target = testdb.Open(t)
+	out.Reset()
+	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer, RuntimeOIDCIssuer: "https://other.example.test"}); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), `WARNING: OIDC_ISSUER here is "https://other.example.test"`) {
+		t.Errorf("no warning:\n%s", out.String())
+	}
+
+	// Without --oidc-issuer: not carried, said so, and the import still reconciles.
 	target = testdb.Open(t)
 	out.Reset()
 	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t)}); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if !strings.Contains(out.String(), "2 OIDC links left behind because OIDC_ISSUER isn't set") {
+	if !strings.Contains(out.String(), "2 OIDC links left behind because --oidc-issuer isn't given") {
 		t.Errorf("no note:\n%s", out.String())
 	}
 	var n int

@@ -178,7 +178,7 @@ func (c Config) validateOIDC() []error {
 		return []error{errors.New("OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together: set all three, or none")}
 	}
 	var errs []error
-	if !validIssuer(c.OIDCIssuer) {
+	if !ValidIssuer(c.OIDCIssuer) {
 		errs = append(errs, fmt.Errorf("OIDC_ISSUER: %q must be an https URL with no query, fragment or user", c.OIDCIssuer))
 	}
 	if len(c.OIDCClientID) > 255 || strings.TrimSpace(c.OIDCClientID) != c.OIDCClientID {
@@ -193,9 +193,9 @@ func (c Config) validateOIDC() []error {
 	return errs
 }
 
-// validIssuer reports whether u is an issuer URL OpenCozy will use: https, with a host and no
+// ValidIssuer reports whether u is an issuer URL OpenCozy will use: https, with a host and no
 // query, fragment or user info. Only an e2e build may use http on 127.0.0.1.
-func validIssuer(u string) bool {
+func ValidIssuer(u string) bool {
 	p, err := url.Parse(u)
 	if err != nil || p.Host == "" || p.RawQuery != "" || p.ForceQuery || p.Fragment != "" || p.User != nil || p.Opaque != "" {
 		return false

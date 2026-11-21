@@ -41,6 +41,9 @@ type identity struct {
 	nonce, aud, iss string
 	exp             time.Time
 	sendNoIDToken   bool
+	// The email claims only from userinfo, not the ID token; and userinfo answering another sub.
+	userinfoOnly bool
+	userinfoSub  string
 }
 
 // fakeProvider is a minimal OpenID provider: discovery, keys, and a token endpoint that checks
@@ -54,7 +57,8 @@ type fakeProvider struct {
 
 	mu       sync.Mutex
 	codes    map[string]grant
-	requests int // every request the provider served
+	tokens   map[string]identity // access token: who, for userinfo
+	requests int                 // every request the provider served
 }
 
 type grant struct {
@@ -68,7 +72,7 @@ func newFakeProvider(t *testing.T) *fakeProvider {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &fakeProvider{t: t, key: key, codes: map[string]grant{}}
+	p := &fakeProvider{t: t, key: key, codes: map[string]grant{}, tokens: map[string]identity{}}
 	p.srv = httptest.NewTLSServer(http.HandlerFunc(p.serve))
 	t.Cleanup(p.srv.Close)
 	p.issuer = p.srv.URL
@@ -89,7 +93,7 @@ func (p *fakeProvider) serve(w http.ResponseWriter, r *http.Request) {
 	case "/.well-known/openid-configuration":
 		p.json(w, 200, map[string]any{
 			"issuer": p.issuer, "authorization_endpoint": p.issuer + "/authorize", "token_endpoint": p.issuer + "/token",
-			"jwks_uri": p.issuer + "/jwks", "response_types_supported": []string{"code"}, "subject_types_supported": []string{"public"},
+			"jwks_uri": p.issuer + "/jwks", "userinfo_endpoint": p.issuer + "/userinfo", "response_types_supported": []string{"code"}, "subject_types_supported": []string{"public"},
 			"id_token_signing_alg_values_supported": []string{"RS256"}, "code_challenge_methods_supported": []string{"S256"},
 		})
 	case "/jwks":
@@ -100,6 +104,22 @@ func (p *fakeProvider) serve(w http.ResponseWriter, r *http.Request) {
 		}}})
 	case "/token":
 		p.token(w, r)
+	case "/userinfo":
+		p.mu.Lock()
+		who, ok := p.tokens[strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")]
+		p.mu.Unlock()
+		if !ok {
+			p.json(w, 401, map[string]any{"error": "invalid_token"})
+			return
+		}
+		claims := map[string]any{"sub": who.sub, "email": who.email}
+		if who.userinfoSub != "" {
+			claims["sub"] = who.userinfoSub
+		}
+		if who.verified != nil {
+			claims["email_verified"] = who.verified
+		}
+		p.json(w, 200, claims)
 	default:
 		http.NotFound(w, r)
 	}
@@ -131,12 +151,20 @@ func (p *fakeProvider) token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	who := g.who
-	out := map[string]any{"token_type": "Bearer", "expires_in": 3600, "access_token": "fixture-access-" + uuid.NewString()}
+	access := "fixture-access-" + uuid.NewString()
+	p.mu.Lock()
+	p.tokens[access] = who
+	p.mu.Unlock()
+	out := map[string]any{"token_type": "Bearer", "expires_in": 3600, "access_token": access}
 	if !who.sendNoIDToken {
 		claims := map[string]any{"iss": p.issuer, "aud": oidcClientID, "sub": who.sub, "iat": time.Now().Unix(),
 			"exp": time.Now().Add(5 * time.Minute).Unix(), "nonce": g.nonce, "email": who.email, "name": "Fixture person"}
 		if who.verified != nil {
 			claims["email_verified"] = who.verified
+		}
+		if who.userinfoOnly {
+			delete(claims, "email")
+			delete(claims, "email_verified")
 		}
 		if who.nonce != "" {
 			claims["nonce"] = who.nonce
@@ -367,6 +395,8 @@ func TestOIDCSignIn(t *testing.T) {
 			"a token from another issuer":         {identity{sub: "sam-sub", email: email, verified: true, iss: "https://elsewhere.example.test"}, "oidc_failed"},
 			"an expired token":                    {identity{sub: "sam-sub", email: email, verified: true, exp: time.Now().Add(-time.Hour)}, "oidc_failed"},
 			"no ID token":                         {identity{sub: "sam-sub", email: email, verified: true, sendNoIDToken: true}, "oidc_failed"},
+			"userinfo about another subject":      {identity{sub: "other-b", email: "sam.b@example.test", verified: true, userinfoOnly: true, userinfoSub: "someone-else"}, "oidc_failed"},
+			"userinfo with an unverified email":   {identity{sub: "other-b", email: "sam.b@example.test", verified: false, userinfoOnly: true}, "oidc_unverified"},
 		} {
 			t.Run(name, func(t *testing.T) {
 				loc, session := e.signInOIDC(p, tc.who)
@@ -379,6 +409,17 @@ func TestOIDCSignIn(t *testing.T) {
 		if n := count(`SELECT count(*) FROM oidc_link`); n != 1 {
 			t.Errorf("links %d, want only sam-sub's", n)
 		}
+	})
+
+	t.Run("an ID token without the email: the email comes from userinfo, for the same subject", func(t *testing.T) {
+		loc, session := e.signInOIDC(p, identity{sub: "other-b-userinfo", email: "Sam.B@example.test", verified: "true", userinfoOnly: true})
+		if loc.String() != "/" || session == nil {
+			t.Fatalf("got %s", loc)
+		}
+		if n := count(`SELECT count(*) FROM oidc_link WHERE adult_id = $1 AND subject = 'other-b-userinfo'`, other.adult); n != 1 {
+			t.Fatalf("links: %d", n)
+		}
+		e.exec(`DELETE FROM oidc_link WHERE adult_id = $1`, other.adult)
 	})
 
 	t.Run("the callback needs the browser that started, once, and the provider's answer", func(t *testing.T) {

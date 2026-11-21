@@ -61,7 +61,9 @@ type oidcFlow struct {
 type oidcProvider struct {
 	oauth    oauth2.Config
 	verifier *oidc.IDTokenVerifier
-	fetched  time.Time
+	// p answers userinfo, for providers that keep the email out of the ID token.
+	p       *oidc.Provider
+	fetched time.Time
 }
 
 // oidcIdentity is what a verified ID token says about the person.
@@ -127,7 +129,8 @@ func (f *oidcFlow) discover(ctx context.Context) (*oidcProvider, error) {
 		return nil, err
 	}
 	var meta struct {
-		JWKS string `json:"jwks_uri"`
+		JWKS     string `json:"jwks_uri"`
+		UserInfo string `json:"userinfo_endpoint"`
 	}
 	if err := p.Claims(&meta); err != nil {
 		return nil, err
@@ -138,7 +141,11 @@ func (f *oidcFlow) discover(ctx context.Context) (*oidcProvider, error) {
 	if u, err := url.Parse(f.issuer); err == nil {
 		scheme = u.Scheme
 	}
-	for _, e := range []string{ep.AuthURL, ep.TokenURL, meta.JWKS} {
+	endpoints := []string{ep.AuthURL, ep.TokenURL, meta.JWKS}
+	if meta.UserInfo != "" { // optional: only asked when the ID token has no email
+		endpoints = append(endpoints, meta.UserInfo)
+	}
+	for _, e := range endpoints {
 		if u, err := url.Parse(e); err != nil || u.Scheme != scheme || u.Host == "" {
 			return nil, fmt.Errorf("oidc discovery: endpoint %q is not %s", e, scheme)
 		}
@@ -152,6 +159,7 @@ func (f *oidcFlow) discover(ctx context.Context) (*oidcProvider, error) {
 			RedirectURL: f.redirectURL, Scopes: []string{oidc.ScopeOpenID, "email", "profile"},
 		},
 		verifier: p.VerifierContext(keys, &oidc.Config{ClientID: f.clientID}),
+		p:        p,
 		fetched:  time.Now(),
 	}, nil
 }
@@ -190,10 +198,46 @@ func (f *oidcFlow) identify(ctx context.Context, p *oidcProvider, code, verifier
 	if idt.Subject == "" || len(idt.Subject) > 255 {
 		return oidcIdentity{}, errors.New("ID token: bad subject")
 	}
-	// Some providers send email_verified as a string.
-	verified := c.EmailVerified == true || c.EmailVerified == "true"
-	return oidcIdentity{subject: idt.Subject, email: normalizeEmail(c.Email), emailVerified: verified}, nil
+	email, verified := c.Email, emailVerified(c.EmailVerified)
+	if email == "" {
+		// OIDC Core §5.4: in the code flow a provider may return the email scope's claims only
+		// from userinfo. Asked through egress, and its answer must be about the same subject.
+		email, verified, err = f.userInfo(ctx, p, tok, idt.Subject)
+		if err != nil {
+			return oidcIdentity{}, err
+		}
+	}
+	return oidcIdentity{subject: idt.Subject, email: normalizeEmail(email), emailVerified: verified}, nil
 }
+
+// userInfo asks the provider's userinfo endpoint for the email of subject. A provider with no
+// userinfo endpoint answers no email (so the sign-in can't link by email).
+func (f *oidcFlow) userInfo(ctx context.Context, p *oidcProvider, tok *oauth2.Token, subject string) (string, bool, error) {
+	var meta struct {
+		UserInfo string `json:"userinfo_endpoint"`
+	}
+	if err := p.p.Claims(&meta); err != nil || meta.UserInfo == "" {
+		return "", false, nil
+	}
+	info, err := p.p.UserInfo(f.with(ctx), oauth2.StaticTokenSource(tok))
+	if err != nil {
+		return "", false, fmt.Errorf("userinfo: %w", err)
+	}
+	if info.Subject != subject { // §5.3.2: otherwise the response must not be used
+		return "", false, errors.New("userinfo: another subject")
+	}
+	var c struct {
+		Email         string `json:"email"`
+		EmailVerified any    `json:"email_verified"`
+	}
+	if err := info.Claims(&c); err != nil {
+		return "", false, fmt.Errorf("userinfo claims: %w", err)
+	}
+	return c.Email, emailVerified(c.EmailVerified), nil
+}
+
+// emailVerified reads email_verified, which some providers send as a string.
+func emailVerified(v any) bool { return v == true || v == "true" }
 
 func randomToken() (string, error) {
 	b := make([]byte, 32)

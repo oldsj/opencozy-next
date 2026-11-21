@@ -164,7 +164,13 @@ func importOIDCLinks(ctx context.Context, x *run) (written, skipped int64, err e
 		return 0, 0, safe(err)
 	}
 	if noIssuer > 0 {
-		x.r.note("auth_account", fmt.Sprintf("%d OIDC links left behind because OIDC_ISSUER isn't set; those adults link again by verified email at their first single sign-on", noIssuer))
+		x.r.note("auth_account", fmt.Sprintf("%d OIDC links left behind because --oidc-issuer isn't given; those adults link again by verified email at their first single sign-on", noIssuer))
+	}
+	if written > 0 {
+		x.r.note("auth_account", fmt.Sprintf("%d OIDC links carried as subjects at %s (--oidc-issuer)", written, x.oidcIssuer))
+		if x.oidcIssuer != x.runtimeOIDCIssuer {
+			x.r.note("auth_account", fmt.Sprintf("WARNING: OIDC_ISSUER here is %q, not %s: the carried links are used only once OIDC_ISSUER is exactly the old provider's issuer", x.runtimeOIDCIssuer, x.oidcIssuer))
+		}
 	}
 	if otherProvider > 0 {
 		x.r.note("auth_account", fmt.Sprintf("%d accounts of an unknown provider, not carried", otherProvider))
