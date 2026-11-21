@@ -44,6 +44,9 @@ type Server struct {
 	// calendarWake starts the calendar refresh early (slice 13a).
 	calendarWake chan struct{}
 	wa           *webauthn.WebAuthn // nil when passkeys are off
+	oidc         *oidcFlow          // nil when single sign-on is off (slice 10b)
+	// oidcClient replaces the egress client for the OIDC provider, in tests only.
+	oidcClient func(context.Context) context.Context
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -65,6 +68,13 @@ func (s *Server) Handler() (http.Handler, error) {
 			return nil, fmt.Errorf("passkeys: %w", err)
 		}
 		s.wa = wa
+	}
+	if s.cfg.OIDCEnabled() {
+		f, err := newOIDCFlow(s.cfg, s.oidcClient)
+		if err != nil {
+			return nil, fmt.Errorf("single sign-on: %w", err)
+		}
+		s.oidc = f
 	}
 	apiHandler, err := s.apiHandler()
 	if err != nil {
@@ -166,7 +176,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 			switch {
 			case r.Method != http.MethodPost:
 				next.ServeHTTP(w, r)
-			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/auth/passkey"):
+			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/auth/passkey") || r.URL.Path == "/auth/oidc/start":
 				auth.ServeHTTP(w, r)
 			case strings.HasPrefix(r.URL.Path, "/display/pairings"):
 				pair.ServeHTTP(w, r)
