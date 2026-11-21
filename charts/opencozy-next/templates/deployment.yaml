@@ -93,6 +93,13 @@ spec:
             - name: PUBLIC_ORIGIN
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.config.googleClientID }}
+            {{- if not $.Values.config.publicOrigin }}
+            {{- fail "config.googleClientID needs config.publicOrigin: Google returns adults to it" }}
+            {{- end }}
+            - name: GOOGLE_CLIENT_ID
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.config.webauthnRPID }}
             - name: WEBAUTHN_RP_ID
               value: {{ . | quote }}

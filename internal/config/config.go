@@ -84,6 +84,12 @@ type Config struct {
 	// key). Unset means no push is enqueued or sent.
 	APNsKeyID string `env:"APNS_KEY_ID"`
 	APNsKey   string `env:"APNS_KEY"`
+	// Slice 13b: Google calendar. Both or neither; neither turns Google off. The client is the
+	// installation's own OAuth client (a "Web application" in Google Cloud) whose redirect URI
+	// is GoogleRedirectURL(). Google needs PUBLIC_ORIGIN and OPENCOZY_SECRET_KEYS.
+	GoogleClientID string `env:"GOOGLE_CLIENT_ID"`
+	// GoogleClientSecret is the OAuth client's secret. Secret: no default.
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
 
 	// Slice 10b: single sign-on with an OpenID Connect provider (design §6). Set the issuer,
 	// client ID and client secret together, or none of them (single sign-on off). The provider's
@@ -99,6 +105,12 @@ type Config struct {
 	// OIDCName is the button's text after "Sign in with".
 	OIDCName string `env:"OIDC_NAME" envDefault:"single sign-on"`
 }
+
+// GoogleRedirectURL is where Google sends an adult back after consent; register it exactly.
+func (c Config) GoogleRedirectURL() string { return c.PublicOrigin + "/api/calendar/google/callback" }
+
+// GoogleEnabled reports whether Google calendar is configured.
+func (c Config) GoogleEnabled() bool { return c.GoogleClientID != "" }
 
 // OIDCCallbackPath is where the provider sends the browser back: the old app's path, so the
 // redirect URI registered at the provider keeps working.
@@ -142,6 +154,7 @@ func (c Config) validate() error {
 	if c.PublicOrigin != "" && !validOrigin(c.PublicOrigin) {
 		errs = append(errs, fmt.Errorf("PUBLIC_ORIGIN: %q must be https://host[:port] (http only for localhost)", c.PublicOrigin))
 	}
+	errs = append(errs, c.validateGoogle()...)
 	if c.MigrationDatabaseURL != "" && c.DatabaseRuntimeRole == "" {
 		errs = append(errs, errors.New("DATABASE_RUNTIME_ROLE is required with MIGRATION_DATABASE_URL"))
 	}
@@ -211,6 +224,20 @@ func (c Config) validateApple() []error {
 		errs = append(errs, errors.New("APNS_KEY must be the .p8 key's PEM (a P-256 PKCS #8 key)")) // never echo the key
 	}
 	return errs
+}
+
+func (c Config) validateGoogle() []error {
+	switch {
+	case c.GoogleClientID == "" && c.GoogleClientSecret == "":
+		return nil
+	case c.GoogleClientID == "" || c.GoogleClientSecret == "":
+		return []error{errors.New("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together")}
+	case c.PublicOrigin == "":
+		return []error{errors.New("GOOGLE_CLIENT_ID needs PUBLIC_ORIGIN: Google returns adults to it")}
+	case c.SecretKeys == nil:
+		return []error{errors.New("GOOGLE_CLIENT_ID needs OPENCOZY_SECRET_KEYS: Google tokens are stored encrypted")}
+	}
+	return nil
 }
 
 func (c Config) validateOIDC() []error {

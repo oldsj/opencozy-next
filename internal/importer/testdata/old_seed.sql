@@ -171,6 +171,50 @@ INSERT INTO completion_approval (household_id, id, child_id, chore_occurrence_id
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000183', '0190a000-0000-7000-8000-0000000000c2', '0190a000-0000-7000-8000-000000000113', NULL, 'Water the plants', 2, '2026-03-11', 'pending', 1, '0190a000-0000-7000-8000-000000000187', '2026-03-11T16:00:00Z', NULL, NULL, NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000185', '0190a000-0000-7000-8000-0000000000c2', NULL, '0190a000-0000-7000-8000-000000000122', 'Morning routine', 3, '2026-03-10', 'rejected', 2, '0190a000-0000-7000-8000-000000000188', '2026-03-10T08:00:00Z', '2026-03-10T08:10:00Z', 'fixtureSecondUser2', 'Bed not made');
 
+-- Slice 5: more rewards. iPad time (30 minutes) Avery bought and an adult cancelled with all 2
+-- points back; TV time, archived; a reward whose name and cost are over the new input limits;
+-- and a parent's grant of 20 minutes (a redemption with no reward, no points).
+INSERT INTO reward (household_id, id, name, cost, version, created_at, archived_at, screen_time_minutes, screen_time_target) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000109', 'iPad time', 2, 2, '2026-03-02T08:00:00Z', NULL, 30, 'personal'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-00000000010a', 'TV time', 5, 1, '2026-03-02T08:00:00Z', '2026-03-05T08:00:00Z', 20, 'tv'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-00000000010b', 'A trip to the big playground by the river, with a picnic and the long way home through the woods', 250000, 1, '2026-03-02T08:00:00Z', NULL, NULL, NULL);
+INSERT INTO reward_redemption (household_id, id, reward_id, child_id, name_snapshot, cost_snapshot, reward_version, version, state, created_at, settled_at, fulfilled_at, refunded_points, screen_time_minutes_snapshot, screen_time_target_snapshot) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000136', '0190a000-0000-7000-8000-000000000109', '0190a000-0000-7000-8000-0000000000c1', 'iPad time', 2, 2, 3, 'canceled', '2026-03-12T08:00:00Z', '2026-03-12T08:30:00Z', '2026-03-12T08:00:00Z', 2, 30, 'personal'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000137', NULL, '0190a000-0000-7000-8000-0000000000c1', 'Extra time', 0, NULL, 1, 'fulfilled', '2026-03-12T09:00:00Z', '2026-03-12T09:00:00Z', '2026-03-12T09:00:00Z', NULL, 20, 'personal');
+INSERT INTO point_ledger (household_id, id, child_id, redemption_id, reward_entry_type, command_id, delta, description_snapshot, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001a1', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-000000000136', 'spend', '0190a000-0000-7000-8000-0000000001a3', -2, 'iPad time', '2026-03-12T08:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001a2', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-000000000136', 'refund', '0190a000-0000-7000-8000-0000000001a4', 2, 'iPad time', '2026-03-12T08:30:00Z');
+
+-- Slice 13b (IDs ...0002xx): two Google accounts (fictional; the token opens with oldsecret's fixture secret), one
+-- connected and one the old app already needed connected again. A calendar of each, a recurring
+-- series on the first with an assignment for one child, and a calendar whose account is gone.
+INSERT INTO calendar_google_connection (household_id, id, google_subject, account_email, status, scope, refresh_token_encrypted, access_token_encrypted, access_token_expires_at, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000201', '1001', 'Parent@Example.test', 'connected', 'openid email https://www.googleapis.com/auth/calendar.readonly',
+   '872dc466ff84ba59ca64297f:b995293500d7e16c130cef443823d573:d5582b7fa0096d63824808adf3a34e0422fe027ae99fda0f6574e28a', 'fixture-access-token-ciphertext', '2026-01-08T09:00:00Z', '2026-01-07T09:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000202', '1002', 'other@example.test', 'needs_reauth', 'openid email https://www.googleapis.com/auth/calendar.readonly',
+   'not-a-ciphertext', NULL, NULL, '2026-01-07T10:00:00Z');
+INSERT INTO calendar_source (household_id, id, provider, name, show_on_display, version, created_at, google_connection_id, google_calendar_id, google_sync_token) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000211', 'google', 'Family', true, 3, '2026-01-07T09:05:00Z', '0190a000-0000-7000-8000-000000000201', 'family@group.calendar.example.test', 'fixture-sync-token'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000212', 'google', 'Work', false, 1, '2026-01-07T10:05:00Z', '0190a000-0000-7000-8000-000000000202', 'other@example.test', NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000213', 'google', 'Gone', true, 1, '2026-01-07T11:05:00Z', '0190a000-0000-7000-8000-000000000299', 'gone@example.test', NULL);
+INSERT INTO calendar_series (household_id, id, source_id, provider_uid, summary, all_day, recurring, status, content_hash, removed_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000221', '0190a000-0000-7000-8000-000000000211', 'fixtureevent0001', 'Piano', false, true, 'confirmed', repeat('e', 64), NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000222', '0190a000-0000-7000-8000-000000000213', 'fixtureevent0002', 'Gone', false, false, 'confirmed', repeat('f', 64), NULL);
+INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, version, active, cleared_from_version) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000231', '0190a000-0000-7000-8000-000000000221', NULL, 1, true, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000232', '0190a000-0000-7000-8000-000000000222', NULL, 1, true, NULL);
+INSERT INTO calendar_assignment_person (household_id, assignment_id, child_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000231', '0190a000-0000-7000-8000-0000000000c2'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000232', '0190a000-0000-7000-8000-0000000000c1');
+
+-- Slices 7 and 10a: Avery's iPad (paired, with a push token) and an old phone, revoked; the
+-- owner's passkey.
+INSERT INTO device (household_id, id, child_id, name, platform, public_key, paired_at, last_seen_at, revoked_at, push_token, push_environment, push_registered_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000e1', '0190a000-0000-7000-8000-0000000000c1', 'Avery''s iPad', 'ios', 'BAKbIfov6bjJE2K/0m8q8Ww+KaMnpkx31JcSaw+kLHv2uEH5EuIMK+Jdfi5cfDcJqgP7RHR0J+hZwVIDaIP4jTY=', '2026-02-01T10:00:00Z', '2026-03-12T07:00:00Z', NULL, 'abababababababababababababababababababababababababababababababab', 'production', '2026-02-01T10:01:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000e2', NULL, 'Old phone', 'android', 'BFFPwcZ97M1Hb43Y7YMTTQyNVZ1QJJOB1/ccjXhV7j+oIUMq5MSdLKL6nZ4xkEbTtk9jrRMsxhnRiH35+r7Ihgo=', '2026-01-10T10:00:00Z', NULL, '2026-02-01T09:00:00Z', NULL, NULL, NULL);
+INSERT INTO parent_passkey (id, user_id, name, credential_id, public_key, counter, transports, backed_up, created_at, last_used_at) VALUES
+  ('0190a000-0000-7000-8000-0000000000f1', 'fixtureOwnerUser01', 'Laptop', 'noRvXHIPIyi0Tl69DglRRGS2caWAs59BXOBb8vVIChI', 'eOV92IEGuIP6vrIPDqEFaA7sRGHMErD6lefA4WIzSOoXyU7EGswKFhDUzE2MjTgbZ9amBuo3X86tgZgJWA-_qGPY70krADB7YKfSDaU', 7, ARRAY['internal', 'hybrid'], true, '2026-02-02T10:00:00Z', '2026-03-10T08:00:00Z');
+
 -- Slice 9: a TV with open hours and two MACs, a removed TV, two ended sessions (a child's
 -- started from her device, a parents one a parent ended by opening the TV), the opening and
 -- its close, an answered prompt (not carried), and TV time from a reward (waits for the
