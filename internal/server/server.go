@@ -73,6 +73,11 @@ func (s *Server) Handler() (http.Handler, error) {
 
 	app := http.NewServeMux()
 	app.Handle("/api/", http.StripPrefix("/api", apiHandler))
+	// The previous server's API: its apps (the iOS app before slice 17) are told to update,
+	// rather than getting a 404 they can't tell from a missing feature.
+	app.HandleFunc("/api/v1/", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.WriteError(w, http.StatusGone, "update_app", "This app is out of date. Update OpenCozy on this device.")
+	})
 	app.HandleFunc("GET /device/session", s.deviceSessionPage)
 	app.Handle("/", web.Handler(web.Dist()))
 
