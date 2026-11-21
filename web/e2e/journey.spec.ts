@@ -11,6 +11,7 @@ type ScreenTime = { bankedSeconds: number; unlockedUntil?: string };
 // once, spent from the iPad, ended early with the rest refunded) and on TV time, which they
 // watch on a TV that asked from the wall and stop when they're done.
 test('a household’s day: chores, approval, points, rewards, screen time, TV', async ({ browser, playwright, baseURL }) => {
+  test.setTimeout(60_000); // the whole day, across four screens
   const problems: string[] = [];
   const watch = (page: Page) => {
     page.on('console', (m) => {
@@ -185,6 +186,9 @@ test('a household’s day: chores, approval, points, rewards, screen time, TV', 
   await kid.getByRole('button', { name: new RegExp(`^Watch ${tvName}`) }).click();
   await expect(kid.getByRole('heading', { name: `Watching ${tvName}` })).toBeVisible();
   await expect.poll(session).not.toBeNull();
+  // Charged by the whole second: watch for more than one before stopping.
+  const started = Date.parse(((await session()) as { startedAt: string }).startedAt);
+  await expect.poll(() => Date.now() - started).toBeGreaterThan(1_500);
   await kid.getByRole('button', { name: 'I’m done' }).click();
   await expect(kid.getByRole('heading', { name: `Watching ${tvName}` })).toHaveCount(0);
   await expect.poll(session).toBeNull();
