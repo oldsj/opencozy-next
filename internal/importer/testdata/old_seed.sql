@@ -25,6 +25,9 @@ INSERT INTO child (household_id, id, name, color, created_at, archived_at) VALUE
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c1', 'Avery', 'teal', '2026-01-02T09:00:00Z', NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c2', 'Rowan', 'sky', '2026-01-02T09:01:00Z', NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c3', 'Mika', 'sage', '2026-01-02T09:02:00Z', '2026-03-01T09:00:00Z');
+-- Avery may start screen time 15:00-19:00 on school nights, 09:00-20:00 at weekends.
+UPDATE child SET school_night_start = 900, school_night_end = 1140, weekend_start = 540, weekend_end = 1200
+WHERE id = '0190a000-0000-7000-8000-0000000000c1';
 
 -- One service credential whose scopes all have a new name, one that waits on a later slice
 -- (tv:gate), and an assistant whose scope waits too.

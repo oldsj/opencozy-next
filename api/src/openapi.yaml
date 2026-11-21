@@ -54,6 +54,8 @@ tags:
     description: Recipes and the meal plan
   - name: calendar
     description: Followed calendars, their events, and who they are for
+  - name: screentime
+    description: iPad screen time, allowed hours and time requests
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
 
@@ -145,6 +147,22 @@ paths:
     $ref: inbox.yaml#/approve
   /inbox/{itemId}/reject:
     $ref: inbox.yaml#/reject
+  /inbox/{itemId}/answer:
+    $ref: inbox.yaml#/answer
+  /children/{childId}/screen-time:
+    $ref: screentime.yaml#/screenTime
+  /children/{childId}/screen-time/spend:
+    $ref: screentime.yaml#/spend
+  /children/{childId}/screen-time/grant:
+    $ref: screentime.yaml#/grant
+  /children/{childId}/screen-time/end:
+    $ref: screentime.yaml#/end
+  /children/{childId}/allowed-hours:
+    $ref: screentime.yaml#/allowedHours
+  /children/{childId}/time-requests:
+    $ref: screentime.yaml#/timeRequests
+  /device/screen-time-events:
+    $ref: screentime.yaml#/events
   /chores:
     $ref: chores.yaml#/chores
   /chores/{choreId}:
