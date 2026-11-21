@@ -34,7 +34,7 @@ func TestRewardsAndRedemptionsCommit(t *testing.T) {
 	var rewards string
 	if err := db.QueryRow(ctx, `SELECT string_agg(right(id::text, 3) || ':' || kind || ':' || COALESCE(minutes::text, '-') || ':' ||
 		COALESCE(screen_time_target, '-') || ':' || (archived_at IS NOT NULL) || ':' || length(title), ' ' ORDER BY id) FROM reward`).Scan(&rewards); err != nil ||
-		rewards != "103:item:-:-:false:9 104:item:-:-:false:7 109:screen_time:30:ipad:false:9 10a:screen_time:20:tv:true:7 10b:item:-:-:false:80" {
+		rewards != "103:item:-:-:false:9 104:item:-:-:false:7 109:screen_time:30:ipad:false:9 10a:screen_time:20:tv:true:7 10b:item:-:-:false:80 9f1:screen_time:30:tv:false:7" {
 		t.Errorf("rewards: %q %v", rewards, err)
 	}
 
@@ -44,7 +44,7 @@ func TestRewardsAndRedemptionsCommit(t *testing.T) {
 	if err := db.QueryRow(ctx, `SELECT string_agg(right(r.id::text, 3) || ':' || r.state || ':' || COALESCE(r.minutes::text, '-') || ':' ||
 		(r.fulfilled_at IS NOT NULL) || ':' || (r.cancelled_at IS NOT NULL) || ':' || right(r.ledger_id::text, 3), ' ' ORDER BY r.id)
 		FROM redemption r`).Scan(&redemptions); err != nil ||
-		redemptions != "131:fulfilled:-:true:false:148 132:cancelled:-:false:true:149 136:cancelled:30:true:true:1a1" {
+		redemptions != "131:fulfilled:-:true:false:148 132:cancelled:-:false:true:149 136:cancelled:30:true:true:1a1 9f2:fulfilled:30:true:false:1d2" {
 		t.Errorf("redemptions: %q %v", redemptions, err)
 	}
 }

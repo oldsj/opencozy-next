@@ -126,3 +126,11 @@ LEFT JOIN device d ON d.household_id = e.household_id AND d.id = e.device_id
 WHERE e.household_id = $1 AND e.child_id = $2
 ORDER BY e.occurred_at DESC, e.id DESC
 LIMIT 200;
+
+-- name: GetWebFilter :one
+SELECT game_portal_domains, game_domains FROM household WHERE id = $1;
+
+-- name: SetWebFilter :one
+UPDATE household SET game_portal_domains = @game_portals::text[], game_domains = @games::text[]
+WHERE id = $1
+RETURNING game_portal_domains, game_domains;

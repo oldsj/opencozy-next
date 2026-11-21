@@ -15,6 +15,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/ledger"
 	"github.com/oldsj/opencozy-next/internal/screentime"
+	"github.com/oldsj/opencozy-next/internal/tv"
 )
 
 // Editing what adults manage. Every save names the version it was made from; a stale one gets
@@ -329,6 +330,21 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 	refund := red.Cost
 	switch {
 	case red.State == "approved":
+	case red.State == "fulfilled" && red.Minutes.Valid && red.ScreenTimeTarget != nil && *red.ScreenTimeTarget == string(api.TargetTv):
+		// The same for TV time; a child watching on it is charged up to now first.
+		now, err := cmd.Now(ctx)
+		if err != nil {
+			return nil, err
+		}
+		refund, err = s.tv.CancelCredit(ctx, cmd.Q, cmd.HouseholdID(), red.ID, red.Cost, now)
+		switch {
+		case errors.Is(err, tv.ErrCreditUsed):
+			return refuse("already_used", "That TV time has already been watched, so there’s nothing to refund."), nil
+		case errors.Is(err, tv.ErrNoCredit):
+			return refuse(tv.ErrNoCredit.Code, tv.ErrNoCredit.Message), nil
+		case err != nil:
+			return nil, err
+		}
 	case red.State == "fulfilled" && red.Minutes.Valid:
 		// The unspent rest is forfeited; its share of the cost comes back, rounded down.
 		refund, err = screentime.CancelRedemption(ctx, cmd, red.ID, red.Cost)
