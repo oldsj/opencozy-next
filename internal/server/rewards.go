@@ -125,9 +125,7 @@ func (s *Server) RedeemReward(ctx context.Context, req api.RedeemRewardRequestOb
 		return conflict(errRewardUnavailable), nil
 	}
 	screen := r.Minutes.Valid
-	if screen && r.ScreenTimeTarget != nil && *r.ScreenTimeTarget == string(api.TargetTv) {
-		return api.RedeemReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTVNotReady)}, nil
-	}
+	toTV := screen && r.ScreenTimeTarget != nil && *r.ScreenTimeTarget == string(api.TargetTv)
 	adult := a.Kind == actor.Adult || a.Kind == actor.Phone
 	state := "pending"
 	var fulfilled *time.Time
@@ -163,19 +161,27 @@ func (s *Server) RedeemReward(ctx context.Context, req api.RedeemRewardRequestOb
 		return nil, err
 	}
 	switch {
+	case toTV:
+		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, &red.ID, nil, r.Minutes.Int32*60, *fulfilled); err != nil {
+			return nil, err
+		}
 	case screen:
 		if _, err := screentime.AddCredit(ctx, cmd, screentime.Credit{
 			Child: req.ChildId, Source: screentime.SourceRedemption, RedemptionID: &red.ID, Minutes: r.Minutes.Int32,
 		}); err != nil {
 			return nil, err
 		}
-		if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+		if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 			return nil, err
 		}
 	case !adult:
-		if _, err := cmd.Q.CreateRedemptionApproval(ctx, dbq.CreateRedemptionApprovalParams{
+		ap, err := cmd.Q.CreateRedemptionApproval(ctx, dbq.CreateRedemptionApprovalParams{
 			HouseholdID: a.HouseholdID, ChildID: req.ChildId, RedemptionID: &red.ID, Title: r.Title, Points: r.Cost,
-		}); err != nil {
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := s.pushPending(ctx, cmd, ap, ap.CreatedAt); err != nil {
 			return nil, err
 		}
 	}

@@ -423,6 +423,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/display/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What this wall display may show
+         * @description Its scopes, so the board offers only the tabs it can load.
+         */
+        get: operations["getDisplaySession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/displays": {
         parameters: {
             query?: never;
@@ -435,7 +455,7 @@ export interface paths {
         put?: never;
         /**
          * Pair the wall display showing this code
-         * @description Needs a sign-in within the last 10 minutes.
+         * @description Needs a sign-in within the last 10 minutes. Every display gets `today`, whatever else it is given.
          */
         post: operations["createDisplay"];
         delete?: never;
@@ -609,6 +629,189 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/device/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this kid device's APNs token
+         * @description Pushes go to the device's current child. A token moves here from any other device or phone session that had it.
+         */
+        put: operations["registerDevicePush"];
+        post?: never;
+        /** Stop pushes to this kid device */
+        delete: operations["unregisterDevicePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in with an email and password
+         * @description The token is in this response only. Every failure is the same 401.
+         */
+        post: operations["phoneSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in with a passkey
+         * @description Start with `POST /auth/passkey/options`, then send the authenticator's response here with
+         *     the phone's name. The token is in this response only.
+         */
+        post: operations["phoneSignInWithPasskey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in from the web sign-in in its app
+         * @description The iOS app sends its web view's session cookie natively, after the parent signs in there,
+         *     so they sign in once. Needs a recent sign-in. The token is in this response only. A request
+         *     from a web page (`Sec-Fetch-Site` other than `none`) is refused with 403 `use_the_app`, so
+         *     page script can't read a phone token.
+         */
+        post: operations["phoneSignInFromWeb"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This phone's session */
+        get: operations["getPhoneSession"];
+        put?: never;
+        post?: never;
+        /** Sign this phone out; its token stops working and it gets no more pushes */
+        delete: operations["phoneSignOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/session/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this phone's APNs token
+         * @description A token is one app install, so it moves here from any other phone session or device that had it.
+         */
+        put: operations["registerPhonePush"];
+        post?: never;
+        /** Stop pushes to this phone (it stays signed in) */
+        delete: operations["unregisterPhonePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's signed-in parent phones */
+        get: operations["listPhoneSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether your phone alerts are paused */
+        get: operations["getPushMute"];
+        /**
+         * Pause your phone alerts until a time, or turn them back on
+         * @description While paused, your phones get no alerts; silent updates (an answered item leaving, the
+         *     badge) still arrive, and other adults and the children's devices are unaffected. Alerts
+         *     come back on their own at that time. At most 90 days ahead.
+         */
+        put: operations["setPushMute"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phones/{phoneSessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phoneSessionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Sign a parent phone out; it stops working at once */
+        delete: operations["revokePhoneSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/today": {
         parameters: {
             query?: never;
@@ -744,7 +947,7 @@ export interface paths {
         put?: never;
         /**
          * Spend points on a reward
-         * @description The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once. Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked for the child to start later. TV time is 422 `tv_not_ready` until the TV gate arrives.
+         * @description The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once. Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked for the child to start later (TV time on a TV, when they watch).
          */
         post: operations["redeemReward"];
         delete?: never;
@@ -929,7 +1132,7 @@ export interface paths {
         put?: never;
         /**
          * Give a child screen time
-         * @description Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at once, after anything already queued and regardless of allowed hours. TV time (`target: tv`) arrives with the TV gate; until then it is 422 `tv_not_ready`.
+         * @description Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at once, after anything already queued and regardless of allowed hours. TV time (`target: tv`) is added to the child's TV time, spent when they watch a TV; `startNow` is 422 with it.
          */
         post: operations["grantScreenTime"];
         delete?: never;
@@ -1378,6 +1581,129 @@ export interface paths {
         patch: operations["updateCalendar"];
         trace?: never;
     };
+    "/calendar/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start connecting a Google account
+         * @description Returns Google's consent page to open in this browser. Google sends the adult back to
+         *     `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
+         *     within ten minutes. 422 `not_configured` when this server has no Google client
+         *     (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+         *     (`too_many`), since connecting an account that is already connected must still work.
+         */
+        post: operations["connectGoogle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Google sends the adult back after consent
+         * @description Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
+         *     `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
+         *     calendar permission was unticked), `expired` (no such connect for this adult, or used or
+         *     older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+         *     token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+         *     connected replaces its token and clears "reconnect needed".
+         */
+        get: operations["googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Google accounts this household has connected
+         * @description Tokens are never returned. `enabled` is false when this server has no Google client.
+         */
+        get: operations["listGoogleConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect a Google account, with every calendar followed through it
+         * @description Deletes the account's token and stops following its calendars, with their events and who
+         *     they were for. After the change commits, the server asks Google to revoke the token (best
+         *     effort). Google revokes the whole grant, so the same Google account connected in another
+         *     household on this server has to be connected again there.
+         */
+        delete: operations["disconnectGoogle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The calendars a connected Google account can read
+         * @description Asks Google. 422 `reconnect_needed` when Google no longer accepts the account's token;
+         *     502 `google_unavailable` when Google could not be reached.
+         */
+        get: operations["listGoogleCalendars"];
+        put?: never;
+        /**
+         * Follow one of a connected account's calendars
+         * @description The first refresh runs within a minute. 409 `calendar_exists` when the household already
+         *     follows it; 422 `too_many_calendars` past 50, `reconnect_needed` when the account must be
+         *     connected again.
+         */
+        post: operations["followGoogleCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/learning/rules": {
         parameters: {
             query?: never;
@@ -1469,6 +1795,368 @@ export interface paths {
          * @description For a learning app's service credential. The linked account picks the child, and the live rule for the activity sets the points, up to the rule's daily limit per child (household day). Each sourceEventId pays at most once, forever: sending it again with the same account and activity returns the award (200); with anything else, 409. Send the same UUID as the Idempotency-Key.
          */
         post: operations["awardLearning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every TV with its state, and each child's TV time
+         * @description Each TV with its MACs, Home Assistant entity, power, open hours, whether it is open, its running session and its "Who's watching?" prompt; and each live child's TV time, as offered in "Turn on for…" and the prompt.
+         */
+        get: operations["listTvs"];
+        put?: never;
+        /** Add a TV */
+        post: operations["createTv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/display": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The TVs as a wall display shows them
+         * @description Names and state only, never MACs or entities. Parents sessions show no countdown.
+         */
+        get: operations["displayTvs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent TV sessions and who opened which TV */
+        get: operations["tvHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open TVs for 1 hour, 2 hours or all day
+         * @description Every TV, or the ones listed, is simply online until then, as in open hours. Opening a TV ends its session now (a child keeps the rest of their time) and withdraws its prompt. Opening an open TV replaces its end.
+         */
+        post: operations["openTvs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep open TVs open an hour longer
+         * @description Adds an hour to TVs a parent opened (all of them, or the ones listed), at most 24 hours ahead.
+         */
+        post: operations["extendTvs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close TVs a parent opened, now
+         * @description They are gated again (open hours still keep a TV open inside them). A TV that isn't open is left as it is.
+         */
+        post: operations["closeTvs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/{tvId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a TV
+         * @description Replaces the name, room, MACs, Home Assistant entity and open hours. A new or cleared entity forgets the TV's power. Open hours that are open now end its session at once.
+         */
+        put: operations["updateTv"];
+        post?: never;
+        /**
+         * Remove a TV
+         * @description Ends its session, withdraws its prompt and forgets its MACs, so the router stops listing it at once.
+         */
+        delete: operations["removeTv"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/{tvId}/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a TV on for parents or a child
+         * @description Replaces the TV's running session and answers its prompt. A child's session spends their TV time, needs time left and their allowed hours, and ends when either runs out.
+         */
+        post: operations["startTvSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/{tvId}/session/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a TV off now
+         * @description Ends its running session (parent_ended); a TV with none is left as it is.
+         */
+        post: operations["endTvSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/{tvId}/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the parents to turn a TV on
+         * @description Raises "Who's watching?" (a display never starts a session itself). A TV already on or open answers on. Asking again while it is asking keeps the one prompt and, at most every two minutes, reminds the parents.
+         */
+        post: operations["askForTv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tvs/{tvId}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Done watching
+         * @description Ends a TV's running session (done). A display or an adult ends any; a child's device only that child's own. It can only turn a TV off, never on.
+         */
+        post: operations["doneWatching"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tv-prompts/{promptId}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer "Who's watching?"
+         * @description Parents, a child (a session starts), or not now. The first answer wins: answering a prompt already answered, withdrawn or at another version is a 409.
+         */
+        post: operations["answerTvPrompt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/tv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A child's TV time, as the kid view shows it
+         * @description Their time left and where it came from, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
+         */
+        get: operations["childTv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/tv/credits/{creditId}/forfeit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back the unused rest of a parent's TV grant
+         * @description The credit keeps what was already watched; the rest leaves the child's TV time, and a session left with none ends. A reward's TV time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+         */
+        post: operations["forfeitTvCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/tv/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Watch on a TV that is asking (the child's own device)
+         * @description The child starts their own session, spending their TV time, on a TV asking "Who's watching?" with nobody on it. It answers the prompt as a parent choosing them would.
+         */
+        post: operations["watchTv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tv/allowances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which TV MACs may be online, and for how long (the router)
+         * @description Every MAC of a TV with a running session or that is open, with the seconds it may stay online: at most 300, so a router that loses the server closes TVs within five minutes. A session's MACs drop out a minute before it ends (streaming apps keep playing from their buffer). Poll every few seconds.
+         */
+        get: operations["tvAllowances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tv/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Blocked TVs trying to go online (the router)
+         * @description The router reports MACs it blocked, at most once a minute each. OpenCozy decides whether that is a TV turning on worth asking about: a TV whose Home Assistant entity has reported asks only while it says on; one without asks once it has kept trying for three minutes. After "Not now" or a session ending it stays quiet for 30 minutes unless Home Assistant sees it turn on again. Each MAC's result: requested (a prompt was raised), pending (already asking), open (on or open), suppressed, or unknown (no TV lists it). Send a new UUID as the Idempotency-Key each time.
+         */
+        post: operations["reportTvAttempts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tv/power": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A TV's power, from Home Assistant
+         * @description Send the media_player's state and, when known, its last_changed. Turning on with nobody watching asks "Who's watching?"; off ends its session and withdraws its prompt; an open TV stays open either way. idle or paused unchanged for 15 minutes is unknown, not off. unavailable and unknown change nothing. Repeating a state changes nothing, so retries are safe; send a new UUID as the Idempotency-Key each time.
+         */
+        post: operations["reportTvPower"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1618,6 +2306,9 @@ export interface components {
             /** @enum {string} */
             status: "waiting";
         };
+        DisplaySession: {
+            scopes: components["schemas"]["DisplayScope"][];
+        };
         NewDisplay: {
             code: string;
             name: string;
@@ -1688,6 +2379,64 @@ export interface components {
             proof: string;
             platform: components["schemas"]["Platform"];
             name: components["schemas"]["DeviceName"];
+        };
+        PushRegistration: {
+            /** @description The APNs device token in hex */
+            token: string;
+            /**
+             * @description The APNs environment the app was built for
+             * @enum {string}
+             */
+            environment: "development" | "production";
+        };
+        PushRegistered: {
+            /** @enum {string} */
+            environment: "development" | "production";
+            /** Format: date-time */
+            registeredAt: string;
+        };
+        /** @description What the phone is called in Manage, e.g. "Alex's iPhone" */
+        PhoneName: string;
+        PhoneSession: {
+            id: components["schemas"]["Id"];
+            adultId: components["schemas"]["Id"];
+            adultName: string;
+            name: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description Coarse (within 5 minutes); null until first used
+             */
+            lastUsedAt: string | null;
+            /** @description The phone gets pushes */
+            pushRegistered: boolean;
+            /** @description This is the phone making the request */
+            current: boolean;
+        };
+        PhoneSignedIn: {
+            /** @description The `ocp_` bearer secret; shown once */
+            token: string;
+            session: components["schemas"]["PhoneSession"];
+            me: components["schemas"]["Me"];
+        };
+        PhoneSelf: {
+            session: components["schemas"]["PhoneSession"];
+            me: components["schemas"]["Me"];
+            /**
+             * Format: date-time
+             * @description While in the future, this adult's phones get no alerts (silent updates still arrive)
+             */
+            pushMutedUntil: string | null;
+        };
+        PushMute: {
+            /**
+             * Format: date-time
+             * @description Alerts are paused until then; null when they are on
+             */
+            mutedUntil: string | null;
         };
         TodayItem: {
             id: components["schemas"]["Id"];
@@ -1850,8 +2599,114 @@ export interface components {
             submittedAt: string;
             minutesRequested?: number;
         };
+        /** @enum {string} */
+        TvPower: "on" | "off" | "unknown";
+        /** @description HH:MM, household time */
+        Clock: string;
+        /** @enum {string} */
+        Weekday: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+        /** @description One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day. */
+        OpenHours: {
+            start: components["schemas"]["Clock"];
+            end: components["schemas"]["Clock"];
+            days?: components["schemas"]["Weekday"][];
+        };
+        Tv: {
+            id: components["schemas"]["Id"];
+            name: string;
+            room: string | null;
+            macs: string[];
+            haEntityId: string | null;
+            power: components["schemas"]["TvPower"];
+            /** Format: date-time */
+            powerChangedAt: string | null;
+            openHours: components["schemas"]["OpenHours"] | null;
+            version: components["schemas"]["Version"];
+        };
+        /** @description Open until closesAt, or closed until opensAt */
+        WindowStatus: {
+            open: boolean;
+            /** Format: date-time */
+            closesAt?: string;
+            /** Format: date-time */
+            opensAt?: string;
+        };
+        TvSession: {
+            id: components["schemas"]["Id"];
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            /** @enum {string} */
+            watcher: "parents" | "child";
+            childId: components["schemas"]["Id"] | null;
+            childName: string | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** @enum {string|null} */
+            endReason: "tv_off" | "time_up" | "parent_ended" | "done" | "open_hours" | "parent_override" | null;
+            /**
+             * Format: date-time
+             * @description A running session's end at the latest (parents, the 4-hour safety cap)
+             */
+            endsAt: string | null;
+            secondsRemaining: number | null;
+            /** @description The child's allowed hours end it before their time runs out */
+            endsWithHours: boolean;
+            watchedSeconds: number;
+        };
+        TvPrompt: {
+            id: components["schemas"]["Id"];
+            version: components["schemas"]["Version"];
+            /** @enum {string} */
+            source: "home_assistant" | "router" | "display" | "adult";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description A TV and where it stands now. */
+        TvState: components["schemas"]["Tv"] & {
+            /** @description Online without a session (open hours, or opened by a parent) */
+            open: boolean;
+            /**
+             * Format: date-time
+             * @description When the open TV is gated again; null while gated
+             */
+            openClosesAt: string | null;
+            /**
+             * Format: date-time
+             * @description A parent's "Open TVs" end, while one is active
+             */
+            openUntil: string | null;
+            /** @enum {string|null} */
+            openReason: "open_hours" | "parent" | null;
+            openHoursNow: components["schemas"]["WindowStatus"] | null;
+            session: components["schemas"]["TvSession"] | null;
+            prompt: components["schemas"]["TvPrompt"] | null;
+        };
+        /** @description A live child as "Turn on for…" and "Who's watching?" offer them. */
+        TvChild: {
+            childId: components["schemas"]["Id"];
+            name: string;
+            color: string;
+            tvSecondsRemaining: number;
+            watchingTvId: components["schemas"]["Id"] | null;
+            /** @description The child's allowed hours now; null with no rule */
+            hours: components["schemas"]["WindowStatus"] | null;
+            /** @description Has TV time, is inside their hours and isn't watching another TV */
+            canWatch: boolean;
+            /** @description canWatch, not watching, and has a paired device to start it from */
+            canStartOwn: boolean;
+        };
+        TvList: {
+            /** Format: date-time */
+            serverTime: string;
+            tvs: components["schemas"]["TvState"][];
+            children: components["schemas"]["TvChild"][];
+        };
         Inbox: {
             items: components["schemas"]["InboxItem"][];
+            /** @description The TVs asking "Who's watching?" now (only those), with each child's TV time, to answer with answerTvPrompt. */
+            tvs: components["schemas"]["TvList"];
         };
         Decision: {
             id: components["schemas"]["Id"];
@@ -1886,10 +2741,10 @@ export interface components {
             endsAt: string;
         };
         /** @description A time of day, HH:MM, 24-hour, household time */
-        Clock: string;
+        "Clock-2": string;
         HoursWindow: {
-            start: components["schemas"]["Clock"];
-            end: components["schemas"]["Clock"];
+            start: components["schemas"]["Clock-2"];
+            end: components["schemas"]["Clock-2"];
         };
         AllowedHours: {
             schoolNight: components["schemas"]["HoursWindow"];
@@ -1945,7 +2800,7 @@ export interface components {
             allowedHours?: components["schemas"]["AllowedHours"];
             hoursNow?: components["schemas"]["HoursNow"];
             timeRequest?: components["schemas"]["TimeRequest"];
-            /** @description Banked time with some left, oldest first (spent in this order) */
+            /** @description Banked time with some left, oldest first (spent in this order); the oldest 200, while bankedSeconds is the whole bank */
             credits: components["schemas"]["Credit"][];
             webFilter: components["schemas"]["WebFilter"];
         };
@@ -1959,9 +2814,55 @@ export interface components {
             /** @description Allowed hours cut it short; the rest stays banked */
             clipped: boolean;
         };
+        /** @description TV time with some left */
+        TvCredit: {
+            id: components["schemas"]["Id"];
+            /**
+             * @description A reward bought with points, or a parent's grant
+             * @enum {string}
+             */
+            source: "redemption" | "grant";
+            redemptionId?: components["schemas"]["Id"];
+            rewardTitle?: string;
+            /** @description The parent who gave it, by name */
+            grantedBy?: string;
+            /** @description What it was given as */
+            minutes: number;
+            /** @description What it holds */
+            seconds: number;
+            usedSeconds: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        WaitingTv: {
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            room: string | null;
+        };
+        Watching: {
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            /** Format: date-time */
+            endsAt: string;
+            secondsRemaining: number;
+            endsWithHours: boolean;
+        };
+        ChildTv: {
+            /** Format: date-time */
+            serverTime: string;
+            secondsRemaining: number;
+            /** @description TV time with some left, oldest first (watched in this order) */
+            credits: components["schemas"]["TvCredit"][];
+            /** @description TVs asking "Who's watching?" now with nobody on them, oldest first */
+            waiting: components["schemas"]["WaitingTv"][];
+            watching: components["schemas"]["Watching"] | null;
+            hours: components["schemas"]["WindowStatus"] | null;
+        };
         SpendResult: {
             spend?: components["schemas"]["Spend"];
             screenTime: components["schemas"]["ScreenTime"];
+            /** @description For TV time given (target tv), the child's TV time now */
+            tv?: components["schemas"]["ChildTv"];
         };
         EndResult: {
             /** @enum {string} */
@@ -2162,6 +3063,8 @@ export interface components {
             /** Format: date-time */
             lastSyncAt?: string;
             error?: components["schemas"]["CalendarErrorCode"];
+            /** @description For a Google calendar, the account it is followed through */
+            googleConnectionId?: components["schemas"]["Id"];
             version: number;
         };
         CalendarList: {
@@ -2180,6 +3083,39 @@ export interface components {
             color: components["schemas"]["ProfileColor"];
             showOnDisplay: boolean;
             expectedVersion: number;
+        };
+        GoogleConnectStart: {
+            /** @description Google's consent page; open it in this browser tab. */
+            authorizeUrl: string;
+        };
+        GoogleConnection: {
+            id: components["schemas"]["Id"];
+            email: string;
+            /** @description Google no longer accepts the token; connect the account again. */
+            needsReconnect: boolean;
+            /** @description How many of its calendars the household follows */
+            calendars: number;
+            version: number;
+        };
+        GoogleConnectionList: {
+            enabled: boolean;
+            connections: components["schemas"]["GoogleConnection"][];
+        };
+        GoogleCalendar: {
+            googleId: string;
+            name: string;
+            primary: boolean;
+            /** @description Set when the household follows it */
+            calendarId?: components["schemas"]["Id"];
+        };
+        GoogleCalendarList: {
+            calendars: components["schemas"]["GoogleCalendar"][];
+        };
+        NewGoogleCalendar: {
+            googleId: string;
+            name: components["schemas"]["CalendarName"];
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
         };
         AwardRule: {
             id: components["schemas"]["Id"];
@@ -2238,6 +3174,169 @@ export interface components {
              * @description The child's balance now
              */
             balance: number;
+        };
+        TvName: string;
+        Room: string | null;
+        /** @description Lower case, colons (any case and dashes are accepted and normalized) */
+        Mac: string;
+        Macs: components["schemas"]["Mac"][];
+        EntityId: string;
+        NewTv: {
+            name: components["schemas"]["TvName"];
+            room?: components["schemas"]["Room"];
+            macs: components["schemas"]["Macs"];
+            haEntityId?: components["schemas"]["EntityId"] | null;
+            openHours?: components["schemas"]["OpenHours"] | null;
+        };
+        /** @description Who is watching; a parents session has no countdown */
+        DisplayTvSession: {
+            /** @enum {string} */
+            watcher: "parents" | "child";
+            childId: components["schemas"]["Id"] | null;
+            childName: string | null;
+            /** Format: date-time */
+            endsAt: string | null;
+            secondsRemaining: number | null;
+        };
+        DisplayTv: {
+            id: components["schemas"]["Id"];
+            name: string;
+            room: string | null;
+            power: components["schemas"]["TvPower"];
+            asking: boolean;
+            /** Format: date-time */
+            openClosesAt: string | null;
+            /** Format: date-time */
+            openUntil: string | null;
+            session: components["schemas"]["DisplayTvSession"] | null;
+        };
+        DisplayTvList: {
+            /** Format: date-time */
+            serverTime: string;
+            tvs: components["schemas"]["DisplayTv"][];
+        };
+        TvOpening: {
+            id: components["schemas"]["Id"];
+            /** Format: date-time */
+            at: string;
+            /** @enum {string} */
+            action: "open" | "extend" | "close";
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            /** Format: date-time */
+            until: string | null;
+            byName: string | null;
+            viaAssistant: boolean;
+            endedSessionId: components["schemas"]["Id"] | null;
+        };
+        TvHistory: {
+            sessions: components["schemas"]["TvSession"][];
+            openings: components["schemas"]["TvOpening"][];
+        };
+        /** @description Every TV (all) or the ones listed, not both, for 1 hour, 2 hours or until midnight */
+        OpenTvs: {
+            all?: boolean;
+            tvIds?: components["schemas"]["Id"][];
+            /** @enum {string} */
+            duration: "1h" | "2h" | "all_day";
+        };
+        OpenedTv: {
+            id: components["schemas"]["Id"];
+            name: string;
+            /** Format: date-time */
+            openUntil: string | null;
+            /** Format: date-time */
+            openClosesAt: string | null;
+        };
+        OpenedTvs: {
+            /** Format: date-time */
+            serverTime: string;
+            tvs: components["schemas"]["OpenedTv"][];
+            endedSessions: components["schemas"]["TvSession"][];
+        };
+        /** @description Every TV (all) or the ones listed, not both */
+        ChosenTvs: {
+            all?: boolean;
+            tvIds?: components["schemas"]["Id"][];
+        };
+        TvEdit: {
+            name: components["schemas"]["TvName"];
+            room: components["schemas"]["Room"];
+            macs: components["schemas"]["Macs"];
+            haEntityId: components["schemas"]["EntityId"] | null;
+            openHours: components["schemas"]["OpenHours"] | null;
+            expectedVersion: components["schemas"]["Version"];
+        };
+        StartTvSession: {
+            /** @enum {string} */
+            watcher: "parents" | "child";
+            childId?: components["schemas"]["Id"];
+        };
+        EndedTvSession: {
+            session: components["schemas"]["TvSession"] | null;
+        };
+        TvAsked: {
+            /** @description Already on (a session) or open */
+            on: boolean;
+            asking: boolean;
+        };
+        TvPromptAnswer: {
+            expectedVersion: components["schemas"]["Version"];
+            /** @enum {string} */
+            answer: "parents" | "child" | "not_now";
+            childId?: components["schemas"]["Id"];
+        };
+        TvPromptAnswered: {
+            prompt: {
+                id: components["schemas"]["Id"];
+                version: components["schemas"]["Version"];
+                /** @enum {string} */
+                state: "answered" | "dismissed";
+            };
+            session: components["schemas"]["TvSession"] | null;
+        };
+        WatchTv: {
+            tvId: components["schemas"]["Id"];
+        };
+        TvAllowance: {
+            mac: string;
+            secondsRemaining: number;
+        };
+        TvAllowances: {
+            /** Format: date-time */
+            serverTime: string;
+            allowances: components["schemas"]["TvAllowance"][];
+        };
+        TvAttempt: {
+            mac: components["schemas"]["Mac"];
+            /** Format: date-time */
+            lastSeenAt: string;
+        };
+        TvAttempts: {
+            attempts: components["schemas"]["TvAttempt"][];
+        };
+        TvAttemptResult: {
+            mac: string;
+            /** @enum {string} */
+            state: "requested" | "pending" | "open" | "suppressed" | "unknown";
+        };
+        TvAttemptResults: {
+            /** Format: date-time */
+            serverTime: string;
+            results: components["schemas"]["TvAttemptResult"][];
+        };
+        TvPowerReport: {
+            entityId: components["schemas"]["EntityId"];
+            /** @description The media_player state (on, playing, buffering, idle, paused, off, standby, unavailable, …) */
+            state: string;
+            /** Format: date-time */
+            lastChanged?: string;
+        };
+        TvPowerResult: {
+            tvId: components["schemas"]["Id"];
+            power: components["schemas"]["TvPower"];
+            online: boolean;
+            asking: boolean;
         };
     };
     responses: {
@@ -2331,6 +3430,24 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description The TVs it changed, and any sessions opening ended */
+        Opened: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["OpenedTvs"];
+            };
+        };
+        /** @description tv_open (it's open, nobody needs to turn it on), child_unavailable, already_watching (another TV), no_tv_time, or outside_hours */
+        StartConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
         /**
@@ -2340,6 +3457,8 @@ export interface components {
         IdempotencyKey: string;
         ItemId: components["schemas"]["Id"];
         ChildId: components["schemas"]["Id"];
+        ConnectionId: components["schemas"]["Id"];
+        TvId: components["schemas"]["Id"];
     };
     requestBodies: never;
     headers: {
@@ -3297,6 +4416,29 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    getDisplaySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This display's scopes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplaySession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
     listDisplays: {
         parameters: {
             query?: never;
@@ -3692,6 +4834,430 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    registerDevicePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "token": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+                 *       "environment": "production"
+                 *     }
+                 */
+                "application/json": components["schemas"]["PushRegistration"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRegistered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unregisterDevicePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No more pushes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "email": "alex@example.test",
+                 *       "password": "correct horse battery staple",
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    password: string;
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignInWithPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "challengeId": "0195f2d4-0000-7000-8000-000000000000",
+                 *       "credential": {},
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    challengeId: components["schemas"]["Id"];
+                    /** @description PublicKeyCredential.toJSON() */
+                    credential: {
+                        [key: string]: unknown;
+                    };
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignInFromWeb: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPhoneSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session, its adult and household */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSelf"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    registerPhonePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "token": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+                 *       "environment": "production"
+                 *     }
+                 */
+                "application/json": components["schemas"]["PushRegistration"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRegistered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unregisterPhonePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No more pushes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listPhoneSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phones, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PhoneSession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPushMute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushMute"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setPushMute: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "until": "2026-12-01T08:00:00Z"
+                 *     }
+                 */
+                "application/json": {
+                    /**
+                     * Format: date-time
+                     * @description When alerts come back; null turns them back on now
+                     */
+                    until: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Your alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushMute"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    revokePhoneSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                phoneSessionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             default: components["responses"]["Error"];
         };
     };
@@ -5710,6 +7276,199 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    connectGoogle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open authorizeUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectStart"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    googleCallback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the calendars screen */
+            303: {
+                headers: {
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accounts, by address */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectionList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    disconnectGoogle: {
+        parameters: {
+            query: {
+                expectedVersion: number;
+            };
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account's calendars */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleCalendarList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    followGoogleCalendar: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "googleId": "family@group.calendar.example.test",
+                 *       "name": "Family",
+                 *       "color": "sky",
+                 *       "showOnDisplay": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewGoogleCalendar"];
+            };
+        };
+        responses: {
+            /** @description Following */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSource"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
     listAwardRules: {
         parameters: {
             query?: {
@@ -6027,6 +7786,798 @@ export interface operations {
                 };
             };
             413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listTvs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The TVs, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createTv: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "Den TV",
+                 *       "room": "Den",
+                 *       "macs": [
+                 *         "02:00:5e:10:00:01"
+                 *       ],
+                 *       "haEntityId": "media_player.den_tv",
+                 *       "openHours": null
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewTv"];
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tv"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description mac_taken, entity_taken or too_many_tvs (50 at most) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    displayTvs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The TVs, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayTvList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    tvHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest 50 of each, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvHistory"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    openTvs: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "all": true,
+                 *       "duration": "2h"
+                 *     }
+                 */
+                "application/json": components["schemas"]["OpenTvs"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Opened"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description no_tvs */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    extendTvs: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "all": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["ChosenTvs"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Opened"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description not_open (no TV, or a listed one, is open by a parent) or open_limit (more than 24 hours ahead) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    closeTvs: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "tvIds": [
+                 *         "0190a1b2-0000-7000-8000-0000000000a1"
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["ChosenTvs"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Opened"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    updateTv: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tvId: components["parameters"]["TvId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "name": "Den TV",
+                 *       "room": "Den",
+                 *       "macs": [
+                 *         "02:00:5e:10:00:01"
+                 *       ],
+                 *       "haEntityId": null,
+                 *       "openHours": {
+                 *         "start": "21:00",
+                 *         "end": "07:00"
+                 *       },
+                 *       "expectedVersion": 1
+                 *     }
+                 */
+                "application/json": components["schemas"]["TvEdit"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tv"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description version_conflict, mac_taken or entity_taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    removeTv: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tvId: components["parameters"]["TvId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    startTvSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tvId: components["parameters"]["TvId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "watcher": "child",
+                 *       "childId": "0190a1b2-0000-7000-8000-000000000001"
+                 *     }
+                 */
+                "application/json": components["schemas"]["StartTvSession"];
+            };
+        };
+        responses: {
+            /** @description The running session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvSession"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["StartConflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    endTvSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tvId: components["parameters"]["TvId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session that ended, if there was one */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndedTvSession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    askForTv: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tvId: components["parameters"]["TvId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where the TV stands */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvAsked"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    doneWatching: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                tvId: components["parameters"]["TvId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session that ended, if there was one */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndedTvSession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description not_your_session (a device, and someone else is watching) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    answerTvPrompt: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                promptId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "expectedVersion": 1,
+                 *       "answer": "parents"
+                 *     }
+                 */
+                "application/json": components["schemas"]["TvPromptAnswer"];
+            };
+        };
+        responses: {
+            /** @description Answered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvPromptAnswered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description already_answered, prompt_withdrawn (the TV turned off or opened), version_conflict, tv_removed, or a reason the session can't start (as for startTvSession) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    childTv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The child's TV time */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildTv"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    forfeitTvCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+                creditId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {} */
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Taken back */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        forfeitedSeconds: number;
+                        tv: components["schemas"]["ChildTv"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    watchTv: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "tvId": "0190a1b2-0000-7000-8000-0000000000a1"
+                 *     }
+                 */
+                "application/json": components["schemas"]["WatchTv"];
+            };
+        };
+        responses: {
+            /** @description The child's session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvSession"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description not_asking (the TV isn't asking), tv_on (someone already answered), or a reason the session can't start (as for startTvSession) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    tvAllowances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The allowances, by MAC */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvAllowances"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    reportTvAttempts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "attempts": [
+                 *         {
+                 *           "mac": "02:00:5e:10:00:01",
+                 *           "lastSeenAt": "2026-11-21T16:12:00Z"
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["TvAttempts"];
+            };
+        };
+        responses: {
+            /** @description What OpenCozy made of each MAC */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvAttemptResults"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    reportTvPower: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "entityId": "media_player.den_tv",
+                 *       "state": "playing"
+                 *     }
+                 */
+                "application/json": components["schemas"]["TvPowerReport"];
+            };
+        };
+        responses: {
+            /** @description Where the TV stands now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvPowerResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description unknown_entity (no TV has that entity) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
             default: components["responses"]["Error"];
         };
     };

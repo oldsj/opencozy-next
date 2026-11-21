@@ -35,6 +35,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/jobs"
 	"github.com/oldsj/opencozy-next/internal/keyring"
+	"github.com/oldsj/opencozy-next/internal/push"
 	"github.com/oldsj/opencozy-next/internal/server"
 )
 
@@ -80,6 +81,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		defer pool.Close()
 		srv := server.New(cfg, log, pool)
+		var google *calendar.Google
+		if cfg.GoogleEnabled() {
+			if google, err = calendar.NewGoogle(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL()); err != nil {
+				return err
+			}
+			srv.UseGoogle(google)
+		}
 		h, err := srv.Handler()
 		if err != nil {
 			return err
@@ -87,13 +95,22 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		go srv.SweepSessions(ctx)
 		srv.StartLive(ctx)
 		go command.DeleteExpired(ctx, dbq.New(pool), log)
+		background := []jobs.Job{srv.TVJob()}
 		if cfg.SecretKeys != nil { // calendar links need the keyring
 			fetcher, err := calendar.NewFetcher()
 			if err != nil {
 				return err
 			}
-			go jobs.Runner{Pool: pool, Log: log}.Run(ctx, calendar.Job(cfg.SecretKeys, fetcher, log, srv.CalendarWake()))
+			background = append(background, calendar.Job(cfg.SecretKeys, fetcher.WithGoogle(google), log, srv.CalendarWake()))
 		}
+		if cfg.PushEnabled() {
+			apns, err := push.NewAPNs(push.APNsConfig{TeamID: cfg.AppleTeamID, Topic: cfg.AppleBundleID, KeyID: cfg.APNsKeyID, Key: cfg.APNsKey}, log)
+			if err != nil {
+				return err
+			}
+			background = append(background, push.Job(apns, srv.PushNotes(), log))
+		}
+		go jobs.Runner{Pool: pool, Log: log}.Run(ctx, background...)
 		return server.Serve(ctx, log, cfg.ListenAddr, h, srv.Drain)
 	case "import": // copy the old app's data into this empty installation
 		return runImport(ctx, cfg, log, args, stdout)

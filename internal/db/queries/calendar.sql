@@ -34,7 +34,7 @@ UPDATE calendar_source SET feed_url = $2, feed_url_mac = $3 WHERE id = $1;
 -- name: ClaimDueFeeds :many
 WITH due AS (
     SELECT s.id FROM calendar_source s
-    WHERE s.provider = 'ics' AND s.next_sync_at <= now()
+    WHERE s.provider IN ('ics', 'google') AND s.next_sync_at <= now()
     ORDER BY s.next_sync_at
     LIMIT $1
     FOR UPDATE SKIP LOCKED
@@ -42,8 +42,8 @@ WITH due AS (
 UPDATE calendar_source s SET next_sync_at = now() + interval '10 minutes', last_attempt_at = now()
 FROM due, household h
 WHERE s.id = due.id AND h.id = s.household_id
-RETURNING s.id, s.household_id, s.feed_url, s.http_etag, s.http_last_modified, s.feed_hash, s.window_start,
-    h.time_zone;
+RETURNING s.id, s.household_id, s.provider, s.feed_url, s.http_etag, s.http_last_modified, s.feed_hash, s.window_start,
+    s.google_connection_id, s.google_calendar_id, s.google_sync_token, h.time_zone;
 
 -- name: LockCalendarSource :one
 SELECT id, feed_hash, window_start FROM calendar_source WHERE household_id = $1 AND id = $2 FOR UPDATE;

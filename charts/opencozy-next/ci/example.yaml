@@ -5,6 +5,7 @@ image:
 config:
   trustedProxies: 10.0.0.0/16
   publicOrigin: https://opencozy.example.test
+  googleClientID: 000000000000-example.apps.googleusercontent.com
   oidc:
     issuer: https://id.example.test
     clientId: opencozy
@@ -21,6 +22,8 @@ secrets:
   env:
     - name: EXAMPLE_API_KEY
       key: example-api-key
+    - name: GOOGLE_CLIENT_SECRET
+      key: google-client-secret
     - name: OIDC_CLIENT_SECRET
       key: oidc-client-secret
 onepassword:
