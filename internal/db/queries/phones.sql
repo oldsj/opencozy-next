@@ -92,10 +92,14 @@ WHERE d.household_id = $1 AND d.child_id = $2 AND d.push_token IS NOT NULL AND d
 ORDER BY d.id;
 
 -- name: CountPendingInbox :one
--- The badge: everything waiting for an adult (the inbox), as ListPendingApprovals counts it.
-SELECT count(*)::integer FROM approval a
-JOIN child c ON c.household_id = a.household_id AND c.id = a.child_id
-WHERE a.household_id = $1 AND a.state = 'pending' AND c.archived_at IS NULL;
+-- The badge: everything waiting for an adult (the inbox): the approvals as ListPendingApprovals
+-- counts them, and the TVs asking "Who's watching?" as ListPendingTvPrompts does.
+SELECT ((SELECT count(*) FROM approval a
+         JOIN child c ON c.household_id = a.household_id AND c.id = a.child_id
+         WHERE a.household_id = $1 AND a.state = 'pending' AND c.archived_at IS NULL)
+      + (SELECT count(*) FROM tv_prompt p
+         JOIN tv ON tv.household_id = p.household_id AND tv.id = p.tv_id AND tv.archived_at IS NULL
+         WHERE p.household_id = $1 AND p.state = 'pending'))::integer;
 
 -- name: SetPushMute :one
 -- Old #87: an adult pauses their own phone alerts until a time, or (NULL) turns them back on.

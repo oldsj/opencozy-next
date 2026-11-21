@@ -12,6 +12,7 @@ import (
 
 	"github.com/oldsj/opencozy-next/internal/api"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/push"
 )
 
 // Commands run on a Snapshot from Begin, under the household lock, with the command's time.
@@ -217,7 +218,14 @@ func (s *Snapshot) raise(ctx context.Context, t dbq.Tv, source string) error {
 	}
 	s.Prompts = append(s.Prompts, p)
 	s.changed = true
-	return nil
+	return s.pushWaiting(ctx, t, p)
+}
+
+// pushWaiting tells the parents' phones t is asking "Who's watching?", whatever raised it: a
+// TV turning on by itself, the family display or an adult (old tv.pending).
+func (s *Snapshot) pushWaiting(ctx context.Context, t dbq.Tv, p dbq.TvPrompt) error {
+	key, n := push.TvWaiting(p, t.Name)
+	return s.d.Push.ToAdults(ctx, s.q, s.H, key, n)
 }
 
 // Ask raises "Who's watching?" for a TV (a display or an adult asking). A TV on or open answers
@@ -237,6 +245,9 @@ func (s *Snapshot) Ask(ctx context.Context, tvID uuid.UUID, source string) (api.
 			}
 			p.CreatedAt = s.Now
 			s.changed = true
+			if err := s.pushWaiting(ctx, *t, *p); err != nil {
+				return api.TvAsked{}, err
+			}
 		}
 		return api.TvAsked{Asking: true}, nil
 	}

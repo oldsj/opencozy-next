@@ -300,3 +300,75 @@ func TestSendToAdult(t *testing.T) {
 		t.Errorf("a muted adult missed a silent update: %d requests", len(f.requests))
 	}
 }
+
+// TestTvWaiting is the parents' "Who's watching?": a plain alert the shipped app shows as an
+// inbox item and opens on the inbox (no category, so no actions), sent only to an adult's
+// phones that can receive it, never to a muted adult, and counted in the badge.
+func TestTvWaiting(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := context.Background()
+	h, adult := household(t, db.Owner)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := db.Owner.Exec(ctx, sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// (A revoked phone holds no token: the schema clears it.)
+	live, expired := strings.Repeat("a", 64), strings.Repeat("c", 64)
+	phone := `INSERT INTO phone_session (household_id, adult_id, name, created_at, expires_at, push_token, push_environment, push_registered_at)
+		VALUES ($1, $2, 'Phone', now() - interval '1 day', now() + $3::interval, $4, 'production', now())`
+	exec(phone, h, adult, "1 day", live)
+	exec(phone, h, adult, "-1 minute", expired)
+	var tvID uuid.UUID
+	if err := db.Owner.QueryRow(ctx, `INSERT INTO tv (household_id, name) VALUES ($1, 'Den TV') RETURNING id`, h).Scan(&tvID); err != nil {
+		t.Fatal(err)
+	}
+	var p dbq.TvPrompt
+	if err := db.Owner.QueryRow(ctx, `INSERT INTO tv_prompt (household_id, tv_id, source, created_at) VALUES ($1, $2, 'home_assistant', now()) RETURNING id, created_at`, h, tvID).Scan(&p.ID, &p.CreatedAt); err != nil {
+		t.Fatal(err)
+	}
+
+	f := newFakeAPNs(t)
+	f.answer[live] = func(http.ResponseWriter) {}
+	a, _ := testAPNs(t, f)
+	q := dbq.New(db.Runtime)
+	send := func(n Notification) {
+		t.Helper()
+		payload, _ := json.Marshal(n)
+		if err := a.Send(ctx, q, dbq.PushOutbox{HouseholdID: h, AdultID: &adult, Payload: payload}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	key, n := TvWaiting(p, "Den TV")
+
+	// Only the live phone, not the expired one. The badge counts the waiting TV.
+	send(n)
+	if len(f.requests) != 1 {
+		t.Fatalf("%d requests", len(f.requests))
+	}
+	aps, app := f.bodies[0]["aps"].(map[string]any), f.bodies[0]["opencozy"].(map[string]any)
+	if aps["alert"].(map[string]any)["title"] != "Den TV: who's watching?" || aps["sound"] != "default" || aps["category"] != nil || aps["badge"] != float64(1) {
+		t.Errorf("aps: %v", aps)
+	}
+	if app["type"] != "approval.pending" || app["itemId"] != p.ID.String() || app["kind"] != "tv_prompt" {
+		t.Errorf("opencozy: %v", app)
+	}
+	// A reminder is a new push replacing the first; the same ask dedupes.
+	again, n2 := TvWaiting(dbq.TvPrompt{ID: p.ID, CreatedAt: p.CreatedAt.Add(3 * time.Minute)}, "Den TV")
+	if again == key || n2.Collapse != n.Collapse || n.Collapse != p.ID.String() {
+		t.Errorf("reminder: %q vs %q", again, key)
+	}
+
+	// Muted (old #87): no alert, but the silent clear still arrives.
+	exec(`UPDATE adult SET push_muted_until = now() + interval '1 hour' WHERE id = $1`, adult)
+	send(n)
+	if len(f.requests) != 1 {
+		t.Errorf("a muted adult got the alert: %d requests", len(f.requests))
+	}
+	_, clear := ApprovalResolved(p.ID, "answered")
+	send(clear)
+	if len(f.requests) != 2 || f.bodies[1]["opencozy"].(map[string]any)["itemId"] != p.ID.String() {
+		t.Errorf("a muted adult missed the silent clear: %d requests", len(f.requests))
+	}
+}

@@ -67,7 +67,7 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	q := dbq.New(pool)
-	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), tv: tv.Domain{Hours: allowedHours{}}, deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute),
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), tv: tv.Domain{Hours: allowedHours{}, Push: push.Outbox{Enabled: cfg.PushEnabled()}}, deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute),
 		push: push.Outbox{Enabled: cfg.PushEnabled()}}
 }
 
