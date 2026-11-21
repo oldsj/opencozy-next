@@ -106,6 +106,20 @@ spec:
             - name: WEBAUTHN_ORIGINS
               value: {{ required "config.webauthnOrigins is required with config.webauthnRPID" $.Values.config.webauthnOrigins | quote }}
             {{- end }}
+            {{- with .Values.config.oidc.issuer }}
+            {{- $_ := required "config.publicOrigin is required with config.oidc.issuer (the redirect URI is <publicOrigin>/api/auth/callback/oidc)" $.Values.config.publicOrigin }}
+            {{- if and $.Values.networkPolicy.enabled (not $.Values.egress.internet) (not $.Values.egress.oidc.cidrs) }}
+            {{- fail "config.oidc.issuer needs a way out through the NetworkPolicy: egress.internet: true for a public provider, or egress.oidc.cidrs (and egress.oidc.ports) for a private one" }}
+            {{- end }}
+            - name: OIDC_ISSUER
+              value: {{ . | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ required "config.oidc.clientId is required with config.oidc.issuer" $.Values.config.oidc.clientId | quote }}
+            {{- with $.Values.config.oidc.name }}
+            - name: OIDC_NAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
             # Migrations run in the init container.
             - name: MIGRATE_ON_START
               value: "false"

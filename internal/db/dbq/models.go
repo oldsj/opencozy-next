@@ -346,6 +346,25 @@ type Occurrence struct {
 	UpdatedAt      time.Time
 }
 
+type OidcLink struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	AdultID     uuid.UUID
+	Issuer      string
+	Subject     string
+	Email       string
+	CreatedAt   time.Time
+	LastUsedAt  *time.Time
+}
+
+type OidcSignIn struct {
+	StateHash    []byte
+	BindingHash  []byte
+	CodeVerifier string
+	Nonce        string
+	ExpiresAt    time.Time
+}
+
 type Passkey struct {
 	ID              uuid.UUID
 	HouseholdID     uuid.UUID

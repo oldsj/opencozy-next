@@ -2,8 +2,10 @@
 -- revoked, its household not archived and (where it has one) its adult not removed.
 
 -- name: CreateAdultSession :exec
-INSERT INTO adult_session (token_hash, adult_id, expires_at)
-VALUES ($1, $2, $3);
+-- authenticated_at is now, or when the provider says the person last signed in there (a
+-- single sign-on's auth_time), never later than now.
+INSERT INTO adult_session (token_hash, adult_id, expires_at, authenticated_at)
+VALUES ($1, $2, $3, LEAST(COALESCE(sqlc.narg(authenticated_at)::timestamptz, now()), now()));
 
 -- name: GetAdultSession :one
 SELECT a.id AS adult_id, a.household_id, s.authenticated_at

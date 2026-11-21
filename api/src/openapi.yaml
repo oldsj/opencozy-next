@@ -69,6 +69,14 @@ paths:
     $ref: auth.yaml#/me
   /auth/confirm:
     $ref: auth.yaml#/confirm
+  /auth/methods:
+    $ref: oidc.yaml#/methods
+  /auth/oidc/start:
+    $ref: oidc.yaml#/start
+  /auth/callback/oidc:
+    $ref: oidc.yaml#/callback
+  /auth/oidc/link:
+    $ref: oidc.yaml#/link
   /auth/passkey/options:
     $ref: passkeys.yaml#/signInOptions
   /auth/passkey:

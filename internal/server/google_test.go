@@ -68,7 +68,7 @@ func (f *fakeGoogle) revokedTokens() []string {
 
 // callback is Google sending the browser back: a GET with the session cookie (SameSite=Lax
 // lets it through on a top-level navigation), not followed past the redirect.
-func (e *env) callback(c cred, query url.Values) string {
+func (e *env) googleCallback(c cred, query url.Values) string {
 	e.t.Helper()
 	req, _ := http.NewRequestWithContext(e.t.Context(), http.MethodGet, e.base+"/api/calendar/google/callback?"+query.Encode(), nil)
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
@@ -118,19 +118,19 @@ func TestGoogleConnectFlow(t *testing.T) {
 
 	state := start()
 	ok := url.Values{"state": {state}, "code": {"fixture-code"}}
-	if loc := e.callback(cred{}, ok); !strings.Contains(loc, "401") {
+	if loc := e.googleCallback(cred{}, ok); !strings.Contains(loc, "401") {
 		t.Errorf("signed out: %s", loc)
 	}
-	if loc := e.callback(other.actors["adult"], ok); loc != "/calendars?google=expired" {
+	if loc := e.googleCallback(other.actors["adult"], ok); loc != "/calendars?google=expired" {
 		t.Errorf("another household's adult: %s", loc)
 	}
-	loc := e.callback(adult, ok)
+	loc := e.googleCallback(adult, ok)
 	if !strings.HasPrefix(loc, "/calendars?connection=") || !strings.HasSuffix(loc, "&google=connected") {
 		t.Fatalf("connect: %s", loc)
 	}
 	u, _ := url.Parse(loc)
 	conn := u.Query().Get("connection")
-	if loc := e.callback(adult, ok); loc != "/calendars?google=expired" {
+	if loc := e.googleCallback(adult, ok); loc != "/calendars?google=expired" {
 		t.Errorf("the state used twice: %s", loc)
 	}
 	var stored string
@@ -145,16 +145,16 @@ func TestGoogleConnectFlow(t *testing.T) {
 		t.Errorf("connects in progress left: %d %v", states, err)
 	}
 
-	if loc := e.callback(adult, url.Values{"state": {start()}, "error": {"access_denied"}}); loc != "/calendars?google=denied" {
+	if loc := e.googleCallback(adult, url.Values{"state": {start()}, "error": {"access_denied"}}); loc != "/calendars?google=denied" {
 		t.Errorf("declined: %s", loc)
 	}
 	g.exchange = calendar.ErrScopeMissing
-	if loc := e.callback(adult, url.Values{"state": {start()}, "code": {"fixture-code"}}); loc != "/calendars?google=scope_missing" {
+	if loc := e.googleCallback(adult, url.Values{"state": {start()}, "code": {"fixture-code"}}); loc != "/calendars?google=scope_missing" {
 		t.Errorf("no calendar permission: %s", loc)
 	}
 	g.exchange = nil
 	// The same account again replaces the token on the same connection.
-	if loc := e.callback(adult, url.Values{"state": {start()}, "code": {"fixture-code"}}); !strings.Contains(loc, conn) {
+	if loc := e.googleCallback(adult, url.Values{"state": {start()}, "code": {"fixture-code"}}); !strings.Contains(loc, conn) {
 		t.Errorf("reconnect: %s", loc)
 	}
 
