@@ -1,4 +1,4 @@
-// Package importer copies the frozen old app (commit e717170, migration 0044) into a
+// Package importer copies the frozen old app (commit d7fead8, migration 0045) into a
 // new, empty installation, in one transaction (design §12, §13).
 //
 //   - The source is opened read-only: default_transaction_read_only=on and one REPEATABLE READ
@@ -83,15 +83,8 @@ func Run(ctx context.Context, o Options) error {
 		return err
 	}
 
-	r := &Report{}
-	run := &run{src: src.tx, dst: tx, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret}
-	for _, d := range domains {
-		if err := d(ctx, run); err != nil {
-			return err
-		}
-	}
-	run.remarkOldSecret()
-	if err := coverage(ctx, src.tx, r); err != nil {
+	r, err := importAll(ctx, o, src.tx, tx)
+	if err != nil {
 		return err
 	}
 	r.Print(o.Out)
@@ -112,6 +105,22 @@ func Run(ctx context.Context, o Options) error {
 	return nil
 }
 
+// importAll runs every domain from src into dst and reconciles; it neither prints nor commits.
+func importAll(ctx context.Context, o Options, src, dst pgx.Tx) (*Report, error) {
+	r := &Report{}
+	run := &run{src: src, dst: dst, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret, carried: map[string]bool{}}
+	for _, d := range domains {
+		if err := d(ctx, run); err != nil {
+			return nil, err
+		}
+	}
+	run.remarkOldSecret()
+	if err := coverage(ctx, src, r); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 // run is one import's state.
 type run struct {
 	src pgx.Tx
@@ -121,6 +130,8 @@ type run struct {
 	adults map[string]adultRef
 	keys   *keyring.Keyring
 	old    *oldsecret.Secret
+	// carried lists the ledger source kinds whose rows this import has written.
+	carried map[string]bool
 }
 
 // remarkOldSecret says in the report whether old integration secrets could be opened.
@@ -140,10 +151,12 @@ var domains = []func(context.Context, *run) error{
 	importScreenTime,
 	importCredentials,
 	importLearning,
+	importLedger,
 	importCalendars,
 	importRecipes,
 	importMeals,
 	importTV,
+	checkLedgerSources, // last: every source kind has been imported
 }
 
 type source struct {
@@ -180,7 +193,7 @@ func (s *source) close(ctx context.Context) {
 	_ = s.conn.Close(ctx)
 }
 
-// checkVersion refuses any source other than the old app at e717170.
+// checkVersion refuses any source other than the old app at d7fead8.
 func checkVersion(ctx context.Context, src pgx.Tx) error {
 	rows, err := src.Query(ctx, "SELECT version, checksum FROM opencozy.schema_migrations ORDER BY version")
 	if err != nil {
@@ -198,7 +211,7 @@ func checkVersion(ctx context.Context, src pgx.Tx) error {
 		if len(got) > 0 {
 			last = got[len(got)-1].version
 		}
-		return fmt.Errorf("import: the source is not the old app at e717170 (it has %d migrations, the last %s; want %d ending %s, with matching checksums)",
+		return fmt.Errorf("import: the source is not the old app at d7fead8 (it has %d migrations, the last %s; want %d ending %s, with matching checksums)",
 			len(got), last, len(oldMigrations), oldMigrations[len(oldMigrations)-1].version)
 	}
 	return nil

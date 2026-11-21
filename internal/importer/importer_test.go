@@ -100,7 +100,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"household":                     "pending", // lock_message waits on the devices import
 		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
-		"household_owner":               "ok",
+		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
 		"service_credential":            "ok",
 		"service_credential_child":      "ok",
@@ -122,12 +122,18 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"calendar_assignment":           "ok",
 		"calendar_assignment_person":    "ok",
 		"calendar_occurrence":           "not carried",
+		"point_ledger":                  "ok",
+		"chore_award_reversal":          "ok",
+		"chore_active_award":            "ok",
+		"external_award":                "ok",
+		"chore_definition":              "pending", // chores, routines, approvals and rewards wait on their importers
+		"reward_redemption":             "pending",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -393,9 +399,9 @@ func TestCalendarLinksNeedKeys(t *testing.T) {
 func TestRefusesAnotherVersion(t *testing.T) {
 	target := testdb.Open(t)
 	for name, arrange := range map[string]string{
-		"older":   `DELETE FROM opencozy.schema_migrations WHERE version = '0044_screen_time_grant_cut_guards'`,
+		"older":   `DELETE FROM opencozy.schema_migrations WHERE version = '0045_parent_push_mute'`,
 		"edited":  `UPDATE opencozy.schema_migrations SET checksum = repeat('0', 64) WHERE version = '0010_screen_time_fulfillment'`,
-		"newer":   `INSERT INTO opencozy.schema_migrations (version, checksum) VALUES ('0045_next', repeat('0', 64))`,
+		"newer":   `INSERT INTO opencozy.schema_migrations (version, checksum) VALUES ('0046_next', repeat('0', 64))`,
 		"missing": `DROP TABLE opencozy.schema_migrations`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -431,20 +437,18 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	}
 }
 
-// Old screen time waits on redemptions and devices: a source with any says so and can't commit.
-func TestScreenTimeWaitsOnRedemptionsAndDevices(t *testing.T) {
+// The iPad shield event log is not carried (James): the import says how many and commits.
+func TestScreenTimeEventsAreNotCarried(t *testing.T) {
 	event := `SET search_path TO opencozy;
 		ALTER TABLE screen_time_event DROP CONSTRAINT screen_time_event_device_fk;
 		INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
 		  ('0190a000-0000-7000-8000-00000000000a', gen_random_uuid(), '0190a000-0000-7000-8000-0000000000c1', gen_random_uuid(),
 		   'one_more_minute', '2026-01-05T08:00:00Z', '2026-01-05T08:00:01Z');`
-	target := testdb.Open(t)
-	out, err := importOnce(t, oldDB(t, complete, event), target, false)
-	if !errors.Is(err, ErrPending) {
-		t.Fatalf("err = %v, want ErrPending\n%s", err, out)
+	out, err := importOnce(t, oldDB(t, complete, event), testdb.Open(t), false)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
 	}
-	if statuses(out)["screen_time_event"] != "pending" || !strings.Contains(out, "waits on the import of devices") {
+	if statuses(out)["screen_time_event"] != "not carried" || !strings.Contains(out, "screen_time_event              1") {
 		t.Errorf("screen_time_event:\n%s", out)
 	}
-	empty(t, target)
 }
