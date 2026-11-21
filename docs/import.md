@@ -25,7 +25,12 @@ lists before cutover.
 
 ## Commands
 
-The new installation's environment is the same as for `app serve`:
+Rehearse first, with fictional data: `make import-rehearsal` runs two dry runs, a real import
+and a second import against a throwaway Postgres, and checks each child's points and banked time
+independently. It must pass with nothing pending.
+
+The new installation's environment is the same as for `app serve` (every setting is in
+[deploy.md](deploy.md)):
 
 | Variable | What it is |
 | --- | --- |
@@ -48,8 +53,14 @@ PGPASSWORD=… app import --dry-run \
 PGPASSWORD=… app import \
   --source-url 'postgres://opencozy@old-restore.example.test:5432/opencozy?sslmode=require' \
   --old-auth-secret-file ./old-auth-secret
+
+# 4. Start the app, then run the read-only smoke test against it.
+scripts/smoke.sh https://cozy.example.test
 ```
 
+- **Google calendars** keep working only with the old app's OAuth client: reuse its client ID
+  and secret (deploy.md, Google calendars). With a new client every imported account shows "Sign
+  in again".
 - **`--old-auth-secret-file`** is a file (`chmod 600`) holding the old app's
   `BETTER_AUTH_SECRET`. The import reads it once, uses it to open the old Google refresh tokens, and
   seals them under `OPENCOZY_SECRET_KEYS`; it is never stored. Without it, Google accounts arrive
@@ -170,7 +181,8 @@ old column makes its table `pending`.
 - **Banked iPad and TV time is one balance per child** (James), shown as a grant from no one in
   particular. A parent can still take back what's left.
 - **An imported screen-time or TV redemption can't be cancelled for a partial refund.** It has
-  no credit of its own, because its time is in the balance.
+  no credit of its own, because its time is in the balance. The screens don't offer cancel on it
+  (each redemption says whether it can be cancelled).
 - **History shows a chore's current title**, not the title it had then.
 - **Calendar feeds get colours in turn.** The old app had none.
 - **TVs' power and router attempts start as unknown** until Home Assistant reports.
@@ -201,15 +213,16 @@ old column makes its table `pending`.
 ## Passkeys and devices after cutover
 
 - **Passkeys** work only if the new installation keeps the old hostname: `WEBAUTHN_RP_ID`
-  must be the old hostname, and `WEBAUTHN_ORIGINS` must include the old origin. Otherwise
-  adults sign in with their password and add a passkey again.
+  must be the old hostname (or a parent domain of it), and `WEBAUTHN_ORIGINS` must include the
+  old origin. The smoke test checks that the passkey domain fits the site. Otherwise adults sign
+  in with their password and add a passkey again.
 - **An imported iPad** stays paired if the new kids' build keeps the same bundle ID, keychain
   item and host. If someone pairs it again anyway, revoke the old entry in Manage → Devices.
 
 ## Limits
 
 The new app accepts less for new input than the old app did. The database allows the old
-limits (migrations 00024 and 00025), so old rows are carried as they are, without shortening:
+limits (migrations 00023 and 00024), so old rows are carried as they are, without shortening:
 
 | | Old app | New input |
 | --- | --- | --- |

@@ -10,11 +10,9 @@ import (
 // Two branches can each add migration 00007 under different names: git merges both without a
 // conflict and goose fails only after they land. This catches it on every PR.
 //
-// Until the first production deploy, numbers only need to be unique: slices get numbers handed
-// out up front and may merge out of order, so gaps are allowed (nothing is deployed, and every
-// database here is built fresh). Before cutover, restore the contiguous check
-// (contiguousBeforeCutover) and renumber once.
-const contiguousBeforeCutover = false
+// Numbers are also contiguous from 00001: they were renumbered once before cutover, and from
+// now on a migration, once deployed, keeps its number. A new one takes the next number.
+const contiguousBeforeCutover = true
 
 func TestMigrationNumbersAreUnique(t *testing.T) {
 	names, err := fs.Glob(migrations, "migrations/*.sql")
