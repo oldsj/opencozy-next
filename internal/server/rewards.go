@@ -171,7 +171,7 @@ func (s *Server) RedeemReward(ctx context.Context, req api.RedeemRewardRequestOb
 		}); err != nil {
 			return nil, err
 		}
-		if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+		if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 			return nil, err
 		}
 	case !adult:

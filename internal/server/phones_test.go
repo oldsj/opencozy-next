@@ -277,3 +277,65 @@ func TestTimeRequestPushes(t *testing.T) {
 		t.Errorf("not cleared: %v", pushRows(e))
 	}
 }
+
+// A child's device that registered for push hears a parent's answer to "Ask for more time" and
+// is woken to sync when a parent changes their iPad time; the device's own requests and a
+// child without such a device queue nothing.
+func TestKidPushes(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.APNsKeyID = "KEY1234567" })
+	h := e.house("a", nil)
+	if r := e.send(h.actors["device"], "PUT", "/api/device/push", map[string]any{"token": testPushToken, "environment": "production"}); r.status != 200 {
+		t.Fatalf("register: %d %s", r.status, r.raw)
+	}
+	kid := func() map[string]string {
+		out := map[string]string{}
+		rows, err := e.owner.Query(context.Background(), `SELECT child_id::text, payload->>'type', coalesce(payload->>'body', '') FROM push_outbox WHERE child_id IS NOT NULL`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var c, typ, body string
+			if err := rows.Scan(&c, &typ, &body); err != nil {
+				t.Fatal(err)
+			}
+			out[c+" "+typ] += body + ";"
+		}
+		return out
+	}
+	child1 := "/api/children/" + h.child1.String()
+	if r := e.send(h.actors["device"], "POST", child1+"/time-requests", map[string]any{}); r.status != 201 {
+		t.Fatalf("ask: %d %s", r.status, r.raw)
+	}
+	if got := kid(); len(got) != 0 {
+		t.Errorf("the device's own ask pushed to it: %v", got)
+	}
+	var item string
+	if err := e.owner.QueryRow(context.Background(), `SELECT id FROM approval WHERE kind = 'time_request' AND child_id = $1`, h.child1).Scan(&item); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.send(h.actors["phone"], "POST", "/api/inbox/"+item+"/answer", map[string]any{"choice": "30min"}); r.status != 200 {
+		t.Fatalf("answer: %d %s", r.status, r.raw)
+	}
+	if got := kid()[h.child1.String()+" time.answered"]; got != "You have 30 more minutes.;" {
+		t.Errorf("answer push: %q (%v)", got, kid())
+	}
+	if got := kid()[h.child1.String()+" screentime.changed"]; got != "" {
+		t.Errorf("an answer also pushed silently: %q", got)
+	}
+	if r := e.send(h.actors["adult"], "POST", child1+"/screen-time/end", map[string]any{"scope": "now"}); r.status != 200 {
+		t.Fatalf("end: %d %s", r.status, r.raw)
+	}
+	if got := kid()[h.child1.String()+" screentime.changed"]; got != ";" {
+		t.Errorf("ending time early: %q (%v)", got, kid())
+	}
+	// Child 2 has no device with a push token: giving them time queues nothing.
+	if r := e.send(h.actors["adult"], "POST", "/api/children/"+h.child2.String()+"/screen-time/grant", map[string]any{"minutes": 10}); r.status != 200 {
+		t.Fatalf("grant: %d %s", r.status, r.raw)
+	}
+	for k := range kid() {
+		if strings.HasPrefix(k, h.child2.String()) {
+			t.Errorf("child 2 has no push device: %v", kid())
+		}
+	}
+}
