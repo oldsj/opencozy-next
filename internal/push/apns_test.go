@@ -230,7 +230,7 @@ func TestNotificationPayload(t *testing.T) {
 		t.Errorf("redemption: %q / %q", n.Title, n.Body)
 	}
 	ap.Kind = "time_request"
-	if _, n := ApprovalPending(ap, "Robin", asked); n.Title != "Robin is asking for more iPad time" {
+	if _, n := ApprovalPending(ap, "Robin", asked); n.Title != "Robin is asking for more iPad time" || n.Category != "TIME_REQUEST" {
 		t.Errorf("time request: %q", n.Title)
 	}
 

@@ -89,16 +89,18 @@ func (n Notification) APNs(pending int) map[string]any {
 func ApprovalPending(a dbq.Approval, childName string, askedAt time.Time) (key string, n Notification) {
 	title := fmt.Sprintf("%s finished %s", childName, a.Title)
 	body := fmt.Sprintf("%s · waiting for your approval", points(a.Points))
+	category := "APPROVAL" // Approve, Reject
 	switch a.Kind {
 	case "redemption":
 		title = fmt.Sprintf("%s wants %s", childName, a.Title)
 	case "time_request":
 		title = fmt.Sprintf("%s is asking for more iPad time", childName)
 		body = "Give 30 min, 1 hour, the rest of the day, or say no."
+		category = "TIME_REQUEST" // 30 min, 1 hour, all day, no (POST /inbox/{id}/answer)
 	}
 	return "approval.pending/" + a.ID.String() + "/" + strconv.FormatInt(askedAt.Unix(), 10), Notification{
 		Type: "approval.pending", Collapse: a.ID.String(), Title: title, Body: body,
-		Category: "APPROVAL", Thread: "opencozy-approvals", Badge: true,
+		Category: category, Thread: "opencozy-approvals", Badge: true,
 		Data: map[string]string{"itemId": a.ID.String(), "kind": a.Kind},
 	}
 }
