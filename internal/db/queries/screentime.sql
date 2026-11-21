@@ -99,3 +99,11 @@ RETURNING *;
 
 -- name: PendingApprovalForTimeRequest :one
 SELECT * FROM approval WHERE household_id = $1 AND time_request_id = $2 AND state = 'pending';
+
+-- name: GetWebFilter :one
+SELECT game_portal_domains, game_domains FROM household WHERE id = $1;
+
+-- name: SetWebFilter :one
+UPDATE household SET game_portal_domains = @game_portals::text[], game_domains = @games::text[]
+WHERE id = $1
+RETURNING game_portal_domains, game_domains;

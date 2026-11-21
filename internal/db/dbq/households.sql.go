@@ -64,7 +64,7 @@ func (q *Queries) CreateAdult(ctx context.Context, arg CreateAdultParams) (Adult
 }
 
 const createHousehold = `-- name: CreateHousehold :one
-INSERT INTO household (name, time_zone) VALUES ($1, $2) RETURNING id, name, time_zone, archived_at, created_at, lock_message, version
+INSERT INTO household (name, time_zone) VALUES ($1, $2) RETURNING id, name, time_zone, archived_at, created_at, lock_message, version, game_portal_domains, game_domains
 `
 
 type CreateHouseholdParams struct {
@@ -83,6 +83,8 @@ func (q *Queries) CreateHousehold(ctx context.Context, arg CreateHouseholdParams
 		&i.CreatedAt,
 		&i.LockMessage,
 		&i.Version,
+		&i.GamePortalDomains,
+		&i.GameDomains,
 	)
 	return i, err
 }
@@ -137,7 +139,7 @@ func (q *Queries) GetAdultByEmail(ctx context.Context, email string) (Adult, err
 }
 
 const getHousehold = `-- name: GetHousehold :one
-SELECT id, name, time_zone, archived_at, created_at, lock_message, version FROM household WHERE id = $1
+SELECT id, name, time_zone, archived_at, created_at, lock_message, version, game_portal_domains, game_domains FROM household WHERE id = $1
 `
 
 func (q *Queries) GetHousehold(ctx context.Context, id uuid.UUID) (Household, error) {
@@ -151,12 +153,14 @@ func (q *Queries) GetHousehold(ctx context.Context, id uuid.UUID) (Household, er
 		&i.CreatedAt,
 		&i.LockMessage,
 		&i.Version,
+		&i.GamePortalDomains,
+		&i.GameDomains,
 	)
 	return i, err
 }
 
 const listHouseholds = `-- name: ListHouseholds :many
-SELECT id, name, time_zone, archived_at, created_at, lock_message, version FROM household ORDER BY created_at LIMIT 100
+SELECT id, name, time_zone, archived_at, created_at, lock_message, version, game_portal_domains, game_domains FROM household ORDER BY created_at LIMIT 100
 `
 
 func (q *Queries) ListHouseholds(ctx context.Context) ([]Household, error) {
@@ -176,6 +180,8 @@ func (q *Queries) ListHouseholds(ctx context.Context) ([]Household, error) {
 			&i.CreatedAt,
 			&i.LockMessage,
 			&i.Version,
+			&i.GamePortalDomains,
+			&i.GameDomains,
 		); err != nil {
 			return nil, err
 		}
@@ -212,7 +218,7 @@ func (q *Queries) SetAdultPassword(ctx context.Context, arg SetAdultPasswordPara
 const updateHousehold = `-- name: UpdateHousehold :one
 UPDATE household SET name = $2, time_zone = $3, version = version + 1
 WHERE id = $1 AND version = $4
-RETURNING id, name, time_zone, archived_at, created_at, lock_message, version
+RETURNING id, name, time_zone, archived_at, created_at, lock_message, version, game_portal_domains, game_domains
 `
 
 type UpdateHouseholdParams struct {
@@ -238,6 +244,8 @@ func (q *Queries) UpdateHousehold(ctx context.Context, arg UpdateHouseholdParams
 		&i.CreatedAt,
 		&i.LockMessage,
 		&i.Version,
+		&i.GamePortalDomains,
+		&i.GameDomains,
 	)
 	return i, err
 }

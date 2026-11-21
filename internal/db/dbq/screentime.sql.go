@@ -211,6 +211,22 @@ func (q *Queries) GetCredit(ctx context.Context, arg GetCreditParams) (ScreenTim
 	return i, err
 }
 
+const getWebFilter = `-- name: GetWebFilter :one
+SELECT game_portal_domains, game_domains FROM household WHERE id = $1
+`
+
+type GetWebFilterRow struct {
+	GamePortalDomains []string
+	GameDomains       []string
+}
+
+func (q *Queries) GetWebFilter(ctx context.Context, id uuid.UUID) (GetWebFilterRow, error) {
+	row := q.db.QueryRow(ctx, getWebFilter, id)
+	var i GetWebFilterRow
+	err := row.Scan(&i.GamePortalDomains, &i.GameDomains)
+	return i, err
+}
+
 const insertCredit = `-- name: InsertCredit :one
 INSERT INTO screen_time_credit (household_id, child_id, source, redemption_id, granted_by, minutes, seconds, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -626,6 +642,30 @@ type SetCreditUsedParams struct {
 func (q *Queries) SetCreditUsed(ctx context.Context, arg SetCreditUsedParams) error {
 	_, err := q.db.Exec(ctx, setCreditUsed, arg.HouseholdID, arg.ID, arg.UsedSeconds)
 	return err
+}
+
+const setWebFilter = `-- name: SetWebFilter :one
+UPDATE household SET game_portal_domains = $2::text[], game_domains = $3::text[]
+WHERE id = $1
+RETURNING game_portal_domains, game_domains
+`
+
+type SetWebFilterParams struct {
+	ID          uuid.UUID
+	GamePortals []string
+	Games       []string
+}
+
+type SetWebFilterRow struct {
+	GamePortalDomains []string
+	GameDomains       []string
+}
+
+func (q *Queries) SetWebFilter(ctx context.Context, arg SetWebFilterParams) (SetWebFilterRow, error) {
+	row := q.db.QueryRow(ctx, setWebFilter, arg.ID, arg.GamePortals, arg.Games)
+	var i SetWebFilterRow
+	err := row.Scan(&i.GamePortalDomains, &i.GameDomains)
+	return i, err
 }
 
 const unspentCredits = `-- name: UnspentCredits :many
