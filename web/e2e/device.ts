@@ -1,4 +1,4 @@
-import { createHash, generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 
 import { expect, type APIRequestContext } from '@playwright/test';
 
@@ -8,9 +8,12 @@ export class FakeDevice {
   readonly key: KeyObject;
   readonly publicKey: string;
   id = '';
-  constructor(private readonly api: APIRequestContext) {
-    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  /** A new key, or (an already paired device) its PKCS #8 PEM and id. */
+  constructor(private readonly api: APIRequestContext, paired?: { pem: string; id: string }) {
+    const privateKey = paired ? createPrivateKey(paired.pem) : generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey;
+    const publicKey = createPublicKey(privateKey);
     this.key = privateKey;
+    this.id = paired?.id ?? '';
     const jwk = publicKey.export({ format: 'jwk' });
     const point = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x ?? '', 'base64url'), Buffer.from(jwk.y ?? '', 'base64url')]);
     this.publicKey = point.toString('base64');
@@ -37,6 +40,6 @@ export class FakeDevice {
       'X-OpenCozy-Signature': this.sign(['OPENCOZY-DEVICE-V1', method, path, ts, nonce, bodyHash, this.id].join('\n')),
       'Content-Type': 'application/json',
     };
-    return method === 'GET' ? this.api.get(path, { headers }) : this.api.post(path, { headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() }, data: body });
+    return method === 'GET' ? this.api.get(path, { headers }) : this.api.post(path, { headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() }, ...(body ? { data: body } : {}) });
   }
 }

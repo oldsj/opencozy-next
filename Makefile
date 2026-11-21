@@ -133,6 +133,11 @@ security: ## govulncheck, pnpm audit, and osv-scanner (every lockfile, tools inc
 import-rehearsal: ## Rehearse the old app's import with fictional data (Docker); ALLOW_PENDING=1 leaves out unmapped tables
 	scripts/import-rehearsal.sh
 
+.PHONY: import-journey
+import-journey: ## The rehearsal, then the release binary on the imported database: smoke.sh and e2e/imported.spec.ts
+	$(PNPM) build
+	JOURNEY=1 scripts/import-rehearsal.sh
+
 .PHONY: image
 image: ## Build the multi-arch image (no push)
 	@# Multi-platform builds need a docker-container builder; Docker Desktop's default can't.

@@ -22,6 +22,13 @@
 # testdata/complete.sql (which removes the fixture's pending parts), so the real import and the
 # second run are rehearsed today. The rehearsal is only complete without it.
 #
+# JOURNEY=1 then runs the app on the imported database (after a real import, so with
+# ALLOW_PENDING=1 until nothing is pending): scripts/import-rehearsal/journey.sql is applied to
+# the old database last (keys the tests hold, no time limits), the release binary (embedweb, not
+# the e2e build) serves the imported database, scripts/smoke.sh checks it, and Playwright runs
+# web/e2e/imported.spec.ts against it. Needs web/dist built (pnpm --dir web build) and Playwright's
+# Chromium.
+#
 # Needs Docker and Go. Prints timings. DAYS=3650 seeds ten years of the daily chore instead of one
 # (more volume for the timing). KEEP=1 leaves the container running for a look.
 set -euo pipefail
@@ -73,7 +80,14 @@ port=$(docker port "$name" 5432/tcp | head -n 1 | sed 's/.*://')
 base="postgres://%s@127.0.0.1:$port/%s?sslmode=disable"
 
 echo "== Build"
-timed "build app" go build -C "$root" -o "$work/app" ./cmd/app
+if [ "${JOURNEY:-}" = 1 ]; then
+  # The release build, as the image ships it: the SPA embedded, no e2e tag.
+  [ -f "$root/web/dist/index.html" ] || { echo "JOURNEY=1 needs web/dist: pnpm --dir web build" >&2; exit 1; }
+  CGO_ENABLED=0 timed "build app (release)" go build -C "$root" -tags embedweb -trimpath -o "$work/app" ./cmd/app
+  "$root/scripts/check-release-binary.sh" "$work/app"
+else
+  timed "build app" go build -C "$root" -o "$work/app" ./cmd/app
+fi
 
 echo "== Old database (d7fead8, 0045) with the fictional household"
 seed() {
@@ -86,6 +100,7 @@ seed() {
   else
     psql_in -d old < "$here/pending.sql"
   fi
+  if [ "${JOURNEY:-}" = 1 ]; then psql_in -d old < "$here/journey.sql"; fi
 }
 timed "load old schema and seed" seed
 psql_in -d old -At -c "SELECT 'old rows: ' || (SELECT count(*) FROM opencozy.point_ledger) || ' ledger, '
@@ -190,6 +205,38 @@ else
   grep -q "the target is not empty" "$work/again.txt" || fail "the second import didn't refuse the non-empty target: $(tail -n 1 "$work/again.txt")"
 fi
 echo "Refused: $(tail -n 1 "$work/again.txt")"
+
+journey() { # the release binary on the imported database: smoke test, then imported.spec.ts
+  local port=${JOURNEY_PORT:-18090} origin pid status=0
+  origin="http://localhost:$port"
+  LISTEN_ADDR="127.0.0.1:$port" PUBLIC_ORIGIN="$origin" WEBAUTHN_RP_ID=localhost WEBAUTHN_ORIGINS="$origin" \
+    APPLE_TEAM_ID=EXAMPLE123 APPLE_BUNDLE_ID=test.example.opencozy \
+    "$work/app" serve > "$work/serve.log" 2>&1 &
+  pid=$!
+  for _ in $(seq 1 30); do curl -fsS -o /dev/null "$origin/readyz" 2> /dev/null && break; sleep 0.5; done
+  # The fixture's router and the journey's assistant (importer_test.go, journey.sql).
+  local mcp=oca_yaoh_muqPvFYqb3PNl1V6q7_I7O_Lz-zYc0zll0tM3s skip=0
+  if ! grep -q '^  /mcp:' "$root/api/openapi.yaml"; then
+    # Until slice 12 serves MCP, only its check may be skipped; it starts once /mcp is in the contract.
+    echo "No /mcp in api/openapi.yaml yet: the smoke test's MCP check is skipped"
+    mcp='' skip=1
+  fi
+  OPENCOZY_SMOKE_ROUTER_TOKEN=ocz__koCd_CivNhz2YxuA1Boq99DgqwxWJ9ULvrZgF5RUd0 OPENCOZY_SMOKE_MCP_TOKEN=$mcp SMOKE_ALLOW_SKIP=$skip \
+    timed "smoke test" "$root/scripts/smoke.sh" "$origin" || { status=$?; fail "the smoke test failed on the imported database"; }
+  IMPORTED_URL="$origin" timed "imported.spec.ts" pnpm --dir "$root/web" exec playwright test --config playwright.imported.config.ts \
+    || { status=$?; fail "imported.spec.ts failed on the imported database"; }
+  kill "$pid" 2> /dev/null || true
+  wait "$pid" 2> /dev/null || true
+  if [ "$status" != 0 ]; then echo "== Server log (last 40 lines)"; tail -n 40 "$work/serve.log"; fi
+}
+if [ "${JOURNEY:-}" = 1 ]; then
+  if [ -n "$pending" ]; then
+    fail "JOURNEY=1 needs a real import, which refuses while tables are pending (ALLOW_PENDING=1 until they're mapped)"
+  elif [ "${#failures[@]}" = 0 ]; then
+    echo "== The release binary on the imported database"
+    journey
+  fi
+fi
 
 echo "== Timings"
 printf '  %s\n' "${timings[@]}"
