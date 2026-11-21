@@ -72,6 +72,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How adults can sign in here, for the sign-in page */
+        get: operations["getSignInMethods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start signing in with the single sign-on provider */
+        post: operations["startOidcSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/callback/oidc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where the provider sends the browser back; redirects to the app
+         * @description Registered at the provider as `<PUBLIC_ORIGIN>/api/auth/callback/oidc`, the old app's path.
+         *     Every outcome is a 303: to `/` with a new session, or to `/login?error=<code>`.
+         */
+        get: operations["oidcCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your single sign-on link, if you have one */
+        get: operations["getOidcLink"];
+        put?: never;
+        post?: never;
+        /**
+         * Unlink your single sign-on account
+         * @description Signing in with the provider stops working for you until you use it again, when it links
+         *     afresh by your verified email. Your password and passkeys keep working.
+         */
+        delete: operations["unlinkOidc"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/passkey/options": {
         parameters: {
             query?: never;
@@ -1217,6 +1294,23 @@ export interface components {
             };
             household: components["schemas"]["Household"];
         };
+        OidcProvider: {
+            name: string;
+        };
+        SignInMethods: {
+            /** @description Passkeys are set up on this server (WEBAUTHN_RP_ID) */
+            passkeys: boolean;
+            /** @description The single sign-on provider's button name ("Sign in with <name>"), or null when it isn't set up */
+            oidc: components["schemas"]["OidcProvider"] | null;
+        };
+        OidcLink: {
+            /** @description The email the provider confirmed when the link was made */
+            email: string;
+            /** Format: date-time */
+            linkedAt: string;
+            /** Format: date-time */
+            lastUsedAt?: string;
+        };
         PasskeyOptions: {
             challengeId: components["schemas"]["Id"];
             /** @description PublicKeyCredentialCreationOptionsJSON or PublicKeyCredentialRequestOptionsJSON */
@@ -1881,6 +1975,8 @@ export interface components {
     headers: {
         /** @description Sets or clears the __Host-session cookie */
         SetSession: string;
+        /** @description Sets the __Secure-oidc cookie that binds the sign-in to this browser (10 minutes, sent only to the callback) */
+        SetSignIn: string;
     };
     pathItems: never;
 }
@@ -2006,6 +2102,148 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getSignInMethods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sign-in methods */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInMethods"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startOidcSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Send the browser to `url` */
+            200: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSignIn"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        url: string;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            /** @description The provider can't be reached (`oidc_unavailable`) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    oidcCallback: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                iss?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                "__Secure-oidc"?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the app */
+            303: {
+                headers: {
+                    Location?: string;
+                    "Set-Cookie": components["headers"]["SetSession"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getOidcLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link, or null when there is none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        link: components["schemas"]["OidcLink"] | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unlinkOidc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlinked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             default: components["responses"]["Error"];
         };
     };

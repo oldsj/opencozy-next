@@ -45,5 +45,5 @@ func runImport(ctx context.Context, cfg config.Config, log *slog.Logger, args []
 		return err
 	}
 	defer owner.Close()
-	return importer.Run(ctx, importer.Options{SourceURL: *source, Target: owner, DryRun: *dryRun, Out: stdout, Keys: cfg.SecretKeys, OldSecret: old})
+	return importer.Run(ctx, importer.Options{SourceURL: *source, Target: owner, DryRun: *dryRun, Out: stdout, Keys: cfg.SecretKeys, OldSecret: old, OIDCIssuer: cfg.OIDCIssuer})
 }

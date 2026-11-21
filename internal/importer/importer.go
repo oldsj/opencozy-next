@@ -50,6 +50,9 @@ type Options struct {
 	// OldSecret opens the old app's integration secrets (--old-auth-secret-file) so they can be
 	// sealed under Keys. Without it, those integrations import as "reconnect needed".
 	OldSecret *oldsecret.Secret
+	// OIDCIssuer is the single sign-on provider the old app used (OIDC_ISSUER). The old app's
+	// OIDC accounts are carried as links to it; empty leaves them behind.
+	OIDCIssuer string
 }
 
 // Errors.
@@ -84,7 +87,7 @@ func Run(ctx context.Context, o Options) error {
 	}
 
 	r := &Report{}
-	run := &run{src: src.tx, dst: tx, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret}
+	run := &run{src: src.tx, dst: tx, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret, oidcIssuer: o.OIDCIssuer}
 	for _, d := range domains {
 		if err := d(ctx, run); err != nil {
 			return err
@@ -121,6 +124,8 @@ type run struct {
 	adults map[string]adultRef
 	keys   *keyring.Keyring
 	old    *oldsecret.Secret
+	// oidcIssuer is Options.OIDCIssuer.
+	oidcIssuer string
 }
 
 // remarkOldSecret says in the report whether old integration secrets could be opened.

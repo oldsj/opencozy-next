@@ -99,6 +99,16 @@ spec:
             - name: WEBAUTHN_ORIGINS
               value: {{ required "config.webauthnOrigins is required with config.webauthnRPID" $.Values.config.webauthnOrigins | quote }}
             {{- end }}
+            {{- with .Values.config.oidc.issuer }}
+            - name: OIDC_ISSUER
+              value: {{ . | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ required "config.oidc.clientId is required with config.oidc.issuer" $.Values.config.oidc.clientId | quote }}
+            {{- with $.Values.config.oidc.name }}
+            - name: OIDC_NAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
             # Migrations run in the init container.
             - name: MIGRATE_ON_START
               value: "false"

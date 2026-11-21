@@ -55,6 +55,9 @@ func (s *Server) SweepSessions(ctx context.Context) {
 		if _, err := s.q.DeleteExpiredChallenges(ctx); err != nil && ctx.Err() == nil {
 			s.log.WarnContext(ctx, "passkey challenge sweep", "err", err)
 		}
+		if _, err := s.q.DeleteExpiredOIDCSignIns(ctx); err != nil && ctx.Err() == nil {
+			s.log.WarnContext(ctx, "single sign-on sweep", "err", err)
+		}
 		select {
 		case <-ctx.Done():
 			return

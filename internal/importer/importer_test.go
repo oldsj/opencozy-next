@@ -374,3 +374,64 @@ func TestSafeErrorsHideRows(t *testing.T) {
 		t.Errorf("other: %v", err)
 	}
 }
+
+// TestOIDCLinksCarried: the old app's OIDC accounts become single sign-on links to OIDC_ISSUER,
+// for the adult who had them, keeping the subject. Without OIDC_ISSUER they are left behind
+// with a note, and the rest of the import is unaffected.
+func TestOIDCLinksCarried(t *testing.T) {
+	const issuer = "https://id.example.test"
+	// A second OIDC account for the same adult (only the first is carried), and one for a user
+	// with no household (not an adult here).
+	more := `INSERT INTO opencozy.auth_account (id, user_id, account_id, provider_id, created_at, updated_at) VALUES
+	  ('fixtureAccount0003', 'fixtureSecondUser2', 'fixture-oidc-subject-2', 'oidc', '2026-02-01T08:00:00Z', '2026-02-01T08:00:00Z'),
+	  ('fixtureAccount0004', 'fixtureNoHousehold', 'fixture-oidc-subject-3', 'oidc', '2026-02-01T08:00:00Z', '2026-02-01T08:00:00Z');`
+	source := oldDB(t, complete, more)
+
+	target := testdb.Open(t)
+	var out bytes.Buffer
+	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer}); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if got := statuses(out.String())["auth_account"]; got != "ok" {
+		t.Errorf("auth_account %q\n%s", got, out.String())
+	}
+	if !strings.Contains(out.String(), "1 second OIDC accounts of an adult") {
+		t.Errorf("no note on the second account:\n%s", out.String())
+	}
+	rows, err := target.Owner.Query(context.Background(), `
+		SELECT l.issuer, l.subject, l.email, l.created_at = '2026-01-03T08:00:00Z', a.email
+		FROM oidc_link l JOIN adult a ON a.id = l.adult_id AND a.household_id = l.household_id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type link struct {
+		issuer, subject, email string
+		created                bool
+		adult                  string
+	}
+	var links []link
+	for rows.Next() {
+		var l link
+		if err := rows.Scan(&l.issuer, &l.subject, &l.email, &l.created, &l.adult); err != nil {
+			t.Fatal(err)
+		}
+		links = append(links, l)
+	}
+	if want := (link{issuer, "fixture-oidc-subject", "sam@example.test", true, "sam@example.test"}); len(links) != 1 || links[0] != want {
+		t.Errorf("links %+v, want %+v", links, want)
+	}
+
+	// Without OIDC_ISSUER: not carried, said so, and the import still reconciles.
+	target = testdb.Open(t)
+	out.Reset()
+	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t)}); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "2 OIDC links left behind because OIDC_ISSUER isn't set") {
+		t.Errorf("no note:\n%s", out.String())
+	}
+	var n int
+	if err := target.Owner.QueryRow(context.Background(), `SELECT count(*) FROM oidc_link`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("links %d (%v)", n, err)
+	}
+}

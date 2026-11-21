@@ -1,0 +1,206 @@
+# Single sign-on with an OpenID Connect provider (design §6, slice 10b). Whoever runs OpenCozy
+# names the provider (OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_NAME); without it,
+# these operations answer 404 `oidc_off`.
+#
+# The flow: the sign-in page posts to /auth/oidc/start, which answers the provider's
+# authorization URL (code flow, PKCE S256, state and nonce) and sets a short cookie binding the
+# sign-in to this browser. The provider sends the browser to /auth/callback/oidc, which checks
+# the state, the cookie and the signed ID token, and redirects to `/` signed in, or to
+# `/login?error=<code>` (`oidc_failed`, `oidc_no_adult`, `oidc_unverified`, `oidc_linked_other`,
+# `oidc_off`, `kid_device`).
+#
+# Single sign-on never creates anyone. A provider account links to an existing adult on its
+# first use, only when the provider says the adult's own email is verified; later sign-ins match
+# the provider's subject.
+methods:
+  get:
+    operationId: getSignInMethods
+    summary: How adults can sign in here, for the sign-in page
+    tags: [auth]
+    x-actors: [public]
+    responses:
+      '200':
+        description: The sign-in methods
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/SignInMethods'
+      default:
+        $ref: common.yaml#/responses/Error
+start:
+  post:
+    operationId: startOidcSignIn
+    summary: Start signing in with the single sign-on provider
+    tags: [auth]
+    x-actors: [public]
+    x-body-limit: 1
+    responses:
+      '200':
+        description: Send the browser to `url`
+        headers:
+          Set-Cookie:
+            $ref: '#/headers/SetSignIn'
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        description: A child's device (`kid_device`, the request carries a device cookie); sign in elsewhere
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      '429':
+        $ref: common.yaml#/responses/TooManyRequests
+      '503':
+        description: The provider can't be reached (`oidc_unavailable`)
+        content:
+          application/json:
+            schema:
+              $ref: common.yaml#/schemas/Error
+      default:
+        $ref: common.yaml#/responses/Error
+callback:
+  get:
+    operationId: oidcCallback
+    summary: Where the provider sends the browser back; redirects to the app
+    description: |
+      Registered at the provider as `<PUBLIC_ORIGIN>/api/auth/callback/oidc`, the old app's path.
+      Every outcome is a 303: to `/` with a new session, or to `/login?error=<code>`.
+    tags: [auth]
+    x-actors: [public]
+    parameters:
+      - name: code
+        in: query
+        schema:
+          type: string
+          maxLength: 2048
+      - name: state
+        in: query
+        schema:
+          type: string
+          maxLength: 256
+      - name: iss
+        in: query
+        schema:
+          type: string
+          maxLength: 2048
+      - name: error
+        in: query
+        schema:
+          type: string
+          maxLength: 256
+      - name: __Secure-oidc
+        in: cookie
+        schema:
+          type: string
+          maxLength: 256
+    responses:
+      '303':
+        description: Back to the app
+        headers:
+          Location:
+            schema:
+              type: string
+          Set-Cookie:
+            $ref: common.yaml#/headers/SetSession
+      default:
+        $ref: common.yaml#/responses/Error
+link:
+  get:
+    operationId: getOidcLink
+    summary: Your single sign-on link, if you have one
+    tags: [auth]
+    x-actors: [adult]
+    responses:
+      '200':
+        description: The link, or null when there is none
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [link]
+              properties:
+                link:
+                  oneOf:
+                    - $ref: '#/schemas/OidcLink'
+                    - type: 'null'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+  delete:
+    operationId: unlinkOidc
+    summary: Unlink your single sign-on account
+    description: |
+      Signing in with the provider stops working for you until you use it again, when it links
+      afresh by your verified email. Your password and passkeys keep working.
+    tags: [auth]
+    x-actors: [adult]
+    x-recent-auth: true
+    responses:
+      '204':
+        description: Unlinked
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+
+headers:
+  SetSignIn:
+    description: Sets the __Secure-oidc cookie that binds the sign-in to this browser (10 minutes, sent only to the callback)
+    schema:
+      type: string
+
+schemas:
+  SignInMethods:
+    type: object
+    additionalProperties: false
+    required: [passkeys, oidc]
+    properties:
+      passkeys:
+        type: boolean
+        description: Passkeys are set up on this server (WEBAUTHN_RP_ID)
+      oidc:
+        description: The single sign-on provider's button name ("Sign in with <name>"), or null when it isn't set up
+        oneOf:
+          - $ref: '#/schemas/OidcProvider'
+          - type: 'null'
+  OidcProvider:
+    type: object
+    additionalProperties: false
+    required: [name]
+    properties:
+      name:
+        type: string
+  OidcLink:
+    type: object
+    additionalProperties: false
+    required: [email, linkedAt]
+    properties:
+      email:
+        type: string
+        description: The email the provider confirmed when the link was made
+      linkedAt:
+        type: string
+        format: date-time
+      lastUsedAt:
+        type: string
+        format: date-time

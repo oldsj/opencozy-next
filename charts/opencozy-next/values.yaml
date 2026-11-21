@@ -36,6 +36,16 @@ config:
   # comma-separated origins they are used from. Empty turns passkeys off.
   webauthnRPID: ""
   webauthnOrigins: ""
+  # Single sign-on for adults with an OpenID Connect provider: its issuer URL (https, exactly as
+  # its discovery document says it) and OpenCozy's client ID there, plus the client secret as
+  # OIDC_CLIENT_SECRET in secrets.env. name is the button text after "Sign in with" (default
+  # "single sign-on"). Needs publicOrigin: register <publicOrigin>/api/auth/callback/oidc as the
+  # redirect URI. A provider on a private address also needs egress.oidc.cidrs. Empty issuer:
+  # off.
+  oidc:
+    issuer: ""
+    clientId: ""
+    name: ""
 
 database:
   # cnpg.enabled: the chart makes a CloudNativePG Cluster named <fullname>-db, and the app
