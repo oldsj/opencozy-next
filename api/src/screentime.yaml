@@ -1,0 +1,533 @@
+# iPad screen time (slice 8). Minutes a child gets are banked: a screen-time reward bought with
+# points (no approval), a parent's grant, or a parent's yes to "Ask for more time". Nothing runs
+# until the time is spent; spending queues an unlock window after any window already queued, and
+# the child's devices read the windows. A child's own spending is limited by their allowed hours
+# (refused outside them, cut off at their end); an adult's is not. Times are server time; the
+# household's zone decides allowed hours. TV time is the TV gate's (slice 9).
+
+screenTime:
+  get:
+    operationId: getScreenTime
+    summary: A child's iPad time now
+    description: >
+      The banked time, the windows running or queued, where the child stands against their
+      allowed hours, and their latest "Ask for more time" (while it waits, and for an hour after
+      the answer). A device stays unlocked at most `allowanceSeconds` (≤ 300) past `serverTime`
+      without asking again, so it locks when it loses the server.
+    tags: [screentime]
+    x-actors: [adult, phone, device, device-web]
+    x-child-param: childId
+    parameters:
+      - $ref: '#/parameters/ChildId'
+    responses:
+      '200':
+        description: The child's iPad time
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/ScreenTime'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+spend:
+  post:
+    operationId: spendScreenTime
+    summary: Start some of the child's banked time
+    description: >
+      Spends up to `minutes` (what is left, when less), starting when the child's queue ends. On
+      the child's own device it must be within their allowed hours and stops at their end
+      (`clipped`), the rest staying banked. 409 `nothing_banked`, `outside_hours` or
+      `hours_full`, with a message to show the child.
+    tags: [screentime]
+    x-actors: [adult, phone, device, device-web]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 256
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ChildId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [minutes]
+            properties:
+              minutes:
+                $ref: '#/schemas/Minutes'
+          example: { minutes: 30 }
+    responses:
+      '200':
+        description: Started (or queued)
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/SpendResult'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+grant:
+  post:
+    operationId: grantScreenTime
+    summary: Give a child screen time
+    description: >
+      Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at
+      once, after anything already queued and regardless of allowed hours. TV time (`target: tv`)
+      is added to the child's TV time, spent when they watch a TV; `startNow` is 422 with it.
+    tags: [screentime]
+    x-actors: [adult, phone]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 256
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ChildId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [minutes]
+            properties:
+              minutes:
+                $ref: '#/schemas/Minutes'
+              target:
+                $ref: '#/schemas/Target'
+              startNow:
+                type: boolean
+                default: false
+          example: { minutes: 30, target: ipad, startNow: true }
+    responses:
+      '200':
+        description: Given
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/SpendResult'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+end:
+  post:
+    operationId: endScreenTime
+    summary: End a child's iPad time early, or cancel what is queued
+    description: >
+      `now` locks the iPad now and cancels everything queued; `queued` lets the running window
+      finish and cancels only what is queued after it. The unused time is forfeited, unless
+      `refund` puts it back in the child's bank. 409 `nothing_to_end`.
+    tags: [screentime]
+    x-actors: [adult, phone]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 256
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ChildId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              scope:
+                type: string
+                enum: [now, queued]
+                default: now
+              refund:
+                type: boolean
+                default: false
+          example: { scope: now, refund: false }
+    responses:
+      '200':
+        description: Ended
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/EndResult'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+allowedHours:
+  put:
+    operationId: setAllowedHours
+    summary: Set when a child may start their own screen time
+    description: >
+      School nights are Sunday to Thursday, weekends Friday and Saturday, in the household's time
+      zone. Each window ends after it starts, on the same day. `allowedHours: null` removes the
+      rule. Only a child's own spending is limited; parents' grants are not.
+    tags: [screentime]
+    x-actors: [adult, phone]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 512
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ChildId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [allowedHours]
+            properties:
+              allowedHours:
+                oneOf:
+                  - $ref: '#/schemas/AllowedHours'
+                  - type: 'null'
+          example: { allowedHours: { schoolNight: { start: '15:30', end: '19:30' }, weekend: { start: '08:00', end: '20:00' } } }
+    responses:
+      '200':
+        description: Set
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/ScreenTime'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+timeRequests:
+  post:
+    operationId: askForTime
+    summary: Ask the parents for more time
+    description: >
+      From the child's own device, at any hour. 201 with a new request (an inbox item); 200 with
+      the one already waiting, which reminds the parents when it was asked at least two minutes
+      ago. 409 `asked_too_soon` within five minutes of a "no". The app's queued ask sends its
+      own ID as the Idempotency-Key, so it is made once however often it is sent.
+    tags: [screentime]
+    x-actors: [device, device-web]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 64
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ChildId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+          example: {}
+    responses:
+      '200':
+        description: Already waiting
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/TimeRequest'
+      '201':
+        description: Asked
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/TimeRequest'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+events:
+  post:
+    operationId: recordScreenTimeEvents
+    summary: Record what the child did on the locked shield
+    description: >
+      "One more minute", recorded by the app while it may have been offline and sent later, for
+      this device's child. Each event is recorded once, `secondsAgo` before the server gets it (at
+      most 7 days). `recorded` lists every accepted ID, including ones recorded before, so the
+      app can drop them.
+    tags: [screentime]
+    x-actors: [device]
+    x-command: true
+    x-body-limit: 8192
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [events]
+            properties:
+              events:
+                type: array
+                minItems: 1
+                maxItems: 50
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [id, kind, secondsAgo]
+                  properties:
+                    id:
+                      $ref: common.yaml#/schemas/Id
+                    kind:
+                      type: string
+                      enum: [one_more_minute]
+                    secondsAgo:
+                      type: integer
+                      minimum: 0
+                      maximum: 604800
+          example: { events: [{ id: 0195f2d4-0000-7000-8000-0000000000e1, kind: one_more_minute, secondsAgo: 90 }] }
+    responses:
+      '200':
+        description: Recorded
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [recorded]
+              properties:
+                recorded:
+                  type: array
+                  items:
+                    $ref: common.yaml#/schemas/Id
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      default:
+        $ref: common.yaml#/responses/Error
+
+parameters:
+  ChildId:
+    name: childId
+    in: path
+    required: true
+    schema:
+      $ref: common.yaml#/schemas/Id
+
+schemas:
+  Minutes:
+    type: integer
+    minimum: 1
+    maximum: 240
+  Target:
+    type: string
+    enum: [ipad, tv]
+    description: Which screen the minutes are for (ipad when absent)
+  Clock:
+    type: string
+    pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+    description: A time of day, HH:MM, 24-hour, household time
+  HoursWindow:
+    type: object
+    additionalProperties: false
+    required: [start, end]
+    properties:
+      start:
+        $ref: '#/schemas/Clock'
+      end:
+        $ref: '#/schemas/Clock'
+  AllowedHours:
+    type: object
+    additionalProperties: false
+    required: [schoolNight, weekend]
+    properties:
+      schoolNight:
+        $ref: '#/schemas/HoursWindow'
+      weekend:
+        $ref: '#/schemas/HoursWindow'
+  HoursNow:
+    type: object
+    required: [open]
+    description: Open now until `closesAt`, or closed until `opensAt`
+    properties:
+      open:
+        type: boolean
+      closesAt:
+        type: string
+        format: date-time
+      opensAt:
+        type: string
+        format: date-time
+  Window:
+    type: object
+    required: [id, startsAt, endsAt]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      startsAt:
+        type: string
+        format: date-time
+      endsAt:
+        type: string
+        format: date-time
+        description: Its effective end, if a parent ended it early
+  TimeRequest:
+    type: object
+    required: [id, state, askedAt]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      state:
+        type: string
+        enum: [pending, approved, declined]
+      choice:
+        $ref: '#/schemas/TimeChoice'
+      askedAt:
+        type: string
+        format: date-time
+      decidedAt:
+        type: string
+        format: date-time
+      grantedUntil:
+        type: string
+        format: date-time
+        description: When a yes ends
+  TimeChoice:
+    type: string
+    enum: ['30min', '1h', all_day, 'no']
+  ScreenTime:
+    type: object
+    required: [serverTime, childId, bankedSeconds, allowanceSeconds, windows]
+    properties:
+      serverTime:
+        type: string
+        format: date-time
+      childId:
+        $ref: common.yaml#/schemas/Id
+      bankedSeconds:
+        type: integer
+        description: Banked, not yet spent
+      unlockedUntil:
+        type: string
+        format: date-time
+        description: The end of the run of windows covering now; absent while locked
+      allowanceSeconds:
+        type: integer
+        minimum: 0
+        maximum: 300
+        description: How long a device may stay unlocked from serverTime without asking again
+      windows:
+        type: array
+        description: Running and queued windows, in order
+        items:
+          $ref: '#/schemas/Window'
+      allowedHours:
+        $ref: '#/schemas/AllowedHours'
+      hoursNow:
+        $ref: '#/schemas/HoursNow'
+      timeRequest:
+        $ref: '#/schemas/TimeRequest'
+  Spend:
+    type: object
+    required: [seconds, startsAt, endsAt, clipped]
+    properties:
+      seconds:
+        type: integer
+      startsAt:
+        type: string
+        format: date-time
+      endsAt:
+        type: string
+        format: date-time
+      clipped:
+        type: boolean
+        description: Allowed hours cut it short; the rest stays banked
+  SpendResult:
+    type: object
+    required: [screenTime]
+    properties:
+      spend:
+        $ref: '#/schemas/Spend'
+      screenTime:
+        $ref: '#/schemas/ScreenTime'
+  EndResult:
+    type: object
+    required: [scope, windows, cutSeconds, refundedSeconds, forfeitedSeconds, screenTime]
+    properties:
+      scope:
+        type: string
+        enum: [now, queued]
+      windows:
+        type: integer
+        description: Windows ended or cancelled
+      cutSeconds:
+        type: integer
+      refundedSeconds:
+        type: integer
+      forfeitedSeconds:
+        type: integer
+      endedAt:
+        type: string
+        format: date-time
+      keptUntil:
+        type: string
+        format: date-time
+        description: With `queued`, when the running window still ends
+      screenTime:
+        $ref: '#/schemas/ScreenTime'

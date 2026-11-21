@@ -19,11 +19,13 @@ package tv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
@@ -474,7 +476,9 @@ func (d Domain) CancelCredit(ctx context.Context, q *dbq.Queries, householdID, r
 		return 0, err
 	}
 	c, err := q.GetTvCreditByRedemption(ctx, dbq.GetTvCreditByRedemptionParams{HouseholdID: householdID, RedemptionID: &redemptionID})
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return cost, nil // bought before TV time was kept here: nothing was watched through OpenCozy
+	} else if err != nil {
 		return 0, err
 	}
 	if sess := s.childSession(c.ChildID); sess != nil {
