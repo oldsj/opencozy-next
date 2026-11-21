@@ -277,3 +277,25 @@ func TestTimeRequestPushes(t *testing.T) {
 		t.Errorf("not cleared: %v", pushRows(e))
 	}
 }
+
+func TestPhoneSignInFromWeb(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	body := map[string]any{"deviceName": "Sam's iPhone"}
+	// A stale web sign-in isn't enough for a 90-day phone credential.
+	if r := e.send(h.actors["adult-stale"], "POST", "/api/phone/sessions/web", body); r.status != 403 {
+		t.Errorf("stale: %d %s", r.status, r.raw)
+	}
+	r := e.send(h.actors["adult"], "POST", "/api/phone/sessions/web", body)
+	if r.status != 201 {
+		t.Fatalf("from web: %d %s", r.status, r.raw)
+	}
+	phone := cred{bearer: r.body["token"].(string)}
+	if r := e.send(phone, "GET", "/api/phone/session", nil); r.status != 200 || r.body["session"].(map[string]any)["name"] != "Sam's iPhone" {
+		t.Errorf("session: %d %s", r.status, r.raw)
+	}
+	// A phone can't mint another phone.
+	if r := e.send(phone, "POST", "/api/phone/sessions/web", body); r.status != 403 {
+		t.Errorf("phone: %d %s", r.status, r.raw)
+	}
+}

@@ -1521,6 +1521,50 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
+  /phone/sessions/web:
+    post:
+      operationId: phoneSignInFromWeb
+      summary: Sign a parent phone in from the web sign-in in its app
+      description: |
+        The iOS app sends its web view's session cookie natively, after the parent signs in there,
+        so they sign in once. Needs a recent sign-in. The token is in this response only.
+      tags:
+        - phones
+      x-actors:
+        - adult
+      x-recent-auth: true
+      x-body-limit: 1024
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - deviceName
+              properties:
+                deviceName:
+                  $ref: '#/components/schemas/PhoneName'
+            example:
+              deviceName: Alex's iPhone
+      responses:
+        '201':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneSignedIn'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
   /phone/session:
     get:
       operationId: getPhoneSession
