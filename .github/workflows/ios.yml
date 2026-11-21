@@ -6,12 +6,13 @@ name: iOS
 #
 # Public repository: GitHub-hosted runners only, never self-hosted.
 
+# Every push to main runs it, so a change elsewhere that breaks the app shows at once. A pull
+# request runs it when it touches the app, or the API contract the app's Swift client follows.
 on:
   push:
     branches: [main]
-    paths: [ios/**, .github/workflows/ios.yml]
   pull_request:
-    paths: [ios/**, .github/workflows/ios.yml]
+    paths: [ios/**, api/**, .github/workflows/ios.yml]
   workflow_dispatch:
 
 permissions:
