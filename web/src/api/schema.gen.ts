@@ -2194,6 +2194,8 @@ export interface components {
             usedMinutes?: number;
             /** @description Points given back (a rejection or a cancellation) */
             refundedPoints: number;
+            /** @description Whether cancelRedemption can take it back: approved, or given screen time with its own record of the time. Imported screen time has none (its time is in the child's balance), so it isn't. Time already all used is refused too (usedMinutes). */
+            cancellable: boolean;
             version: components["schemas"]["Version"];
         };
         InboxItem: {
