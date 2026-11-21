@@ -22,7 +22,7 @@ import {
   Textarea,
 } from '@app/design';
 
-import { $api, errorMessage, idempotencyKey } from '../api/client';
+import { $api, errorMessage, useAttempts } from '../api/client';
 import { EditError } from './edit-error';
 import {
   clockLabel,
@@ -62,20 +62,27 @@ export function useTvs() {
 export function WhoIsWatching({ tv, kids }: { tv: TvState; kids: readonly TvChild[] }) {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries(tvsKey);
+  // A tap retried after a lost answer reuses its key, so the server answers it once.
+  const attempts = useAttempts();
   const answer = $api.useMutation('post', '/tv-prompts/{promptId}/answer', { onSettled: refresh });
   const open = $api.useMutation('post', '/tvs/open', { onSettled: refresh });
   const prompt = tv.prompt;
   if (!prompt) return null;
   const choose = (choice: WhoChoice) => {
     if (choice === 'open') {
-      open.mutate({ params: idempotencyKey(), body: { tvIds: [tv.id], duration: '1h' } });
+      const attempt = `open:${tv.id}`;
+      open.mutate({ params: attempts.params(attempt), body: { tvIds: [tv.id], duration: '1h' } }, { onSettled: attempts.settleIfAnswered(attempt) });
       return;
     }
     const child = choice.startsWith('child:') ? choice.slice('child:'.length) : undefined;
-    answer.mutate({
-      params: { ...idempotencyKey(), path: { promptId: prompt.id } },
-      body: { expectedVersion: prompt.version, answer: child ? 'child' : (choice as 'parents' | 'not_now'), ...(child ? { childId: child } : {}) },
-    });
+    const attempt = `answer:${prompt.id}:${choice}`;
+    answer.mutate(
+      {
+        params: { ...attempts.params(attempt), path: { promptId: prompt.id } },
+        body: { expectedVersion: prompt.version, answer: child ? 'child' : (choice as 'parents' | 'not_now'), ...(child ? { childId: child } : {}) },
+      },
+      { onSettled: attempts.settleIfAnswered(attempt) },
+    );
   };
   const error = answer.error ?? open.error;
   return (
@@ -145,6 +152,10 @@ export function TvsPage() {
   const { tvs, skew } = useTvs();
   const history = $api.useQuery('get', '/tvs/history', {}, { refetchInterval: 60_000 });
   const refresh = () => Promise.all([queryClient.invalidateQueries(tvsKey), queryClient.invalidateQueries({ queryKey: ['get', '/tvs/history'] })]);
+  // Each action keeps its key until the server answers: a tap retried after a lost answer (+1 hr
+  // above all) is the same command, not a second one.
+  const attempts = useAttempts();
+  const keyed = (attempt: string) => ({ params: attempts.params(attempt), settled: { onSettled: attempts.settleIfAnswered(attempt) } });
   const end = $api.useMutation('post', '/tvs/{tvId}/session/end', { onSettled: refresh });
   const extend = $api.useMutation('post', '/tvs/extend', { onSettled: refresh });
   const close = $api.useMutation('post', '/tvs/close', { onSettled: refresh });
@@ -183,14 +194,17 @@ export function TvsPage() {
     };
     const done = { onSuccess: () => { setEditing(null); } };
     if (editing.id === undefined || editing.version === undefined) {
-      create.mutate({ params: idempotencyKey(), body: fields }, done);
+      const k = keyed(`create:${JSON.stringify(fields)}`);
+      create.mutate({ params: k.params, body: fields }, { ...done, ...k.settled });
       return;
     }
     const id = editing.id;
+    const k = keyed(`update:${id}:${String(editing.version)}:${JSON.stringify(fields)}`);
     update.mutate(
-      { params: { ...idempotencyKey(), path: { tvId: id } }, body: { ...fields, expectedVersion: editing.version } },
+      { params: { ...k.params, path: { tvId: id } }, body: { ...fields, expectedVersion: editing.version } },
       {
         ...done,
+        ...k.settled,
         onError: () => {
           // A stale version: show the TV as it is now, to check and save again.
           void tvs.refetch().then((r) => {
@@ -221,7 +235,7 @@ export function TvsPage() {
         trailing: (
           <>
             {left !== null && <Countdown seconds={left} />}
-            <Button variant="danger" disabled={busy} aria-label={`Turn off ${tv.name}`} onClick={() => { end.mutate({ params: { ...idempotencyKey(), path: { tvId: tv.id } } }); }}>
+            <Button variant="danger" disabled={busy} aria-label={`Turn off ${tv.name}`} onClick={() => { const k = keyed(`end:${tv.id}`); end.mutate({ params: { ...k.params, path: { tvId: tv.id } } }, k.settled); }}>
               Turn off
             </Button>
           </>
@@ -234,10 +248,10 @@ export function TvsPage() {
         meta: `Open until ${clockLabel(tv.openClosesAt)}${byParent ? '' : ' (open hours)'} · nobody is asked or charged`,
         trailing: byParent ? (
           <>
-            <Button disabled={busy} aria-label={`Keep ${tv.name} open 1 hour longer`} onClick={() => { extend.mutate({ params: idempotencyKey(), body: { tvIds: [tv.id] } }); }}>
+            <Button disabled={busy} aria-label={`Keep ${tv.name} open 1 hour longer`} onClick={() => { const k = keyed(`extend:${tv.id}`); extend.mutate({ params: k.params, body: { tvIds: [tv.id] } }, k.settled); }}>
               +1 hr
             </Button>
-            <Button variant="danger" disabled={busy} aria-label={`Close ${tv.name} now`} onClick={() => { close.mutate({ params: idempotencyKey(), body: { tvIds: [tv.id] } }); }}>
+            <Button variant="danger" disabled={busy} aria-label={`Close ${tv.name} now`} onClick={() => { const k = keyed(`close:${tv.id}`); close.mutate({ params: k.params, body: { tvIds: [tv.id] } }, k.settled); }}>
               Close
             </Button>
           </>
@@ -324,10 +338,9 @@ export function TvsPage() {
               variant="primary"
               disabled={open.isPending || picked.length === 0}
               onClick={() => {
-                open.mutate(
-                  { params: idempotencyKey(), body: { ...(all ? { all: true } : { tvIds: picked }), duration } },
-                  { onSuccess: () => { setOpening(false); } },
-                );
+                const body = { ...(all ? { all: true } : { tvIds: picked }), duration };
+                const k = keyed(`open:${JSON.stringify(body)}`);
+                open.mutate({ params: k.params, body }, { onSuccess: () => { setOpening(false); }, ...k.settled });
               }}
             >
               {picked.length === 0 ? 'Choose a TV' : `Open ${all ? 'all TVs' : picked.length === 1 ? (list.find((t) => t.id === picked[0])?.name ?? '1 TV') : `${String(picked.length)} TVs`}`}
@@ -429,7 +442,8 @@ export function TvsPage() {
         onCancel={() => { setRemoving(null); remove.reset(); }}
         onConfirm={() => {
           if (!removing) return;
-          remove.mutate({ params: { ...idempotencyKey(), path: { tvId: removing.id } } }, { onSuccess: () => { setRemoving(null); setEditing(null); } });
+          const k = keyed(`remove:${removing.id}`);
+          remove.mutate({ params: { ...k.params, path: { tvId: removing.id } } }, { onSuccess: () => { setRemoving(null); setEditing(null); }, ...k.settled });
         }}
       />
     </section>

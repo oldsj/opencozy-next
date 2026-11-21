@@ -18,7 +18,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   page.on('console', (m) => {
     // Chrome logs every 4xx (the household form gets a 422 and a stale cancel a 409 on purpose),
     // and the reset of the save whose answer the test drops.
-    if (m.type() === 'error' && !/status of 4\d\d|ERR_CONNECTION_RESET/.test(m.text())) problems.push(m.text());
+    if (m.type() === 'error' && !/status of 4\d\d|ERR_CONNECTION_RESET|net::ERR_FAILED/.test(m.text())) problems.push(m.text());
   });
   page.on('pageerror', (e) => problems.push(e.message));
   const run = String(Date.now()).slice(-6);
@@ -137,6 +137,21 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.getByRole('button', { name: '1 hour' }).click();
   await page.getByRole('button', { name: /^Open (all TVs|Den TV)/ }).click();
   await expect(tvRow.getByText(/^Open until/)).toBeVisible();
+  // "+1 hr" whose answer is lost after the server kept the TV open longer: tapping again is the
+  // same command, so the TV is open one hour longer, not two.
+  const openUntil = async () => {
+    const r = (await (await page.request.get('/api/tvs')).json()) as { tvs: { name: string; openUntil: string | null }[] };
+    return Date.parse(r.tvs.find((t) => t.name === tv)?.openUntil ?? '');
+  };
+  const opened = await openUntil();
+  await page.route('**/api/tvs/extend', async (route) => {
+    await route.fetch();
+    await route.abort('failed');
+  }, { times: 1 });
+  await tvRow.getByRole('button', { name: `Keep ${tv} open 1 hour longer` }).click();
+  await expect(page.getByText('Couldn’t reach the server. Check the connection and try again.')).toBeVisible();
+  await tvRow.getByRole('button', { name: `Keep ${tv} open 1 hour longer` }).click();
+  await expect.poll(openUntil).toBe(opened + 3_600_000);
   await tvRow.getByRole('button', { name: `Close ${tv} now` }).click();
   await expect(tvRow.getByText('Offline until someone is watching')).toBeVisible();
   await tvRow.getByRole('button', { name: `Edit ${tv}` }).click();
