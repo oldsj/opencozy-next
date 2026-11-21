@@ -148,6 +148,10 @@ func TestTVRegistry(t *testing.T) {
 	if r.status != 200 || len(r.body["tvs"].([]any)) != 2 || r.body["tvs"].([]any)[0].(map[string]any)["macs"] != nil {
 		t.Fatalf("display: %d %s", r.status, r.raw)
 	}
+	// A display learns its scopes, so its board offers a TV tab only with tv.
+	if r := e.send(e.h.actors["display-today"], "GET", "/api/display/session", nil); r.status != 200 || len(r.body["scopes"].([]any)) != 1 || r.body["scopes"].([]any)[0] != "today" {
+		t.Fatalf("display session: %d %s", r.status, r.raw)
+	}
 }
 
 func TestTVChildSessionSpendsTimeAndEnds(t *testing.T) {

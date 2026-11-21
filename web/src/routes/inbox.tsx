@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button, EmptyState, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type InboxItem } from '../api/client';
+import { TvsAsking } from './tvs';
 
 export const REJECT_REASON_MAX = 200;
 
@@ -44,6 +45,7 @@ export function InboxPage() {
     <section className="flex flex-col gap-6">
       <PageHeader title="Inbox" description="Approve what the children finished. Oldest first." />
       {error && <Notice tone="error">{errorMessage(error)}</Notice>}
+      <TvsAsking />
       {items.length > 0 ? (
         <Section title="Waiting for you" count={items.length}>
           <List aria-label="Waiting for you">

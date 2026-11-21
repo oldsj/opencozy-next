@@ -11,7 +11,8 @@ async function post<T>(request: APIRequestContext, path: string, data: unknown):
 }
 
 // Editing in Manage: a chore given to another child, a reward hidden, a chosen reward given or
-// cancelled with its points back, and the household's time zone checked.
+// cancelled with its points back, the household's time zone checked, and a TV added, opened and
+// closed.
 test('manage: edit and reassign, hide, give and cancel, household', async ({ page }) => {
   const problems: string[] = [];
   page.on('console', (m) => {
@@ -122,6 +123,26 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
   await expect(page.getByLabel('Name')).toHaveValue('The Example Family');
+
+  // A TV: added, opened for everyone for an hour, closed again, removed.
+  const tv = `Den TV ${run}`;
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'TVs' }).click();
+  await page.getByRole('button', { name: 'Add a TV' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(tv);
+  await page.getByLabel('Network addresses (MACs)').fill(`02:00:5e:${run.slice(0, 2)}:${run.slice(2, 4)}:${run.slice(4, 6)}`);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const tvRow = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: tv }) });
+  await expect(tvRow.getByText('Offline until someone is watching')).toBeVisible();
+  await page.getByRole('button', { name: 'Open TVs…' }).click();
+  await page.getByRole('button', { name: '1 hour' }).click();
+  await page.getByRole('button', { name: /^Open (all TVs|Den TV)/ }).click();
+  await expect(tvRow.getByText(/^Open until/)).toBeVisible();
+  await tvRow.getByRole('button', { name: `Close ${tv} now` }).click();
+  await expect(tvRow.getByText('Offline until someone is watching')).toBeVisible();
+  await tvRow.getByRole('button', { name: `Edit ${tv}` }).click();
+  await page.getByRole('button', { name: 'Remove…' }).click();
+  await page.getByRole('button', { name: `Remove ${tv}` }).click();
+  await expect(page.getByRole('heading', { name: tv })).toHaveCount(0);
 
   expect(problems).toEqual([]);
 });

@@ -205,3 +205,13 @@ func (s *Server) RevokeDisplay(ctx context.Context, req api.RevokeDisplayRequest
 	}
 	return api.RevokeDisplay204Response{}, nil
 }
+
+// GetDisplaySession is the calling display's scopes.
+func (s *Server) GetDisplaySession(ctx context.Context, _ api.GetDisplaySessionRequestObject) (api.GetDisplaySessionResponseObject, error) {
+	a := mustActor(ctx)
+	out := api.GetDisplaySession200JSONResponse{Scopes: make([]api.DisplayScope, 0, len(a.Scopes))}
+	for _, sc := range a.Scopes {
+		out.Scopes = append(out.Scopes, api.DisplayScope(sc))
+	}
+	return out, nil
+}

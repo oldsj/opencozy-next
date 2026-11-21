@@ -57,6 +57,12 @@ export const toWeekdays = (picked: readonly number[]): Weekday[] | undefined =>
   picked.length === 0 || picked.length === 7 ? undefined : picked.map((d) => days[d] ?? 'sun');
 export const fromWeekdays = (w: readonly Weekday[] | undefined): number[] => (w ? w.map((d) => days.indexOf(d)).sort((a, b) => a - b) : []);
 
+/** Open hours from a form: days omitted when every day. */
+export function openHours(start: string, end: string, picked: readonly number[]): OpenHours {
+  const w = toWeekdays(picked);
+  return w ? { start, end, days: w } : { start, end };
+}
+
 /** "9:00 PM to 7:00 AM, Fri and Sat" for a TV's open hours. */
 export function openHoursLabel(h: OpenHours): string {
   const at = (clock: string) => {

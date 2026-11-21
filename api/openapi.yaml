@@ -947,6 +947,30 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
+  /display/session:
+    get:
+      operationId: getDisplaySession
+      summary: What this wall display may show
+      description: Its scopes, so the board offers only the tabs it can load.
+      tags:
+        - displays
+      x-actors:
+        - display
+      x-display-scopes:
+        - today
+      responses:
+        '200':
+          description: This display's scopes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisplaySession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
   /displays:
     get:
       operationId: listDisplays
@@ -4820,6 +4844,15 @@ components:
           type: string
           enum:
             - waiting
+    DisplaySession:
+      type: object
+      required:
+        - scopes
+      properties:
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisplayScope'
     NewDisplay:
       type: object
       additionalProperties: false

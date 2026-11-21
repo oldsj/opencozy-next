@@ -346,6 +346,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/display/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What this wall display may show
+         * @description Its scopes, so the board offers only the tabs it can load.
+         */
+        get: operations["getDisplaySession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/displays": {
         parameters: {
             query?: never;
@@ -1801,6 +1821,9 @@ export interface components {
         PairingWait: {
             /** @enum {string} */
             status: "waiting";
+        };
+        DisplaySession: {
+            scopes: components["schemas"]["DisplayScope"][];
         };
         NewDisplay: {
             code: string;
@@ -3605,6 +3628,29 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDisplaySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This display's scopes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplaySession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };
