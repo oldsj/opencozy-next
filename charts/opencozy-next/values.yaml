@@ -40,8 +40,9 @@ config:
   # its discovery document says it) and OpenCozy's client ID there, plus the client secret as
   # OIDC_CLIENT_SECRET in secrets.env. name is the button text after "Sign in with" (default
   # "single sign-on"). Needs publicOrigin: register <publicOrigin>/api/auth/callback/oidc as the
-  # redirect URI. A provider on a private address also needs egress.oidc.cidrs. Empty issuer:
-  # off.
+  # redirect URI. With networkPolicy.enabled, the provider must be reachable: egress.internet:
+  # true for a public one, or egress.oidc.cidrs for one on a private address (and egress.oidc.ports
+  # when its port isn't 443). Empty issuer: off.
   oidc:
     issuer: ""
     clientId: ""

@@ -44,6 +44,7 @@ type identity struct {
 	// The email claims only from userinfo, not the ID token; and userinfo answering another sub.
 	userinfoOnly bool
 	userinfoSub  string
+	authTime     time.Time // auth_time, when set
 }
 
 // fakeProvider is a minimal OpenID provider: discovery, keys, and a token endpoint that checks
@@ -58,6 +59,7 @@ type fakeProvider struct {
 	mu       sync.Mutex
 	codes    map[string]grant
 	tokens   map[string]identity // access token: who, for userinfo
+	down     bool                // discovery answers 503
 	requests int                 // every request the provider served
 }
 
@@ -89,8 +91,15 @@ func (p *fakeProvider) serve(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.requests++
 	p.mu.Unlock()
+	p.mu.Lock()
+	down := p.down
+	p.mu.Unlock()
 	switch r.URL.Path {
 	case "/.well-known/openid-configuration":
+		if down {
+			http.Error(w, "down", http.StatusServiceUnavailable)
+			return
+		}
 		p.json(w, 200, map[string]any{
 			"issuer": p.issuer, "authorization_endpoint": p.issuer + "/authorize", "token_endpoint": p.issuer + "/token",
 			"jwks_uri": p.issuer + "/jwks", "userinfo_endpoint": p.issuer + "/userinfo", "response_types_supported": []string{"code"}, "subject_types_supported": []string{"public"},
@@ -161,6 +170,9 @@ func (p *fakeProvider) token(w http.ResponseWriter, r *http.Request) {
 			"exp": time.Now().Add(5 * time.Minute).Unix(), "nonce": g.nonce, "email": who.email, "name": "Fixture person"}
 		if who.verified != nil {
 			claims["email_verified"] = who.verified
+		}
+		if !who.authTime.IsZero() {
+			claims["auth_time"] = who.authTime.Unix()
 		}
 		if who.userinfoOnly {
 			delete(claims, "email")
@@ -281,10 +293,17 @@ func (e *env) callback(query url.Values, cookies ...*http.Cookie) (location *url
 	if err != nil {
 		e.t.Fatal(err)
 	}
+	cleared := false
 	for _, c := range res.Cookies() {
 		if c.Name == actor.AdultCookie && c.Value != "" {
 			session = c
 		}
+		if c.Name == oidcCookie && c.MaxAge < 0 && c.Path == "/" {
+			cleared = true
+		}
+	}
+	if !cleared {
+		e.t.Errorf("callback didn't clear the binding cookie: %v", res.Header.Values("Set-Cookie"))
 	}
 	return location, session
 }
@@ -347,7 +366,7 @@ func TestOIDCSignIn(t *testing.T) {
 			t.Error("state, nonce and binding must differ")
 		}
 		b := s.binding
-		if b.Path != "/api/auth/callback/oidc" || !b.HttpOnly || !b.Secure || b.SameSite != http.SameSiteLaxMode || b.MaxAge != 600 {
+		if b.Name != "__Host-oidc" || b.Path != "/" || b.Domain != "" || !b.HttpOnly || !b.Secure || b.SameSite != http.SameSiteLaxMode || b.MaxAge != 600 {
 			t.Errorf("binding cookie %+v", b)
 		}
 	})
@@ -378,6 +397,24 @@ func TestOIDCSignIn(t *testing.T) {
 		r := e.send(cred{cookie: session}, http.MethodGet, "/api/auth/me", nil)
 		if r.body["adult"].(map[string]any)["id"] != h.adult.String() {
 			t.Fatalf("me: %s", r.raw)
+		}
+	})
+
+	t.Run("a silent sign-in from an old provider session isn't recent", func(t *testing.T) {
+		loc, session := e.signInOIDC(p, identity{sub: "sam-sub", email: email, verified: true, authTime: time.Now().Add(-2 * time.Hour)})
+		if loc.String() != "/" || session == nil {
+			t.Fatalf("got %s", loc)
+		}
+		if r := e.send(cred{cookie: session}, http.MethodPost, "/api/auth/passkeys/options", nil); r.status != 403 || r.code() != "reauthentication_required" {
+			t.Errorf("recent anyway: %d %s", r.status, r.raw)
+		}
+		// auth_time in the future counts as now, never later.
+		_, session = e.signInOIDC(p, identity{sub: "sam-sub", email: email, verified: true, authTime: time.Now().Add(time.Hour)})
+		if n := count(`SELECT count(*) FROM adult_session WHERE authenticated_at > now()`); n != 0 {
+			t.Errorf("%d sessions authenticated in the future", n)
+		}
+		if r := e.send(cred{cookie: session}, http.MethodPost, "/api/auth/passkeys/options", nil); r.status == 403 {
+			t.Errorf("not recent: %s", r.raw)
 		}
 	})
 
@@ -579,4 +616,52 @@ func TestOIDCGoesThroughEgress(t *testing.T) {
 	if p.requests != 0 {
 		t.Fatalf("the provider got %d requests", p.requests)
 	}
+}
+
+// A provider outage at refresh time: requests keep the last good discovery without waiting, and
+// the failed refresh is retried after oidcRetry rather than on every request.
+func TestOIDCDiscoveryOutage(t *testing.T) {
+	p := newFakeProvider(t)
+	var cfg config.Config
+	withOIDC(p)(&cfg)
+	client := p.srv.Client()
+	f, err := newOIDCFlow(cfg, func(ctx context.Context) context.Context { return egress.Context(ctx, client) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := f.provider(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.mu.Lock()
+	p.down = true
+	p.mu.Unlock()
+	f.mu.Lock()
+	f.next = time.Now().Add(-time.Second) // due
+	f.mu.Unlock()
+	for range 5 {
+		got, err := f.provider(t.Context())
+		if err != nil || got != first {
+			t.Fatalf("during the outage: %v, %v", got == first, err)
+		}
+	}
+	// The background refresh fails and puts the next try off.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		f.mu.Lock()
+		next := f.next
+		f.mu.Unlock()
+		if next.After(time.Now().Add(oidcRetry / 2)) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the failed refresh didn't schedule a retry")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	f.mu.Lock()
+	if f.cur != first {
+		t.Error("the last good answer was dropped")
+	}
+	f.mu.Unlock()
 }

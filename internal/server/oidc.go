@@ -16,6 +16,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/oldsj/opencozy-next/internal/api"
 	"github.com/oldsj/opencozy-next/internal/auth"
@@ -35,13 +36,16 @@ import (
 // same issuer is refused rather than given a second link.
 
 const (
-	// oidcCookie binds a sign-in to the browser that started it. __Secure- rather than __Host-
-	// so it can be scoped to the callback's path; it is sent nowhere else.
-	oidcCookie       = "__Secure-oidc"
+	// oidcCookie binds a sign-in to the browser that started it. __Host-, so no other host under
+	// the same parent domain (a self-hosted provider's, say) can plant one; that means Path=/.
+	// The callback clears it.
+	oidcCookie       = "__Host-oidc"
 	oidcSignInTTL    = 10 * time.Minute
 	oidcFetchTimeout = 15 * time.Second
-	// oidcRediscover is how long discovery's answer is kept. A failed refresh keeps the old one.
+	// oidcRediscover is how long discovery's answer is kept. A failed refresh keeps the old one
+	// and tries again after oidcRetry.
 	oidcRediscover = time.Hour
+	oidcRetry      = time.Minute
 )
 
 var errOIDCOff = apiError("oidc_off", "Single sign-on isn’t set up here.")
@@ -54,22 +58,28 @@ type oidcFlow struct {
 	// the egress client (egress.Context), except in tests.
 	with func(context.Context) context.Context
 
-	mu  sync.Mutex
-	cur *oidcProvider
+	// cur is the last good discovery, and next when to refresh it. One fetch runs at a time
+	// (refresh), outside mu.
+	mu      sync.Mutex
+	cur     *oidcProvider
+	next    time.Time
+	refresh singleflight.Group
 }
 
 type oidcProvider struct {
 	oauth    oauth2.Config
 	verifier *oidc.IDTokenVerifier
 	// p answers userinfo, for providers that keep the email out of the ID token.
-	p       *oidc.Provider
-	fetched time.Time
+	p *oidc.Provider
 }
 
 // oidcIdentity is what a verified ID token says about the person.
 type oidcIdentity struct {
 	subject, email string
 	emailVerified  bool
+	// authTime is the ID token's auth_time: when the person last proved who they are at the
+	// provider, which may be long before a silent sign-in. Nil when the token doesn't say.
+	authTime *time.Time
 }
 
 // newOIDCFlow builds the flow from the configuration. with is nil except in tests, which pass
@@ -103,21 +113,37 @@ func newOIDCFlow(cfg config.Config, with func(context.Context) context.Context) 
 	}, nil
 }
 
-// provider returns the provider's endpoints and ID-token verifier, from discovery.
+// provider returns the provider's endpoints and ID-token verifier, from discovery. Only the
+// first use waits for it. After that a due refresh runs in the background while requests keep
+// the last good answer, so a provider outage never stalls or queues sign-ins behind it.
 func (f *oidcFlow) provider(ctx context.Context) (*oidcProvider, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.cur != nil && time.Since(f.cur.fetched) < oidcRediscover {
-		return f.cur, nil
-	}
-	p, err := f.discover(ctx)
-	if err != nil {
-		if f.cur != nil {
-			return f.cur, nil // the last good answer beats none
+	cur, due := f.cur, !time.Now().Before(f.next)
+	f.mu.Unlock()
+	if cur != nil {
+		if due {
+			f.refresh.DoChan("discover", f.rediscover) // in the background; joins one in flight
 		}
+		return cur, nil
+	}
+	v, err, _ := f.refresh.Do("discover", f.rediscover)
+	if err != nil {
 		return nil, err
 	}
-	f.cur = p
+	return v.(*oidcProvider), nil //nolint:forcetypeassert // rediscover returns one on success
+}
+
+// rediscover fetches discovery and keeps the answer; on failure it keeps the last good one and
+// waits oidcRetry before the next try. Not tied to any request, which may end first.
+func (f *oidcFlow) rediscover() (any, error) {
+	p, err := f.discover(context.Background())
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err != nil {
+		f.next = time.Now().Add(oidcRetry)
+		return nil, err
+	}
+	f.cur, f.next = p, time.Now().Add(oidcRediscover)
 	return p, nil
 }
 
@@ -160,7 +186,6 @@ func (f *oidcFlow) discover(ctx context.Context) (*oidcProvider, error) {
 		},
 		verifier: p.VerifierContext(keys, &oidc.Config{ClientID: f.clientID}),
 		p:        p,
-		fetched:  time.Now(),
 	}, nil
 }
 
@@ -185,9 +210,10 @@ func (f *oidcFlow) identify(ctx context.Context, p *oidcProvider, code, verifier
 		return oidcIdentity{}, errors.New("ID token: wrong nonce")
 	}
 	var c struct {
-		Email         string `json:"email"`
-		EmailVerified any    `json:"email_verified"`
-		AZP           string `json:"azp"`
+		Email         string  `json:"email"`
+		EmailVerified any     `json:"email_verified"`
+		AZP           string  `json:"azp"`
+		AuthTime      float64 `json:"auth_time"`
 	}
 	if err := idt.Claims(&c); err != nil {
 		return oidcIdentity{}, fmt.Errorf("ID token claims: %w", err)
@@ -207,7 +233,12 @@ func (f *oidcFlow) identify(ctx context.Context, p *oidcProvider, code, verifier
 			return oidcIdentity{}, err
 		}
 	}
-	return oidcIdentity{subject: idt.Subject, email: normalizeEmail(email), emailVerified: verified}, nil
+	id := oidcIdentity{subject: idt.Subject, email: normalizeEmail(email), emailVerified: verified}
+	if c.AuthTime > 0 {
+		at := time.Unix(int64(c.AuthTime), 0)
+		id.authTime = &at
+	}
+	return id, nil
 }
 
 // userInfo asks the provider's userinfo endpoint for the email of subject. A provider with no
@@ -249,7 +280,7 @@ func randomToken() (string, error) {
 
 func oidcBindingCookie(value string, maxAge int) string {
 	c := &http.Cookie{
-		Name: oidcCookie, Value: value, Path: config.OIDCCallbackPath, MaxAge: maxAge,
+		Name: oidcCookie, Value: value, Path: "/", MaxAge: maxAge,
 		HttpOnly: true, Secure: true,
 		// Lax: the provider's redirect back is a top-level GET navigation from another site.
 		SameSite: http.SameSiteLaxMode,
@@ -305,67 +336,84 @@ func (s *Server) StartOidcSignIn(ctx context.Context, _ api.StartOidcSignInReque
 }
 
 // OidcCallback finishes a sign-in. Every outcome is a redirect: home with a new session, or the
-// sign-in page with an error code it can put into words.
+// sign-in page with an error code it can put into words. Either way the binding cookie is cleared.
 func (s *Server) OidcCallback(ctx context.Context, req api.OidcCallbackRequestObject) (api.OidcCallbackResponseObject, error) {
-	adult, refusal, err := s.oidcCallback(ctx, req.Params)
+	clear := oidcBindingCookie("", -1)
+	adult, authAt, refusal, err := s.oidcCallback(ctx, req.Params)
 	if err != nil {
 		return nil, err
 	}
 	if refusal != "" {
 		s.log.InfoContext(ctx, "oidc sign-in refused", "reason", refusal)
-		to := "/login?error=" + url.QueryEscape(refusal)
-		return api.OidcCallback303Response{Headers: api.OidcCallback303ResponseHeaders{Location: &to}}, nil
+		return oidcRedirect{to: "/login?error=" + url.QueryEscape(refusal), cookies: []string{clear}}, nil
 	}
-	cookie, err := s.startSession(ctx, adult.ID)
+	cookie, err := s.startSession(ctx, adult.ID, authAt)
 	if err != nil {
 		return nil, err
 	}
-	home := "/"
-	return api.OidcCallback303Response{Headers: api.OidcCallback303ResponseHeaders{Location: &home, SetCookie: &cookie}}, nil
+	return oidcRedirect{to: "/", cookies: []string{cookie, clear}}, nil
 }
 
-// oidcCallback returns the adult to sign in, or the error code to send the browser back with.
-func (s *Server) oidcCallback(ctx context.Context, p api.OidcCallbackParams) (dbq.Adult, string, error) {
+// oidcRedirect is the callback's 303. The generated response type holds one Set-Cookie; this
+// one sets the session and clears the binding together.
+type oidcRedirect struct {
+	to      string
+	cookies []string
+}
+
+func (r oidcRedirect) VisitOidcCallbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", r.to)
+	for _, c := range r.cookies {
+		w.Header().Add("Set-Cookie", c)
+	}
+	w.WriteHeader(http.StatusSeeOther)
+	return nil
+}
+
+// oidcCallback returns the adult to sign in (and when the provider last authenticated them),
+// or the error code to send the browser back with.
+func (s *Server) oidcCallback(ctx context.Context, p api.OidcCallbackParams) (dbq.Adult, *time.Time, string, error) {
 	const failed = "oidc_failed"
 	if s.oidc == nil {
-		return dbq.Adult{}, "oidc_off", nil
+		return dbq.Adult{}, nil, "oidc_off", nil
 	}
 	if onKidDevice(ctx) {
-		return dbq.Adult{}, "kid_device", nil
+		return dbq.Adult{}, nil, "kid_device", nil
 	}
 	if p.State == nil || *p.State == "" {
-		return dbq.Adult{}, failed, nil
+		return dbq.Adult{}, nil, failed, nil
 	}
 	// Taken before anything else is checked, so a state is tried at most once.
 	row, err := s.q.TakeOIDCSignIn(ctx, auth.HashToken(*p.State))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return dbq.Adult{}, failed, nil
+		return dbq.Adult{}, nil, failed, nil
 	}
 	if err != nil {
-		return dbq.Adult{}, "", err
+		return dbq.Adult{}, nil, "", err
 	}
 	// The browser that comes back must be the one that started: its cookie matches the row's.
-	binding := p.UnderscoreUnderscoreSecureOidc
+	binding := p.UnderscoreUnderscoreHostOidc
 	if binding == nil || subtle.ConstantTimeCompare(auth.HashToken(*binding), row.BindingHash) != 1 {
-		return dbq.Adult{}, failed, nil
+		return dbq.Adult{}, nil, failed, nil
 	}
 	if p.Error != nil || p.Code == nil || *p.Code == "" {
-		return dbq.Adult{}, failed, nil // declined at the provider, or a broken redirect
+		return dbq.Adult{}, nil, failed, nil // declined at the provider, or a broken redirect
 	}
 	if p.Iss != nil && *p.Iss != s.oidc.issuer { // RFC 9207: a response from another issuer
-		return dbq.Adult{}, failed, nil
+		return dbq.Adult{}, nil, failed, nil
 	}
 	prov, err := s.oidc.provider(ctx)
 	if err != nil {
 		s.log.WarnContext(ctx, "oidc discovery failed", "err", err)
-		return dbq.Adult{}, failed, nil
+		return dbq.Adult{}, nil, failed, nil
 	}
 	id, err := s.oidc.identify(ctx, prov, *p.Code, row.CodeVerifier, row.Nonce)
 	if err != nil {
 		s.log.WarnContext(ctx, "oidc sign-in: provider answer refused", "err", err)
-		return dbq.Adult{}, failed, nil
+		return dbq.Adult{}, nil, failed, nil
 	}
-	return s.oidcAdult(ctx, id)
+	a, refusal, err := s.oidcAdult(ctx, id)
+	return a, id.authTime, refusal, err
 }
 
 // oidcAdult finds the adult a verified identity signs in, linking it on first use.

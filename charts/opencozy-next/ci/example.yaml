@@ -9,6 +9,9 @@ config:
     issuer: https://id.example.test
     clientId: opencozy
     name: Example ID
+# A public single sign-on provider (config.oidc) is reached over the internet.
+egress:
+  internet: true
 database:
   cnpg:
     storage:

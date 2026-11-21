@@ -1975,7 +1975,7 @@ export interface components {
     headers: {
         /** @description Sets or clears the __Host-session cookie */
         SetSession: string;
-        /** @description Sets the __Secure-oidc cookie that binds the sign-in to this browser (10 minutes, sent only to the callback) */
+        /** @description Sets the __Host-oidc cookie that binds the sign-in to this browser (10 minutes; the callback clears it) */
         SetSignIn: string;
     };
     pathItems: never;
@@ -2182,7 +2182,7 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: {
-                "__Secure-oidc"?: string;
+                "__Host-oidc"?: string;
             };
         };
         requestBody?: never;
