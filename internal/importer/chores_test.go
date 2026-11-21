@@ -71,3 +71,34 @@ func TestChoresRoutinesAndApprovalsCommit(t *testing.T) {
 		t.Errorf("approvals: %q %v", approvals, err)
 	}
 }
+
+// The old app allowed titles up to 160 characters, up to 1,000,000 points and 32 routine
+// steps; the import carries such rows as they are, without shortening anything.
+func TestChoresOverTheNewInputLimitsAreCarriedAsTheyAre(t *testing.T) {
+	long := strings.Repeat("Tidy the shelf, ", 9) + "then dust" // 153 characters
+	steps := `[{"id": "0190a000-0000-7000-8000-000000000105", "title": "Brush teeth"}, {"id": "0190a000-0000-7000-8000-000000000106", "title": "Get dressed"}`
+	for i := range 30 {
+		steps += `, {"id": "` + uuid.NewSHA1(uuid.NameSpaceOID, []byte{byte(i)}).String() + `", "title": "` + long + `"}`
+	}
+	steps += "]"
+	source := oldDB(t, complete, `SET search_path TO opencozy; SET session_replication_role = replica; -- the old history triggers refuse edits
+		UPDATE chore_definition SET title = '`+long+`', points = 1000000 WHERE id = '0190a000-0000-7000-8000-000000000101';
+		UPDATE routine_definition SET title = '`+long+`', points = 5000, steps = '`+steps+`' WHERE id = '0190a000-0000-7000-8000-000000000102';
+		UPDATE completion_approval SET title_snapshot = '`+long+`', points_snapshot = 999999 WHERE id = '0190a000-0000-7000-8000-000000000181';`)
+	target := testdb.Open(t)
+	if out, err := importOnce(t, source, target, false); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	ctx := context.Background()
+	var got string
+	if err := target.Owner.QueryRow(ctx, `SELECT (SELECT title || ':' || points FROM chore WHERE id = $1)
+		|| ' ' || (SELECT title || ':' || points FROM routine WHERE id = $2)
+		|| ' ' || (SELECT count(*) || ':' || max(position) || ':' || max(length(title)) FROM routine_step WHERE routine_id = $2)
+		|| ' ' || (SELECT title || ':' || points FROM approval WHERE id = $3)`,
+		id("000000000101"), id("000000000102"), id("000000000181")).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if want := long + ":1000000 " + long + ":5000 32:31:153 " + long + ":999999"; got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}

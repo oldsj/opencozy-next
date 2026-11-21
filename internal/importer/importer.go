@@ -164,7 +164,7 @@ var domains = []func(context.Context, *run) error{
 	importCalendars,
 	importRecipes,
 	importMeals,
-	importTV,           // after rewards and devices: sessions and credits point at them
+	importTV,
 	checkLedgerSources, // last: every source kind has been imported
 }
 
