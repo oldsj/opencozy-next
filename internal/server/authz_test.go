@@ -86,6 +86,7 @@ func TestAuthzMatrix(t *testing.T) {
 				}
 				u = strings.ReplaceAll(u, "{passkeyId}", h.passkey.String())
 				u = strings.ReplaceAll(u, "{deviceId}", h.device.String())
+				u = strings.ReplaceAll(u, "{creditId}", h.credit.String())
 				return "/api" + u
 			}
 			body := func() any {

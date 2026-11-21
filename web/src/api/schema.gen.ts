@@ -719,7 +719,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel an approved reward, or the unused rest of given screen time, and give the points back */
+        /**
+         * Cancel an approved reward, or the unused rest of given screen time, and give the points back
+         * @description iPad time refunds the unused share of its cost, rounded down: 409 `already_used` when none is left, `no_credit` when OpenCozy has no record of the time (so it can't tell how much was used).
+         */
         post: operations["cancelRedemption"];
         delete?: never;
         options?: never;
@@ -872,6 +875,26 @@ export interface paths {
          * @description `now` locks the iPad now and cancels everything queued; `queued` lets the running window finish and cancels only what is queued after it. The unused time is forfeited, unless `refund` puts it back in the child's bank. 409 `nothing_to_end`.
          */
         post: operations["endScreenTime"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/screen-time/credits/{creditId}/forfeit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back the unused rest of a parent's grant or "yes"
+         * @description The credit keeps what was already spent; the rest leaves the child's bank. Time already started or queued isn't touched (end it with `end`). A reward's time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+         */
+        post: operations["forfeitScreenTimeCredit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1617,8 +1640,11 @@ export interface components {
             id: components["schemas"]["Id"];
             /** Format: date-time */
             at: string;
-            /** @enum {string} */
-            kind: "earned" | "reversed" | "redeemed" | "refunded";
+            /**
+             * @description one_more_minute is the child asking for one more minute on the locked iPad (no points)
+             * @enum {string}
+             */
+            kind: "earned" | "reversed" | "redeemed" | "refunded" | "one_more_minute";
             title: string;
             /** @description Signed; negative takes points away */
             points: number;
@@ -1627,6 +1653,8 @@ export interface components {
             reverses?: components["schemas"]["Id"];
             /** @description The adult who decided it, by name */
             by?: string;
+            /** @description The device it happened on, by name */
+            device?: string;
         };
         History: {
             /** Format: int64 */
@@ -1781,6 +1809,25 @@ export interface components {
             /** Format: date-time */
             opensAt?: string;
         };
+        /** @description Banked time with some left */
+        Credit: {
+            id: components["schemas"]["Id"];
+            /**
+             * @description A reward bought with points, a parent's grant, or a yes to "Ask for more time"
+             * @enum {string}
+             */
+            source: "redemption" | "grant" | "time_request";
+            redemptionId?: components["schemas"]["Id"];
+            rewardTitle?: string;
+            /** @description The parent who gave it, by name */
+            grantedBy?: string;
+            minutes: number;
+            /** @description What it holds */
+            seconds: number;
+            usedSeconds: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
         /** @description Blocked websites: game portals always; games while the child has no iPad time running. Lowercase names; each covers its subdomains. */
         WebFilter: {
             gamePortals: string[];
@@ -1804,6 +1851,8 @@ export interface components {
             allowedHours?: components["schemas"]["AllowedHours"];
             hoursNow?: components["schemas"]["HoursNow"];
             timeRequest?: components["schemas"]["TimeRequest"];
+            /** @description Banked time with some left, oldest first (spent in this order) */
+            credits: components["schemas"]["Credit"][];
             webFilter: components["schemas"]["WebFilter"];
         };
         Minutes: number;
@@ -4234,6 +4283,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EndResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    forfeitScreenTimeCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+                creditId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {} */
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Taken back */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        forfeitedSeconds: number;
+                        screenTime: components["schemas"]["ScreenTime"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
