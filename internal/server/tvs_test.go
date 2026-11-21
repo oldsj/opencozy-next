@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -501,5 +503,33 @@ func TestTVRewards(t *testing.T) {
 	}
 	if r := e.send(e.adult, "POST", "/api/tvs/"+e.h.tv.String()+"/session", map[string]any{"watcher": "child", "childId": e.h.child1.String()}); r.status != 409 || r.code() != "outside_hours" {
 		t.Fatalf("outside hours: %d %s", r.status, r.raw)
+	}
+}
+
+// failFirst fails the first household's transaction (the second call: the first lists them).
+type failFirst struct {
+	poolTx
+	calls int
+}
+
+func (f *failFirst) Tx(ctx context.Context, fn func(q *dbq.Queries) error) error {
+	f.calls++
+	if f.calls == 2 {
+		return errors.New("this household's settlement broke")
+	}
+	return f.poolTx.Tx(ctx, fn)
+}
+
+// One household failing to settle doesn't hold up the others.
+func TestTVSettleKeepsGoing(t *testing.T) {
+	e := newTVEnv(t)
+	e.house("b", nil) // a second household with a TV asking (the fixture's prompt)
+	f := &failFirst{poolTx: poolTx{e.srv}}
+	err := e.srv.tv.SettleAll(context.Background(), f, e.fake)
+	if err == nil || !strings.Contains(err.Error(), "settlement broke") {
+		t.Fatalf("error: %v", err)
+	}
+	if f.calls != 3 {
+		t.Fatalf("%d transactions, want the list and both households", f.calls)
 	}
 }
