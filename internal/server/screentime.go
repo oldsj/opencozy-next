@@ -170,12 +170,13 @@ func childInitiated(a actor.Actor) bool { return !a.ActsAsAdult() }
 
 // screenTimeChanged tells the household's screens (live) and the child's devices that the
 // child's iPad time changed: a silent push wakes the app to sync, so the shields lift or come
-// back at once. The device's own request needs no push: its response has the answer.
+// back at once. The app's own request needs no push: its response has the answer. The kid view
+// (device-web) does: it is a page in the app's web view, and the app doesn't see its responses.
 func (s *Server) screenTimeChanged(ctx context.Context, cmd *command.Cmd, child uuid.UUID) error {
 	if err := live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &child}); err != nil {
 		return err
 	}
-	if a, ok := actor.From(ctx); ok && (a.Kind == actor.Device || a.Kind == actor.DeviceWeb) {
+	if a, ok := actor.From(ctx); ok && a.Kind == actor.Device {
 		return nil
 	}
 	key, n := push.ScreenTimeChanged(child)
