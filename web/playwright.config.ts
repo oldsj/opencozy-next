@@ -2,6 +2,8 @@ import { randomBytes } from 'node:crypto';
 
 import { defineConfig, devices } from '@playwright/test';
 
+import { oidcClientID, oidcClientSecret, oidcIssuer, oidcName } from './e2e/oidc';
+
 // Runs against the production binary (`make build`, SPA embedded, strict CSP), not the Vite dev
 // server, so the test sees what users get. DATABASE_URL must point at a disposable database.
 const port = process.env.E2E_PORT ?? '18080';
@@ -35,6 +37,12 @@ export default defineConfig({
       OPENCOZY_SECRET_KEYS: secretKeys,
       // bin/app is an e2e build (make build-e2e); it refuses to start without this.
       OPENCOZY_E2E_BUILD: '1',
+      // Single sign-on against e2e/oidc.ts's fake provider; its redirect comes back here.
+      PUBLIC_ORIGIN: `http://localhost:${port}`,
+      OIDC_ISSUER: oidcIssuer,
+      OIDC_CLIENT_ID: oidcClientID,
+      OIDC_CLIENT_SECRET: oidcClientSecret,
+      OIDC_NAME: oidcName,
     },
   },
 });

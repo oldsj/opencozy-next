@@ -81,11 +81,13 @@ func TestAuthzMatrix(t *testing.T) {
 				switch op {
 				case "GET /calendar":
 					u += "?from=2026-09-14&to=2026-09-21"
-				case "DELETE /calendars/{calendarId}":
+				case "DELETE /calendars/{calendarId}", "DELETE /calendar/google/connections/{connectionId}":
 					u += "?expectedVersion=1"
 				}
+				u = strings.ReplaceAll(u, "{connectionId}", h.google.String())
 				u = strings.ReplaceAll(u, "{passkeyId}", h.passkey.String())
 				u = strings.ReplaceAll(u, "{deviceId}", h.device.String())
+				u = strings.ReplaceAll(u, "{phoneSessionId}", h.phone.String())
 				u = strings.ReplaceAll(u, "{tvId}", h.tv.String())
 				u = strings.ReplaceAll(u, "{promptId}", h.prompt.String())
 				u = strings.ReplaceAll(u, "{creditId}", h.credit.String())
@@ -98,10 +100,17 @@ func TestAuthzMatrix(t *testing.T) {
 				return nil
 			}
 
+			// Only the app may mint a phone from the web session, natively (no Sec-Fetch-Site; a
+			// page's request is refused before authentication, TestPhoneSignInFromWeb).
+			var native []string
+			if op == "POST /phone/sessions/web" {
+				native = []string{"Sec-Fetch-Site", ""}
+			}
+
 			// 1. Every actor of household A against A's own ids.
 			var unauthorized []byte
 			for _, name := range actorNames {
-				r := e.send(a.actors[name], method, url(a, a.child1), body())
+				r := e.send(a.actors[name], method, url(a, a.child1), body(), native...)
 				if r.status >= 500 {
 					t.Fatalf("%s: %d %s", name, r.status, r.raw)
 				}
@@ -148,7 +157,7 @@ func TestAuthzMatrix(t *testing.T) {
 					if !live || !allowed(p, name, kind) || (p.RecentAuth && name == "adult-stale") {
 						continue
 					}
-					if r := e.send(b.actors[name], method, url(a, a.child1), body()); ids && r.status != 404 {
+					if r := e.send(b.actors[name], method, url(a, a.child1), body(), native...); ids && r.status != 404 {
 						t.Errorf("household B %s on A's ids: want 404, got %d %s", name, r.status, r.raw)
 					}
 				}
@@ -160,7 +169,7 @@ func TestAuthzMatrix(t *testing.T) {
 			// 3. A child outside the actor's children: 404, nothing changed.
 			if p.ChildParam != "" && allowed(p, "service-child1", actor.Service) {
 				before := e.fingerprint(a.id)
-				if r := e.send(a.actors["service-child1"], method, url(a, a.child2), body()); r.status != 404 {
+				if r := e.send(a.actors["service-child1"], method, url(a, a.child2), body(), native...); r.status != 404 {
 					t.Errorf("service-child1 on child2: want 404, got %d %s", r.status, r.raw)
 				}
 				if e.fingerprint(a.id) != before {

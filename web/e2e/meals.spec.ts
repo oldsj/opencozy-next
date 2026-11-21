@@ -15,7 +15,7 @@ test('add a recipe and plan it', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('Email').fill(owner.email);
   await page.getByLabel('Password').fill(owner.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
   await page.goto('/recipes');

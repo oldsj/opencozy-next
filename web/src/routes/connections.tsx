@@ -19,6 +19,8 @@ const scopeLabels: Record<string, string> = {
   'household:read': 'See the household’s name and settings',
   'children:read': 'See the children, their points and their day',
   [LEARNING]: 'Give points for learning, by your award rules',
+  'tv:gate': 'Let gated TVs online (your router)',
+  'tv:report': 'Report TVs turning on and off (Home Assistant)',
   'screentime:read': 'See the children’s iPad time',
   'games:gate': 'Open game websites only while a child’s iPad time runs (a router)',
   'today:read': 'See today’s chores and routines',
@@ -33,8 +35,6 @@ const scopeLabels: Record<string, string> = {
   'tv:read': 'See the TVs, who is watching and TV history',
   'tv:manage': 'Add, edit and remove TVs',
   'tv:control': 'Let TVs online, turn them off, open and close them, as you',
-  'tv:gate': 'Let TVs online only while they may be (a router)',
-  'tv:report': 'Report TVs trying to go online and their power (Home Assistant, a router)',
 };
 
 // Which scopes each kind is offered. An assistant acts as its adult, for every child.

@@ -42,8 +42,8 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     }
 
     private func locked(name: String?) -> ShieldConfiguration {
-        let title = name.map { "\($0) is locked" } ?? "Locked"
         let store = SharedStore(), content = store.shieldContent, queued = store.queuedTimeRequest != nil
+        let title = ShieldText.title(content, now: Date(), name: name)
         return ShieldConfiguration(
             backgroundBlurStyle: .systemThickMaterial,
             backgroundColor: nil,

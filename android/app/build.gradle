@@ -1,0 +1,82 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Nothing about a household is built in: the server's address is typed on the display the first
+// time it starts. OPENCOZY_ORIGIN (or -PopencozyOrigin) only fills that field in, for a build made
+// for one household; it stays out of Git either way.
+def valueFrom = { String property, String env ->
+    providers.gradleProperty(property).orElse(providers.environmentVariable(env)).orNull
+}
+def suggestedOrigin = (valueFrom('opencozyOrigin', 'OPENCOZY_ORIGIN') ?: '').replace('\\', '\\\\').replace('"', '\\"')
+
+def keystore = valueFrom('opencozyKeystore', 'OPENCOZY_RELEASE_KEYSTORE')
+def keyAlias = valueFrom('opencozyKeyAlias', 'OPENCOZY_RELEASE_KEY_ALIAS')
+def storePassword = valueFrom('opencozyStorePassword', 'OPENCOZY_RELEASE_STORE_PASSWORD')
+def keyPassword = valueFrom('opencozyKeyPassword', 'OPENCOZY_RELEASE_KEY_PASSWORD')
+def signed = [keystore, keyAlias, storePassword, keyPassword].every { it }
+
+android {
+    namespace 'org.opencozy.display'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'org.opencozy.display'
+        minSdk 26
+        targetSdk 35
+        versionCode((findProperty('versionCode') ?: '1').toString().toInteger())
+        versionName((findProperty('versionName') ?: '0.1.0').toString())
+        buildConfigField 'String', 'SUGGESTED_ORIGIN', "\"${suggestedOrigin}\""
+    }
+
+    if (signed) {
+        signingConfigs {
+            release {
+                storeFile file(keystore)
+                it.storePassword storePassword
+                it.keyAlias keyAlias
+                it.keyPassword keyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (signed) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    lint {
+        abortOnError true
+        warningsAsErrors false
+    }
+}
+
+// A release is signed or not built: the private keystore comes from the environment.
+tasks.configureEach {
+    if (name == 'preReleaseBuild') {
+        doFirst {
+            if (!signed || !file(keystore).isFile()) {
+                throw new GradleException('Release builds need OPENCOZY_RELEASE_KEYSTORE, _KEY_ALIAS, _STORE_PASSWORD and _KEY_PASSWORD.')
+            }
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}

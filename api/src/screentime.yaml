@@ -646,7 +646,7 @@ schemas:
         $ref: '#/schemas/TimeRequest'
       credits:
         type: array
-        description: Banked time with some left, oldest first (spent in this order)
+        description: Banked time with some left, oldest first (spent in this order); the oldest 200, while bankedSeconds is the whole bank
         items:
           $ref: '#/schemas/Credit'
       webFilter:

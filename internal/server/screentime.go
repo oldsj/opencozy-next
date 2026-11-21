@@ -15,6 +15,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/live"
+	"github.com/oldsj/opencozy-next/internal/push"
 	"github.com/oldsj/opencozy-next/internal/screentime"
 )
 
@@ -167,9 +168,18 @@ func toSpend(s screentime.Spent) *api.Spend {
 // later is limited too.
 func childInitiated(a actor.Actor) bool { return !a.ActsAsAdult() }
 
-// changed tells live clients the child's screen time (on Today) changed.
-func screenTimeChanged(ctx context.Context, cmd *command.Cmd, child uuid.UUID) error {
-	return live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &child})
+// screenTimeChanged tells the household's screens (live) and the child's devices that the
+// child's iPad time changed: a silent push wakes the app to sync, so the shields lift or come
+// back at once. The device's own request needs no push: its response has the answer.
+func (s *Server) screenTimeChanged(ctx context.Context, cmd *command.Cmd, child uuid.UUID) error {
+	if err := live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &child}); err != nil {
+		return err
+	}
+	if a, ok := actor.From(ctx); ok && (a.Kind == actor.Device || a.Kind == actor.DeviceWeb) {
+		return nil
+	}
+	key, n := push.ScreenTimeChanged(child)
+	return s.push.ToChild(ctx, cmd.Q, cmd.HouseholdID(), child, key, n)
 }
 
 // GetScreenTime is a child's iPad time now.
@@ -230,7 +240,7 @@ func (s *Server) SpendScreenTime(ctx context.Context, req api.SpendScreenTimeReq
 	case err != nil:
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
@@ -284,7 +294,7 @@ func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeReq
 		}
 		out.Spend = toSpend(spent)
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	if out.ScreenTime, err = screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now); err != nil {
@@ -319,7 +329,7 @@ func (s *Server) EndScreenTime(ctx context.Context, req api.EndScreenTimeRequest
 	} else if err != nil {
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
@@ -353,7 +363,7 @@ func (s *Server) SetAllowedHours(ctx context.Context, req api.SetAllowedHoursReq
 	if err := screentime.SetRule(ctx, cmd.Q, a.HouseholdID, req.ChildId, hours); err != nil {
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
@@ -380,9 +390,16 @@ func (s *Server) AskForTime(ctx context.Context, req api.AskForTimeRequestObject
 	} else if err != nil {
 		return nil, err
 	}
-	// Pushes to the parents (a new request, or a reminder) arrive with slice 11.
 	if asked.New || asked.Reminded {
-		if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+		if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+			return nil, err
+		}
+		// A new request, or asking again after RemindAfter, pushes to the parents (old #74).
+		ap, err := cmd.Q.PendingApprovalForTimeRequest(ctx, dbq.PendingApprovalForTimeRequestParams{HouseholdID: a.HouseholdID, TimeRequestID: &asked.Request.ID})
+		if err != nil {
+			return nil, err
+		}
+		if err := s.pushPending(ctx, cmd, ap, asked.Request.AskedAt); err != nil {
 			return nil, err
 		}
 	}
@@ -451,7 +468,7 @@ func (s *Server) ForfeitScreenTimeCredit(ctx context.Context, req api.ForfeitScr
 	case err != nil:
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)

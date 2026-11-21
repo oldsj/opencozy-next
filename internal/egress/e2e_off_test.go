@@ -23,3 +23,16 @@ func TestCalendarClientRefusesLoopback(t *testing.T) {
 		}
 	}
 }
+
+// Nor does the single sign-on client: an issuer on loopback is refused outside an e2e build.
+func TestOIDCClientRefusesLoopback(t *testing.T) {
+	c, err := New(Options{Name: OIDCClient, Ports: []uint16{443, 9000}, Timeout: 5 * time.Second, MaxResponseBytes: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, host := range []string{"127.0.0.1", "[::1]", "localhost"} {
+		if err := try(t, c, "http://"+host+":9000/.well-known/openid-configuration"); !errors.Is(err, ErrRefused) {
+			t.Errorf("%s: err = %v, want ErrRefused", host, err)
+		}
+	}
+}

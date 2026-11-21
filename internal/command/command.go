@@ -54,6 +54,22 @@ type Cmd struct {
 	locked      []uuid.UUID
 	clock       clock.Clock
 	now         time.Time
+	after       []func(context.Context)
+}
+
+// AfterCommit runs f once the command has committed with a 2xx answer, after the response is
+// sent and with no lock held: for network calls (a token revoke) that must not hold up the
+// household or happen when the change rolls back. f gets a context that outlives the request.
+// Jobs that use Lock run their own hooks with RunAfterCommit.
+func (c *Cmd) AfterCommit(f func(context.Context)) { c.after = append(c.after, f) }
+
+// RunAfterCommit runs the AfterCommit hooks; call it only after a successful commit.
+func (c *Cmd) RunAfterCommit(ctx context.Context) {
+	ctx = context.WithoutCancel(ctx)
+	for _, f := range c.after {
+		f(ctx)
+	}
+	c.after = nil
 }
 
 // Lock starts a command in tx for a job: it takes the household lock, so a job and a request
@@ -262,6 +278,10 @@ func (rn Runner) Wrap(spec Spec, next http.Handler, w http.ResponseWriter, r *ht
 		return
 	}
 	rec.flush(w)
+	if rec.status >= 200 && rec.status < 300 && len(cmd.after) > 0 {
+		_ = http.NewResponseController(w).Flush() // the answer goes out before the hooks run
+		cmd.RunAfterCommit(ctx)
+	}
 }
 
 // requestHash binds a recorded answer to who asked, what they asked for and the exact body.

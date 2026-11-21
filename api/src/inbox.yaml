@@ -176,12 +176,17 @@ parameters:
 schemas:
   Inbox:
     type: object
-    required: [items]
+    required: [items, tvs]
     properties:
       items:
         type: array
         items:
           $ref: '#/schemas/InboxItem'
+      tvs:
+        $ref: tvs.yaml#/schemas/TvList
+        description: >-
+          The TVs asking "Who's watching?" now (only those), with each child's TV time, to answer
+          with answerTvPrompt.
   InboxItem:
     type: object
     required: [id, kind, child, title, submittedAt]

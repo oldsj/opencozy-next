@@ -383,6 +383,9 @@ schemas:
         format: date-time
       error:
         $ref: '#/schemas/CalendarErrorCode'
+      googleConnectionId:
+        $ref: common.yaml#/schemas/Id
+        description: For a Google calendar, the account it is followed through
       version:
         type: integer
   CalendarList:

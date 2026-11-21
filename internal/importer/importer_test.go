@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/auth"
+	"github.com/oldsj/opencozy-next/internal/calendar"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/importer/oldsecret"
 	"github.com/oldsj/opencozy-next/internal/keyring"
@@ -97,10 +99,10 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                     "pending", // lock_message waits on the devices import
-		"child":                         "pending", // the colour too
+		"household":                     "ok",
+		"child":                         "ok",
 		"auth_user":                     "ok",
-		"household_owner":               "ok",
+		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
 		"service_credential":            "ok",
 		"service_credential_child":      "ok",
@@ -109,7 +111,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"gated_tv_mac":                  "ok",
 		"tv_session":                    "ok",
 		"tv_open_event":                 "ok",
-		"tv_credit":                     "pending", // its redemption waits for the rewards import
+		"tv_credit":                     "ok",
 		"tv_prompt":                     "not carried",
 		"auth_session":                  "not carried",
 		"recipe":                        "ok",
@@ -122,12 +124,24 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"calendar_assignment":           "ok",
 		"calendar_assignment_person":    "ok",
 		"calendar_occurrence":           "not carried",
+		"calendar_google_connection":    "ok",
+		"point_ledger":                  "ok",
+		"chore_award_reversal":          "ok",
+		"chore_active_award":            "ok",
+		"external_award":                "ok",
+		"chore_definition":              "ok",
+		"chore_occurrence":              "ok",
+		"routine_definition":            "ok",
+		"routine_occurrence":            "ok",
+		"completion_approval":           "ok",
+		"reward":                        "ok",
+		"reward_redemption":             "ok",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine", "Bed not made", "Water the plants", "fixture-sync-token", "Piano", "Family", "1001"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
@@ -135,7 +149,8 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	if !strings.Contains(out, "1 open sessions dropped") || !strings.Contains(out, "power and router attempts forgotten") {
 		t.Errorf("the report doesn't count the dropped TV sessions or forgotten power:\n%s", out)
 	}
-	if !strings.Contains(out, "1 without a household") { // the assistant imports since slice 12: no pending scope note
+	if !strings.Contains(out, "1 without a household") || // the assistant imports since slice 12: no pending scope note
+		!strings.Contains(out, "1 with partly set allowed hours, carried as none") {
 		t.Errorf("missing notes:\n%s", out)
 	}
 }
@@ -255,7 +270,8 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	}
 	var assignments string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(a.recurrence_key || '=' || COALESCE(c.child_id::text, 'nobody'), ' ' ORDER BY a.recurrence_key)
-		FROM calendar_assignment a LEFT JOIN calendar_assignment_child c ON c.assignment_id = a.id`).Scan(&assignments); err != nil ||
+		FROM calendar_assignment a LEFT JOIN calendar_assignment_child c ON c.assignment_id = a.id
+		WHERE a.series_id = '0190a000-0000-7000-8000-0000000000b2'`).Scan(&assignments); err != nil ||
 		assignments != "*=0190a000-0000-7000-8000-0000000000c1 20260114T163000Z=nobody" {
 		t.Errorf("assignments: %q %v", assignments, err)
 	}
@@ -354,7 +370,7 @@ INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, ve
 		t.Error("the report shows a link")
 	}
 	var names string
-	if err := target.Owner.QueryRow(context.Background(), `SELECT string_agg(name, ',') FROM calendar_source`).Scan(&names); err != nil || names != "School" {
+	if err := target.Owner.QueryRow(context.Background(), `SELECT string_agg(name, ',') FROM calendar_source WHERE provider = 'ics'`).Scan(&names); err != nil || names != "School" {
 		t.Errorf("calendars: %q %v", names, err)
 	}
 }
@@ -401,9 +417,9 @@ func TestCalendarLinksNeedKeys(t *testing.T) {
 func TestRefusesAnotherVersion(t *testing.T) {
 	target := testdb.Open(t)
 	for name, arrange := range map[string]string{
-		"older":   `DELETE FROM opencozy.schema_migrations WHERE version = '0044_screen_time_grant_cut_guards'`,
+		"older":   `DELETE FROM opencozy.schema_migrations WHERE version = '0045_parent_push_mute'`,
 		"edited":  `UPDATE opencozy.schema_migrations SET checksum = repeat('0', 64) WHERE version = '0010_screen_time_fulfillment'`,
-		"newer":   `INSERT INTO opencozy.schema_migrations (version, checksum) VALUES ('0045_next', repeat('0', 64))`,
+		"newer":   `INSERT INTO opencozy.schema_migrations (version, checksum) VALUES ('0046_next', repeat('0', 64))`,
 		"missing": `DROP TABLE opencozy.schema_migrations`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -439,20 +455,102 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	}
 }
 
-// Old screen time waits on redemptions and devices: a source with any says so and can't commit.
-func TestScreenTimeWaitsOnRedemptionsAndDevices(t *testing.T) {
+func TestGoogleAccountsAndCalendars(t *testing.T) {
+	ctx := context.Background()
+	h := uuid.MustParse("0190a000-0000-7000-8000-00000000000a")
+	path := filepath.Join(t.TempDir(), "old-secret")
+	if err := os.WriteFile(path, []byte("fixture-old-auth-secret-0123456789abcdefghij\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, withSecret := range []bool{true, false} {
+		t.Run(fmt.Sprintf("old secret %v", withSecret), func(t *testing.T) {
+			var old *oldsecret.Secret
+			if withSecret {
+				var err error
+				if old, err = oldsecret.Load(path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			target := testdb.Open(t)
+			var out bytes.Buffer
+			if err := Run(ctx, Options{SourceURL: oldDB(t, complete), Target: target.Owner, Out: &out, Keys: testKeys(t), OldSecret: old}); err != nil {
+				t.Fatalf("%v\n%s", err, out.String())
+			}
+			if strings.Contains(out.String(), "fixture-google-refresh-token") || strings.Contains(out.String(), "example.test") {
+				t.Errorf("the report shows a secret or an address:\n%s", out.String())
+			}
+			// The connected account opens with the old secret and is sealed under the keyring;
+			// without it, or when the old app already needed it, it needs connecting again.
+			type conn struct {
+				email     string
+				token     *string
+				reconnect bool
+			}
+			got := map[string]conn{}
+			rows, err := target.Owner.Query(ctx, `SELECT id::text, email, refresh_token, needs_reconnect FROM calendar_google_connection`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for rows.Next() {
+				var id string
+				var c conn
+				if err := rows.Scan(&id, &c.email, &c.token, &c.reconnect); err != nil {
+					t.Fatal(err)
+				}
+				got[id] = c
+			}
+			if rows.Err() != nil || len(got) != 2 {
+				t.Fatalf("connections: %+v %v", got, rows.Err())
+			}
+			first := got["0190a000-0000-7000-8000-000000000201"]
+			if first.email != "parent@example.test" || first.reconnect == withSecret || (first.token != nil) != withSecret {
+				t.Errorf("connected account: %+v", first)
+			}
+			if withSecret {
+				tok, err := calendar.OpenGoogleToken(testKeys(t), h, uuid.MustParse("0190a000-0000-7000-8000-000000000201"), *first.token)
+				if err != nil || tok != "fixture-google-refresh-token" {
+					t.Errorf("refresh token: %q %v", tok, err)
+				}
+			}
+			if second := got["0190a000-0000-7000-8000-000000000202"]; !second.reconnect || second.token != nil {
+				t.Errorf("account the old app needed connected again: %+v", second)
+			}
+			// Calendars of carried accounts keep their Google IDs, not their sync tokens; the
+			// one whose account was gone is left out with its series and assignment.
+			var calendars string
+			if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || ':' || google_calendar_id || ':' || (google_sync_token IS NULL)::text || ':' || version, ' ' ORDER BY name)
+				FROM calendar_source WHERE provider = 'google'`).Scan(&calendars); err != nil ||
+				calendars != "Family:family@group.calendar.example.test:true:3 Work:other@example.test:true:1" {
+				t.Errorf("Google calendars: %q %v", calendars, err)
+			}
+			var assigned string
+			if err := target.Owner.QueryRow(ctx, `SELECT s.uid || '=' || c.child_id FROM calendar_assignment a
+				JOIN calendar_series s ON s.id = a.series_id JOIN calendar_assignment_child c ON c.assignment_id = a.id
+				WHERE s.source_id = '0190a000-0000-7000-8000-000000000211'`).Scan(&assigned); err != nil ||
+				assigned != "fixtureevent0001=0190a000-0000-7000-8000-0000000000c2" {
+				t.Errorf("Google assignment: %q %v", assigned, err)
+			}
+			for _, note := range []string{"1 Google calendars left out: their account was gone", "1 left out with their Google calendars"} {
+				if !strings.Contains(out.String(), note) {
+					t.Errorf("the report does not say %q:\n%s", note, out.String())
+				}
+			}
+		})
+	}
+}
+
+// The iPad shield event log is not carried (James): the import says how many and commits.
+func TestScreenTimeEventsAreNotCarried(t *testing.T) {
 	event := `SET search_path TO opencozy;
 		ALTER TABLE screen_time_event DROP CONSTRAINT screen_time_event_device_fk;
 		INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
 		  ('0190a000-0000-7000-8000-00000000000a', gen_random_uuid(), '0190a000-0000-7000-8000-0000000000c1', gen_random_uuid(),
 		   'one_more_minute', '2026-01-05T08:00:00Z', '2026-01-05T08:00:01Z');`
-	target := testdb.Open(t)
-	out, err := importOnce(t, oldDB(t, complete, event), target, false)
-	if !errors.Is(err, ErrPending) {
-		t.Fatalf("err = %v, want ErrPending\n%s", err, out)
+	out, err := importOnce(t, oldDB(t, complete, event), testdb.Open(t), false)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
 	}
-	if statuses(out)["screen_time_event"] != "pending" || !strings.Contains(out, "waits on the import of devices") {
+	if statuses(out)["screen_time_event"] != "not carried" || !strings.Contains(out, "screen_time_event              1") {
 		t.Errorf("screen_time_event:\n%s", out)
 	}
-	empty(t, target)
 }

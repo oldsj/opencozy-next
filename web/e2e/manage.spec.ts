@@ -11,13 +11,14 @@ async function post<T>(request: APIRequestContext, path: string, data: unknown):
 }
 
 // Editing in Manage: a chore given to another child, a reward hidden, a chosen reward given or
-// cancelled with its points back, and the household's time zone checked.
+// cancelled with its points back, the household's time zone checked, and a TV added, opened and
+// closed.
 test('manage: edit and reassign, hide, give and cancel, household', async ({ page }) => {
   const problems: string[] = [];
   page.on('console', (m) => {
     // Chrome logs every 4xx (the household form gets a 422 and a stale cancel a 409 on purpose),
     // and the reset of the save whose answer the test drops.
-    if (m.type() === 'error' && !/status of 4\d\d|ERR_CONNECTION_RESET/.test(m.text())) problems.push(m.text());
+    if (m.type() === 'error' && !/status of 4\d\d|ERR_CONNECTION_RESET|net::ERR_FAILED/.test(m.text())) problems.push(m.text());
   });
   page.on('pageerror', (e) => problems.push(e.message));
   const run = String(Date.now()).slice(-6);
@@ -27,7 +28,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.goto('/login');
   await page.getByLabel('Email').fill(owner.email);
   await page.getByLabel('Password').fill(owner.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
   // Two children; Ada earns 14 points (an adult's tick counts at once) and has a chore to move.
@@ -122,6 +123,45 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
   await expect(page.getByLabel('Name')).toHaveValue('The Example Family');
+
+  // A TV: added, opened for everyone for an hour, closed again, removed.
+  const tv = `Den TV ${run}`;
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'TVs' }).click();
+  await page.getByRole('button', { name: 'Add a TV' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(tv);
+  await page.getByLabel('Network addresses (MACs)').fill(`02:00:5e:${run.slice(0, 2)}:${run.slice(2, 4)}:${run.slice(4, 6)}`);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const tvRow = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: tv }) });
+  await expect(tvRow.getByText('Offline until someone is watching')).toBeVisible();
+  await page.getByRole('button', { name: 'Open TVs…' }).click();
+  // Only this TV: other specs (the journey) have TVs in the same household, which must stay gated.
+  for (const label of await page.getByRole('dialog').locator('label').filter({ has: page.getByRole('checkbox') }).all()) {
+    await label.getByRole('checkbox').setChecked((await label.innerText()).includes(tv));
+  }
+  await page.getByRole('button', { name: '1 hour' }).click();
+  await page.getByRole('button', { name: `Open ${tv}`, exact: true }).click();
+  await expect(tvRow.getByText(/^Open until/)).toBeVisible();
+  // "+1 hr" whose answer is lost after the server kept the TV open longer: tapping again is the
+  // same command, so the TV is open one hour longer, not two.
+  const openUntil = async () => {
+    const r = (await (await page.request.get('/api/tvs')).json()) as { tvs: { name: string; openUntil: string | null }[] };
+    return Date.parse(r.tvs.find((t) => t.name === tv)?.openUntil ?? '');
+  };
+  const opened = await openUntil();
+  await page.route('**/api/tvs/extend', async (route) => {
+    await route.fetch();
+    await route.abort('failed');
+  }, { times: 1 });
+  await tvRow.getByRole('button', { name: `Keep ${tv} open 1 hour longer` }).click();
+  await expect(page.getByText('Couldn’t reach the server. Check the connection and try again.')).toBeVisible();
+  await tvRow.getByRole('button', { name: `Keep ${tv} open 1 hour longer` }).click();
+  await expect.poll(openUntil).toBe(opened + 3_600_000);
+  await tvRow.getByRole('button', { name: `Close ${tv} now` }).click();
+  await expect(tvRow.getByText('Offline until someone is watching')).toBeVisible();
+  await tvRow.getByRole('button', { name: `Edit ${tv}` }).click();
+  await page.getByRole('button', { name: 'Remove…' }).click();
+  await page.getByRole('button', { name: `Remove ${tv}` }).click();
+  await expect(page.getByRole('heading', { name: tv })).toHaveCount(0);
 
   expect(problems).toEqual([]);
 });

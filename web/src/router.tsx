@@ -10,8 +10,9 @@ import {
   useMatches,
 } from '@tanstack/react-router';
 
-import { meQuery, onSignedOut } from './api/client';
-import { LoginPage } from './routes/login';
+import { $api, meQuery, onSignedOut } from './api/client';
+import { LoginPage, isSsoError, type SsoError } from './routes/login';
+import { AccountPage } from './routes/account';
 import { HomePage } from './routes/home';
 import { DisplayPage } from './routes/display';
 import { ChoresPage } from './routes/chores';
@@ -26,8 +27,10 @@ import { DeviceExpiredPage, KidPage } from './routes/kid';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
 import { CalendarEventPage, CalendarPage, CalendarsPage } from './routes/calendar';
+import { googleOutcomes, type GoogleOutcome } from './routes/calendar-google';
 import { ConnectionsPage } from './routes/connections';
 import { LearningPage } from './routes/learning';
+import { TvsPage } from './routes/tvs';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -52,6 +55,7 @@ const nav = [
   { to: '/inbox', label: 'Inbox' },
   { to: '/chores', label: 'Chores' },
   { to: '/rewards', label: 'Rewards' },
+  { to: '/tvs', label: 'TVs' },
   { to: '/calendar', label: 'Calendar' },
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
@@ -60,17 +64,21 @@ const nav = [
   { to: '/connections', label: 'Connections' },
   { to: '/devices', label: 'Devices' },
   { to: '/household', label: 'Household' },
+  { to: '/account', label: 'Account' },
 ] as const;
 
 // The manage pages' column, with the main navigation once signed in.
 function PageLayout() {
   const me = useQuery(meQuery).data;
+  // Account has only single sign-on so far (slice 10b): list it when that is set up.
+  const sso = $api.useQuery('get', '/auth/methods', {}, { enabled: !!me }).data?.oidc;
+  const links = nav.filter((n) => n.to !== '/account' || sso);
   return (
     <>
       {me && (
         <header className="mx-auto max-w-2xl px-4 pt-6">
           <nav aria-label="Main" className="flex flex-wrap gap-x-5">
-            {nav.map((n) => (
+            {links.map((n) => (
               <Link key={n.to} to={n.to} className="inline-flex min-h-11 items-center" activeOptions={{ exact: n.to === '/' }} activeProps={{ className: 'font-semibold' }}>
                 {n.label}
               </Link>
@@ -113,10 +121,14 @@ const loginRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/login',
   staticData: { title: 'Sign in' },
-  // ?ended=true: sent here because the session ended.
-  validateSearch: (search: Record<string, unknown>): { ended?: boolean } => (search.ended === true ? { ended: true } : {}),
+  // ?ended=true: sent here because the session ended. ?error=<code>: back from single sign-on.
+  validateSearch: (search: Record<string, unknown>): { ended?: boolean; error?: SsoError } => ({
+    ...(search.ended === true ? { ended: true } : {}),
+    ...(isSsoError(search.error) ? { error: search.error } : {}),
+  }),
   component: function Login() {
-    return <LoginPage ended={loginRoute.useSearch().ended === true} />;
+    const search = loginRoute.useSearch();
+    return <LoginPage ended={search.ended === true} ssoError={search.error} />;
   },
 });
 
@@ -239,6 +251,18 @@ const redemptionsRoute = createRoute({
   },
   component: RedemptionsPage,
 });
+// Account: how the signed-in adult signs in.
+const accountRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/account',
+  staticData: { title: 'Account' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: AccountPage,
+});
 const householdRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/household',
@@ -283,12 +307,21 @@ const calendarsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/calendars',
   staticData: { title: 'Calendars' },
+  // ?google=<outcome>&connection=<id>: back from connecting Google.
+  validateSearch: (search: Record<string, unknown>): { google?: GoogleOutcome; connection?: string } => {
+    const google = googleOutcomes.find((o) => o === search.google);
+    const connection = typeof search.connection === 'string' && /^[0-9a-f-]{36}$/.test(search.connection) ? search.connection : undefined;
+    return google ? { google, ...(connection ? { connection } : {}) } : {};
+  },
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
     if (!me) throw redirect({ to: '/login' });
   },
-  component: CalendarsPage,
+  component: function Calendars() {
+    const { google, connection } = calendarsRoute.useSearch();
+    return <CalendarsPage google={google} connection={connection} />;
+  },
 });
 
 // Manage: services, assistants and learning apps, each with its own key.
@@ -315,6 +348,19 @@ const learningRoute = createRoute({
     if (!me) throw redirect({ to: '/login' });
   },
   component: LearningPage,
+});
+
+// Manage: the TVs, who is watching, and opening them.
+const tvsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/tvs',
+  staticData: { title: 'TVs' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: TvsPage,
 });
 
 // Manage: the children's iPads and phones.
@@ -353,7 +399,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, householdRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, householdRoute, tvsRoute, accountRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

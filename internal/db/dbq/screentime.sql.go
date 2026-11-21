@@ -590,6 +590,7 @@ LEFT JOIN redemption r ON r.household_id = k.household_id AND r.id = k.redemptio
 LEFT JOIN adult a ON a.household_id = k.household_id AND a.id = k.granted_by
 WHERE k.household_id = $1 AND k.child_id = $2 AND k.used_seconds < k.seconds
 ORDER BY k.created_at, k.id
+LIMIT 200
 `
 
 type OpenCreditsParams struct {
@@ -610,7 +611,8 @@ type OpenCreditsRow struct {
 	CreatedAt     time.Time
 }
 
-// The child's credits with time left, oldest first, with who gave each.
+// The child's credits with time left, oldest first, with who gave each: the oldest 200 (every
+// device poll reads it; bankedSeconds is still the whole bank).
 func (q *Queries) OpenCredits(ctx context.Context, arg OpenCreditsParams) ([]OpenCreditsRow, error) {
 	rows, err := q.db.Query(ctx, openCredits, arg.HouseholdID, arg.ChildID)
 	if err != nil {

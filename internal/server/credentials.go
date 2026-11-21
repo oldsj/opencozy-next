@@ -98,6 +98,9 @@ func (s *Server) CreateCredential(ctx context.Context, req api.CreateCredentialR
 	if req.Body.AwardRuleIds != nil {
 		ruleIDs = *req.Body.AwardRuleIds
 	}
+	if req.Body.Kind != api.CreateCredentialJSONBodyKindService && (slices.Contains(req.Body.Scopes, "tv:gate") || slices.Contains(req.Body.Scopes, "tv:report")) {
+		return bad("unknown_scope", "Only a service credential can gate TVs or report their power.")
+	}
 	if slices.Contains(req.Body.Scopes, ScopeLearningAward) {
 		if req.Body.Kind != api.CreateCredentialJSONBodyKindService {
 			return bad("unknown_scope", "Only a service credential can award learning points.")

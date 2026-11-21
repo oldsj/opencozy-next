@@ -45,11 +45,29 @@ func (s *Server) route(next http.Handler) http.Handler {
 			writeForbidden(w)
 			return
 		}
+		if p.OperationID == phoneFromWebOp && !nativeRequest(r) {
+			httpx.WriteError(w, http.StatusForbidden, "use_the_app", "Request a phone session from the app.")
+			return
+		}
 		ctx := withRoute(r.Context(), routeInfo{policy: p, params: params})
 		ctx = context.WithValue(ctx, loopbackKey{}, loopbackOrigin(r))
 		ctx = context.WithValue(ctx, deviceCookieKey{}, hasDeviceCookie(r))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// phoneFromWebOp mints a 90-day phone token from the web session's cookie. Only the iOS app may
+// call it, natively: a page script (an XSS, a bad dependency) could otherwise read the token out
+// of the response and keep it after the web session ends. Strict handlers don't see headers, so
+// the route refuses it here.
+const phoneFromWebOp = "PhoneSignInFromWeb" // authz keys operations by their Go name
+
+// nativeRequest reports whether r came from outside a web page. Browsers set Sec-Fetch-Site on
+// every request a page makes, and script can't remove it; "none" is a user typing the address. The
+// app's URLSession sends no Sec-Fetch-* headers.
+func nativeRequest(r *http.Request) bool {
+	site := r.Header.Get("Sec-Fetch-Site")
+	return site == "" || site == "none"
 }
 
 // sameRoute runs after the ServeMux has matched (a per-route middleware of the generated
@@ -105,6 +123,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			writeUnauthorized(w)
 			return
 		case ok:
+			s.touchPhone(r.Context(), a)
 			r = r.WithContext(actor.With(r.Context(), a))
 		}
 		next.ServeHTTP(w, r)
