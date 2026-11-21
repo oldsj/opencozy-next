@@ -139,7 +139,7 @@ func TestLedgerImport(t *testing.T) {
 	// Active awards: the two paid chores, the routine not undone and the learning award not undone.
 	var active string
 	if err := tx.QueryRow(ctx, `SELECT string_agg(right(ledger_id::text, 3), ',' ORDER BY ledger_id) FROM active_award`).Scan(&active); err != nil ||
-		active != "141,144,145,14c" {
+		active != "141,144,145,14c,1d1" {
 		t.Errorf("active awards: %q %v", active, err)
 	}
 

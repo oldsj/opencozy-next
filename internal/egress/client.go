@@ -29,6 +29,9 @@ var (
 // CalendarClient is the calendar feed client's name.
 const CalendarClient = "ics"
 
+// OIDCClient is the single sign-on provider client's name.
+const OIDCClient = "oidc"
+
 // FeedPorts are the ports a calendar feed may use (design §10).
 var FeedPorts = []uint16{80, 443, 8080, 8443}
 

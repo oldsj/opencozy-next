@@ -23,20 +23,28 @@ func (q *Queries) ConfirmAdultSession(ctx context.Context, tokenHash []byte) err
 
 const createAdultSession = `-- name: CreateAdultSession :exec
 
-INSERT INTO adult_session (token_hash, adult_id, expires_at)
-VALUES ($1, $2, $3)
+INSERT INTO adult_session (token_hash, adult_id, expires_at, authenticated_at)
+VALUES ($1, $2, $3, LEAST(COALESCE($4::timestamptz, now()), now()))
 `
 
 type CreateAdultSessionParams struct {
-	TokenHash []byte
-	AdultID   uuid.UUID
-	ExpiresAt time.Time
+	TokenHash       []byte
+	AdultID         uuid.UUID
+	ExpiresAt       time.Time
+	AuthenticatedAt *time.Time
 }
 
 // Actor resolution. Each lookup returns a row only while the credential is live: not expired, not
 // revoked, its household not archived and (where it has one) its adult not removed.
+// authenticated_at is now, or when the provider says the person last signed in there (a
+// single sign-on's auth_time), never later than now.
 func (q *Queries) CreateAdultSession(ctx context.Context, arg CreateAdultSessionParams) error {
-	_, err := q.db.Exec(ctx, createAdultSession, arg.TokenHash, arg.AdultID, arg.ExpiresAt)
+	_, err := q.db.Exec(ctx, createAdultSession,
+		arg.TokenHash,
+		arg.AdultID,
+		arg.ExpiresAt,
+		arg.AuthenticatedAt,
+	)
 	return err
 }
 
