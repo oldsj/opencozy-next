@@ -1,6 +1,6 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type SyntheticEvent } from 'react';
+import { useEffect, useState, type SyntheticEvent } from 'react';
 
 import {
   Button,
@@ -23,6 +23,7 @@ import {
 
 import { $api, errorCode, errorMessage, idempotencyKey, useAttempts } from '../api/client';
 import type { components } from '../api/schema.gen';
+import { GoogleAccounts, googleOutcomeText, useConnectGoogle, type GoogleOutcome } from './calendar-google';
 
 type CalendarEvent = components['schemas']['CalendarEvent'];
 type CalendarSource = components['schemas']['CalendarSource'];
@@ -257,10 +258,18 @@ interface SourceForm {
 const syncedLabel = (s: CalendarSource) =>
   s.lastSyncAt === undefined ? 'Not synced yet' : `Synced ${new Date(s.lastSyncAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
 
-// Manage: the followed calendars, their sync state, and adding a calendar link. A link's address
-// is write-only: it is never shown again.
-export function CalendarsPage() {
+// Manage: the followed calendars, their sync state, adding a calendar link, and Google accounts. A
+// link's address is write-only: it is never shown again. Google sends an adult back here with
+// ?google=<outcome>&connection=<id>: a new account opens its calendar picker, anything else says why.
+export function CalendarsPage({ google, connection }: { google?: GoogleOutcome | undefined; connection?: string | undefined } = {}) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [outcome] = useState(google);
+  const [choose, setChoose] = useState<string | null>(google === 'connected' ? (connection ?? null) : null);
+  const connectGoogle = useConnectGoogle();
+  useEffect(() => {
+    if (google !== undefined) void navigate({ to: '/calendars', search: {}, replace: true });
+  }, [google, navigate]);
   const sources = $api.useQuery('get', '/calendars');
   const refresh = () => Promise.all([
     queryClient.invalidateQueries({ queryKey: ['get', '/calendars'] }),
@@ -319,6 +328,7 @@ export function CalendarsPage() {
           </>
         }
       />
+      {outcome && outcome !== 'connected' && <Notice tone="attention">{googleOutcomeText[outcome]}</Notice>}
       {trouble.length > 0 && (
         <Notice tone="attention" title={trouble.length === 1 ? '1 calendar needs attention' : `${String(trouble.length)} calendars need attention`}>
           {trouble.map((s) => s.name).join(', ')}: see below.
@@ -342,6 +352,11 @@ export function CalendarsPage() {
                 trailing={
                   <>
                     {s.status === 'error' ? <Tag tone="error">Not updating</Tag> : null}
+                    {s.status === 'needs_reauth' && s.provider === 'google' ? (
+                      <Button variant="primary" aria-label={`Sign in again: ${s.name}`} disabled={connectGoogle.pending} onClick={connectGoogle.start}>
+                        Sign in again
+                      </Button>
+                    ) : null}
                     <Button variant="quiet" aria-label={`Edit ${s.name}`} onClick={() => { open({ id: s.id, version: s.version, name: s.name, url: '', color: s.color, showOnDisplay: s.showOnDisplay }); }}>
                       Edit
                     </Button>
@@ -352,8 +367,10 @@ export function CalendarsPage() {
           </List>
         </Section>
       ) : (
-        sources.isSuccess && <EmptyState title="No calendars yet" description="Add a calendar link from school, a club or your own calendar app." variant="surface" />
+        sources.isSuccess && <EmptyState title="No calendars yet" description="Add a calendar link from school, a club or your own calendar app, or connect Google." variant="surface" />
       )}
+      <GoogleAccounts choose={choose} onChoose={setChoose} usedColors={list.map((s) => s.color)} />
+      {connectGoogle.error && <Notice tone="error">{errorMessage(connectGoogle.error)}</Notice>}
 
       <Sheet
         open={form !== null}

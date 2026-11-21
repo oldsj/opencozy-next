@@ -72,6 +72,7 @@ final class ParentModel {
     var errorMessage: String?
 
     static let unreachableMessage = WebShell.unreachableMessage
+    static let parentModeLater = "Parent mode on the iPhone comes in a later update. Use OpenCozy in the browser for now."
     static let addressHint = "Enter the OpenCozy address, for example https://opencozy.example.org."
 
     let store: ParentStore
@@ -148,7 +149,7 @@ final class ParentModel {
             store.baseURL = url
             origin = url
             store.token = result.token
-            return await signedIn(result.session, result.household)
+            return await signedIn(result.session, result.me.household)
         } catch {
             handle(error, signingIn: true)
             return false
@@ -176,7 +177,7 @@ final class ParentModel {
             store.baseURL = url
             origin = url
             store.token = result.token
-            return await signedIn(result.session, result.household)
+            return await signedIn(result.session, result.me.household)
         } catch PasskeyAuthenticator.PasskeyError.cancelled {
             errorMessage = nil
             return false
@@ -195,7 +196,7 @@ final class ParentModel {
         case skipped
         /// The web view isn't signed in as an adult (401/403).
         case notSignedIn
-        /// The server has no `POST /api/parent-sessions` (404/405): manual sign-in only.
+        /// The server has no `POST /api/phone/sessions/web` (404/405): manual sign-in only.
         case unsupported
         /// Unreachable or a server error; the bell sheet still works.
         case failed
@@ -204,7 +205,7 @@ final class ParentModel {
     private var handingOff = false
 
     /// Turns the web view's adult sign-in into this phone's notification session
-    /// (`POST /api/parent-sessions` with the web cookie, sent natively by `mint`),
+    /// (`POST /api/phone/sessions/web` with the web cookie, sent natively by `mint`),
     /// so the parent doesn't sign in twice. `mint` returns nil when there's no web
     /// cookie to use. Quiet on failure: the manual sign-in in the bell sheet remains.
     @discardableResult
@@ -222,8 +223,9 @@ final class ParentModel {
                 // The server may have changed while the request was out.
                 guard origin == url, !isSignedIn else { return .skipped }
                 store.token = result.token
-                _ = await signedIn(result.session, result.household)
+                _ = await signedIn(result.session, result.me.household)
                 return .enabled
+            // 403: the web sign-in isn't recent enough (or isn't an adult's); the bell sheet remains.
             case 401, 403: return .notSignedIn
             case 404, 405: return .unsupported
             default: return .failed
@@ -280,7 +282,7 @@ final class ParentModel {
             apply(try await api.inbox())
             if household == nil, let info = try? await api.session() {
                 session = info.session
-                household = info.household
+                household = info.me.household
             }
         } catch {
             handle(error)
@@ -320,22 +322,28 @@ final class ParentModel {
         return "\(base):\(digest)"
     }
 
+    /// A time request's answer: one key per phone session, item and choice.
+    nonisolated static func answerKey(session: String, _ id: String, _ choice: TimeChoice) -> String {
+        "\(session.lowercased()):\(id.lowercased()):answer:\(choice.wire)"
+    }
+
     /// The session id for the key: in memory, else stored, else asked of the server.
     private func sessionIdForKey(_ api: any ParentAPI) async throws -> String {
         if let id = session?.id ?? store.sessionId { return id }
         let info = try await api.session()
         session = info.session
-        household = info.household
+        household = info.me.household
         return info.session.id
     }
 
-    private func decide(_ id: String, decision: ApprovalDecision, reason: String? = nil, retries: Int) async -> Outcome {
+    private func decide(_ id: String, decision: ApprovalDecision, reason: String? = nil, choice: TimeChoice? = nil, retries: Int) async -> Outcome {
         guard let api, !busy.contains(id) else { return .failed }
         busy.insert(id)
         defer { busy.remove(id) }
         let key: String
         do {
-            key = Self.idempotencyKey(session: try await sessionIdForKey(api), id, decision, reason: reason)
+            let session = try await sessionIdForKey(api)
+            key = choice.map { Self.answerKey(session: session, id, $0) } ?? Self.idempotencyKey(session: session, id, decision, reason: reason)
         } catch {
             handle(error)
             return .failed
@@ -343,10 +351,12 @@ final class ParentModel {
         var attempt = 0
         while true {
             do {
-                switch decision {
-                case .approve:
+                switch (choice, decision) {
+                case (let choice?, _):
+                    _ = try await api.answer(id: id, TimeAnswerRequest(choice: choice.wire), idempotencyKey: key)
+                case (nil, .approve):
                     _ = try await api.approve(id: id, idempotencyKey: key)
-                case .reject:
+                case (nil, .reject):
                     _ = try await api.reject(id: id, RejectRequest(reason: reason), idempotencyKey: key)
                 }
                 removeLocally(id)
@@ -385,8 +395,8 @@ final class ParentModel {
     /// The notification is removed once the item is settled either way.
     @discardableResult
     func handleAction(_ decision: ApprovalDecision, push: ApprovalPush) async -> Outcome {
-        // The push's version isn't needed: the server's 409 already_decided says when it's stale.
-        guard case .pending = push.event else { return .failed }
+        // A stale push is fine: the server's 409 already_decided says so.
+        guard push.event == .pending, !push.isTimeRequest else { return .failed }
         guard isSignedIn else {
             await notifier.post(Self.notSentTitle, "Turn on notifications in OpenCozy on this phone first.")
             return .failed
@@ -404,48 +414,26 @@ final class ParentModel {
         return outcome
     }
 
-    /// A TIME_REQUEST action: answers once, retrying a lost response with the
-    /// same request ID, and says what happened.
+    /// A TIME_REQUEST action: answers once (`POST /api/inbox/{id}/answer`), retrying a lost
+    /// response with the same key, and says what happened.
     @discardableResult
-    func handleTimeAction(_ choice: TimeChoice, push: TimePush) async -> Outcome {
-        guard let version = push.version else { return .failed }
-        guard let api, isSignedIn else {
+    func handleTimeAction(_ choice: TimeChoice, push: ApprovalPush) async -> Outcome {
+        guard push.event == .pending, push.isTimeRequest else { return .failed }
+        guard isSignedIn else {
             await notifier.post(Self.timeNotSentTitle, "Turn on notifications in OpenCozy on this phone first.")
             return .failed
         }
-        let request = TimeAnswerRequest(requestId: UUID().uuidString.lowercased(), expectedVersion: version, choice: choice.wire)
-        var attempt = 0
-        while true {
-            do {
-                try await api.answerTimeRequest(id: push.requestId, request)
-                await notifier.remove(push.requestId)
-                await refresh()
-                return .done
-            } catch let error as APIError where error.isRetryable && attempt < 2 {
-                attempt += 1
-                try? await Task.sleep(for: .seconds(2))
-            } catch {
-                if case APIError.server(let status, let message) = error, status == 404 || status == 409 {
-                    await notifier.remove(push.requestId)
-                    await notifier.post(Self.alreadyHandledTitle, message)
-                    await refresh()
-                    return .alreadyHandled
-                }
-                handle(error)
-                await notifier.post(Self.timeNotSentTitle, errorMessage ?? "Try again in OpenCozy.")
-                return .failed
-            }
+        let outcome = await decide(push.approvalId, decision: choice == .no ? .reject : .approve, choice: choice, retries: 2)
+        switch outcome {
+        case .done:
+            await notifier.remove(push.approvalId)
+        case .alreadyHandled:
+            await notifier.remove(push.approvalId)
+            await notifier.post(Self.alreadyHandledTitle, errorMessage ?? "Someone already answered.")
+        case .failed:
+            await notifier.post(Self.timeNotSentTitle, errorMessage ?? "Try again in OpenCozy.")
         }
-    }
-
-    /// `time.resolved`: answered elsewhere; drop the delivered notification and set the badge.
-    func handleResolvedTimePush(_ push: TimePush) async {
-        guard push.version == nil else { return }
-        await notifier.remove(push.requestId)
-        if let count = push.pendingCount {
-            pendingCount = max(0, count)
-            await notifier.setBadge(pendingCount)
-        }
+        return outcome
     }
 
     static let timeNotSentTitle = "Answer not sent"
@@ -491,6 +479,10 @@ final class ParentModel {
         case APIError.transport:
             isUnreachable = true
             errorMessage = Self.unreachableMessage
+        case APIError.server(410, _):
+            // This server answers the previous server's parent paths `update_app`; parent
+            // mode on the phone moves to this server in a later update (slices 10 and 11).
+            errorMessage = Self.parentModeLater
         case APIError.server(401, let message) where signingIn:
             errorMessage = message
         case APIError.server(401, _):

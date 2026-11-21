@@ -90,7 +90,7 @@ struct ParentHomeView: View {
                 guard watcher.shouldTry(after: url), !model.isSignedIn else { return }
                 Task {
                     let result = await model.enableFromWebSession(deviceName: model.phoneName) { name in
-                        guard let made, let cookie = WebCookies.parentHeader(await made.cookies(), url: origin.appending(path: "api/parent-sessions")) else {
+                        guard let made, let cookie = WebCookies.parentHeader(await made.cookies(), url: origin.appending(path: "api/phone/sessions/web")) else {
                             return nil
                         }
                         return try await ParentSessionMint.send(ParentSessionMint.request(origin: origin, cookie: cookie, deviceName: name))
@@ -169,7 +169,7 @@ struct ParentNotificationsView: View {
         Section {
             if let household = model.household { LabeledContent("Household", value: household.name) }
             if let session = model.session {
-                LabeledContent("This phone", value: session.deviceName)
+                LabeledContent("This phone", value: session.name)
                 LabeledContent("Session expires") { Text(session.expiresAt, format: .dateTime.day().month().year()) }
             }
             Button("Turn on notifications") { AppDelegate.registerForPush() }

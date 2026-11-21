@@ -27,6 +27,7 @@ import { DeviceExpiredPage, KidPage } from './routes/kid';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
 import { CalendarEventPage, CalendarPage, CalendarsPage } from './routes/calendar';
+import { googleOutcomes, type GoogleOutcome } from './routes/calendar-google';
 import { ConnectionsPage } from './routes/connections';
 import { LearningPage } from './routes/learning';
 import { TvsPage } from './routes/tvs';
@@ -306,12 +307,21 @@ const calendarsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/calendars',
   staticData: { title: 'Calendars' },
+  // ?google=<outcome>&connection=<id>: back from connecting Google.
+  validateSearch: (search: Record<string, unknown>): { google?: GoogleOutcome; connection?: string } => {
+    const google = googleOutcomes.find((o) => o === search.google);
+    const connection = typeof search.connection === 'string' && /^[0-9a-f-]{36}$/.test(search.connection) ? search.connection : undefined;
+    return google ? { google, ...(connection ? { connection } : {}) } : {};
+  },
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
     if (!me) throw redirect({ to: '/login' });
   },
-  component: CalendarsPage,
+  component: function Calendars() {
+    const { google, connection } = calendarsRoute.useSearch();
+    return <CalendarsPage google={google} connection={connection} />;
+  },
 });
 
 // Manage: services, assistants and learning apps, each with its own key.

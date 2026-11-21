@@ -27,7 +27,7 @@ func (q *Queries) CountHouseholds(ctx context.Context) (int64, error) {
 const createAdult = `-- name: CreateAdult :one
 INSERT INTO adult (household_id, email, name, password_hash, password_scheme, webauthn_user_handle)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at
+RETURNING id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at, push_muted_until
 `
 
 type CreateAdultParams struct {
@@ -59,6 +59,7 @@ func (q *Queries) CreateAdult(ctx context.Context, arg CreateAdultParams) (Adult
 		&i.WebauthnUserHandle,
 		&i.RemovedAt,
 		&i.CreatedAt,
+		&i.PushMutedUntil,
 	)
 	return i, err
 }
@@ -90,7 +91,7 @@ func (q *Queries) CreateHousehold(ctx context.Context, arg CreateHouseholdParams
 }
 
 const getAdult = `-- name: GetAdult :one
-SELECT id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL
+SELECT id, household_id, email, name, password_hash, password_scheme, webauthn_user_handle, removed_at, created_at, push_muted_until FROM adult WHERE household_id = $1 AND id = $2 AND removed_at IS NULL
 `
 
 type GetAdultParams struct {
@@ -111,12 +112,13 @@ func (q *Queries) GetAdult(ctx context.Context, arg GetAdultParams) (Adult, erro
 		&i.WebauthnUserHandle,
 		&i.RemovedAt,
 		&i.CreatedAt,
+		&i.PushMutedUntil,
 	)
 	return i, err
 }
 
 const getAdultByEmail = `-- name: GetAdultByEmail :one
-SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at FROM adult a
+SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at, a.push_muted_until FROM adult a
 JOIN household h ON h.id = a.household_id
 WHERE a.email = $1 AND a.removed_at IS NULL AND h.archived_at IS NULL
 `
@@ -134,6 +136,7 @@ func (q *Queries) GetAdultByEmail(ctx context.Context, email string) (Adult, err
 		&i.WebauthnUserHandle,
 		&i.RemovedAt,
 		&i.CreatedAt,
+		&i.PushMutedUntil,
 	)
 	return i, err
 }

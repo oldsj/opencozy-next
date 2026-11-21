@@ -368,3 +368,42 @@ func TestVerifiesCertificates(t *testing.T) {
 		t.Fatalf("err = %v, want an unknown-authority error", err)
 	}
 }
+
+// A client with Hosts reaches only those names: never another name, nor an address written
+// out, even one the allowed name resolves to.
+func TestHostsAllowlist(t *testing.T) {
+	var reached atomic.Int32
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reached.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer s.Close()
+	port := serverPort(t, s)
+	// Both loopback addresses stand in for public ones: localhost resolves to each.
+	c, err := build(Options{Name: "test", Timeout: 5 * time.Second, MaxResponseBytes: 1 << 20, Ports: []uint16{port}, Hosts: []string{"localhost"}},
+		func(a netip.Addr) bool {
+			return a.IsLoopback()
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := strconv.Itoa(int(port))
+	resp, err := get(t, c, "http://LOCALHOST:"+p+"/")
+	if err != nil {
+		t.Fatalf("the allowed host: %v", err)
+	}
+	_ = resp.Body.Close()
+	for _, u := range []string{"http://127.0.0.1:" + p + "/", "http://localhost.example.test:" + p + "/", "http://[::1]:" + p + "/"} {
+		if err := try(t, c, u); !errors.Is(err, ErrRefused) {
+			t.Errorf("%s: err = %v, want ErrRefused", u, err)
+		}
+	}
+	if reached.Load() != 1 {
+		t.Errorf("the server was reached %d times, want once", reached.Load())
+	}
+	for _, hosts := range [][]string{{"Upper.example.test"}, {"10.0.0.1"}, {"example.test:443"}, {""}} {
+		if _, err := New(Options{Name: "x", Timeout: time.Second, MaxResponseBytes: 1, Hosts: hosts}); err == nil {
+			t.Errorf("Hosts %q accepted", hosts)
+		}
+	}
+}

@@ -114,7 +114,7 @@ struct ResolvedPushTests {
     @Test func pendingPushIsNotTreatedAsResolved() async {
         let log = NotificationLog()
         let (model, _) = await signedIn([ParentModelTests.approval("a", minutesAgo: 5)], log: log)
-        await model.handleResolvedPush(ApprovalPush(approvalId: "a", event: .pending(version: 1), pendingCount: 0))
+        await model.handleResolvedPush(ApprovalPush(approvalId: "a", event: .pending, pendingCount: 0))
         #expect(log.removed.isEmpty)
         #expect(model.approvals.map(\.id) == ["a"])
     }
@@ -123,7 +123,7 @@ struct ResolvedPushTests {
         let log = NotificationLog()
         let (model, server) = await signedIn([ParentModelTests.approval("a", minutesAgo: 5)], log: log)
         await server.fail([.server(status: 409, message: "Someone already decided this one.")])
-        let outcome = await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1)))
+        let outcome = await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending))
         #expect(outcome == .alreadyHandled)
         #expect(log.removed == ["a"])
         #expect(log.posted.map(\.title) == [ParentModel.alreadyHandledTitle])
@@ -133,7 +133,7 @@ struct ResolvedPushTests {
     @Test func successfulActionClearsTheNotificationQuietly() async {
         let log = NotificationLog()
         let (model, _) = await signedIn([ParentModelTests.approval("a", minutesAgo: 5)], log: log)
-        let outcome = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1)))
+        let outcome = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending))
         #expect(outcome == .done)
         #expect(log.removed == ["a"])
         #expect(log.posted.isEmpty)
@@ -143,7 +143,7 @@ struct ResolvedPushTests {
         let log = NotificationLog()
         let (model, server) = await signedIn([ParentModelTests.approval("a", minutesAgo: 5)], log: log)
         await server.fail([.transport("offline"), .transport("offline"), .transport("offline")])
-        let outcome = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1)))
+        let outcome = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending))
         #expect(outcome == .failed)
         #expect(log.removed.isEmpty)
         #expect(log.posted.map(\.title) == [ParentModel.notSentTitle])
