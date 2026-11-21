@@ -13,8 +13,13 @@ public struct ShieldContent: Codable, Equatable, Sendable {
     public var closesAt: Date?
     /// The latest "Ask for more time" the server knows of.
     public var ask: ShieldAsk?
+    /// The end of the running window when the shield came back only at the allowance's cap
+    /// (the app wasn't open to sync): the child still has time until then.
+    public var runsUntil: Date?
 
-    public init(message: String, bankedSeconds: Int = 0, opensAt: Date? = nil, closesAt: Date? = nil, ask: ShieldAsk? = nil) {
+    public init(message: String, bankedSeconds: Int = 0, opensAt: Date? = nil, closesAt: Date? = nil, ask: ShieldAsk? = nil,
+                runsUntil: Date? = nil) {
+        self.runsUntil = runsUntil
         self.message = message
         self.bankedSeconds = bankedSeconds
         self.opensAt = opensAt
@@ -38,12 +43,22 @@ public enum ShieldText {
     /// Matches the server's default lock message (GET /api/device `household.lockMessage`).
     public static let defaultMessage = "Earn time on the chore board, then spend your points in OpenCozy."
 
-    /// The lock message, then when screen time starts (while allowed hours are
+    /// "Paused" while the window still runs (`runsUntil`), otherwise "Locked".
+    public static func title(_ content: ShieldContent?, now: Date, name: String?) -> String {
+        let paused = content?.runsUntil.map { $0 > now } ?? false
+        return name.map { "\($0) is \(paused ? "paused" : "locked")" } ?? (paused ? "Paused" : "Locked")
+    }
+
+    /// While the window still runs (`runsUntil`), only that. Otherwise the lock message, then when screen time starts (while allowed hours are
     /// closed), then either where a request for more time stands or, with none, the
     /// banked time. `queued` is a request made on this shield that the app has not
     /// sent yet; `canOpenApp` whether the shield's button opens it.
     public static func subtitle(_ content: ShieldContent?, now: Date, queued: Bool = false, canOpenApp: Bool = true,
                                 timeZone: TimeZone = .current, locale: Locale = Locale(identifier: "en_US")) -> String {
+        // Time is still running on the server: say so, not "time is over".
+        if let runsUntil = content?.runsUntil, runsUntil > now {
+            return "Your time runs until \(clock(runsUntil, timeZone: timeZone, locale: locale)). Open OpenCozy to carry on."
+        }
         let message = content?.message.trimmingCharacters(in: .whitespacesAndNewlines)
         var lines = [message.flatMap { $0.isEmpty ? nil : $0 } ?? defaultMessage]
         if let content {

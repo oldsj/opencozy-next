@@ -34,8 +34,13 @@ struct DeviceReassignmentTests {
         await model.refresh()
         #expect(model.childName == "Robin")
         #expect(model.unlockedUntil != nil)
+        // Robin pressed these on the shield just before the move: they aren't Sky's to send.
+        model.lock.store.enqueue(ScreenTimeEvent(id: "00000000-0000-4000-8000-0000000000e9", kind: .oneMoreMinute, at: .now()))
+        model.lock.store.queuedTimeRequest = QueuedTimeRequest(requestId: "00000000-0000-4000-8000-0000000000f9", at: Date())
         await owner.set("00000000-0000-4000-8000-0000000000c2")
         await model.refresh()
+        #expect(model.lock.store.pendingEvents.isEmpty)
+        #expect(model.lock.store.queuedTimeRequest == nil)
         #expect(model.childId == "00000000-0000-4000-8000-0000000000c2")
         #expect(model.childName == "Sky")
         // Robin's window isn't Sky's.
@@ -44,6 +49,34 @@ struct DeviceReassignmentTests {
 }
 
 // MARK: Parent
+
+/// This server answers the previous server's parent paths 410 `update_app`: parent mode on
+/// the phone isn't here yet, which isn't the same as the app being out of date.
+@MainActor
+struct ParentModeLaterTests {
+    struct Gone: ParentAPI {
+        static let gone = APIError.server(status: 410, message: "This app is out of date. Update OpenCozy on this device.")
+        func signIn(_ request: SignInRequest) async throws -> SignInResponse { throw Self.gone }
+        func passkeyOptions() async throws -> PasskeyOptionsResponse { throw Self.gone }
+        func signIn(passkey request: PasskeySessionRequest) async throws -> SignInResponse { throw Self.gone }
+        func session() async throws -> SessionResponse { throw Self.gone }
+        func signOut() async throws { throw Self.gone }
+        func inbox() async throws -> InboxResponse { throw Self.gone }
+        func approve(id: String, idempotencyKey: String) async throws -> Decision { throw Self.gone }
+        func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision { throw Self.gone }
+        func registerPushToken(_ request: PushTokenRequest) async throws { throw Self.gone }
+        func unregisterPushToken() async throws { throw Self.gone }
+    }
+
+    @Test func signInSaysParentModeComesLater() async {
+        let unique = UUID().uuidString
+        let store = ParentStore(keychain: Keychain(service: "org.opencozy.tests.\(unique)"), defaultsSuite: "org.opencozy.tests.\(unique)")
+        let model = ParentModel(store: store, makeAPI: { _, _ in Gone() }, notifier: .none)
+        let ok = await model.signIn(server: "https://opencozy.example.org", email: "adult@example.test", password: "x", deviceName: "Phone")
+        #expect(!ok)
+        #expect(model.errorMessage == ParentModel.parentModeLater)
+    }
+}
 
 struct ApprovalPushTests {
     @Test func pendingPayload() throws {
