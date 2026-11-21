@@ -11,10 +11,15 @@ The OpenCozy server is the source of truth for the unlock window, the device's c
 > server's API (`api/src/devices.yaml`, slice 7). Its screen-time calls are still the previous
 > server's (`/api/v1/screen-time`, `/api/v1/device/...`) until slice 8: this server answers them
 > 404, so the device stays locked and keeps "One more minute" and "Ask for more time" queued
-> without reporting a failed sync. The parent's device approves and rejects through this server's
-> inbox (`/api/inbox`, an `Idempotency-Key` of `<phone session id>:<item id>:approve|reject`,
-> and a 409 shown as Already handled), but signs in, keeps its phone session and registers for
-> pushes on `/api/v1/parent/...` until slices 10 and 11, so it can't sign in here yet.
+> without reporting a failed sync. The parent's device is fully on this server's API
+> (`api/src/phones.yaml`, slice 11): it signs in with a password or passkey
+> (`/api/phone/sessions[/passkey]`), or from the web view's own sign-in
+> (`/api/phone/sessions/web`, so the parent signs in once), keeps an `ocp_` phone session, and
+> registers its APNs token (`PUT /api/phone/session/push`). Notification actions approve, reject
+> (`/api/inbox/{id}/approve|reject`) and answer a request for more time
+> (`/api/inbox/{id}/answer`), with an `Idempotency-Key` of
+> `<phone session id>:<item id>:approve|reject|answer:<choice>`; a 409 is shown as Already
+> handled. The kid device registers its own token at `PUT /api/device/push`.
 
 ## Layout
 

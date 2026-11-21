@@ -96,7 +96,7 @@ struct HTTPOpenCozyAPI: OpenCozyAPI {
     }
 
     func registerPushToken(_ request: PushTokenRequest) async throws {
-        _ = try await http.put("v1/device/push-token", body: request, as: PushTokenResponse.self)
+        _ = try await http.put("device/push", body: request, headers: ["Idempotency-Key": UUID().uuidString.lowercased()], as: PushTokenResponse.self)
     }
 }
 
@@ -209,8 +209,8 @@ struct APITransport: Sendable {
         try Self.decode(type, from: try await send("POST", path, body: body, headers: headers).0)
     }
 
-    func put<B: Encodable, T: Decodable>(_ path: String, body: B, as type: T.Type) async throws -> T {
-        try Self.decode(type, from: try await send("PUT", path, body: body).0)
+    func put<B: Encodable, T: Decodable>(_ path: String, body: B, headers: [String: String] = [:], as type: T.Type) async throws -> T {
+        try Self.decode(type, from: try await send("PUT", path, body: body, headers: headers).0)
     }
 
     func delete(_ path: String) async throws {

@@ -1,73 +1,46 @@
 import Foundation
 import UserNotifications
 
-/// The `opencozy` part of an approval push (contract "Push payloads").
+/// The `opencozy` part of an inbox push (internal/push/notification.go): `approval.pending`
+/// when something enters the inbox (category APPROVAL, or TIME_REQUEST for "more time"), and the
+/// silent `approval.resolved` when it leaves it anywhere.
 struct ApprovalPush: Equatable, Sendable {
     enum Event: Equatable, Sendable {
-        /// Entered the inbox; actions need this version.
-        case pending(version: Int)
-        /// Left the inbox (approved, rejected or withdrawn anywhere).
+        case pending
+        /// Left the inbox (approved, rejected, answered or withdrawn anywhere).
         case resolved
     }
 
+    /// The inbox item's id (`itemId`).
     var approvalId: String
     var event: Event
+    /// The item's kind (`completion`, `routine`, `redemption`, `time_request`); nil when resolved.
+    var kind: String?
     var pendingCount: Int?
 
-    init(approvalId: String, event: Event, pendingCount: Int? = nil) {
+    init(approvalId: String, event: Event, kind: String? = nil, pendingCount: Int? = nil) {
         self.approvalId = approvalId
         self.event = event
+        self.kind = kind
         self.pendingCount = pendingCount
     }
 
     init?(userInfo: [AnyHashable: Any]) {
         guard let body = userInfo["opencozy"] as? [String: Any],
-              let id = body["approvalId"] as? String, !id.isEmpty,
+              let id = body["itemId"] as? String, !id.isEmpty,
               let type = body["type"] as? String else { return nil }
         switch type {
-        case "approval.pending":
-            guard let version = (body["approvalVersion"] as? NSNumber)?.intValue else { return nil }
-            event = .pending(version: version)
-        case "approval.resolved":
-            event = .resolved
-        default:
-            return nil
+        case "approval.pending": event = .pending
+        case "approval.resolved": event = .resolved
+        default: return nil
         }
         approvalId = id
+        kind = body["kind"] as? String
         pendingCount = (body["pendingCount"] as? NSNumber)?.intValue
     }
-}
 
-/// The `opencozy` part of a "more time" push: a child asked from their iPad
-/// (`time.pending`, category TIME_REQUEST) or a parent answered (`time.resolved`).
-struct TimePush: Equatable, Sendable {
-    var requestId: String
-    /// The version an answer needs; nil once resolved.
-    var version: Int?
-    var pendingCount: Int?
-
-    init(requestId: String, version: Int?, pendingCount: Int? = nil) {
-        self.requestId = requestId
-        self.version = version
-        self.pendingCount = pendingCount
-    }
-
-    init?(userInfo: [AnyHashable: Any]) {
-        guard let body = userInfo["opencozy"] as? [String: Any],
-              let id = body["requestId"] as? String, !id.isEmpty,
-              let type = body["type"] as? String else { return nil }
-        switch type {
-        case "time.pending":
-            guard let version = (body["requestVersion"] as? NSNumber)?.intValue else { return nil }
-            self.version = version
-        case "time.resolved":
-            version = nil
-        default:
-            return nil
-        }
-        requestId = id
-        pendingCount = (body["pendingCount"] as? NSNumber)?.intValue
-    }
+    /// A child's "Ask for more time": answered with a `TimeChoice`, not Approve/Reject.
+    var isTimeRequest: Bool { kind == "time_request" }
 }
 
 /// The TIME_REQUEST actions, and the answer each sends.
@@ -135,13 +108,10 @@ enum ApprovalNotifications {
         try? await center.setBadgeCount(pendingCount)
     }
 
-    /// Removes delivered notifications for one approval or time request.
+    /// Removes delivered notifications for one inbox item.
     static func remove(approvalId: String, center: UNUserNotificationCenter = .current()) async {
         let ids = await center.deliveredNotifications()
-            .filter { note in
-                let info = note.request.content.userInfo
-                return ApprovalPush(userInfo: info)?.approvalId == approvalId || TimePush(userInfo: info)?.requestId == approvalId
-            }
+            .filter { ApprovalPush(userInfo: $0.request.content.userInfo)?.approvalId == approvalId }
             .map(\.request.identifier)
         if !ids.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ids) }
     }

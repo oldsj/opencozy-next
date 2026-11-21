@@ -305,8 +305,10 @@ struct WebHandoffTests {
 
     private static let minted = Data(#"""
     { "token": "ocp_from_web",
-      "session": { "id": "s2", "deviceName": "Example phone", "createdAt": "2026-11-07T10:00:00.000Z", "expiresAt": "2027-02-05T10:00:00.000Z", "lastUsedAt": null },
-      "household": { "id": "h", "name": "The Example House" } }
+      "session": { "id": "s2", "adultId": "a", "adultName": "Alex", "name": "Example phone", "createdAt": "2026-11-07T10:00:00.000Z",
+                   "expiresAt": "2027-02-05T10:00:00.000Z", "lastUsedAt": null, "pushRegistered": false, "current": true },
+      "me": { "adult": { "id": "a", "email": "alex@example.test", "name": "Alex" },
+              "household": { "id": "h", "name": "The Example House", "timeZone": "Europe/Amsterdam" } } }
     """#.utf8)
 
     @Test func mintsTheNotificationSessionFromTheWebCookie() async {
@@ -439,7 +441,7 @@ struct WebDataGateTests {
 }
 
 struct WebCookiesTests {
-    let url = URL(string: "https://opencozy.example.org/api/parent-sessions")!
+    let url = URL(string: "https://opencozy.example.org/api/phone/sessions/web")!
 
     private func cookie(_ name: String, domain: String = "opencozy.example.org", path: String = "/", secure: Bool = true,
                         expires: Date? = nil) -> HTTPCookie {
@@ -455,13 +457,13 @@ struct WebCookiesTests {
                        cookie("parent-domain", domain: ".example.org")]
         let names = Set(WebCookies.matching(cookies, url: url).map(\.name))
         #expect(names == ["__Secure-better-auth.session_token", "parent-domain"])
-        #expect(WebCookies.matching([cookie("s")], url: URL(string: "http://opencozy.example.org/api/parent-sessions")!).isEmpty)
+        #expect(WebCookies.matching([cookie("s")], url: URL(string: "http://opencozy.example.org/api/phone/sessions/web")!).isEmpty)
     }
 
     @Test func refusesWhenADeviceCookieIsPresent() {
         #expect(WebCookies.parentHeader([cookie("__Secure-better-auth.session_token"), cookie("__Host-opencozy-device")], url: url) == nil)
         #expect(WebCookies.parentHeader([cookie("better-auth.session_token", secure: false), cookie("opencozy-device", secure: false)],
-                                        url: URL(string: "http://localhost:8765/api/parent-sessions")!.replacingHost("localhost")) == nil)
+                                        url: URL(string: "http://localhost:8765/api/phone/sessions/web")!.replacingHost("localhost")) == nil)
         #expect(WebCookies.parentHeader([], url: url) == nil)
         #expect(WebCookies.parentHeader([cookie("__Secure-better-auth.session_token")], url: url)
                 == "__Secure-better-auth.session_token=v-__Secure-better-auth.session_token")
@@ -470,7 +472,7 @@ struct WebCookiesTests {
     @Test func mintRequestIsNativeWithCookieAndOrigin() throws {
         let request = try ParentSessionMint.request(origin: URL(string: "https://opencozy.example.org")!, cookie: "a=b", deviceName: "Example phone")
         #expect(request.httpMethod == "POST")
-        #expect(request.url?.absoluteString == "https://opencozy.example.org/api/parent-sessions")
+        #expect(request.url?.absoluteString == "https://opencozy.example.org/api/phone/sessions/web")
         #expect(request.value(forHTTPHeaderField: "Cookie") == "a=b")
         #expect(request.value(forHTTPHeaderField: "Origin") == "https://opencozy.example.org")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
