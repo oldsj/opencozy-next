@@ -4499,7 +4499,7 @@ components:
           description: Required for screen_time, refused otherwise
         target:
           $ref: '#/components/schemas/Target'
-          description: For screen_time, which screen (ipad when absent); refused otherwise
+          description: For screen_time, which screen (unchanged when absent); refused otherwise
         available:
           type: boolean
           description: false hides it from children

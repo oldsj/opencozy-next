@@ -1387,7 +1387,7 @@ type RewardEdit struct {
 	// Minutes Required for screen_time, refused otherwise
 	Minutes *int `json:"minutes,omitempty"`
 
-	// Target For screen_time, which screen (ipad when absent); refused otherwise
+	// Target For screen_time, which screen (unchanged when absent); refused otherwise
 	Target *Target `json:"target,omitempty"`
 	Title  Title   `json:"title"`
 }

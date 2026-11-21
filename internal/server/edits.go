@@ -187,9 +187,12 @@ func (s *Server) UpdateReward(ctx context.Context, req api.UpdateRewardRequestOb
 	if screen != (b.Minutes != nil) {
 		return api.UpdateReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(apiError("minutes_mismatch", "Give minutes for iPad time, and none for other rewards."))}, nil
 	}
-	target, ok := rewardTarget(screen, b.Target)
-	if !ok {
+	if !screen && b.Target != nil {
 		return api.UpdateReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTargetMismatch)}, nil
+	}
+	var target *string // absent: screen time keeps its screen
+	if b.Target != nil {
+		target = ptr(string(*b.Target))
 	}
 	var minutes pgtype.Int4
 	if b.Minutes != nil {

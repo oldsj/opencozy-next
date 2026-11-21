@@ -1631,7 +1631,7 @@ export interface components {
             kind: "item" | "screen_time";
             /** @description Required for screen_time, refused otherwise */
             minutes?: number;
-            /** @description For screen_time, which screen (ipad when absent); refused otherwise */
+            /** @description For screen_time, which screen (unchanged when absent); refused otherwise */
             target?: components["schemas"]["Target"];
             /** @description false hides it from children */
             available: boolean;

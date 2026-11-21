@@ -464,7 +464,9 @@ func (q *Queries) SetRedemptionState(ctx context.Context, arg SetRedemptionState
 }
 
 const updateReward = `-- name: UpdateReward :one
-UPDATE reward SET title = $3, cost = $4, kind = $5, minutes = $6, available = $7, screen_time_target = $8, version = version + 1
+UPDATE reward SET title = $3, cost = $4, kind = $5, minutes = $6, available = $7,
+    screen_time_target = CASE WHEN $5 = 'screen_time' THEN COALESCE($8, screen_time_target, 'ipad') END,
+    version = version + 1
 WHERE household_id = $1 AND id = $2 AND archived_at IS NULL AND version = $9
 RETURNING id, household_id, title, cost, kind, minutes, available, archived_at, created_at, version, screen_time_target
 `
@@ -481,6 +483,7 @@ type UpdateRewardParams struct {
 	ExpectedVersion  int32
 }
 
+// Screen time keeps its screen unless the edit names one; an item has none.
 func (q *Queries) UpdateReward(ctx context.Context, arg UpdateRewardParams) (Reward, error) {
 	row := q.db.QueryRow(ctx, updateReward,
 		arg.HouseholdID,
