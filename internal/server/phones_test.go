@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/oldsj/opencozy-next/internal/auth"
+	"github.com/oldsj/opencozy-next/internal/clock"
 	"github.com/oldsj/opencozy-next/internal/config"
 )
 
@@ -227,5 +228,52 @@ func TestAppleAppSiteAssociation(t *testing.T) {
 	r := e.send(cred{}, "GET", "/.well-known/apple-app-site-association", nil)
 	if r.status != 200 || !strings.Contains(string(r.raw), `"TEAM123456.org.example.opencozy"`) {
 		t.Errorf("%d %s", r.status, r.raw)
+	}
+}
+
+func TestTimeRequestPushes(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.APNsKeyID = "KEY1234567" })
+	h := e.house("a", nil)
+	clk := clock.NewFake(time.Now())
+	e.srv.runner.Clock = clk
+	if r := e.send(h.actors["phone"], "PUT", "/api/phone/session/push", map[string]any{"token": testPushToken, "environment": "production"}); r.status != 200 {
+		t.Fatalf("register: %d %s", r.status, r.raw)
+	}
+	ask := "/api/children/" + h.child1.String() + "/time-requests"
+	pending := func() int {
+		n := 0
+		for k, typ := range pushRows(e) {
+			if typ == "approval.pending" && strings.HasPrefix(k, "approval.pending/") {
+				n++
+			}
+		}
+		return n
+	}
+	r := e.send(h.actors["device"], "POST", ask, map[string]any{})
+	if r.status != 201 {
+		t.Fatalf("ask: %d %s", r.status, r.raw)
+	}
+	if pending() != 1 {
+		t.Fatalf("after asking: %v", pushRows(e))
+	}
+	// Asking again at once is the same request and no new push.
+	if r := e.send(h.actors["device"], "POST", ask, map[string]any{}); r.status != 200 || pending() != 1 {
+		t.Fatalf("again at once: %d, %v", r.status, pushRows(e))
+	}
+	// Two minutes later it reminds the parents (old #74): a second push.
+	clk.Advance(3 * time.Minute)
+	if r := e.send(h.actors["device"], "POST", ask, map[string]any{}); r.status != 200 || pending() != 2 {
+		t.Fatalf("reminder: %d, %v", r.status, pushRows(e))
+	}
+	// A parent's answer clears it from the phones.
+	var item string
+	if err := e.owner.QueryRow(context.Background(), `SELECT id FROM approval WHERE kind = 'time_request' AND child_id = $1`, h.child1).Scan(&item); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.send(h.actors["adult"], "POST", "/api/inbox/"+item+"/reject", map[string]any{}); r.status != 200 {
+		t.Fatalf("no: %d %s", r.status, r.raw)
+	}
+	if typ := pushRows(e)["approval.resolved/"+item+"/"+h.adult.String()]; typ != "approval.resolved" {
+		t.Errorf("not cleared: %v", pushRows(e))
 	}
 }

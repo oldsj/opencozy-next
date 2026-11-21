@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -12,12 +13,14 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/ledger"
 	"github.com/oldsj/opencozy-next/internal/push"
+	"github.com/oldsj/opencozy-next/internal/screentime"
 )
 
 // SourceOccurrence is the ledger source kind for points from a chore or routine done on a day.
 const SourceOccurrence = "occurrence"
 
 var (
+	errChoiceRequired = apiError("choice_required", "Choose 30 min, 1 hour, all day or no.")
 	errAlreadyDecided = apiError("already_decided", "Someone already decided this one.")
 	errChildArchived  = apiError("child_archived", "That child is archived. Restore them first.")
 )
@@ -60,6 +63,7 @@ type decision struct {
 	approval dbq.Approval
 	occ      *dbq.Occurrence
 	red      *dbq.Redemption
+	tr       *dbq.TimeRequest
 }
 
 // lockPending finds the approval, locks its child, then the approval and its subject. It
@@ -85,6 +89,15 @@ func lockPending(ctx context.Context, cmd *command.Cmd, id api.Id) (*decision, *
 	}
 	d := &decision{approval: a}
 	switch {
+	case a.TimeRequestID != nil:
+		tr, err := cmd.Q.LockTimeRequest(ctx, dbq.LockTimeRequestParams{HouseholdID: h, ID: *a.TimeRequestID})
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		if tr.State != "pending" {
+			return nil, nil, 0, fmt.Errorf("approval %s: time request %s is %s", a.ID, tr.ID, tr.State)
+		}
+		d.tr = &tr
 	case a.RedemptionID != nil:
 		red, err := cmd.Q.LockRedemption(ctx, dbq.LockRedemptionParams{HouseholdID: h, ID: *a.RedemptionID})
 		if err != nil {
@@ -121,6 +134,9 @@ func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemR
 		return api.ApproveInboxItem404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(*refusal)}, nil
 	case 409:
 		return api.ApproveInboxItem409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(*refusal)}, nil
+	}
+	if d.tr != nil {
+		return api.ApproveInboxItem422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errChoiceRequired)}, nil
 	}
 	now, err := cmd.Now(ctx)
 	if err != nil {
@@ -166,6 +182,13 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 	case 409:
 		return api.RejectInboxItem409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(*refusal)}, nil
 	}
+	if d.tr != nil {
+		decided, _, err := s.answerTimeRequest(ctx, cmd, d, screentime.ChoiceNo, req.Body.Reason)
+		if err != nil {
+			return nil, err
+		}
+		return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
+	}
 	now, err := cmd.Now(ctx)
 	if err != nil {
 		return nil, err
@@ -197,8 +220,9 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 	return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
 }
 
-// pushPending tells the parents' phones about a new inbox item, in its command.
-func (s *Server) pushPending(ctx context.Context, cmd *command.Cmd, ap dbq.Approval) error {
+// pushPending tells the parents' phones about a new inbox item, in its command. askedAt is when
+// it was (last) asked: asking again later is a new push that replaces the first (old #74).
+func (s *Server) pushPending(ctx context.Context, cmd *command.Cmd, ap dbq.Approval, askedAt time.Time) error {
 	if !s.push.Enabled {
 		return nil
 	}
@@ -206,7 +230,7 @@ func (s *Server) pushPending(ctx context.Context, cmd *command.Cmd, ap dbq.Appro
 	if err != nil {
 		return err
 	}
-	key, n := push.ApprovalPending(ap, child.Name, ap.CreatedAt)
+	key, n := push.ApprovalPending(ap, child.Name, askedAt)
 	return s.push.ToAdults(ctx, cmd.Q, ap.HouseholdID, key, n)
 }
 
@@ -214,4 +238,67 @@ func (s *Server) pushPending(ctx context.Context, cmd *command.Cmd, ap dbq.Appro
 func (s *Server) pushResolved(ctx context.Context, cmd *command.Cmd, ap dbq.Approval) error {
 	key, n := push.ApprovalResolved(ap.ID, ap.State)
 	return s.push.ToAdults(ctx, cmd.Q, ap.HouseholdID, key, n)
+}
+
+// answerTimeRequest decides a locked time request and its approval: a yes gives the time at once.
+func (s *Server) answerTimeRequest(ctx context.Context, cmd *command.Cmd, d *decision, choice string, reason *string) (dbq.Approval, dbq.TimeRequest, error) {
+	a := mustActor(ctx)
+	tr, err := screentime.Answer(ctx, cmd, *d.tr, choice, a.AdultID)
+	if err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	now, err := cmd.Now(ctx)
+	if err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	state := "approved"
+	if tr.State == "declined" {
+		state = "rejected"
+	}
+	decided, err := cmd.Q.DecideApproval(ctx, dbq.DecideApprovalParams{
+		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: state, Reason: reason, DecidedBy: &a.AdultID, Now: &now,
+	})
+	if err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	if err := s.pushResolved(ctx, cmd, decided); err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	return decided, tr, screenTimeChanged(ctx, cmd, tr.ChildID)
+}
+
+// AnswerInboxItem answers a child's "Ask for more time".
+func (s *Server) AnswerInboxItem(ctx context.Context, req api.AnswerInboxItemRequestObject) (api.AnswerInboxItemResponseObject, error) {
+	cmd := mustCmd(ctx)
+	d, refusal, status, err := lockPending(ctx, cmd, req.ItemId)
+	if err != nil {
+		return nil, err
+	}
+	switch status {
+	case 404:
+		return api.AnswerInboxItem404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(*refusal)}, nil
+	case 409:
+		return api.AnswerInboxItem409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(*refusal)}, nil
+	}
+	if d.tr == nil {
+		return api.AnswerInboxItem422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(
+			apiError("not_a_time_request", "Only a request for more time is answered this way."))}, nil
+	}
+	decided, tr, err := s.answerTimeRequest(ctx, cmd, d, string(req.Body.Choice), nil)
+	var until screentime.ErrAlreadyUntil
+	if errors.As(err, &until) {
+		rule, rerr := screentime.ChildRule(ctx, cmd.Q, cmd.HouseholdID(), d.tr.ChildID)
+		if rerr != nil {
+			return nil, rerr
+		}
+		c, rerr := cmd.Q.GetChild(ctx, dbq.GetChildParams{HouseholdID: cmd.HouseholdID(), ID: d.tr.ChildID})
+		if rerr != nil {
+			return nil, rerr
+		}
+		return api.AnswerInboxItem409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(apiError("already_until",
+			fmt.Sprintf("%s already has iPad time until %s.", c.Name, clockTime(until.Until, rule.Zone))))}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return api.AnswerInboxItem200JSONResponse{Id: decided.ID, State: api.AnswerInboxItem200JSONResponseBodyState(decided.State), TimeRequest: toTimeRequest(tr)}, nil
 }

@@ -264,7 +264,7 @@ func (s *Server) finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, oc
 	if err != nil {
 		return dbq.Occurrence{}, err
 	}
-	return updated, s.pushPending(ctx, cmd, ap)
+	return updated, s.pushPending(ctx, cmd, ap, ap.CreatedAt)
 }
 
 // CompleteChore marks today's chore done and asks an adult to approve it.
