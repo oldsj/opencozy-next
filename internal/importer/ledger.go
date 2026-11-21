@@ -46,6 +46,8 @@ type oldEntry struct {
 	undoes *uuid.UUID
 	// The adult who approved the completion this award paid for.
 	approver *string
+	// A spend on a reward still waiting for an adult's answer (James: not carried).
+	waiting bool
 }
 
 // newEntry is the row it becomes.
@@ -65,7 +67,8 @@ type newEntry struct {
 // refunds name the row they undo, so the new same-source trigger checks each one. The active
 // awards are rebuilt from awards minus reversals and compared with the old chore_active_award.
 // The rows are written oldest first under the new never-below-zero trigger, so the import fails
-// if the old history ever went below zero.
+// if the old history ever went below zero. A spend on a reward still waiting for an adult's answer
+// is not carried, as the waiting reward isn't: those points go back to the child.
 func importLedger(ctx context.Context, x *run) error {
 	x.r.columnsRead("point_ledger", "household_id", "id", "child_id", "occurrence_id", "redemption_id", "reward_entry_type",
 		"routine_occurrence_id", "routine_entry_type", "delta", "created_at", "external_award_id", "external_entry_type",
@@ -81,7 +84,7 @@ func importLedger(ctx context.Context, x *run) error {
 		       co.chore_id, ro.routine_id, COALESCE(co.local_day, ro.local_day),
 		       l.redemption_id, l.reward_entry_type, l.routine_entry_type, l.external_award_id, l.external_entry_type,
 		       COALESCE(car.award_id, ra.id, rs.id, ea.id),
-		       ca.decided_by
+		       ca.decided_by, COALESCE(rr.state = 'pending', false)
 		FROM opencozy.point_ledger l
 		LEFT JOIN opencozy.chore_occurrence co ON co.household_id = l.household_id AND co.id = l.occurrence_id
 		LEFT JOIN opencozy.routine_occurrence ro ON ro.household_id = l.household_id AND ro.id = l.routine_occurrence_id
@@ -93,7 +96,8 @@ func importLedger(ctx context.Context, x *run) error {
 		LEFT JOIN opencozy.point_ledger ea ON l.external_entry_type = 'reversal' AND ea.household_id = l.household_id
 		     AND ea.external_award_id = l.external_award_id AND ea.external_entry_type = 'award'
 		LEFT JOIN opencozy.completion_approval ca ON ca.household_id = l.household_id AND ca.ledger_id = l.id
-		     AND ca.state = 'approved'`)
+		     AND ca.state = 'approved'
+		LEFT JOIN opencozy.reward_redemption rr ON rr.household_id = l.household_id AND rr.id = l.redemption_id`)
 	if err != nil {
 		return safe(err)
 	}
@@ -101,7 +105,7 @@ func importLedger(ctx context.Context, x *run) error {
 	for rows.Next() {
 		var e oldEntry
 		if err := rows.Scan(&e.household, &e.id, &e.child, &e.delta, &e.created, &e.choreDef, &e.routineDef, &e.localDay,
-			&e.redemption, &e.rewardType, &e.routineType, &e.external, &e.externalType, &e.undoes, &e.approver); err != nil {
+			&e.redemption, &e.rewardType, &e.routineType, &e.external, &e.externalType, &e.undoes, &e.approver, &e.waiting); err != nil {
 			return safe(err)
 		}
 		olds = append(olds, e)
@@ -111,7 +115,15 @@ func importLedger(ctx context.Context, x *run) error {
 	}
 
 	entries := make([]newEntry, 0, len(olds))
+	var waiting, returned int64
 	for _, o := range olds {
+		if o.waiting {
+			// A reward still waiting for an answer isn't carried (James, 2026-11-21): its spend
+			// isn't either, so the points go back to the child, who can ask again.
+			waiting++
+			returned -= int64(o.delta)
+			continue
+		}
 		e, err := x.mapEntry(o)
 		if err != nil {
 			return err
@@ -149,8 +161,18 @@ func importLedger(ctx context.Context, x *run) error {
 			choreReversals = append(choreReversals, e.old.id)
 		}
 	}
-	if err := reconcile(ctx, x, "point_ledger", int64(len(entries)), "point_ledger"); err != nil {
+	src, err := count(ctx, x.src, "point_ledger")
+	if err != nil {
 		return err
+	}
+	got, err := countNew(ctx, x.dst, "point_ledger")
+	if err != nil {
+		return err
+	}
+	x.r.table("point_ledger", src, "point_ledger", int64(len(entries)), got)
+	x.r.check("point_ledger rows read = carried + spends on waiting rewards", src, int64(len(entries))+waiting)
+	if waiting > 0 {
+		x.r.note("point_ledger", fmt.Sprintf("%d spends on rewards still waiting for an answer not carried: %d points go back to the children", waiting, returned))
 	}
 
 	// Active awards: every award not reversed.
@@ -172,11 +194,10 @@ func importLedger(ctx context.Context, x *run) error {
 	}
 
 	// chore_award_reversal became the chore reversals' reverses_id.
-	src, err := count(ctx, x.src, "chore_award_reversal")
+	src, err = count(ctx, x.src, "chore_award_reversal")
 	if err != nil {
 		return err
 	}
-	var got int64
 	if err := x.dst.QueryRow(ctx, `SELECT count(*) FROM point_ledger WHERE id = ANY($1) AND kind = 'reversal' AND reverses_id IS NOT NULL`,
 		choreReversals).Scan(&got); err != nil {
 		return safe(err)
@@ -373,8 +394,12 @@ func importExternalAwards(ctx context.Context, x *run, entries []newEntry) error
 
 // checkBalances compares every child's balance, and the total, in both apps.
 func checkBalances(ctx context.Context, x *run) error {
-	rows, err := x.src.Query(ctx, `SELECT c.household_id, c.id, COALESCE(sum(l.delta), 0)::bigint FROM opencozy.child c
+	// Each child's old balance, plus what they spent on rewards still waiting for an answer
+	// (those points come back; see importLedger).
+	rows, err := x.src.Query(ctx, `SELECT c.household_id, c.id, COALESCE(sum(l.delta) FILTER (WHERE rr.state IS DISTINCT FROM 'pending'), 0)::bigint
+		FROM opencozy.child c
 		LEFT JOIN opencozy.point_ledger l ON l.household_id = c.household_id AND l.child_id = c.id
+		LEFT JOIN opencozy.reward_redemption rr ON rr.household_id = l.household_id AND rr.id = l.redemption_id
 		GROUP BY c.household_id, c.id`)
 	if err != nil {
 		return safe(err)
@@ -409,8 +434,8 @@ func checkBalances(ctx context.Context, x *run) error {
 	if err := x.dst.QueryRow(ctx, `SELECT COALESCE(sum(delta), 0)::bigint FROM point_ledger`).Scan(&newTotal); err != nil {
 		return safe(err)
 	}
-	x.r.check("children whose balance matches", int64(len(olds)), equal)
-	x.r.check("points held, all children", oldTotal, newTotal)
+	x.r.check("children whose balance matches (+ waiting rewards' points)", int64(len(olds)), equal)
+	x.r.check("points held, all children (+ waiting rewards' points)", oldTotal, newTotal)
 	return nil
 }
 

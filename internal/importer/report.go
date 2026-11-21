@@ -141,6 +141,11 @@ var notCarried = map[string]string{
 	"device_pairing":      "pairing offers",
 	"device_web_session":  "device web sessions",
 	"calendar_occurrence": "calendar events: each feed's first refresh rebuilds them",
+	// James, 2026-11-21:
+	"display_session":   "wall displays: pair each display again",
+	"parent_session":    "phone sessions and their push tokens: phones get a new build and sign in again",
+	"owner_bootstrap":   "the first-owner setup token: an imported household already has its owner",
+	"screen_time_event": "the iPad shield event log",
 }
 
 // coverage adds every old table no mapping mentioned, and checks that each mapped table's
