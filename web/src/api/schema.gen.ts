@@ -423,6 +423,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/display/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What this wall display may show
+         * @description Its scopes, so the board offers only the tabs it can load.
+         */
+        get: operations["getDisplaySession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/displays": {
         parameters: {
             query?: never;
@@ -435,7 +455,7 @@ export interface paths {
         put?: never;
         /**
          * Pair the wall display showing this code
-         * @description Needs a sign-in within the last 10 minutes.
+         * @description Needs a sign-in within the last 10 minutes. Every display gets `today`, whatever else it is given.
          */
         post: operations["createDisplay"];
         delete?: never;
@@ -1378,6 +1398,129 @@ export interface paths {
         patch: operations["updateCalendar"];
         trace?: never;
     };
+    "/calendar/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start connecting a Google account
+         * @description Returns Google's consent page to open in this browser. Google sends the adult back to
+         *     `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
+         *     within ten minutes. 422 `not_configured` when this server has no Google client
+         *     (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+         *     (`too_many`), since connecting an account that is already connected must still work.
+         */
+        post: operations["connectGoogle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Google sends the adult back after consent
+         * @description Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
+         *     `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
+         *     calendar permission was unticked), `expired` (no such connect for this adult, or used or
+         *     older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+         *     token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+         *     connected replaces its token and clears "reconnect needed".
+         */
+        get: operations["googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Google accounts this household has connected
+         * @description Tokens are never returned. `enabled` is false when this server has no Google client.
+         */
+        get: operations["listGoogleConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect a Google account, with every calendar followed through it
+         * @description Deletes the account's token and stops following its calendars, with their events and who
+         *     they were for. After the change commits, the server asks Google to revoke the token (best
+         *     effort). Google revokes the whole grant, so the same Google account connected in another
+         *     household on this server has to be connected again there.
+         */
+        delete: operations["disconnectGoogle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The calendars a connected Google account can read
+         * @description Asks Google. 422 `reconnect_needed` when Google no longer accepts the account's token;
+         *     502 `google_unavailable` when Google could not be reached.
+         */
+        get: operations["listGoogleCalendars"];
+        put?: never;
+        /**
+         * Follow one of a connected account's calendars
+         * @description The first refresh runs within a minute. 409 `calendar_exists` when the household already
+         *     follows it; 422 `too_many_calendars` past 50, `reconnect_needed` when the account must be
+         *     connected again.
+         */
+        post: operations["followGoogleCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/learning/rules": {
         parameters: {
             query?: never;
@@ -1980,6 +2123,9 @@ export interface components {
             /** @enum {string} */
             status: "waiting";
         };
+        DisplaySession: {
+            scopes: components["schemas"]["DisplayScope"][];
+        };
         NewDisplay: {
             code: string;
             name: string;
@@ -2212,8 +2358,114 @@ export interface components {
             submittedAt: string;
             minutesRequested?: number;
         };
+        /** @enum {string} */
+        TvPower: "on" | "off" | "unknown";
+        /** @description HH:MM, household time */
+        Clock: string;
+        /** @enum {string} */
+        Weekday: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+        /** @description One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day. */
+        OpenHours: {
+            start: components["schemas"]["Clock"];
+            end: components["schemas"]["Clock"];
+            days?: components["schemas"]["Weekday"][];
+        };
+        Tv: {
+            id: components["schemas"]["Id"];
+            name: string;
+            room: string | null;
+            macs: string[];
+            haEntityId: string | null;
+            power: components["schemas"]["TvPower"];
+            /** Format: date-time */
+            powerChangedAt: string | null;
+            openHours: components["schemas"]["OpenHours"] | null;
+            version: components["schemas"]["Version"];
+        };
+        /** @description Open until closesAt, or closed until opensAt */
+        WindowStatus: {
+            open: boolean;
+            /** Format: date-time */
+            closesAt?: string;
+            /** Format: date-time */
+            opensAt?: string;
+        };
+        TvSession: {
+            id: components["schemas"]["Id"];
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            /** @enum {string} */
+            watcher: "parents" | "child";
+            childId: components["schemas"]["Id"] | null;
+            childName: string | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** @enum {string|null} */
+            endReason: "tv_off" | "time_up" | "parent_ended" | "done" | "open_hours" | "parent_override" | null;
+            /**
+             * Format: date-time
+             * @description A running session's end at the latest (parents, the 4-hour safety cap)
+             */
+            endsAt: string | null;
+            secondsRemaining: number | null;
+            /** @description The child's allowed hours end it before their time runs out */
+            endsWithHours: boolean;
+            watchedSeconds: number;
+        };
+        TvPrompt: {
+            id: components["schemas"]["Id"];
+            version: components["schemas"]["Version"];
+            /** @enum {string} */
+            source: "home_assistant" | "router" | "display" | "adult";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description A TV and where it stands now. */
+        TvState: components["schemas"]["Tv"] & {
+            /** @description Online without a session (open hours, or opened by a parent) */
+            open: boolean;
+            /**
+             * Format: date-time
+             * @description When the open TV is gated again; null while gated
+             */
+            openClosesAt: string | null;
+            /**
+             * Format: date-time
+             * @description A parent's "Open TVs" end, while one is active
+             */
+            openUntil: string | null;
+            /** @enum {string|null} */
+            openReason: "open_hours" | "parent" | null;
+            openHoursNow: components["schemas"]["WindowStatus"] | null;
+            session: components["schemas"]["TvSession"] | null;
+            prompt: components["schemas"]["TvPrompt"] | null;
+        };
+        /** @description A live child as "Turn on for…" and "Who's watching?" offer them. */
+        TvChild: {
+            childId: components["schemas"]["Id"];
+            name: string;
+            color: string;
+            tvSecondsRemaining: number;
+            watchingTvId: components["schemas"]["Id"] | null;
+            /** @description The child's allowed hours now; null with no rule */
+            hours: components["schemas"]["WindowStatus"] | null;
+            /** @description Has TV time, is inside their hours and isn't watching another TV */
+            canWatch: boolean;
+            /** @description canWatch, not watching, and has a paired device to start it from */
+            canStartOwn: boolean;
+        };
+        TvList: {
+            /** Format: date-time */
+            serverTime: string;
+            tvs: components["schemas"]["TvState"][];
+            children: components["schemas"]["TvChild"][];
+        };
         Inbox: {
             items: components["schemas"]["InboxItem"][];
+            /** @description The TVs asking "Who's watching?" now (only those), with each child's TV time, to answer with answerTvPrompt. */
+            tvs: components["schemas"]["TvList"];
         };
         Decision: {
             id: components["schemas"]["Id"];
@@ -2248,10 +2500,10 @@ export interface components {
             endsAt: string;
         };
         /** @description A time of day, HH:MM, 24-hour, household time */
-        Clock: string;
+        "Clock-2": string;
         HoursWindow: {
-            start: components["schemas"]["Clock"];
-            end: components["schemas"]["Clock"];
+            start: components["schemas"]["Clock-2"];
+            end: components["schemas"]["Clock-2"];
         };
         AllowedHours: {
             schoolNight: components["schemas"]["HoursWindow"];
@@ -2307,7 +2559,7 @@ export interface components {
             allowedHours?: components["schemas"]["AllowedHours"];
             hoursNow?: components["schemas"]["HoursNow"];
             timeRequest?: components["schemas"]["TimeRequest"];
-            /** @description Banked time with some left, oldest first (spent in this order) */
+            /** @description Banked time with some left, oldest first (spent in this order); the oldest 200, while bankedSeconds is the whole bank */
             credits: components["schemas"]["Credit"][];
             webFilter: components["schemas"]["WebFilter"];
         };
@@ -2353,14 +2605,6 @@ export interface components {
             endsAt: string;
             secondsRemaining: number;
             endsWithHours: boolean;
-        };
-        /** @description Open until closesAt, or closed until opensAt */
-        WindowStatus: {
-            open: boolean;
-            /** Format: date-time */
-            closesAt?: string;
-            /** Format: date-time */
-            opensAt?: string;
         };
         ChildTv: {
             /** Format: date-time */
@@ -2578,6 +2822,8 @@ export interface components {
             /** Format: date-time */
             lastSyncAt?: string;
             error?: components["schemas"]["CalendarErrorCode"];
+            /** @description For a Google calendar, the account it is followed through */
+            googleConnectionId?: components["schemas"]["Id"];
             version: number;
         };
         CalendarList: {
@@ -2596,6 +2842,39 @@ export interface components {
             color: components["schemas"]["ProfileColor"];
             showOnDisplay: boolean;
             expectedVersion: number;
+        };
+        GoogleConnectStart: {
+            /** @description Google's consent page; open it in this browser tab. */
+            authorizeUrl: string;
+        };
+        GoogleConnection: {
+            id: components["schemas"]["Id"];
+            email: string;
+            /** @description Google no longer accepts the token; connect the account again. */
+            needsReconnect: boolean;
+            /** @description How many of its calendars the household follows */
+            calendars: number;
+            version: number;
+        };
+        GoogleConnectionList: {
+            enabled: boolean;
+            connections: components["schemas"]["GoogleConnection"][];
+        };
+        GoogleCalendar: {
+            googleId: string;
+            name: string;
+            primary: boolean;
+            /** @description Set when the household follows it */
+            calendarId?: components["schemas"]["Id"];
+        };
+        GoogleCalendarList: {
+            calendars: components["schemas"]["GoogleCalendar"][];
+        };
+        NewGoogleCalendar: {
+            googleId: string;
+            name: components["schemas"]["CalendarName"];
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
         };
         AwardRule: {
             id: components["schemas"]["Id"];
@@ -2654,102 +2933,6 @@ export interface components {
              * @description The child's balance now
              */
             balance: number;
-        };
-        /** @enum {string} */
-        TvPower: "on" | "off" | "unknown";
-        /** @description HH:MM, household time */
-        "Clock-2": string;
-        /** @enum {string} */
-        Weekday: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
-        /** @description One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day. */
-        OpenHours: {
-            start: components["schemas"]["Clock-2"];
-            end: components["schemas"]["Clock-2"];
-            days?: components["schemas"]["Weekday"][];
-        };
-        Tv: {
-            id: components["schemas"]["Id"];
-            name: string;
-            room: string | null;
-            macs: string[];
-            haEntityId: string | null;
-            power: components["schemas"]["TvPower"];
-            /** Format: date-time */
-            powerChangedAt: string | null;
-            openHours: components["schemas"]["OpenHours"] | null;
-            version: components["schemas"]["Version"];
-        };
-        TvSession: {
-            id: components["schemas"]["Id"];
-            tvId: components["schemas"]["Id"];
-            tvName: string;
-            /** @enum {string} */
-            watcher: "parents" | "child";
-            childId: components["schemas"]["Id"] | null;
-            childName: string | null;
-            /** Format: date-time */
-            startedAt: string;
-            /** Format: date-time */
-            endedAt: string | null;
-            /** @enum {string|null} */
-            endReason: "tv_off" | "time_up" | "parent_ended" | "done" | "open_hours" | "parent_override" | null;
-            /**
-             * Format: date-time
-             * @description A running session's end at the latest (parents, the 4-hour safety cap)
-             */
-            endsAt: string | null;
-            secondsRemaining: number | null;
-            /** @description The child's allowed hours end it before their time runs out */
-            endsWithHours: boolean;
-            watchedSeconds: number;
-        };
-        TvPrompt: {
-            id: components["schemas"]["Id"];
-            version: components["schemas"]["Version"];
-            /** @enum {string} */
-            source: "home_assistant" | "router" | "display" | "adult";
-            /** Format: date-time */
-            createdAt: string;
-        };
-        /** @description A TV and where it stands now. */
-        TvState: components["schemas"]["Tv"] & {
-            /** @description Online without a session (open hours, or opened by a parent) */
-            open: boolean;
-            /**
-             * Format: date-time
-             * @description When the open TV is gated again; null while gated
-             */
-            openClosesAt: string | null;
-            /**
-             * Format: date-time
-             * @description A parent's "Open TVs" end, while one is active
-             */
-            openUntil: string | null;
-            /** @enum {string|null} */
-            openReason: "open_hours" | "parent" | null;
-            openHoursNow: components["schemas"]["WindowStatus"] | null;
-            session: components["schemas"]["TvSession"] | null;
-            prompt: components["schemas"]["TvPrompt"] | null;
-        };
-        /** @description A live child as "Turn on for…" and "Who's watching?" offer them. */
-        TvChild: {
-            childId: components["schemas"]["Id"];
-            name: string;
-            color: string;
-            tvSecondsRemaining: number;
-            watchingTvId: components["schemas"]["Id"] | null;
-            /** @description The child's allowed hours now; null with no rule */
-            hours: components["schemas"]["WindowStatus"] | null;
-            /** @description Has TV time, is inside their hours and isn't watching another TV */
-            canWatch: boolean;
-            /** @description canWatch, not watching, and has a paired device to start it from */
-            canStartOwn: boolean;
-        };
-        TvList: {
-            /** Format: date-time */
-            serverTime: string;
-            tvs: components["schemas"]["TvState"][];
-            children: components["schemas"]["TvChild"][];
         };
         TvName: string;
         Room: string | null;
@@ -3033,6 +3216,7 @@ export interface components {
         IdempotencyKey: string;
         ItemId: components["schemas"]["Id"];
         ChildId: components["schemas"]["Id"];
+        ConnectionId: components["schemas"]["Id"];
         TvId: components["schemas"]["Id"];
     };
     requestBodies: never;
@@ -3988,6 +4172,29 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getDisplaySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This display's scopes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplaySession"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             default: components["responses"]["Error"];
         };
     };
@@ -6387,6 +6594,199 @@ export interface operations {
         responses: {
             /** @description Updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSource"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    connectGoogle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open authorizeUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectStart"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    googleCallback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the calendars screen */
+            303: {
+                headers: {
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accounts, by address */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectionList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    disconnectGoogle: {
+        parameters: {
+            query: {
+                expectedVersion: number;
+            };
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account's calendars */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleCalendarList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    followGoogleCalendar: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "googleId": "family@group.calendar.example.test",
+                 *       "name": "Family",
+                 *       "color": "sky",
+                 *       "showOnDisplay": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewGoogleCalendar"];
+            };
+        };
+        responses: {
+            /** @description Following */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

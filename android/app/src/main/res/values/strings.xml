@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenCozy Display</string>
+    <string name="setup_title">Connect this display</string>
+    <string name="setup_body">Type your OpenCozy address. The display then shows a code to pair it from Manage → Displays.</string>
+    <string name="setup_hint">family.example.test</string>
+    <string name="setup_invalid">Type an https address, like family.example.test, with nothing after it.</string>
+    <string name="connect">Connect</string>
+    <string name="problem_title">Can’t reach OpenCozy</string>
+    <string name="problem_network">No connection to the server. Trying again in a moment.</string>
+    <string name="problem_server">The server had a problem. Trying again in a moment.</string>
+    <string name="problem_tls">The secure connection failed. Check the network and this device’s date and time.</string>
+    <string name="try_again">Try again</string>
+    <string name="change_server">Change server</string>
+</resources>

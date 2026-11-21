@@ -81,8 +81,9 @@ export function DevicesPage() {
     ask();
   };
 
-  // A device that wasn't there when the offer was made has paired: close the sheet.
-  const arrived = pairing?.offer ? list.find((d) => !pairing.known.includes(d.id)) : undefined;
+  // A device for this child that wasn't there when the offer was made has paired: close the
+  // sheet. Another child's new device (a second adult pairing at the same time) is not it.
+  const arrived = pairing?.offer ? list.find((d) => d.child?.id === pairing.child?.id && !pairing.known.includes(d.id)) : undefined;
   const arrivedName = useRef<string | null>(null);
   useEffect(() => {
     if (arrived && arrivedName.current !== arrived.id) {
