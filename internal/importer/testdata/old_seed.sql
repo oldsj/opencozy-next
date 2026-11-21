@@ -28,6 +28,8 @@ INSERT INTO child (household_id, id, name, color, created_at, archived_at) VALUE
 -- Avery may start screen time 15:00-19:00 on school nights, 09:00-20:00 at weekends.
 UPDATE child SET school_night_start = 900, school_night_end = 1140, weekend_start = 540, weekend_end = 1200
 WHERE id = '0190a000-0000-7000-8000-0000000000c1';
+-- Rowan's rule is half set (the old check let that through): carried as none.
+UPDATE child SET school_night_start = 900 WHERE id = '0190a000-0000-7000-8000-0000000000c2';
 
 -- Two service credentials whose scopes all have a new name (the router's tv:gate since slice 9),
 -- and an assistant whose scope waits on a later slice.
