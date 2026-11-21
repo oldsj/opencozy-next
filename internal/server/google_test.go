@@ -151,9 +151,14 @@ func TestGoogleConnectFlow(t *testing.T) {
 	}
 
 	list := e.send(h.actors["phone"], "GET", "/api/calendar/google/connections", nil)
-	cs := list.body["connections"].([]any)
-	if list.body["enabled"] != true || len(cs) != 1 || cs[0].(map[string]any)["email"] != "parent@example.test" ||
-		cs[0].(map[string]any)["version"] != float64(2) || strings.Contains(string(list.raw), "fixture") {
+	var mine map[string]any // the fixture's own account (needing a reconnect) is listed too
+	for _, c := range list.body["connections"].([]any) {
+		if c.(map[string]any)["id"] == conn {
+			mine = c.(map[string]any)
+		}
+	}
+	if list.body["enabled"] != true || len(list.body["connections"].([]any)) != 2 || mine == nil || mine["email"] != "parent@example.test" ||
+		mine["version"] != float64(2) || mine["needsReconnect"] != false || strings.Contains(string(list.raw), "fixture") {
 		t.Fatalf("connections: %s", list.raw)
 	}
 	if r := e.send(other.actors["adult"], "GET", "/api/calendar/google/connections/"+conn+"/calendars", nil); r.status != 404 {

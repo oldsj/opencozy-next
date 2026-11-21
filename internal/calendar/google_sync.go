@@ -67,7 +67,7 @@ func rekeyGoogleTokens(ctx context.Context, pool *pgxpool.Pool, kr *keyring.Keyr
 		if !did {
 			continue
 		}
-		if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: r.ID, RefreshToken: sealed}); err != nil {
+		if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: r.ID, RefreshToken: &sealed}); err != nil {
 			return changed, err
 		}
 		changed++
@@ -119,10 +119,10 @@ func syncGoogle(ctx context.Context, fence Txer, kr *keyring.Keyring, g *Google,
 	} else if err != nil {
 		return err
 	}
-	if conn.NeedsReconnect {
+	if conn.NeedsReconnect || conn.RefreshToken == nil {
 		return failed(CodeTokenExpired, errors.New("the Google account needs connecting again"))
 	}
-	refresh, err := OpenGoogleToken(kr, conn.HouseholdID, conn.ID, conn.RefreshToken)
+	refresh, err := OpenGoogleToken(kr, conn.HouseholdID, conn.ID, *conn.RefreshToken)
 	if err != nil {
 		log.ErrorContext(ctx, "Google refresh token does not decrypt", "connection", conn.ID, "err", err)
 		return failed(CodeTokenExpired, err)
@@ -142,7 +142,7 @@ func syncGoogle(ctx context.Context, fence Txer, kr *keyring.Keyring, g *Google,
 			return err
 		}
 		if err := fence.Tx(ctx, func(q *dbq.Queries) error {
-			return q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: conn.ID, RefreshToken: sealed})
+			return q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: conn.ID, RefreshToken: &sealed})
 		}); err != nil {
 			return err
 		}

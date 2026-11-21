@@ -89,7 +89,7 @@ type CreateGoogleConnectionParams struct {
 	Subject      string
 	Email        string
 	Scope        string
-	RefreshToken string
+	RefreshToken *string
 }
 
 func (q *Queries) CreateGoogleConnection(ctx context.Context, arg CreateGoogleConnectionParams) (CalendarGoogleConnection, error) {
@@ -164,9 +164,9 @@ type DeleteGoogleConnectionParams struct {
 	ExpectedVersion int32
 }
 
-func (q *Queries) DeleteGoogleConnection(ctx context.Context, arg DeleteGoogleConnectionParams) (string, error) {
+func (q *Queries) DeleteGoogleConnection(ctx context.Context, arg DeleteGoogleConnectionParams) (*string, error) {
 	row := q.db.QueryRow(ctx, deleteGoogleConnection, arg.HouseholdID, arg.ID, arg.ExpectedVersion)
-	var refresh_token string
+	var refresh_token *string
 	err := row.Scan(&refresh_token)
 	return refresh_token, err
 }
@@ -343,7 +343,7 @@ func (q *Queries) ListGoogleOAuthStates(ctx context.Context) ([]ListGoogleOAuthS
 }
 
 const listGoogleRefreshTokens = `-- name: ListGoogleRefreshTokens :many
-SELECT id, household_id, refresh_token FROM calendar_google_connection ORDER BY id
+SELECT id, household_id, refresh_token::text FROM calendar_google_connection WHERE refresh_token IS NOT NULL ORDER BY id
 `
 
 type ListGoogleRefreshTokensRow struct {
@@ -384,7 +384,7 @@ type ReconnectGoogleConnectionParams struct {
 	ID           uuid.UUID
 	Email        string
 	Scope        string
-	RefreshToken string
+	RefreshToken *string
 }
 
 func (q *Queries) ReconnectGoogleConnection(ctx context.Context, arg ReconnectGoogleConnectionParams) (CalendarGoogleConnection, error) {
@@ -430,7 +430,7 @@ UPDATE calendar_google_connection SET refresh_token = $2 WHERE id = $1
 
 type SetGoogleRefreshTokenParams struct {
 	ID           uuid.UUID
-	RefreshToken string
+	RefreshToken *string
 }
 
 func (q *Queries) SetGoogleRefreshToken(ctx context.Context, arg SetGoogleRefreshTokenParams) error {

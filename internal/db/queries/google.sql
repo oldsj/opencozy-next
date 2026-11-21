@@ -56,7 +56,7 @@ UPDATE calendar_google_connection SET needs_reconnect = true WHERE id = $1;
 UPDATE calendar_google_connection SET refresh_token = $2 WHERE id = $1;
 
 -- name: ListGoogleRefreshTokens :many
-SELECT id, household_id, refresh_token FROM calendar_google_connection ORDER BY id;
+SELECT id, household_id, refresh_token::text FROM calendar_google_connection WHERE refresh_token IS NOT NULL ORDER BY id;
 
 -- name: WakeGoogleSources :exec
 UPDATE calendar_source SET next_sync_at = now() WHERE household_id = $1 AND google_connection_id = $2;

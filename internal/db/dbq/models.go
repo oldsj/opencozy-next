@@ -102,7 +102,7 @@ type CalendarGoogleConnection struct {
 	Subject        string
 	Email          string
 	Scope          string
-	RefreshToken   string
+	RefreshToken   *string
 	NeedsReconnect bool
 	Version        int32
 	CreatedAt      time.Time

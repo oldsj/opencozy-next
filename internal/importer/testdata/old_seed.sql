@@ -81,3 +81,25 @@ INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, ve
 INSERT INTO calendar_assignment_person (household_id, assignment_id, child_id) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b5', '0190a000-0000-7000-8000-0000000000c1'),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000b7', '0190a000-0000-7000-8000-0000000000c2');
+
+-- Slice 13b: two Google accounts (fictional; the token opens with oldsecret's fixture secret), one
+-- connected and one the old app already needed connected again. A calendar of each, a recurring
+-- series on the first with an assignment for one child, and a calendar whose account is gone.
+INSERT INTO calendar_google_connection (household_id, id, google_subject, account_email, status, scope, refresh_token_encrypted, access_token_encrypted, access_token_expires_at, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000101', '1001', 'Parent@Example.test', 'connected', 'openid email https://www.googleapis.com/auth/calendar.readonly',
+   '872dc466ff84ba59ca64297f:b995293500d7e16c130cef443823d573:d5582b7fa0096d63824808adf3a34e0422fe027ae99fda0f6574e28a', 'fixture-access-token-ciphertext', '2026-01-08T09:00:00Z', '2026-01-07T09:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000102', '1002', 'other@example.test', 'needs_reauth', 'openid email https://www.googleapis.com/auth/calendar.readonly',
+   'not-a-ciphertext', NULL, NULL, '2026-01-07T10:00:00Z');
+INSERT INTO calendar_source (household_id, id, provider, name, show_on_display, version, created_at, google_connection_id, google_calendar_id, google_sync_token) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000111', 'google', 'Family', true, 3, '2026-01-07T09:05:00Z', '0190a000-0000-7000-8000-000000000101', 'family@group.calendar.example.test', 'fixture-sync-token'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000112', 'google', 'Work', false, 1, '2026-01-07T10:05:00Z', '0190a000-0000-7000-8000-000000000102', 'other@example.test', NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000113', 'google', 'Gone', true, 1, '2026-01-07T11:05:00Z', '0190a000-0000-7000-8000-000000000199', 'gone@example.test', NULL);
+INSERT INTO calendar_series (household_id, id, source_id, provider_uid, summary, all_day, recurring, status, content_hash, removed_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000121', '0190a000-0000-7000-8000-000000000111', 'fixtureevent0001', 'Piano', false, true, 'confirmed', repeat('e', 64), NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000122', '0190a000-0000-7000-8000-000000000113', 'fixtureevent0002', 'Gone', false, false, 'confirmed', repeat('f', 64), NULL);
+INSERT INTO calendar_assignment (household_id, id, series_id, occurrence_key, version, active, cleared_from_version) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000131', '0190a000-0000-7000-8000-000000000121', NULL, 1, true, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000132', '0190a000-0000-7000-8000-000000000122', NULL, 1, true, NULL);
+INSERT INTO calendar_assignment_person (household_id, assignment_id, child_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000131', '0190a000-0000-7000-8000-0000000000c2'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000132', '0190a000-0000-7000-8000-0000000000c1');

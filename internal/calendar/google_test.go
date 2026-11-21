@@ -298,7 +298,7 @@ func TestGoogleRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := q.CreateGoogleConnection(ctx, dbq.CreateGoogleConnectionParams{ID: conn, HouseholdID: h, Subject: "1001",
-		Email: "parent@example.test", Scope: GoogleScope, RefreshToken: sealed}); err != nil {
+		Email: "parent@example.test", Scope: GoogleScope, RefreshToken: &sealed}); err != nil {
 		t.Fatal(err)
 	}
 	calID := "family@group.calendar.example.test"
@@ -396,10 +396,10 @@ func TestGoogleRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tok, err := OpenGoogleToken(kr, h, conn, c.RefreshToken); err != nil || tok != "fixture-rotated-refresh-token" {
+	if tok, err := OpenGoogleToken(kr, h, conn, *c.RefreshToken); err != nil || tok != "fixture-rotated-refresh-token" {
 		t.Errorf("rotated token: %q %v", tok, err)
 	}
-	if strings.Contains(c.RefreshToken, "fixture") {
+	if strings.Contains(*c.RefreshToken, "fixture") {
 		t.Error("the refresh token is stored in the clear")
 	}
 

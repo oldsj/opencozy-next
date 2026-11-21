@@ -163,7 +163,7 @@ func (s *Server) saveGoogleAccount(ctx context.Context, h uuid.UUID, acct calend
 			return uuid.Nil, "", err
 		}
 		if c, err = q.CreateGoogleConnection(ctx, dbq.CreateGoogleConnectionParams{ID: id, HouseholdID: h, Subject: acct.Subject,
-			Email: email, Scope: acct.Scope, RefreshToken: sealed}); err != nil {
+			Email: email, Scope: acct.Scope, RefreshToken: &sealed}); err != nil {
 			return uuid.Nil, "", err
 		}
 	case err != nil:
@@ -174,7 +174,7 @@ func (s *Server) saveGoogleAccount(ctx context.Context, h uuid.UUID, acct calend
 			return uuid.Nil, "", err
 		}
 		if c, err = q.ReconnectGoogleConnection(ctx, dbq.ReconnectGoogleConnectionParams{HouseholdID: h, ID: c.ID, Email: email,
-			Scope: acct.Scope, RefreshToken: sealed}); err != nil {
+			Scope: acct.Scope, RefreshToken: &sealed}); err != nil {
 			return uuid.Nil, "", err
 		}
 		if err := q.WakeGoogleSources(ctx, dbq.WakeGoogleSourcesParams{HouseholdID: h, GoogleConnectionID: &c.ID}); err != nil {
@@ -214,10 +214,10 @@ func (s *Server) ListGoogleConnections(ctx context.Context, _ api.ListGoogleConn
 // googleAccess opens a connection's token and refreshes an access token, marking the
 // connection "reconnect needed" when Google refuses it.
 func (s *Server) googleAccess(ctx context.Context, q *dbq.Queries, c dbq.CalendarGoogleConnection) (string, error) {
-	if c.NeedsReconnect {
+	if c.NeedsReconnect || c.RefreshToken == nil {
 		return "", calendar.ErrReconnect
 	}
-	refresh, err := calendar.OpenGoogleToken(s.cfg.SecretKeys, c.HouseholdID, c.ID, c.RefreshToken)
+	refresh, err := calendar.OpenGoogleToken(s.cfg.SecretKeys, c.HouseholdID, c.ID, *c.RefreshToken)
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +235,7 @@ func (s *Server) googleAccess(ctx context.Context, q *dbq.Queries, c dbq.Calenda
 		if err != nil {
 			return "", err
 		}
-		if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: c.ID, RefreshToken: sealed}); err != nil {
+		if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: c.ID, RefreshToken: &sealed}); err != nil {
 			return "", err
 		}
 	}
@@ -248,14 +248,14 @@ func googleUnavailable() api.Error {
 
 func (s *Server) ListGoogleCalendars(ctx context.Context, req api.ListGoogleCalendarsRequestObject) (api.ListGoogleCalendarsResponseObject, error) {
 	h := mustActor(ctx).HouseholdID
-	if s.google == nil || s.cfg.SecretKeys == nil {
-		return api.ListGoogleCalendars422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errGoogleOff)}, nil
-	}
 	c, err := s.q.GetGoogleConnection(ctx, dbq.GetGoogleConnectionParams{HouseholdID: h, ID: req.ConnectionId})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return api.ListGoogleCalendars404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
 	} else if err != nil {
 		return nil, err
+	}
+	if s.google == nil || s.cfg.SecretKeys == nil {
+		return api.ListGoogleCalendars422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errGoogleOff)}, nil
 	}
 	reconnect := api.ListGoogleCalendars422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errReconnectNeeded)}
 	unavailable := api.ListGoogleCalendarsdefaultJSONResponse{StatusCode: http.StatusBadGateway, Body: googleUnavailable()}
@@ -297,14 +297,14 @@ func (s *Server) FollowGoogleCalendar(ctx context.Context, req api.FollowGoogleC
 	unprocessable := func(e api.Error) api.FollowGoogleCalendarResponseObject {
 		return api.FollowGoogleCalendar422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(e)}
 	}
-	if s.google == nil || s.cfg.SecretKeys == nil {
-		return unprocessable(errGoogleOff), nil
-	}
 	c, err := cmd.Q.GetGoogleConnection(ctx, dbq.GetGoogleConnectionParams{HouseholdID: h, ID: req.ConnectionId})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return api.FollowGoogleCalendar404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
 	} else if err != nil {
 		return nil, err
+	}
+	if s.google == nil || s.cfg.SecretKeys == nil {
+		return unprocessable(errGoogleOff), nil
 	}
 	if c.NeedsReconnect {
 		return unprocessable(errReconnectNeeded), nil
@@ -360,8 +360,8 @@ func (s *Server) DisconnectGoogle(ctx context.Context, req api.DisconnectGoogleR
 	if err := live.Notify(ctx, cmd.Q, h, live.Event{Topic: live.Calendar}); err != nil {
 		return nil, err
 	}
-	if s.cfg.SecretKeys != nil {
-		if token, err := calendar.OpenGoogleToken(s.cfg.SecretKeys, h, req.ConnectionId, sealed); err == nil {
+	if s.cfg.SecretKeys != nil && sealed != nil {
+		if token, err := calendar.OpenGoogleToken(s.cfg.SecretKeys, h, req.ConnectionId, *sealed); err == nil {
 			s.revokeGoogle(ctx, token)
 		}
 	}

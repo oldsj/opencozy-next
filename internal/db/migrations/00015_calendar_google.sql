@@ -11,10 +11,12 @@ CREATE TABLE calendar_google_connection (
     subject         text NOT NULL CHECK (length(subject) BETWEEN 1 AND 255),
     email           text NOT NULL CHECK (length(email) BETWEEN 1 AND 320),
     scope           text NOT NULL CHECK (length(scope) BETWEEN 1 AND 2000),
-    refresh_token   text NOT NULL CHECK (length(refresh_token) BETWEEN 1 AND 8192),
+    -- NULL only when an adult has to connect again: an import without the old app's secret.
+    refresh_token   text CHECK (length(refresh_token) BETWEEN 1 AND 8192),
     -- Google refused the refresh token (revoked, expired or the password changed): an adult
     -- has to connect the account again. Its calendars keep their events meanwhile.
     needs_reconnect boolean NOT NULL DEFAULT false,
+    CHECK (refresh_token IS NOT NULL OR needs_reconnect),
     version         integer NOT NULL DEFAULT 1 CHECK (version > 0),
     created_at      timestamptz NOT NULL DEFAULT clock_timestamp(),
     UNIQUE (household_id, id),

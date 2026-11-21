@@ -212,6 +212,7 @@ type house struct {
 	reward                            uuid.UUID // costs 3
 	redemption                        uuid.UUID // child1 bought the reward; approved, waiting to be given
 	calendar, event                   uuid.UUID // an ICS calendar shown on displays, with one event
+	google                            uuid.UUID // a Google account that needs connecting again (no token)
 	passkey                           uuid.UUID // the adult's only passkey
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
@@ -287,6 +288,8 @@ func (e *env) house(label string, scopes []string) house {
 	series := e.id(`INSERT INTO calendar_series (household_id, source_id, uid, recurring) VALUES ($1, $2, 'picture-day@example.test', false) RETURNING id`, h.id, h.calendar)
 	h.event = e.id(`INSERT INTO calendar_event (household_id, source_id, series_id, recurrence_key, all_day, start_date, end_date, title, status)
 		VALUES ($1, $2, $3, 'single', true, '2026-09-16', '2026-09-17', 'Picture day', 'confirmed') RETURNING id`, h.id, h.calendar, series)
+	h.google = e.id(`INSERT INTO calendar_google_connection (household_id, subject, email, scope, needs_reconnect)
+		VALUES ($1, gen_random_uuid()::text, 'parent@example.test', 'openid', true) RETURNING id`, h.id)
 	h.rule = e.id(`INSERT INTO award_rule (household_id, activity_key, points, daily_limit) VALUES ($1, 'build_house', 5, 20) RETURNING id`, h.id)
 	h.link = e.id(`INSERT INTO learning_link (household_id, child_id, provider, external_id) VALUES ($1, $2, 'minecraft', 'Builder_42') RETURNING id`, h.id, h.child1)
 	h.recipe = e.id(`INSERT INTO recipe (household_id, title, servings) VALUES ($1, 'Soup', 2) RETURNING id`, h.id)
