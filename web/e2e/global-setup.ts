@@ -6,9 +6,9 @@ import { owner } from './owner';
 
 export { owner };
 
-// There is no sign-up: the e2e owner is made with the CLI, as a real installation's would be.
-// A rerun against the same database finds the owner already there.
-
+// There is no sign-up: the e2e owner (owner.ts) is made with the CLI, as a real installation's
+// would be. A rerun against the same database finds the owner already there. Then the fixture
+// calendar feed and the fake OIDC provider start.
 export default async function globalSetup() {
   // bin/app is an e2e build (make build-e2e), which refuses to run without OPENCOZY_E2E_BUILD.
   const env = { ...process.env, LOG_LEVEL: 'warn', DATABASE_URL: process.env.DATABASE_URL ?? '', OPENCOZY_E2E_BUILD: '1' };

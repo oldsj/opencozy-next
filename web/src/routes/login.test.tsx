@@ -67,15 +67,33 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: 'Sign in with password' })).toBeInTheDocument();
   });
 
-  it('never leaves for anything but a web address', async () => {
+  it('never leaves for anything but a web address, and says so', async () => {
     const go = vi.spyOn(browser, 'go').mockImplementation(() => undefined);
     serve({ passkeys: false, oidc: { name: 'Example ID' } }, {
       'POST /api/auth/oidc/start': () => json(200, { url: 'javascript:alert(1)' }),
     });
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in with Example ID' }));
-    await new Promise((r) => setTimeout(r, 50));
+    expect(await screen.findByText(/Signing in with Example ID didn’t finish/)).toBeInTheDocument();
     expect(go).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Sign in with Example ID' })).toBeEnabled();
+  });
+
+  it('is usable again when the browser restores it after the provider’s page', async () => {
+    vi.spyOn(browser, 'go').mockImplementation(() => undefined);
+    serve({ passkeys: false, oidc: { name: 'Example ID' } }, {
+      'POST /api/auth/oidc/start': () => json(200, { url: 'https://id.example.test/authorize?state=x' }),
+    });
+    renderPage();
+    const sso = await screen.findByRole('button', { name: 'Sign in with Example ID' });
+    await userEvent.click(sso);
+    await vi.waitFor(() => { expect(sso).toBeDisabled(); });
+    // Leaving never blocks the password.
+    expect(screen.getByRole('button', { name: 'Sign in with password' })).toBeEnabled();
+    const back = new Event('pageshow') as PageTransitionEvent;
+    Object.defineProperty(back, 'persisted', { value: true });
+    window.dispatchEvent(back);
+    await vi.waitFor(() => { expect(sso).toBeEnabled(); });
   });
 
   it('has no single sign-on button without it', async () => {

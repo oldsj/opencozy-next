@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import type { SubmitEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 
 import { Button, Input, Notice, Panel } from '@app/design';
 
@@ -48,13 +48,30 @@ export function LoginPage({ ended = false, ssoError }: { ended?: boolean; ssoErr
   const login = $api.useMutation('post', '/auth/login');
   const methods = $api.useQuery('get', '/auth/methods');
   const sso = methods.data?.oidc ?? null;
+  // Leaving for the provider: from the start's answer until the page is gone.
+  const [leaving, setLeaving] = useState(false);
+  const [badURL, setBadURL] = useState(false);
   const start = $api.useMutation('post', '/auth/oidc/start', {
     onSuccess: ({ url }) => {
       // Only ever a web address: the provider's, as the server built it.
-      if (/^https?:\/\//.test(url)) browser.go(url);
+      if (!/^https?:\/\//.test(url)) {
+        setBadURL(true);
+        return;
+      }
+      setLeaving(true);
+      browser.go(url);
     },
   });
-  const busy = login.isPending || start.isPending || start.isSuccess;
+  // Back from the provider's page, a browser may restore this page as it was (the back/forward
+  // cache): make both ways of signing in usable again.
+  useEffect(() => {
+    const restored = (e: PageTransitionEvent) => {
+      if (e.persisted) setLeaving(false);
+    };
+    window.addEventListener('pageshow', restored);
+    return () => { window.removeEventListener('pageshow', restored); };
+  }, []);
+  const ssoBusy = start.isPending || leaving;
 
   function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -78,17 +95,18 @@ export function LoginPage({ ended = false, ssoError }: { ended?: boolean; ssoErr
           {ssoError && <Notice tone="error">{ssoErrorText(ssoError, sso?.name ?? 'single sign-on')}</Notice>}
           {sso && (
             <>
-              <Button variant="primary" fullWidth disabled={busy} onClick={() => { start.mutate({}); }}>
+              <Button variant="primary" fullWidth disabled={ssoBusy || login.isPending} onClick={() => { setBadURL(false); start.mutate({}); }}>
                 Sign in with {sso.name}
               </Button>
               {start.isError && <Notice tone="error">{errorMessage(start.error)}</Notice>}
+              {badURL && <Notice tone="error">{ssoErrorText('oidc_failed', sso.name)}</Notice>}
             </>
           )}
           <form onSubmit={onSubmit} className={sso ? 'grid gap-4 border-t border-border pt-4' : 'grid gap-4'}>
             <Input label="Email" name="email" type="email" required autoComplete="email" />
             <Input label="Password" name="password" type="password" required maxLength={256} autoComplete="current-password" />
             {login.isError && <Notice tone="error">{errorMessage(login.error)}</Notice>}
-            <Button type="submit" variant={sso ? 'secondary' : 'primary'} fullWidth disabled={busy}>
+            <Button type="submit" variant={sso ? 'secondary' : 'primary'} fullWidth disabled={login.isPending || start.isPending}>
               {sso ? 'Sign in with password' : 'Sign in'}
             </Button>
           </form>
