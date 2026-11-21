@@ -122,7 +122,7 @@ public enum ClockSkew {
 }
 
 /// Something the child did on the shield, recorded offline and sent by the app
-/// (`POST /api/v1/device/screen-time-events`). `id` makes the upload idempotent.
+/// (`POST /api/device/screen-time-events`). `id` makes the upload idempotent.
 public struct ScreenTimeEvent: Codable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable {
         case oneMoreMinute = "one_more_minute"

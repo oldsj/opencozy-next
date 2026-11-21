@@ -210,28 +210,42 @@ struct DecodingTests {
         try APIDates.decoder().decode(type, from: Data(json.utf8))
     }
 
-    @Test func screenTimeResponse() throws {
+    @Test func screenTime() throws {
         let json = """
-        { "serverTime": "2026-11-07T10:00:00.000Z",
-          "children": [ { "childId": "c1", "target": "personal", "unlockedUntil": "2026-11-07T10:45:00.000Z",
-            "activeGrants": [
-              { "redemptionId": "r1", "minutes": 30, "startsAt": "2026-11-07T09:45:00.000Z", "endsAt": "2026-11-07T10:15:00.000Z" },
-              { "redemptionId": "r2", "minutes": 30, "startsAt": "2026-11-07T10:15:00.000Z", "endsAt": "2026-11-07T10:45:00.000Z" } ] } ] }
+        { "serverTime": "2026-11-07T10:00:00.000Z", "childId": "c1", "bankedSeconds": 1800,
+          "unlockedUntil": "2026-11-07T10:45:00.000Z", "allowanceSeconds": 300,
+          "windows": [
+            { "id": "w1", "startsAt": "2026-11-07T09:45:00.000Z", "endsAt": "2026-11-07T10:15:00.000Z" },
+            { "id": "w2", "startsAt": "2026-11-07T10:15:00.000Z", "endsAt": "2026-11-07T10:45:00.000Z" } ],
+          "hoursNow": { "open": true, "closesAt": "2026-11-07T19:00:00Z" },
+          "timeRequest": { "id": "t1", "state": "pending", "askedAt": "2026-11-07T09:59:00Z" } }
         """
-        let r = try decode(ScreenTimeResponse.self, json)
-        #expect(r.children.count == 1)
-        #expect(r.children[0].activeGrants.count == 2)
-        #expect(r.children[0].unlockedUntil!.timeIntervalSince(r.serverTime) == 45 * 60)
+        let r = try decode(ScreenTime.self, json)
+        #expect(r.windows.count == 2)
+        #expect(r.unlockedUntil!.timeIntervalSince(r.serverTime) == 45 * 60)
+        #expect(r.bankedSeconds == 1800)
+        #expect(r.hoursNow?.open == true)
+        #expect(r.timeRequest?.state == .pending)
     }
 
-    @Test func screenTimeResponseLockedChild() throws {
+    @Test func lockedChild() throws {
         let json = """
-        { "serverTime": "2026-11-07T10:00:00Z", "children": [ { "childId": "c1", "target": "personal", "activeGrants": [], "unlockedUntil": null } ] }
+        { "serverTime": "2026-11-07T10:00:00Z", "childId": "c1", "bankedSeconds": 0, "allowanceSeconds": 0, "windows": [] }
         """
-        let r = try decode(ScreenTimeResponse.self, json)
-        #expect(r.children[0].unlockedUntil == nil)
+        let r = try decode(ScreenTime.self, json)
+        #expect(r.unlockedUntil == nil)
+        #expect(r.lockAt == nil)
     }
 
+    /// Design §3 rule 6: the device locks within the allowance, even with more window to come.
+    @Test func lockAtIsCappedByTheAllowance() throws {
+        let long = FixtureAPI.screenTime(unlockedMinutes: 45)
+        #expect(long.lockAt!.timeIntervalSince(long.serverTime) == 300)
+        #expect(long.isCapped)
+        let short = FixtureAPI.screenTime(unlockedMinutes: 2)
+        #expect(short.lockAt == short.unlockedUntil)
+        #expect(!short.isCapped)
+    }
 }
 
 struct SetupTests {
@@ -283,10 +297,10 @@ struct RefreshQueueTests {
         let fixture = FixtureAPI(unlockedMinutes: nil)
         let counter: Counter
         func device() async throws -> DeviceInfo { try await fixture.device() }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
+        func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
             _ = await counter.hit()
             try await Task.sleep(for: .milliseconds(200))
-            return try await fixture.screenTime(target: target)
+            return try await fixture.screenTime(childId: childId)
         }
     }
 
@@ -307,8 +321,8 @@ struct DeviceRejectionTests {
     struct RejectingAPI: OpenCozyAPI {
         let status: Int
         func device() async throws -> DeviceInfo { throw APIError.server(status: status, message: "Rejected") }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
-            try await FixtureAPI(unlockedMinutes: 20).screenTime(target: target)
+        func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
+            try await FixtureAPI(unlockedMinutes: 20).screenTime(childId: childId)
         }
         func webSession() async throws -> DeviceWebSession { throw APIError.server(status: status, message: "Rejected") }
     }

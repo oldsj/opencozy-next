@@ -7,14 +7,17 @@ A thin native shell around the OpenCozy web app, with two roles chosen on first 
 
 The OpenCozy server is the source of truth for the unlock window, the device's child and the inbox. Screen time uses Apple's **Family Controls** (authorization and the app picker), **ManagedSettings** (shields) and **DeviceActivity** (re-locking on schedule).
 
-> **Status.** The child's device pairs, signs its requests and opens the kid view on this
-> server's API (`api/src/devices.yaml`, slice 7). Its screen-time calls are still the previous
-> server's (`/api/v1/screen-time`, `/api/v1/device/...`) until slice 8: this server answers them
-> 404, so the device stays locked and keeps "One more minute" and "Ask for more time" queued
-> without reporting a failed sync. The parent's device approves and rejects through this server's
-> inbox (`/api/inbox`, an `Idempotency-Key` of `<phone session id>:<item id>:approve|reject`,
-> and a 409 shown as Already handled), but signs in, keeps its phone session and registers for
-> pushes on `/api/v1/parent/...` until slices 10 and 11, so it can't sign in here yet.
+> **Status.** The child's device runs entirely on this server's API: pairing and signed
+> requests (`api/src/devices.yaml`), and its iPad time (`api/src/screentime.yaml`): it reads
+> `GET /api/children/{childId}/screen-time`, sends "One more minute" to
+> `POST /api/device/screen-time-events` and "Ask for more time" to
+> `POST /api/children/{childId}/time-requests` (its queued request ID is the `Idempotency-Key`).
+> It locks at the end of the running window or `allowanceSeconds` (≤ 300 s) after the server's
+> answer, whichever is sooner (design §3 rule 6), and re-syncs before then while open. Blocked
+> websites come with the screen-time answer once slice 8b is served. Kid pushes wait for slice 11.
+> The parent's device approves and rejects through this server's inbox, but signs in, keeps its
+> phone session and registers for pushes on `/api/v1/parent/...` until slices 10 and 11; this
+> server answers every `/api/v1/` path 410 `update_app`, so it can't sign in here yet.
 
 ## Layout
 
@@ -88,6 +91,43 @@ With automatic signing, Xcode registers the IDs.
 
 - **Development** builds can use the Family Controls (Development) entitlement once the team is a paid Apple Developer Program member.
 - **TestFlight and App Store** builds need Apple to approve the Family Controls *distribution* entitlement, [requested per bundle ID](https://developer.apple.com/contact/request/family-controls-distribution) including each extension. Ad-hoc or development installs are enough for one household.
+
+### TestFlight
+
+What to run to sign a build and upload it, on a Mac with Xcode signed in to the team's Apple
+account (Xcode → Settings → Accounts). Nothing here goes into the repository.
+
+Once per Mac and team:
+
+1. `Config/Local.xcconfig` with the real values (see [Signing](#signing)).
+2. In App Store Connect, an app record for `OPENCOZY_BUNDLE_ID` (My Apps → + → New App).
+3. Apple's approval of the **Family Controls (Distribution)** entitlement for the app and its
+   three extensions (`.monitor`, `.shield-configuration`, `.shield-action`). Without it the
+   upload is refused, or the build can't lock apps.
+
+Each build (from the repository root). The build number must be higher than any already
+uploaded, so it is the time, given on the command line:
+
+```sh
+cd ios
+xcodegen generate
+xcodebuild -project OpenCozy.xcodeproj -scheme OpenCozy -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath build/OpenCozy.xcarchive \
+  -allowProvisioningUpdates CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M)" archive
+xcodebuild -exportArchive -archivePath build/OpenCozy.xcarchive \
+  -exportOptionsPlist Config/ExportOptions-TestFlight.plist -exportPath build/export \
+  -allowProvisioningUpdates
+```
+
+The export uploads the build to App Store Connect (`destination: upload`). After processing it
+appears under TestFlight, where it is added to the internal testing group. The same works by
+hand: Product → Archive, then Distribute App → TestFlight & App Store. The app declares
+`ITSAppUsesNonExemptEncryption = NO` (HTTPS and request signing only), so no compliance
+question is asked.
+
+After installing on the iPad: unpair if it was paired with the previous server, then pair again
+from this server's Manage → Devices (step 4 below). A build from before this change gets 410
+`update_app` from this server.
 
 ### Passkeys on a LAN-only server
 

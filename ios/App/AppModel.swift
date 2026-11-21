@@ -33,6 +33,10 @@ final class AppModel {
     /// Re-runs the lock when the current window ends while the app is running, so
     /// relocking never depends on the monitor extension alone.
     @ObservationIgnored private var relockTask: Task<Void, Never>?
+    /// The stored lock time is the allowance's cap, with more of the window after it.
+    @ObservationIgnored private var lockIsCapped = false
+    /// How long before a capped lock time an open app re-syncs.
+    static let resyncBeforeCap: TimeInterval = 30
     var errorMessage: String?
 
     /// The child this device belongs to, as the server last said.
@@ -160,16 +164,10 @@ final class AppModel {
             device = info
             guard let childId = info.device.childId else { throw SetupError.noChild }
             if let previous, previous != childId { childChanged() }
-            try await Self.untilServed { try await uploadShieldEvents(api: api) }
-            try await Self.untilServed { try await sendQueuedTimeRequest(api: api) }
+            try await uploadShieldEvents(api: api)
+            try await sendQueuedTimeRequest(api: api, childId: childId)
             await registerPushTokenIfNeeded()
-            do {
-                try await fetchScreenTime(api: api, childId: childId)
-            } catch let error as APIError where error.isMissingEndpoint {
-                // Screen time (slice 8) isn't on this server yet: no window, so locked.
-                applyScreenTime(ScreenTimeResponse(serverTime: info.serverTime, children: [], webFilter: nil),
-                                receivedAt: Date(), childId: childId)
-            }
+            try await fetchScreenTime(api: api, childId: childId)
             lastSync = Date()
             syncFailed = false
             accessProblem = nil
@@ -181,12 +179,6 @@ final class AppModel {
             handleRejection(error)
             errorMessage = error.localizedDescription
         }
-    }
-
-    /// Runs a call this server may not serve yet (the slice 8 and 11 calls still on
-    /// `v1/` paths). A 404 or 405 skips it; whatever it would send stays queued.
-    static func untilServed(_ call: () async throws -> Void) async throws {
-        do { try await call() } catch let error as APIError where error.isMissingEndpoint {}
     }
 
     /// Sends "one more minute" uses recorded on the shield, then forgets the ones
@@ -223,10 +215,10 @@ final class AppModel {
     /// Sends a request for more time made on the shield. Kept for a retry only
     /// when it may not have been recorded; a definite answer (sent, or refused
     /// because a parent just said no) clears it.
-    private func sendQueuedTimeRequest(api: any OpenCozyAPI) async throws {
+    private func sendQueuedTimeRequest(api: any OpenCozyAPI, childId: String) async throws {
         guard let queued = lock.store.queuedTimeRequest else { return }
         do {
-            _ = try await api.askForTime(requestId: queued.requestId)
+            _ = try await api.askForTime(childId: childId, requestId: queued.requestId)
             lock.store.queuedTimeRequest = nil
         } catch let error as APIError where !error.isRetryable {
             lock.store.queuedTimeRequest = nil
@@ -247,7 +239,7 @@ final class AppModel {
     private func fetchScreenTime(api: any OpenCozyAPI, childId: String) async throws {
         screenTimeRequested += 1
         let ticket = screenTimeRequested
-        let (screen, receivedAt) = try await api.screenTime(target: .personal)
+        let (screen, receivedAt) = try await api.screenTime(childId: childId)
         guard ticket > screenTimeApplied else { return }
         screenTimeApplied = ticket
         applyScreenTime(screen, receivedAt: receivedAt, childId: childId)
@@ -280,34 +272,36 @@ final class AppModel {
         }
     }
 
-    private func applyScreenTime(_ response: ScreenTimeResponse, receivedAt: Date, childId: String) {
-        let entry = response.children.first { $0.childId == childId && $0.target == ScreenTimeTarget.personal.rawValue }
-        let local = entry?.unlockedUntil.map {
-            ClockSkew.localDate(for: $0, serverTime: response.serverTime, receivedAt: receivedAt)
-        }
+    private func applyScreenTime(_ screen: ScreenTime, receivedAt: Date, childId: String) {
+        // Another child's time (the device was reassigned mid-sync) never unlocks this one.
+        let mine = screen.childId == childId
+        let local = mine ? screen.lockAt.map {
+            ClockSkew.localDate(for: $0, serverTime: screen.serverTime, receivedAt: receivedAt)
+        } : nil
+        lockIsCapped = mine && screen.isCapped
         if isPreview {
             unlockedUntil = local
             return
         }
         // The lists first: the reconcile in update applies them.
-        if let webFilter = response.webFilter { lock.store.webFilterLists = webFilter }
+        if let webFilter = screen.webFilter { lock.store.webFilterLists = webFilter }
         lockOutcome = lock.update(unlockedUntil: local)
         unlockedUntil = currentStoredWindow()
         scheduleRelock()
-        storeShieldContent(entry, response: response, receivedAt: receivedAt)
+        storeShieldContent(screen, receivedAt: receivedAt)
     }
 
     /// What the shield says while locked: the household's message, when
     /// allowed hours open and the banked time, as of this sync.
-    private func storeShieldContent(_ entry: ChildScreenTime?, response: ScreenTimeResponse, receivedAt: Date) {
-        let local = { (date: Date?) in date.map { ClockSkew.localDate(for: $0, serverTime: response.serverTime, receivedAt: receivedAt) } }
-        let hours = entry?.allowedHours
+    private func storeShieldContent(_ screen: ScreenTime, receivedAt: Date) {
+        let local = { (date: Date?) in date.map { ClockSkew.localDate(for: $0, serverTime: screen.serverTime, receivedAt: receivedAt) } }
+        let hours = screen.hoursNow
         lock.store.shieldContent = ShieldContent(
             message: device?.household.lockMessage ?? ShieldText.defaultMessage,
-            bankedSeconds: entry?.secondsRemaining ?? 0,
+            bankedSeconds: screen.bankedSeconds,
             opensAt: hours?.open == false ? local(hours?.opensAt) : nil,
             closesAt: hours?.open == true ? local(hours?.closesAt) : nil,
-            ask: entry?.timeRequest.flatMap { $0.state == .pending ? .pending : $0.state == .declined ? .declined : nil })
+            ask: screen.timeRequest.flatMap { $0.state == .pending ? .pending : $0.state == .declined ? .declined : nil })
     }
 
     /// The window only counts as open if the shield is actually lifted.
@@ -317,12 +311,14 @@ final class AppModel {
     }
 
     /// While the app runs, reconciles (and re-syncs) a second after the window
-    /// ends: the shield comes back on time even if no monitor callback arrives.
+    /// ends: the shield comes back on time even if no monitor callback arrives. When the
+    /// lock time is only the allowance's cap, it re-syncs shortly before instead, so an open
+    /// app carries on without the shield flickering on.
     private func scheduleRelock() {
         relockTask?.cancel()
         relockTask = nil
         guard let until = unlockedUntil else { return }
-        let delay = until.timeIntervalSinceNow + 1
+        let delay = lockIsCapped ? until.timeIntervalSinceNow - Self.resyncBeforeCap : until.timeIntervalSinceNow + 1
         relockTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(max(1, delay)))
             guard !Task.isCancelled else { return }

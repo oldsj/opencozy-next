@@ -252,13 +252,15 @@ type DisplayPairing struct {
 }
 
 type Household struct {
-	ID          uuid.UUID
-	Name        string
-	TimeZone    string
-	ArchivedAt  *time.Time
-	CreatedAt   time.Time
-	LockMessage *string
-	Version     int32
+	ID                uuid.UUID
+	Name              string
+	TimeZone          string
+	ArchivedAt        *time.Time
+	CreatedAt         time.Time
+	LockMessage       *string
+	Version           int32
+	GamePortalDomains []string
+	GameDomains       []string
 }
 
 type JobLease struct {

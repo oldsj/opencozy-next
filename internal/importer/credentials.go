@@ -16,7 +16,7 @@ import (
 // slice that adds it (pending), so a credential is never imported with less, or more, access
 // than it had. Each domain slice adds its scopes.
 var (
-	serviceScopes   = map[string]string{"children:read": "children:read", "external:award": "learning:award"}
+	serviceScopes   = map[string]string{"children:read": "children:read", "external:award": "learning:award", "games:gate": "games:gate", "screentime:read": "screentime:read"}
 	assistantScopes = map[string]string{}
 )
 
