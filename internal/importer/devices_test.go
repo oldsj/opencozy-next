@@ -28,19 +28,21 @@ func TestDevicesAndPasskeysCommit(t *testing.T) {
 	}
 
 	// The passkey belongs to the owner, whose user handle is the old user ID it was made for.
+	// "Backup eligible" is unknown (the old app never recorded it): the first sign-in sets it.
 	var (
-		handle             []byte
-		credLen, keyLen    int
-		count              int64
-		transports         string
-		eligible, backedUp bool
+		handle          []byte
+		credLen, keyLen int
+		count           int64
+		transports      string
+		eligible        *bool
+		backedUp        bool
 	)
 	if err := db.QueryRow(ctx, `SELECT a.webauthn_user_handle, length(p.credential_id), length(p.public_key), p.sign_count,
 		array_to_string(p.transports, ','), p.backup_eligible, p.backed_up
 		FROM passkey p JOIN adult a ON a.id = p.adult_id`).Scan(&handle, &credLen, &keyLen, &count, &transports, &eligible, &backedUp); err != nil {
 		t.Fatal(err)
 	}
-	if string(handle) != "fixtureOwnerUser01" || credLen != 32 || keyLen != 77 || count != 7 || transports != "internal,hybrid" || !eligible || !backedUp {
+	if string(handle) != "fixtureOwnerUser01" || credLen != 32 || keyLen != 77 || count != 7 || transports != "internal,hybrid" || eligible != nil || !backedUp {
 		t.Errorf("passkey: %q %d %d %d %s %v %v", handle, credLen, keyLen, count, transports, eligible, backedUp)
 	}
 }

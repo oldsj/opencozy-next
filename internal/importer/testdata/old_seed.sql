@@ -178,3 +178,15 @@ INSERT INTO device (household_id, id, child_id, name, platform, public_key, pair
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000e2', NULL, 'Old phone', 'android', 'BFFPwcZ97M1Hb43Y7YMTTQyNVZ1QJJOB1/ccjXhV7j+oIUMq5MSdLKL6nZ4xkEbTtk9jrRMsxhnRiH35+r7Ihgo=', '2026-01-10T10:00:00Z', NULL, '2026-02-01T09:00:00Z', NULL, NULL, NULL);
 INSERT INTO parent_passkey (id, user_id, name, credential_id, public_key, counter, transports, backed_up, created_at, last_used_at) VALUES
   ('0190a000-0000-7000-8000-0000000000f1', 'fixtureOwnerUser01', 'Laptop', 'noRvXHIPIyi0Tl69DglRRGS2caWAs59BXOBb8vVIChI', 'eOV92IEGuIP6vrIPDqEFaA7sRGHMErD6lefA4WIzSOoXyU7EGswKFhDUzE2MjTgbZ9amBuo3X86tgZgJWA-_qGPY70krADB7YKfSDaU', 7, ARRAY['internal', 'hybrid'], true, '2026-02-02T10:00:00Z', '2026-03-10T08:00:00Z');
+
+-- Slice 8: Avery's banked iPad time. The bought 30 minutes were cancelled (nothing left); the
+-- parent's 20-minute grant, a "yes" to a request, has 5 minutes spent in one window: 900
+-- seconds banked. Another request still waits.
+INSERT INTO personal_credit (household_id, redemption_id, child_id, minutes, seconds, used_seconds, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000136', '0190a000-0000-7000-8000-0000000000c1', 30, 0, 0, '2026-03-12T08:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000137', '0190a000-0000-7000-8000-0000000000c1', 20, 1200, 300, '2026-03-12T09:00:00Z');
+INSERT INTO screen_time_grant (household_id, id, redemption_id, child_id, target, minutes, starts_at, ends_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001b1', '0190a000-0000-7000-8000-000000000137', '0190a000-0000-7000-8000-0000000000c1', 'personal', 5, '2026-03-12T15:00:00Z', '2026-03-12T15:05:00Z');
+INSERT INTO time_request (household_id, id, child_id, device_id, state, version, created_at, decided_at, decided_by, choice, redemption_id, granted_until) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001c1', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-0000000000e1', 'approved', 2, '2026-03-12T08:55:00Z', '2026-03-12T09:00:00Z', 'fixtureOwnerUser01', '30min', '0190a000-0000-7000-8000-000000000137', '2026-03-12T23:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001c2', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-0000000000e1', 'pending', 1, '2026-03-13T15:00:00Z', NULL, NULL, NULL, NULL, NULL);
