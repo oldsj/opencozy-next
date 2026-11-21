@@ -51,59 +51,36 @@ struct DevicesWireTests {
         #expect(APITransport.ErrorBody.message(in: Data("<html>".utf8)) == nil)
     }
 
-    @Test func missingEndpointIsOnly404Or405() {
-        #expect(APIError.server(status: 404, message: "").isMissingEndpoint)
-        #expect(APIError.server(status: 405, message: "").isMissingEndpoint)
-        #expect(!APIError.server(status: 401, message: "").isMissingEndpoint)
-        #expect(!APIError.transport("offline").isMissingEndpoint)
-    }
 }
 
-/// Until slice 8 lands, this server answers the screen-time calls 404. The device
-/// must stay locked, keep what it would send queued, and not report a failed sync.
+/// A failure to read screen time fails the sync, and the device keeps only the window it
+/// already had (locked here).
 @MainActor
-struct NotYetServedTests {
-    actor Calls {
-        var events = 0
-        func event() { events += 1 }
-    }
-
-    struct SliceSevenServer: OpenCozyAPI {
-        let calls: Calls
-        func device() async throws -> DeviceInfo { try await FixtureAPI().device() }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
-            throw APIError.server(status: 404, message: "Not found")
-        }
-        func screenTimeEvents(_ events: [ScreenTimeEventUpload]) async throws -> Set<String> {
-            await calls.event()
-            throw APIError.server(status: 404, message: "Not found")
-        }
-    }
-
-    @Test func missingScreenTimeLocksWithoutAnError() async {
-        let model = AppModel(preview: SliceSevenServer(calls: Calls()))
-        await model.refresh()
-        #expect(model.unlockedUntil == nil)
-        #expect(!model.syncFailed)
-        #expect(model.errorMessage == nil)
-        #expect(model.accessProblem == nil)
-        #expect(model.childName == "Robin")
-    }
-
-    @Test func otherFailuresStillFailTheSync() async {
+struct ScreenTimeSyncTests {
+    @Test func failuresFailTheSync() async {
         struct Down: OpenCozyAPI {
             func device() async throws -> DeviceInfo { try await FixtureAPI().device() }
-            func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
+            func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
                 throw APIError.server(status: 503, message: "Unavailable")
             }
         }
         let model = AppModel(preview: Down())
         await model.refresh()
         #expect(model.syncFailed)
+        #expect(model.unlockedUntil == nil)
     }
 
-    @Test func untilServedSkipsOnlyMissingEndpoints() async {
-        await #expect(throws: Never.self) { try await AppModel.untilServed { throw APIError.server(status: 404, message: "") } }
-        await #expect(throws: APIError.self) { try await AppModel.untilServed { throw APIError.server(status: 401, message: "") } }
+    @Test func anotherChildsTimeNeverUnlocks() async {
+        struct Other: OpenCozyAPI {
+            func device() async throws -> DeviceInfo { try await FixtureAPI().device() }
+            func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
+                var screen = FixtureAPI.screenTime(unlockedMinutes: 20)
+                screen.childId = "00000000-0000-4000-8000-0000000000c9"
+                return (screen, Date())
+            }
+        }
+        let model = AppModel(preview: Other())
+        await model.refresh()
+        #expect(model.unlockedUntil == nil)
     }
 }

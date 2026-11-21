@@ -22,7 +22,7 @@ var (
 	errNothingBanked = apiError("nothing_banked", "No iPad time left to use.")
 	errNothingToEnd  = apiError("nothing_to_end", "No iPad time is running or queued.")
 	errNothingQueued = apiError("nothing_to_end", "No iPad time is queued.")
-	errTVNotReady    = apiError("tv_not_ready", "TV time isn't available yet.")
+	errTVStartNow    = apiError("start_now_tv", "TV time starts when the child watches a TV, not now.")
 )
 
 // readNow is the time for a read: the command clock when tests set one, otherwise the database's.
@@ -121,9 +121,13 @@ func screenTime(ctx context.Context, q *dbq.Queries, h, child uuid.UUID, now tim
 	if err != nil {
 		return api.ScreenTime{}, err
 	}
+	filter, err := webFilter(ctx, q, h)
+	if err != nil {
+		return api.ScreenTime{}, err
+	}
 	out := api.ScreenTime{
 		ServerTime: now.UTC(), ChildId: child, BankedSeconds: int(banked), Windows: make([]api.Window, len(ws)),
-		AllowedHours: toAllowedHours(rule.Hours),
+		AllowedHours: toAllowedHours(rule.Hours), WebFilter: filter,
 	}
 	out.Credits = make([]api.Credit, len(credits))
 	for i, c := range credits {
@@ -238,8 +242,9 @@ func (s *Server) SpendScreenTime(ctx context.Context, req api.SpendScreenTimeReq
 // GrantScreenTime gives a child screen time, and with startNow starts it.
 func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeRequestObject) (api.GrantScreenTimeResponseObject, error) {
 	a, cmd, b := mustActor(ctx), mustCmd(ctx), req.Body
-	if b.Target != nil && *b.Target == api.TargetTv {
-		return api.GrantScreenTime422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTVNotReady)}, nil
+	toTV := b.Target != nil && *b.Target == api.TargetTv
+	if toTV && b.StartNow != nil && *b.StartNow {
+		return api.GrantScreenTime422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTVStartNow)}, nil
 	}
 	if err := cmd.LockChildren(ctx, req.ChildId); errors.Is(err, command.ErrNoChild) {
 		return api.GrantScreenTime404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
@@ -249,6 +254,20 @@ func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeReq
 	now, err := cmd.Now(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if toTV {
+		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, nil, &a.AdultID, int32(b.Minutes)*60, now); err != nil { //nolint:gosec // 1-240 by the spec
+			return nil, err
+		}
+		st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+		if err != nil {
+			return nil, err
+		}
+		view, err := s.childTvNow(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+		if err != nil {
+			return nil, err
+		}
+		return api.GrantScreenTime200JSONResponse{ScreenTime: st, Tv: &view}, nil
 	}
 	cr, err := screentime.AddCredit(ctx, cmd, screentime.Credit{
 		Child: req.ChildId, Source: screentime.SourceGrant, GrantedBy: &a.AdultID, Minutes: int32(b.Minutes), //nolint:gosec // 1-240 by the spec
