@@ -73,7 +73,7 @@ SET name = coalesce(sqlc.narg(name), name), child_id = coalesce(sqlc.narg(child_
 WHERE household_id = $1 AND id = $2 AND revoked_at IS NULL;
 
 -- name: RevokeDevice :execrows
-UPDATE device SET revoked_at = sqlc.arg(now)
+UPDATE device SET revoked_at = sqlc.arg(now), push_token = NULL, push_environment = NULL, push_registered_at = NULL
 WHERE household_id = $1 AND id = $2 AND revoked_at IS NULL;
 
 -- name: DeleteDeviceWebSessions :exec

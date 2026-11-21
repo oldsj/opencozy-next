@@ -51,10 +51,10 @@ PGPASSWORD=… app import \
 ```
 
 - **`--old-auth-secret-file`** is a file (`chmod 600`) holding the old app's
-  `BETTER_AUTH_SECRET`. The import reads it once, uses it to open the old Google, iCloud and
-  Home Assistant secrets, and seals them under `OPENCOZY_SECRET_KEYS`; it is never stored.
-  Without it, those integrations arrive as "reconnect needed" and a Remark at the end of the
-  report says so.
+  `BETTER_AUTH_SECRET`. The import reads it once, uses it to open the old Google refresh tokens, and
+  seals them under `OPENCOZY_SECRET_KEYS`; it is never stored. Without it, Google accounts arrive
+  as "connect again" and a Remark at the end of the report says so. (iCloud and Home Assistant
+  have no mapping yet: see Still pending.)
 - **Exit status.** A run fails, and writes nothing, in any of these cases:
   - the reconciliation has a mismatch ("found mismatches; nothing was written"), in a dry
     run too;
@@ -108,7 +108,7 @@ it checks hasn't run yet.
 | Old | New | How |
 | --- | --- | --- |
 | `household` | `household` | ID, name, time zone, times, blocked websites (games and game portals), and the locked-iPad message |
-| `child` | `child` | ID, name, colour, times and allowed hours (minutes after local midnight) |
+| `child` | `child` | ID, name, colour, times and allowed hours (minutes after local midnight). Allowed hours the old app had only partly set (which both apps read as none) arrive as none, counted. |
 | `auth_user`, `household_owner`, `auth_account` (password) | `adult` | Adults with a household, with email, name and password. Old scrypt hashes are rehashed to argon2id on the first sign-in. The old user ID becomes the passkey user handle. |
 | `parent_passkey` | `passkey` | ID, name, credential ID, public key, sign counter, transports and backed-up flag. "Backup eligible" is unknown until the first sign-in sets it. |
 | `device` | `device` | Child devices: ID, child, name, platform, key, times, and revoked ones as revoked. A paired iPad keeps working without pairing again. |
@@ -127,6 +127,7 @@ it checks hasn't run yet.
 | `gated_tv`, `gated_tv_mac` | `tv`, `tv_mac` | TVs with their IDs, room, open hours, Home Assistant entity, and MAC addresses |
 | `tv_session` (ended) | `tv_session` | Finished sessions, with who started and ended them |
 | `tv_open_event` | `tv_open_event` | The history of a parent opening or closing a TV |
+| `calendar_google_connection` | `calendar_google_connection` | Google accounts, with their refresh token sealed (or "connect again" without `--old-auth-secret-file`, or if the old app already needed it) |
 | `calendar_source`, `calendar_series`, `calendar_assignment`, `calendar_assignment_person` | `calendar_source`, `calendar_series`, `calendar_assignment`, `calendar_assignment_child` | Calendar feeds (links sealed), their events' series, and who each event is for |
 | `recipe`, `meal_plan_entry` | `recipe`, `meal` | Recipes and the meal plan |
 
@@ -153,6 +154,8 @@ Each of these is counted in the report.
 | `tv_prompt` | Pending prompts to start a TV |
 | `calendar_occurrence` | Each feed's first refresh rebuilds the events |
 | `calendar_assignment` cleared | The old app ignored them |
+| Google calendars whose account is gone, with their series and assignments | Nothing can refresh them; connect the account again (sign-off: who those events were for) |
+| Duplicate calendar links | One of each is carried |
 
 Columns dropped on purpose are listed in the mapping code next to `columnsRead`. Any other
 old column makes its table `pending`.
@@ -216,8 +219,14 @@ An adult who edits such a chore, routine or reward brings it within the new limi
 
 ## Still pending
 
-Until these land, a real import of a household that uses them refuses:
+A real import refuses while any of these has rows, and the dry run marks it `pending`:
 
-- `household_owner.push_muted_until`: the phone push mute, which slice 11 adds.
-- `assistant_credential` scopes with no new name yet (`approvals:read`), which slice 12
-  (MCP) adds.
+- `household_owner.push_muted_until`: the phone push mute. Slice 11 has merged, so it is next.
+- `assistant_credential` scopes with no new name yet (`approvals:read`): slice 12 (#81) maps them.
+- `home_assistant_connection`, `home_assistant_entity`: no mapping yet.
+- `icloud_connection`, `icloud_calendar`, `icloud_resource`, `icloud_series`,
+  `icloud_occurrence`: no mapping yet.
+- `dashboard_view`: no mapping yet.
+
+The fixture has no rows in the last three groups, so they show as `ok` with "empty; no mapping
+yet". Before cutover, a dry run against the production backup shows whether they hold anything.

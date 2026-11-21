@@ -62,7 +62,7 @@ enum WebPolicy {
     }
 }
 
-/// When the parent web view should try `POST /api/parent-sessions`: on the first
+/// When the parent web view should try `POST /api/phone/sessions/web`: on the first
 /// page that isn't the sign-in page (the cookie may survive from last time), and
 /// each time the page leaves `/login` (the web sign-in just finished). Not on
 /// every navigation, so a signed-out web view doesn't call it repeatedly.

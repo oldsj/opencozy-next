@@ -114,8 +114,17 @@ type doer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Fetcher fetches feeds through an egress client.
-type Fetcher struct{ client doer }
+// Fetcher fetches feeds through an egress client, and Google calendars when WithGoogle set one.
+type Fetcher struct {
+	client doer
+	google *Google
+}
+
+// WithGoogle returns f, which then also refreshes Google calendars through g.
+func (f Fetcher) WithGoogle(g *Google) Fetcher {
+	f.google = g
+	return f
+}
 
 // NewFetcher builds the "ics" egress client: public addresses only, feed ports, 30 s, 10 MiB,
 // up to 5 redirects (each through the same checks).

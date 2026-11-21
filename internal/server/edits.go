@@ -374,6 +374,11 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 	if err := cmd.Q.CancelRedemption(ctx, dbq.CancelRedemptionParams{HouseholdID: cmd.HouseholdID(), ID: red.ID, Now: &now}); err != nil {
 		return nil, err
 	}
+	if red.Minutes.Valid { // banked iPad time went: the child's devices shield again at once
+		if err := s.screenTimeChanged(ctx, cmd, red.ChildID); err != nil {
+			return nil, err
+		}
+	}
 	row, err := s.redemptionRow(ctx, cmd.Q, red.ID)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,10 @@
 // transaction as the event it reports, with a dedupe key, and sent after commit by the sender
 // job: at least once. Rows hold names and task titles, so each row is deleted as soon as it is
 // sent or finally refused. Nothing is enqueued when no push service (APNs) is configured.
+//
+// A row goes to one adult (all of their signed-in phones) or one child (all of their paired
+// devices); the sender looks the phones and devices up when it sends, so a phone signed out in
+// between gets nothing.
 package push
 
 import (
@@ -30,9 +34,9 @@ type Message struct {
 	HouseholdID uuid.UUID
 	AdultID     *uuid.UUID
 	ChildID     *uuid.UUID
-	// DedupeKey makes a retried enqueue a no-op, such as "approval-requested/<approval id>".
-	DedupeKey string
-	Payload   map[string]any
+	// DedupeKey makes a retried enqueue a no-op, such as "approval.pending/<id>/<asked at>".
+	DedupeKey    string
+	Notification Notification
 }
 
 // Outbox enqueues pushes. The zero value enqueues nothing (no push service configured).
@@ -52,12 +56,15 @@ func (o Outbox) Enqueue(ctx context.Context, q *dbq.Queries, m Message) error {
 	if m.DedupeKey == "" || len(m.DedupeKey) > 200 {
 		return errors.New("push: the dedupe key must be 1 to 200 bytes")
 	}
-	payload, err := json.Marshal(m.Payload)
+	if m.Notification.Type == "" || m.Notification.Collapse == "" || len(m.Notification.Collapse) > 64 {
+		return errors.New("push: a notification needs a type and a collapse ID of at most 64 bytes")
+	}
+	payload, err := json.Marshal(m.Notification)
 	if err != nil {
 		return fmt.Errorf("push: %w", err)
 	}
-	if len(payload) > MaxPayload || m.Payload == nil {
-		return errors.New("push: the payload must be a JSON object of at most 4096 bytes")
+	if len(payload) > MaxPayload {
+		return errors.New("push: the notification must be at most 4096 bytes of JSON")
 	}
 	if err := q.EnqueuePush(ctx, dbq.EnqueuePushParams{HouseholdID: m.HouseholdID, AdultID: m.AdultID, ChildID: m.ChildID, DedupeKey: m.DedupeKey, Payload: payload}); err != nil {
 		return err
@@ -69,9 +76,10 @@ func (o Outbox) Enqueue(ctx context.Context, q *dbq.Queries, m Message) error {
 // payload). The row is deleted and not retried. A Sender clears an invalid token itself.
 var ErrRefused = errors.New("push: refused")
 
-// Sender delivers one row. Any error other than ErrRefused is retried with a backoff.
+// Sender delivers one row, looking its recipients up with q (the job's fenced transaction).
+// Any error other than ErrRefused is retried with a backoff.
 type Sender interface {
-	Send(ctx context.Context, row dbq.PushOutbox) error
+	Send(ctx context.Context, q *dbq.Queries, row dbq.PushOutbox) error
 }
 
 // MaxAttempts is how many times a row is tried before it is dropped.
@@ -107,7 +115,7 @@ func send(ctx context.Context, f jobs.Fence, s Sender, log *slog.Logger) error {
 			n = len(rows)
 			for _, row := range rows {
 				sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-				err := s.Send(sendCtx, row)
+				err := s.Send(sendCtx, q, row)
 				cancel()
 				switch {
 				case err == nil, errors.Is(err, ErrRefused):
