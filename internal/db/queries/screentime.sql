@@ -101,14 +101,16 @@ RETURNING *;
 SELECT * FROM approval WHERE household_id = $1 AND time_request_id = $2 AND state = 'pending';
 
 -- name: OpenCredits :many
--- The child's credits with time left, oldest first, with who gave each.
+-- The child's credits with time left, oldest first, with who gave each: the oldest 200 (every
+-- device poll reads it; bankedSeconds is still the whole bank).
 SELECT k.id, k.source, k.redemption_id, r.title AS reward_title, k.granted_by, a.name AS granted_by_name,
        k.minutes, k.seconds, k.used_seconds, k.created_at
 FROM screen_time_credit k
 LEFT JOIN redemption r ON r.household_id = k.household_id AND r.id = k.redemption_id
 LEFT JOIN adult a ON a.household_id = k.household_id AND a.id = k.granted_by
 WHERE k.household_id = $1 AND k.child_id = $2 AND k.used_seconds < k.seconds
-ORDER BY k.created_at, k.id;
+ORDER BY k.created_at, k.id
+LIMIT 200;
 
 -- name: LockCredit :one
 SELECT * FROM screen_time_credit WHERE household_id = $1 AND child_id = $2 AND id = $3 FOR UPDATE;

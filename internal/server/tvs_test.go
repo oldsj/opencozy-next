@@ -35,6 +35,10 @@ func newTVEnv(t *testing.T) tvEnv {
 		if r.status != 201 {
 			t.Fatalf("credential %s: %d %s", scope, r.status, r.raw)
 		}
+		// Only a home server may hold it, never an assistant.
+		if r := e.send(h.actors["adult"], "POST", "/api/credentials", map[string]any{"kind": "assistant", "name": scope, "scopes": []string{scope}, "allChildren": true}); r.status != 400 || r.code() != "unknown_scope" {
+			t.Fatalf("assistant %s: %d %s", scope, r.status, r.raw)
+		}
 		return cred{bearer: r.body["secret"].(string)}
 	}
 	return tvEnv{env: e, h: h, fake: fake, router: service("tv:gate"), hass: service("tv:report"), adult: h.actors["adult"], device: h.actors["device"]}
@@ -150,6 +154,10 @@ func TestTVRegistry(t *testing.T) {
 	if r.status != 200 || len(r.body["tvs"].([]any)) != 2 || r.body["tvs"].([]any)[0].(map[string]any)["macs"] != nil {
 		t.Fatalf("display: %d %s", r.status, r.raw)
 	}
+	// A display learns its scopes, so its board offers a TV tab only with tv.
+	if r := e.send(e.h.actors["display-today"], "GET", "/api/display/session", nil); r.status != 200 || len(r.body["scopes"].([]any)) != 1 || r.body["scopes"].([]any)[0] != "today" {
+		t.Fatalf("display session: %d %s", r.status, r.raw)
+	}
 }
 
 func TestTVChildSessionSpendsTimeAndEnds(t *testing.T) {
@@ -157,6 +165,12 @@ func TestTVChildSessionSpendsTimeAndEnds(t *testing.T) {
 	mac := "02:00:5e:10:00:01"
 	state := e.tvState(e.h.tv)
 	prompt := state["prompt"].(map[string]any)
+	// The inbox carries the TV asking, with the children to choose from (the iOS app reads only it).
+	inbox := e.send(e.adult, "GET", "/api/inbox", nil)
+	if tvs, _ := inbox.body["tvs"].(map[string]any); inbox.status != 200 || tvs == nil || len(tvs["tvs"].([]any)) != 1 || len(tvs["children"].([]any)) == 0 ||
+		tvs["tvs"].([]any)[0].(map[string]any)["prompt"].(map[string]any)["id"] != prompt["id"] {
+		t.Fatalf("inbox: %d %s", inbox.status, inbox.raw)
+	}
 	if len(e.allowances()) != 0 {
 		t.Fatal("a gated TV is allowed")
 	}

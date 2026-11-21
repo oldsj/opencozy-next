@@ -1,6 +1,18 @@
 -- Fictional rows for the importer's fixture tests, in the old app's schema (old_schema.sql).
 -- Names come from the old app's fictional dev seed; addresses use example.test. The credential
 -- secrets and the password were made for this fixture and are in importer_test.go.
+--
+-- IDs are 0190a000-0000-7000-8000-000000000NNN. To keep branches from colliding, each group adds
+-- new rows only in its own range (rows already here keep their IDs):
+--   0000xx  households, children, adults, credentials (the base)
+--   0001xx  the ledger (#59) and chores, routines, approvals (#65)
+--   0002xx  calendars and Google connections (#60)
+--   0003xx  rewards and redemptions (#68)
+--   0004xx  child devices and passkeys (#70)
+--   0005xx  banked iPad time, grants, requests (#75)
+--   0006xx  banked TV time (#78)
+--   0007xx  phone push (slice 11)
+--   0009xx  TVs (#56)
 SET search_path TO opencozy;
 
 INSERT INTO household (id, name, time_zone, created_at, archived_at, lock_message, game_portal_domains, game_domains)
@@ -28,6 +40,8 @@ INSERT INTO child (household_id, id, name, color, created_at, archived_at) VALUE
 -- Avery may start screen time 15:00-19:00 on school nights, 09:00-20:00 at weekends.
 UPDATE child SET school_night_start = 900, school_night_end = 1140, weekend_start = 540, weekend_end = 1200
 WHERE id = '0190a000-0000-7000-8000-0000000000c1';
+-- Rowan's rule is half set (the old check let that through): carried as none.
+UPDATE child SET school_night_start = 900 WHERE id = '0190a000-0000-7000-8000-0000000000c2';
 
 -- Two service credentials whose scopes all have a new name (the router's tv:gate since slice 9),
 -- and an assistant whose scope waits on a later slice.
