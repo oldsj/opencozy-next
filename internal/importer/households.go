@@ -7,35 +7,47 @@ import (
 	"github.com/google/uuid"
 )
 
-// importHouseholds carries households with their IDs. lock_message and the game domains belong
-// to later slices, so the table stays pending until they are mapped.
+// importHouseholds carries households with their IDs and blocked websites (the two lists keep
+// the same rules). lock_message belongs to the devices import, so the table stays pending until it
+// is mapped.
 func importHouseholds(ctx context.Context, x *run) error {
-	x.r.columnsRead("household", "id", "name", "time_zone", "created_at", "archived_at")
-	rows, err := x.src.Query(ctx, `SELECT id, name, time_zone, created_at, archived_at FROM opencozy.household ORDER BY id`)
+	x.r.columnsRead("household", "id", "name", "time_zone", "created_at", "archived_at", "game_portal_domains", "game_domains")
+	rows, err := x.src.Query(ctx, `SELECT id, name, time_zone, created_at, archived_at, game_portal_domains, game_domains
+		FROM opencozy.household ORDER BY id`)
 	if err != nil {
 		return safe(err)
 	}
-	var n int64
+	var n, domains int64
 	for rows.Next() {
 		var (
-			id       uuid.UUID
-			name, tz string
-			created  time.Time
-			archived *time.Time
+			id             uuid.UUID
+			name, tz       string
+			created        time.Time
+			archived       *time.Time
+			portals, games []string
 		)
-		if err := rows.Scan(&id, &name, &tz, &created, &archived); err != nil {
+		if err := rows.Scan(&id, &name, &tz, &created, &archived, &portals, &games); err != nil {
 			return safe(err)
 		}
-		if _, err := x.dst.Exec(ctx, `INSERT INTO household (id, name, time_zone, created_at, archived_at) VALUES ($1, $2, $3, $4, $5)`,
-			id, name, tz, created, archived); err != nil {
+		if _, err := x.dst.Exec(ctx, `INSERT INTO household (id, name, time_zone, created_at, archived_at, game_portal_domains, game_domains)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`, id, name, tz, created, archived, portals, games); err != nil {
 			return safe(err)
 		}
 		n++
+		domains += int64(len(portals) + len(games))
 	}
 	if err := rows.Err(); err != nil {
 		return safe(err)
 	}
-	return reconcile(ctx, x, "household", n, "household")
+	if err := reconcile(ctx, x, "household", n, "household"); err != nil {
+		return err
+	}
+	var got int64
+	if err := x.dst.QueryRow(ctx, `SELECT COALESCE(sum(cardinality(game_portal_domains) + cardinality(game_domains)), 0) FROM household`).Scan(&got); err != nil {
+		return safe(err)
+	}
+	x.r.check("blocked websites", domains, got)
+	return nil
 }
 
 // importChildren carries children with their IDs (credential_child refers to them) and their

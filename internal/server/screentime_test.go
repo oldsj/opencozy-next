@@ -60,12 +60,11 @@ func TestScreenTime(t *testing.T) {
 	}
 	reward := r.body["id"]
 	refused(e.send(adult, "POST", "/api/rewards", map[string]any{"title": "Ice cream", "cost": 6, "kind": "item", "target": "tv"}), 422, "target_mismatch", "an item for the TV")
-	// An edit that names no screen keeps the reward's; a TV reward can't be bought yet.
+	// An edit that names no screen keeps the reward's. (Buying TV time: TestTVRewards.)
 	tvReward := ok(e.send(adult, "POST", "/api/rewards", map[string]any{"title": "TV", "cost": 6, "kind": "screen_time", "minutes": 30, "target": "tv"}), "TV reward").body["id"].(string)
 	if r := ok(e.send(adult, "PUT", "/api/rewards/"+tvReward, map[string]any{"title": "TV time", "cost": 6, "kind": "screen_time", "minutes": 45, "available": true, "expectedVersion": 1}), "edit TV reward"); r.body["target"] != "tv" {
 		t.Errorf("edited TV reward: %s", r.raw)
 	}
-	refused(e.send(h.actors["device-web"], "POST", child1+"/redemptions", map[string]any{"rewardId": tvReward}), 422, "tv_not_ready", "buy TV time")
 	r = ok(e.send(h.actors["device-web"], "POST", child1+"/redemptions", map[string]any{"rewardId": reward}), "redeem")
 	if r.body["status"] != "fulfilled" {
 		t.Errorf("screen time redemption: %s", r.raw)
@@ -104,7 +103,7 @@ func TestScreenTime(t *testing.T) {
 	if sp := sub(r.body, "spend"); sp["startsAt"] != at(19, 45) || sp["endsAt"] != at(20, 5) {
 		t.Errorf("granted time queues after: %v", sp)
 	}
-	refused(e.send(adult, "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv"}), 422, "tv_not_ready", "TV time")
+	refused(e.send(adult, "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv", "startNow": true}), 422, "start_now_tv", "start TV time now")
 
 	// Cancel what is queued, putting it back; then end the rest now, forfeiting it.
 	r = ok(e.send(adult, "POST", child1+"/screen-time/end", map[string]any{"scope": "queued", "refund": true}), "end queued")
