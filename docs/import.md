@@ -54,7 +54,7 @@ PGPASSWORD=… app import \
   `BETTER_AUTH_SECRET`. The import reads it once, uses it to open the old Google refresh tokens, and
   seals them under `OPENCOZY_SECRET_KEYS`; it is never stored. Without it, Google accounts arrive
   as "connect again" and a Remark at the end of the report says so. (iCloud and Home Assistant
-  have no mapping yet: see Still pending.)
+  are not carried: see Not carried.)
 - **Exit status.** A run fails, and writes nothing, in any of these cases:
   - the reconciliation has a mismatch ("found mismatches; nothing was written"), in a dry
     run too;
@@ -156,6 +156,9 @@ Each of these is counted in the report.
 | `calendar_assignment` cleared | The old app ignored them |
 | Google calendars whose account is gone, with their series and assignments | Nothing can refresh them; connect the account again (sign-off: who those events were for) |
 | Duplicate calendar links | One of each is carried |
+| `home_assistant_connection`, `home_assistant_entity` | Home Assistant is a later slice (15): connect it again after cutover |
+| `icloud_connection`, `icloud_calendar`, `icloud_resource`, `icloud_series`, `icloud_occurrence` | iCloud calendars are a later slice (13b): connect them again after cutover; the first refresh rebuilds the events |
+| `dashboard_view` | Dashboard views are a later slice (16): set them up again after cutover |
 
 Columns dropped on purpose are listed in the mapping code next to `columnsRead`. Any other
 old column makes its table `pending`.
@@ -222,10 +225,6 @@ An adult who edits such a chore, routine or reward brings it within the new limi
 A real import refuses while any of these has rows, and the dry run marks it `pending`:
 
 - `assistant_credential` scopes with no new name yet (`approvals:read`): slice 12 (#81) maps them.
-- `home_assistant_connection`, `home_assistant_entity`: no mapping yet.
-- `icloud_connection`, `icloud_calendar`, `icloud_resource`, `icloud_series`,
-  `icloud_occurrence`: no mapping yet.
-- `dashboard_view`: no mapping yet.
 
-The fixture has no rows in the last three groups, so they show as `ok` with "empty; no mapping
-yet". Before cutover, a dry run against the production backup shows whether they hold anything.
+Any other old table with rows and no mapping is `pending` too, so a new old table is never lost
+silently.
