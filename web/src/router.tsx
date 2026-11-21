@@ -18,6 +18,7 @@ import { ChoresPage } from './routes/chores';
 import { InboxPage } from './routes/inbox';
 import { PointsPage } from './routes/points';
 import { RewardsPage } from './routes/rewards';
+import { ScreenTimePage } from './routes/screen-time';
 import { RedemptionsPage } from './routes/redemptions';
 import { HouseholdPage } from './routes/household';
 import { DevicesPage } from './routes/devices';
@@ -52,6 +53,7 @@ const nav = [
   { to: '/inbox', label: 'Inbox' },
   { to: '/chores', label: 'Chores' },
   { to: '/rewards', label: 'Rewards' },
+  { to: '/screen-time', label: 'Screen time' },
   { to: '/calendar', label: 'Calendar' },
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
@@ -239,6 +241,18 @@ const redemptionsRoute = createRoute({
   },
   component: RedemptionsPage,
 });
+// Manage: the children's iPad time, allowed hours and blocked websites.
+const screenTimeRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/screen-time',
+  staticData: { title: 'Screen time' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: ScreenTimePage,
+});
 const householdRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/household',
@@ -353,7 +367,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, householdRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

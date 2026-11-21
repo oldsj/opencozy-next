@@ -1,11 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Gift, Hourglass, House, Sunrise } from 'lucide-react';
+import { ClipboardCheck, Gift, House, Sunrise } from 'lucide-react';
 import { useState } from 'react';
 
 import {
   AppFrame,
   Button,
-  ComingLaterTile,
   ConnectionBanner,
   EmptyState,
   PageHeader,
@@ -22,6 +21,7 @@ import type { TaskRowCheck } from '@app/design';
 
 import { client, useAttempts, type Child, type TodayGroup, type TodayItem } from '../api/client';
 import { DisplayRewards } from './display-rewards';
+import { KidScreenTime } from './screen-time-kid';
 
 export const todayKey = ['display', 'today'] as const;
 
@@ -167,8 +167,7 @@ export function TodayBoard({
           ) : (
             <EmptyState variant="surface" title="Nothing on your list today" description="When a routine or chore is ready, it will show up here." />
           )}
-          {/* Screen time (banked time, use 30 min, ask for more) arrives with the allowances slice. */}
-          <ComingLaterTile title="Screen time" icon={Hourglass} description="Your iPad time will show here." />
+          <KidScreenTime kid={kid} />
         </>
       ) : (
       <PeopleBoard>

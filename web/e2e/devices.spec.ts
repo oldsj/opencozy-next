@@ -89,6 +89,27 @@ test('pair a child’s iPad, open the kid view, tick a chore, unpair it', async 
   await expect(kid.getByRole('heading', { name: new RegExp(`^Good (morning|afternoon|evening), ${child}$`) })).toBeVisible();
   await kid.getByRole('checkbox', { name: chore }).click();
   await expect(kid.getByRole('checkbox', { name: chore })).toHaveAttribute('aria-checked', 'true');
+
+  // Screen time: the child asks for more, a parent says 30 minutes in the inbox, the iPad shows
+  // the countdown; the parent ends it early from Screen time.
+  await expect(kid.getByText('No time saved')).toBeVisible();
+  await kid.getByRole('button', { name: 'Ask for more time' }).click();
+  await expect(kid.getByText('You asked for more time.')).toBeVisible();
+  await adult.goto('/inbox');
+  await adult.getByRole('group', { name: `More time for ${child}?` }).getByRole('button', { name: '30 min' }).click();
+  await expect(adult.getByRole('group', { name: `More time for ${child}?` })).toHaveCount(0);
+  await kid.reload();
+  await expect(kid.getByRole('timer')).toHaveText(/^\d+:\d\d left$/);
+  await adult.goto('/screen-time');
+  const card = adult.getByRole('region', { name: `${child}’s screen time` });
+  await expect(card.getByRole('timer')).toBeVisible();
+  await card.getByRole('button', { name: 'End now…' }).click();
+  await adult.getByRole('alertdialog', { name: `End ${child}’s iPad time now?` }).getByRole('button', { name: 'End now' }).click();
+  await expect(card.getByText('Locked')).toBeVisible();
+  await kid.reload();
+  await expect(kid.getByText(/saved$/)).toBeVisible();
+  await adult.goto('/devices');
+
   await kid.getByRole('link', { name: 'Rewards' }).click();
   await expect(kid.getByRole('heading', { name: 'Rewards' })).toBeVisible();
   await expect(kid.getByText('Who’s choosing?')).toHaveCount(0);

@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { Button, EmptyState, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
+import { Button, ChoiceGroup, EmptyState, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type InboxItem } from '../api/client';
+import { timeChoices } from './screen-time-logic';
 
 export const REJECT_REASON_MAX = 200;
 
@@ -24,11 +25,12 @@ export function InboxPage() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['get', '/inbox'] });
   const approve = $api.useMutation('post', '/inbox/{itemId}/approve', { onSettled: refresh });
   const reject = $api.useMutation('post', '/inbox/{itemId}/reject', { onSettled: refresh });
+  const answer = $api.useMutation('post', '/inbox/{itemId}/answer', { onSettled: refresh });
   const [sendingBack, setSendingBack] = useState<InboxItem | null>(null);
   const [reason, setReason] = useState('');
 
-  const busy = approve.isPending || reject.isPending;
-  const error = approve.error ?? reject.error;
+  const busy = approve.isPending || reject.isPending || answer.isPending;
+  const error = approve.error ?? reject.error ?? answer.error;
   const items = inbox.data?.items ?? [];
 
   const sendBack = () => {
@@ -59,6 +61,15 @@ export function InboxPage() {
                   title={item.title}
                   meta={meta}
                   trailing={
+                    item.kind === 'time_request' ? (
+                      // One tap answers: how much more time, or no.
+                      <ChoiceGroup
+                        label={`More time for ${item.child.name}?`}
+                        busy={busy}
+                        choices={timeChoices.map((c) => (c.value === 'no' ? { ...c, variant: 'quiet' as const } : c))}
+                        onChoose={(choice) => { answer.mutate({ params: { ...idempotencyKey(), path: { itemId: item.id } }, body: { choice } }); }}
+                      />
+                    ) : (
                     <>
                       <Button variant="danger" disabled={busy} aria-label={`Send back: ${item.title} (${item.child.name})`} onClick={() => { setSendingBack(item); }}>
                         Send back…
@@ -72,6 +83,7 @@ export function InboxPage() {
                         Approve
                       </Button>
                     </>
+                    )
                   }
                 />
               );
@@ -79,7 +91,7 @@ export function InboxPage() {
           </List>
         </Section>
       ) : (
-        inbox.isSuccess && <EmptyState title="Nothing waiting" description="When a child finishes a chore or routine, it shows here." variant="surface" />
+        inbox.isSuccess && <EmptyState title="Nothing waiting" description="When a child finishes a chore or routine, or asks for more iPad time, it shows here." variant="surface" />
       )}
       <Sheet
         open={sendingBack !== null}
