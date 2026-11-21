@@ -76,10 +76,17 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, runtimeR
 var appendOnly = []string{"point_ledger", "learning_award"}
 
 // Grant gives role row access to the application's tables and nothing on goose's bookkeeping.
-// It runs after every migration, so new tables are covered.
+// It runs after every migration, so new tables are covered. It also grants CONNECT on the
+// database: a deployment that revokes it from PUBLIC (as the CNPG bootstraps do) would otherwise
+// refuse every connection as role.
 func Grant(ctx context.Context, pool *pgxpool.Pool, role string) error {
+	var database string
+	if err := pool.QueryRow(ctx, "SELECT current_database()").Scan(&database); err != nil {
+		return fmt.Errorf("db: grant: %w", err)
+	}
 	r := pgx.Identifier{role}.Sanitize()
 	stmts := []string{
+		"GRANT CONNECT ON DATABASE " + pgx.Identifier{database}.Sanitize() + " TO " + r,
 		"GRANT USAGE ON SCHEMA public TO " + r,
 		"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO " + r,
 		"REVOKE ALL ON TABLE goose_db_version FROM " + r,
