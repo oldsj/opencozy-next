@@ -84,8 +84,27 @@ echo "== Discovery and contract"
 req GET /api/auth/methods
 if [[ $status == 200 ]] && jq -e '(.passkeys | type) == "boolean" and has("oidc")' "$work/body" > /dev/null 2>&1; then
   pass "GET /api/auth/methods: passkeys $(jq -r .passkeys "$work/body"), single sign-on $(jq -r '.oidc.name // "off"' "$work/body")"
-  # Imported passkeys need WEBAUTHN_RP_ID set to the same hostname.
-  [[ $(jq -r .passkeys "$work/body") == true ]] || fail "passkeys are off: imported passkeys can't sign in (WEBAUTHN_RP_ID)"
+  # Imported passkeys sign in only on the name they were made for: WEBAUTHN_RP_ID must be this
+  # site's host (or a parent domain of it), and WEBAUTHN_ORIGINS must list this origin.
+  if [[ $(jq -r .passkeys "$work/body") != true ]]; then
+    fail "passkeys are off: imported passkeys can't sign in (WEBAUTHN_RP_ID)"
+  else
+    [[ $base =~ ^(https?://[^/]+) ]] && origin=$(tr '[:upper:]' '[:lower:]' <<< "${BASH_REMATCH[1]}")
+    host=${origin#*://} host=${host%%:*}
+    rp=$(jq -r '.passkeyRpId // empty' "$work/body")
+    if [[ -z $rp ]]; then
+      fail "the server doesn't say its passkey domain (passkeyRpId): can't check imported passkeys"
+    elif [[ $host == "$rp" || $host == *."$rp" ]]; then
+      pass "passkey domain $rp fits $host"
+    else
+      fail "passkey domain $rp isn't $host: imported passkeys can't sign in (WEBAUTHN_RP_ID)"
+    fi
+    if jq -e --arg o "$origin" '(.passkeyOrigins // []) | map(ascii_downcase) | index($o) != null' "$work/body" > /dev/null; then
+      pass "passkey origins include $origin"
+    else
+      fail "passkey origins $(jq -c '.passkeyOrigins // []' "$work/body") don't include $origin (WEBAUTHN_ORIGINS)"
+    fi
+  fi
 else
   fail "GET /api/auth/methods $status: $(body)"
 fi
