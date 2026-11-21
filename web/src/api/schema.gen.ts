@@ -1649,11 +1649,31 @@ export interface paths {
         };
         /**
          * A child's TV time, as the kid view shows it
-         * @description Their time left, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
+         * @description Their time left and where it came from, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
          */
         get: operations["childTv"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/tv/credits/{creditId}/forfeit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back the unused rest of a parent's TV grant
+         * @description The credit keeps what was already watched; the rest leaves the child's TV time, and a session left with none ends. A reward's TV time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+         */
+        post: operations["forfeitTvCredit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2207,9 +2227,63 @@ export interface components {
             /** @description Allowed hours cut it short; the rest stays banked */
             clipped: boolean;
         };
+        /** @description TV time with some left */
+        TvCredit: {
+            id: components["schemas"]["Id"];
+            /**
+             * @description A reward bought with points, or a parent's grant
+             * @enum {string}
+             */
+            source: "redemption" | "grant";
+            redemptionId?: components["schemas"]["Id"];
+            rewardTitle?: string;
+            /** @description The parent who gave it, by name */
+            grantedBy?: string;
+            /** @description What it was given as */
+            minutes: number;
+            /** @description What it holds */
+            seconds: number;
+            usedSeconds: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        WaitingTv: {
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            room: string | null;
+        };
+        Watching: {
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            /** Format: date-time */
+            endsAt: string;
+            secondsRemaining: number;
+            endsWithHours: boolean;
+        };
+        /** @description Open until closesAt, or closed until opensAt */
+        WindowStatus: {
+            open: boolean;
+            /** Format: date-time */
+            closesAt?: string;
+            /** Format: date-time */
+            opensAt?: string;
+        };
+        ChildTv: {
+            /** Format: date-time */
+            serverTime: string;
+            secondsRemaining: number;
+            /** @description TV time with some left, oldest first (watched in this order) */
+            credits: components["schemas"]["TvCredit"][];
+            /** @description TVs asking "Who's watching?" now with nobody on them, oldest first */
+            waiting: components["schemas"]["WaitingTv"][];
+            watching: components["schemas"]["Watching"] | null;
+            hours: components["schemas"]["WindowStatus"] | null;
+        };
         SpendResult: {
             spend?: components["schemas"]["Spend"];
             screenTime: components["schemas"]["ScreenTime"];
+            /** @description For TV time given (target tv), the child's TV time now */
+            tv?: components["schemas"]["ChildTv"];
         };
         EndResult: {
             /** @enum {string} */
@@ -2511,14 +2585,6 @@ export interface components {
             openHours: components["schemas"]["OpenHours"] | null;
             version: components["schemas"]["Version"];
         };
-        /** @description Open until closesAt, or closed until opensAt */
-        WindowStatus: {
-            open: boolean;
-            /** Format: date-time */
-            closesAt?: string;
-            /** Format: date-time */
-            opensAt?: string;
-        };
         TvSession: {
             id: components["schemas"]["Id"];
             tvId: components["schemas"]["Id"];
@@ -2710,28 +2776,6 @@ export interface components {
                 state: "answered" | "dismissed";
             };
             session: components["schemas"]["TvSession"] | null;
-        };
-        WaitingTv: {
-            tvId: components["schemas"]["Id"];
-            tvName: string;
-            room: string | null;
-        };
-        Watching: {
-            tvId: components["schemas"]["Id"];
-            tvName: string;
-            /** Format: date-time */
-            endsAt: string;
-            secondsRemaining: number;
-            endsWithHours: boolean;
-        };
-        ChildTv: {
-            /** Format: date-time */
-            serverTime: string;
-            secondsRemaining: number;
-            /** @description TVs asking "Who's watching?" now with nobody on them, oldest first */
-            waiting: components["schemas"]["WaitingTv"][];
-            watching: components["schemas"]["Watching"] | null;
-            hours: components["schemas"]["WindowStatus"] | null;
         };
         WatchTv: {
             tvId: components["schemas"]["Id"];
@@ -7014,6 +7058,50 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    forfeitTvCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+                creditId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {} */
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Taken back */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        forfeitedSeconds: number;
+                        tv: components["schemas"]["ChildTv"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Error"];
         };
     };

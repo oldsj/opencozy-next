@@ -520,14 +520,18 @@ type Tv struct {
 }
 
 type TvCredit struct {
-	ID             uuid.UUID
-	HouseholdID    uuid.UUID
-	ChildID        uuid.UUID
-	RedemptionID   *uuid.UUID
-	GrantedSeconds int32
-	Seconds        int32
-	UsedSeconds    int32
-	CreatedAt      time.Time
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	ChildID          uuid.UUID
+	RedemptionID     *uuid.UUID
+	GrantedSeconds   int32
+	Seconds          int32
+	UsedSeconds      int32
+	CreatedAt        time.Time
+	GrantedBy        *uuid.UUID
+	ForfeitedAt      *time.Time
+	ForfeitedBy      *uuid.UUID
+	ForfeitedSeconds pgtype.Int4
 }
 
 type TvMac struct {

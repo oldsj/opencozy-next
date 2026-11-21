@@ -265,7 +265,19 @@ func (s *Snapshot) Child(ctx context.Context, child uuid.UUID) (api.ChildTv, err
 	if err != nil {
 		return api.ChildTv{}, err
 	}
-	out := api.ChildTv{ServerTime: s.Now, SecondsRemaining: k.seconds, Waiting: s.waiting(), Hours: hoursView(k.hours)}
+	credits, err := s.q.OpenTvCredits(ctx, dbq.OpenTvCreditsParams{HouseholdID: s.H, ChildID: child})
+	if err != nil {
+		return api.ChildTv{}, err
+	}
+	out := api.ChildTv{ServerTime: s.Now, SecondsRemaining: k.seconds, Credits: make([]api.TvCredit, 0, len(credits)), Waiting: s.waiting(), Hours: hoursView(k.hours)}
+	for _, c := range credits {
+		v := api.TvCredit{Id: c.ID, Source: api.TvCreditSourceGrant, RedemptionId: c.RedemptionID, RewardTitle: c.RewardTitle, GrantedBy: c.GrantedByName,
+			Minutes: int(c.GrantedSeconds / 60), Seconds: int(c.Seconds), UsedSeconds: int(c.UsedSeconds), CreatedAt: c.CreatedAt}
+		if c.RedemptionID != nil {
+			v.Source = api.TvCreditSourceRedemption
+		}
+		out.Credits = append(out.Credits, v)
+	}
 	if k.watching != nil {
 		v := s.SessionView(*k.watching)
 		out.Watching = &api.Watching{TvId: v.TvId, TvName: v.TvName, EndsAt: *v.EndsAt, SecondsRemaining: *v.SecondsRemaining, EndsWithHours: v.EndsWithHours}

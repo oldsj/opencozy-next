@@ -446,7 +446,7 @@ func (s *Snapshot) settleOne(ctx context.Context, sess dbq.TvSession, editedTv *
 // AddCredit gives a child TV time (slice 8: a TV-target redemption or grant). Call it under the
 // household lock with the command's time; settle first is not needed, since a session that ran
 // out is not revived: it has already ended at its end in the books Settle keeps.
-func (d Domain) AddCredit(ctx context.Context, q *dbq.Queries, householdID, childID uuid.UUID, redemptionID *uuid.UUID, seconds int32, now time.Time) error {
+func (d Domain) AddCredit(ctx context.Context, q *dbq.Queries, householdID, childID uuid.UUID, redemptionID, grantedBy *uuid.UUID, seconds int32, now time.Time) error {
 	s, err := d.Load(ctx, q, householdID, now)
 	if err != nil {
 		return err
@@ -454,7 +454,7 @@ func (d Domain) AddCredit(ctx context.Context, q *dbq.Queries, householdID, chil
 	if err := s.Settle(ctx, nil); err != nil {
 		return err
 	}
-	if _, err := q.AddTvCredit(ctx, dbq.AddTvCreditParams{HouseholdID: householdID, ChildID: childID, RedemptionID: redemptionID, Seconds: seconds, Now: now}); err != nil {
+	if _, err := q.AddTvCredit(ctx, dbq.AddTvCreditParams{HouseholdID: householdID, ChildID: childID, RedemptionID: redemptionID, GrantedBy: grantedBy, Seconds: seconds, Now: now}); err != nil {
 		return err
 	}
 	s.changed = true
@@ -515,4 +515,63 @@ func (d Domain) CancelCredit(ctx context.Context, q *dbq.Queries, householdID, r
 		return 0, err
 	}
 	return refund, s.Notify(ctx)
+}
+
+// ErrRewardCredit means a forfeit named a reward's TV time: cancel the reward instead, which
+// refunds its points.
+var ErrRewardCredit = conflict("cancel_the_reward", "This TV time was bought with points: cancel the reward to take it back and return the points.")
+
+// ErrNothingLeft means a forfeit named TV time that has all been watched.
+var ErrNothingLeft = conflict("nothing_left", "This TV time has all been watched.")
+
+// ForfeitCredit takes back the unused rest of a parent's TV grant, recording who did. A watching
+// child is charged up to now first, and a session left with no time then ends. ErrNotFound when
+// the child has no such credit. Call it under the household lock.
+func (d Domain) ForfeitCredit(ctx context.Context, q *dbq.Queries, householdID, childID, creditID, by uuid.UUID, now time.Time) (int32, error) {
+	s, err := d.Load(ctx, q, householdID, now)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.Settle(ctx, nil); err != nil {
+		return 0, err
+	}
+	get := func() (dbq.TvCredit, error) {
+		c, err := q.GetTvCredit(ctx, dbq.GetTvCreditParams{HouseholdID: householdID, ChildID: childID, ID: creditID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c, ErrNotFound
+		}
+		return c, err
+	}
+	c, err := get()
+	if err != nil {
+		return 0, err
+	}
+	if c.RedemptionID != nil {
+		return 0, ErrRewardCredit
+	}
+	if sess := s.childSession(childID); sess != nil {
+		if err := s.charge(ctx, sess, now); err != nil {
+			return 0, err
+		}
+		if c, err = get(); err != nil {
+			return 0, err
+		}
+	}
+	if c.UsedSeconds >= c.Seconds {
+		return 0, ErrNothingLeft
+	}
+	if err := q.ForfeitTvCredit(ctx, dbq.ForfeitTvCreditParams{HouseholdID: householdID, ID: c.ID, ForfeitedBy: &by, Now: &now}); err != nil {
+		return 0, err
+	}
+	credits := s.Credits[childID]
+	for i := range credits {
+		if credits[i].ID == c.ID {
+			credits[i].Seconds = credits[i].UsedSeconds
+		}
+	}
+	s.changed = true
+	if err := s.Settle(ctx, nil); err != nil {
+		return 0, err
+	}
+	return c.Seconds - c.UsedSeconds, s.Notify(ctx)
 }

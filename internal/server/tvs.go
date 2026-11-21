@@ -10,6 +10,7 @@ import (
 
 	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/api"
+	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/jobs"
 	"github.com/oldsj/opencozy-next/internal/screentime"
@@ -462,4 +463,43 @@ func (s *Server) ReportTvPower(ctx context.Context, req api.ReportTvPowerRequest
 		})
 	}
 	return api.ReportTvPower200JSONResponse(out), nil
+}
+
+// childTvNow is a child's TV view inside a command, at its time.
+func (s *Server) childTvNow(ctx context.Context, q *dbq.Queries, householdID, childID uuid.UUID, now time.Time) (api.ChildTv, error) {
+	snap, err := s.tv.Load(ctx, q, householdID, now)
+	if err != nil {
+		return api.ChildTv{}, err
+	}
+	return snap.Child(ctx, childID)
+}
+
+// ForfeitTvCredit takes back the unused rest of a parent's TV grant.
+func (s *Server) ForfeitTvCredit(ctx context.Context, req api.ForfeitTvCreditRequestObject) (api.ForfeitTvCreditResponseObject, error) {
+	a, cmd := mustActor(ctx), mustCmd(ctx)
+	if err := cmd.LockChildren(ctx, req.ChildId); errors.Is(err, command.ErrNoChild) {
+		return api.ForfeitTvCredit404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	now, err := cmd.Now(ctx)
+	if err != nil {
+		return nil, err
+	}
+	seconds, err := s.tv.ForfeitCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, req.CreditId, a.AdultID, now)
+	if err != nil {
+		return tvFail(err, map[int]func(api.Error) api.ForfeitTvCreditResponseObject{
+			404: func(e api.Error) api.ForfeitTvCreditResponseObject {
+				return api.ForfeitTvCredit404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(e)}
+			},
+			409: func(e api.Error) api.ForfeitTvCreditResponseObject {
+				return api.ForfeitTvCredit409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(e)}
+			},
+		})
+	}
+	view, err := s.childTvNow(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+	if err != nil {
+		return nil, err
+	}
+	return api.ForfeitTvCredit200JSONResponse{ForfeitedSeconds: int(seconds), Tv: view}, nil
 }

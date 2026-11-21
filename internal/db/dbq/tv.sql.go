@@ -14,15 +14,16 @@ import (
 )
 
 const addTvCredit = `-- name: AddTvCredit :one
-INSERT INTO tv_credit (household_id, child_id, redemption_id, granted_seconds, seconds, created_at)
-VALUES ($1, $2, $3, $4::integer, $4::integer, $5::timestamptz)
-RETURNING id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at
+INSERT INTO tv_credit (household_id, child_id, redemption_id, granted_by, granted_seconds, seconds, created_at)
+VALUES ($1, $2, $3, $4, $5::integer, $5::integer, $6::timestamptz)
+RETURNING id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at, granted_by, forfeited_at, forfeited_by, forfeited_seconds
 `
 
 type AddTvCreditParams struct {
 	HouseholdID  uuid.UUID
 	ChildID      uuid.UUID
 	RedemptionID *uuid.UUID
+	GrantedBy    *uuid.UUID
 	Seconds      int32
 	Now          time.Time
 }
@@ -32,6 +33,7 @@ func (q *Queries) AddTvCredit(ctx context.Context, arg AddTvCreditParams) (TvCre
 		arg.HouseholdID,
 		arg.ChildID,
 		arg.RedemptionID,
+		arg.GrantedBy,
 		arg.Seconds,
 		arg.Now,
 	)
@@ -45,6 +47,10 @@ func (q *Queries) AddTvCredit(ctx context.Context, arg AddTvCreditParams) (TvCre
 		&i.Seconds,
 		&i.UsedSeconds,
 		&i.CreatedAt,
+		&i.GrantedBy,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
 	)
 	return i, err
 }
@@ -250,6 +256,29 @@ func (q *Queries) EndTvSession(ctx context.Context, arg EndTvSessionParams) (TvS
 	return i, err
 }
 
+const forfeitTvCredit = `-- name: ForfeitTvCredit :exec
+UPDATE tv_credit
+SET seconds = used_seconds, forfeited_at = $4, forfeited_by = $3, forfeited_seconds = seconds - used_seconds
+WHERE household_id = $1 AND id = $2 AND used_seconds < seconds AND redemption_id IS NULL
+`
+
+type ForfeitTvCreditParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+	ForfeitedBy *uuid.UUID
+	Now         *time.Time
+}
+
+func (q *Queries) ForfeitTvCredit(ctx context.Context, arg ForfeitTvCreditParams) error {
+	_, err := q.db.Exec(ctx, forfeitTvCredit,
+		arg.HouseholdID,
+		arg.ID,
+		arg.ForfeitedBy,
+		arg.Now,
+	)
+	return err
+}
+
 const forgetTvPower = `-- name: ForgetTvPower :execrows
 UPDATE tv
 SET power = 'unknown', power_changed_at = $3::timestamptz, attempts_since = NULL, last_attempt_at = NULL
@@ -338,8 +367,38 @@ func (q *Queries) GetLiveTvByEntity(ctx context.Context, arg GetLiveTvByEntityPa
 	return i, err
 }
 
+const getTvCredit = `-- name: GetTvCredit :one
+SELECT id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at, granted_by, forfeited_at, forfeited_by, forfeited_seconds FROM tv_credit WHERE household_id = $1 AND child_id = $2 AND id = $3
+`
+
+type GetTvCreditParams struct {
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	ID          uuid.UUID
+}
+
+func (q *Queries) GetTvCredit(ctx context.Context, arg GetTvCreditParams) (TvCredit, error) {
+	row := q.db.QueryRow(ctx, getTvCredit, arg.HouseholdID, arg.ChildID, arg.ID)
+	var i TvCredit
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.ChildID,
+		&i.RedemptionID,
+		&i.GrantedSeconds,
+		&i.Seconds,
+		&i.UsedSeconds,
+		&i.CreatedAt,
+		&i.GrantedBy,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
+	)
+	return i, err
+}
+
 const getTvCreditByRedemption = `-- name: GetTvCreditByRedemption :one
-SELECT id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at FROM tv_credit WHERE household_id = $1 AND redemption_id = $2
+SELECT id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at, granted_by, forfeited_at, forfeited_by, forfeited_seconds FROM tv_credit WHERE household_id = $1 AND redemption_id = $2
 `
 
 type GetTvCreditByRedemptionParams struct {
@@ -359,6 +418,10 @@ func (q *Queries) GetTvCreditByRedemption(ctx context.Context, arg GetTvCreditBy
 		&i.Seconds,
 		&i.UsedSeconds,
 		&i.CreatedAt,
+		&i.GrantedBy,
+		&i.ForfeitedAt,
+		&i.ForfeitedBy,
+		&i.ForfeitedSeconds,
 	)
 	return i, err
 }
@@ -740,7 +803,7 @@ func (q *Queries) ListTvWorkHouseholds(ctx context.Context) ([]uuid.UUID, error)
 }
 
 const listUnspentTvCredits = `-- name: ListUnspentTvCredits :many
-SELECT id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at FROM tv_credit
+SELECT id, household_id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at, granted_by, forfeited_at, forfeited_by, forfeited_seconds FROM tv_credit
 WHERE household_id = $1 AND seconds > used_seconds
 ORDER BY child_id, created_at, id
 `
@@ -760,6 +823,68 @@ func (q *Queries) ListUnspentTvCredits(ctx context.Context, householdID uuid.UUI
 			&i.HouseholdID,
 			&i.ChildID,
 			&i.RedemptionID,
+			&i.GrantedSeconds,
+			&i.Seconds,
+			&i.UsedSeconds,
+			&i.CreatedAt,
+			&i.GrantedBy,
+			&i.ForfeitedAt,
+			&i.ForfeitedBy,
+			&i.ForfeitedSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const openTvCredits = `-- name: OpenTvCredits :many
+SELECT k.id, k.redemption_id, r.title AS reward_title, k.granted_by, a.name AS granted_by_name,
+       k.granted_seconds, k.seconds, k.used_seconds, k.created_at
+FROM tv_credit k
+LEFT JOIN redemption r ON r.household_id = k.household_id AND r.id = k.redemption_id
+LEFT JOIN adult a ON a.household_id = k.household_id AND a.id = k.granted_by
+WHERE k.household_id = $1 AND k.child_id = $2 AND k.used_seconds < k.seconds
+ORDER BY k.created_at, k.id
+`
+
+type OpenTvCreditsParams struct {
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+}
+
+type OpenTvCreditsRow struct {
+	ID             uuid.UUID
+	RedemptionID   *uuid.UUID
+	RewardTitle    *string
+	GrantedBy      *uuid.UUID
+	GrantedByName  *string
+	GrantedSeconds int32
+	Seconds        int32
+	UsedSeconds    int32
+	CreatedAt      time.Time
+}
+
+// A child's TV credits with time left, oldest first (spent in this order), with who gave each.
+func (q *Queries) OpenTvCredits(ctx context.Context, arg OpenTvCreditsParams) ([]OpenTvCreditsRow, error) {
+	rows, err := q.db.Query(ctx, openTvCredits, arg.HouseholdID, arg.ChildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OpenTvCreditsRow{}
+	for rows.Next() {
+		var i OpenTvCreditsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RedemptionID,
+			&i.RewardTitle,
+			&i.GrantedBy,
+			&i.GrantedByName,
 			&i.GrantedSeconds,
 			&i.Seconds,
 			&i.UsedSeconds,

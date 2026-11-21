@@ -700,6 +700,9 @@ schemas:
         $ref: '#/schemas/Spend'
       screenTime:
         $ref: '#/schemas/ScreenTime'
+      tv:
+        $ref: tvs.yaml#/schemas/ChildTv
+        description: "For TV time given (target tv), the child's TV time now"
   EndResult:
     type: object
     required: [scope, windows, cutSeconds, refundedSeconds, forfeitedSeconds, screenTime]

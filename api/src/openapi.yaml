@@ -235,6 +235,8 @@ paths:
     $ref: tvs.yaml#/answer
   /children/{childId}/tv:
     $ref: tvs.yaml#/childTv
+  /children/{childId}/tv/credits/{creditId}/forfeit:
+    $ref: tvs.yaml#/tvCreditForfeit
   /children/{childId}/tv/watch:
     $ref: tvs.yaml#/watch
   /tv/allowances:

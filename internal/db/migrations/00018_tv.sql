@@ -62,11 +62,22 @@ CREATE TABLE tv_credit (
     seconds         integer NOT NULL,
     used_seconds    integer NOT NULL DEFAULT 0,
     created_at      timestamptz NOT NULL CHECK (isfinite(created_at)),
+    -- A parent's grant (no redemption) records who gave it, and can be taken back: seconds drop
+    -- to what was used and these record when, by whom and how much. A reward's TV time is
+    -- taken back by cancelling the reward, which refunds its points.
+    granted_by        uuid,
+    forfeited_at      timestamptz,
+    forfeited_by      uuid,
+    forfeited_seconds integer CHECK (forfeited_seconds BETWEEN 1 AND 86400),
     UNIQUE (household_id, id),
     UNIQUE (household_id, redemption_id),
     FOREIGN KEY (household_id, child_id) REFERENCES child (household_id, id),
     FOREIGN KEY (household_id, redemption_id) REFERENCES redemption (household_id, id),
-    CHECK (used_seconds >= 0 AND used_seconds <= seconds AND seconds <= granted_seconds)
+    FOREIGN KEY (household_id, granted_by) REFERENCES adult (household_id, id),
+    FOREIGN KEY (household_id, forfeited_by) REFERENCES adult (household_id, id),
+    CHECK (used_seconds >= 0 AND used_seconds <= seconds AND seconds <= granted_seconds),
+    CHECK ((forfeited_at IS NULL AND forfeited_by IS NULL AND forfeited_seconds IS NULL)
+        OR (forfeited_at IS NOT NULL AND forfeited_seconds IS NOT NULL AND redemption_id IS NULL))
 );
 CREATE INDEX tv_credit_unspent_idx ON tv_credit (household_id, child_id, created_at, id) WHERE seconds > used_seconds;
 
