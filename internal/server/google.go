@@ -55,7 +55,7 @@ func (s *Server) ConnectGoogle(ctx context.Context, _ api.ConnectGoogleRequestOb
 	if s.google == nil || kr == nil {
 		return api.ConnectGoogle422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errGoogleOff)}, nil
 	}
-	if err := cmd.Q.DeleteExpiredGoogleOAuthStates(ctx); err != nil {
+	if err := cmd.Q.DeleteExpiredGoogleOAuthStates(ctx, a.HouseholdID); err != nil {
 		return nil, err
 	}
 	state, hash, err := auth.NewSessionToken()
@@ -66,13 +66,17 @@ func (s *Server) ConnectGoogle(ctx context.Context, _ api.ConnectGoogleRequestOb
 	if err != nil {
 		return nil, err
 	}
+	now, err := cmd.Now(ctx)
+	if err != nil {
+		return nil, err
+	}
 	verifier := oauth2.GenerateVerifier()
 	sealed, err := calendar.SealGoogleVerifier(kr, a.HouseholdID, id, verifier)
 	if err != nil {
 		return nil, err
 	}
 	if err := cmd.Q.CreateGoogleOAuthState(ctx, dbq.CreateGoogleOAuthStateParams{ID: id, StateHash: hex.EncodeToString(hash),
-		HouseholdID: a.HouseholdID, AdultID: a.AdultID, Verifier: sealed, ExpiresAt: time.Now().Add(googleConnectTTL)}); err != nil {
+		HouseholdID: a.HouseholdID, AdultID: a.AdultID, Verifier: sealed, ExpiresAt: now.Add(googleConnectTTL)}); err != nil {
 		return nil, err
 	}
 	return api.ConnectGoogle200JSONResponse{AuthorizeUrl: s.google.AuthURL(state, verifier)}, nil
@@ -101,7 +105,8 @@ func (s *Server) GoogleCallback(ctx context.Context, req api.GoogleCallbackReque
 	if errors.Is(err, pgx.ErrNoRows) {
 		return back("expired"), nil
 	} else if err != nil {
-		return nil, err
+		s.log.ErrorContext(ctx, "Google connect: reading the state failed", "err", err)
+		return back("failed"), nil
 	}
 	switch {
 	case p.Error != nil && *p.Error == "access_denied":
@@ -111,7 +116,8 @@ func (s *Server) GoogleCallback(ctx context.Context, req api.GoogleCallbackReque
 	}
 	verifier, err := calendar.OpenGoogleVerifier(kr, a.HouseholdID, st.ID, st.Verifier)
 	if err != nil {
-		return nil, err
+		s.log.ErrorContext(ctx, "Google connect: the verifier does not decrypt", "err", err)
+		return back("failed"), nil
 	}
 	acct, err := s.google.Exchange(ctx, *p.Code, verifier)
 	if errors.Is(err, calendar.ErrScopeMissing) {
@@ -122,7 +128,9 @@ func (s *Server) GoogleCallback(ctx context.Context, req api.GoogleCallbackReque
 	}
 	id, outcome, err := s.saveGoogleAccount(ctx, a.HouseholdID, acct)
 	if err != nil {
-		return nil, err
+		s.log.ErrorContext(ctx, "Google connect: saving the account failed", "err", err)
+		s.revokeGoogle(ctx, acct.RefreshToken)
+		return back("failed"), nil
 	}
 	if outcome != "connected" {
 		s.revokeGoogle(ctx, acct.RefreshToken)
@@ -223,7 +231,7 @@ func (s *Server) googleAccess(ctx context.Context, q *dbq.Queries, c dbq.Calenda
 	}
 	acc, err := s.google.Access(ctx, refresh)
 	if errors.Is(err, calendar.ErrReconnect) {
-		if err := q.GoogleConnectionNeedsReconnect(ctx, c.ID); err != nil {
+		if err := q.GoogleConnectionNeedsReconnect(ctx, dbq.GoogleConnectionNeedsReconnectParams{HouseholdID: c.HouseholdID, ID: c.ID, ReadToken: c.RefreshToken}); err != nil {
 			return "", err
 		}
 		return "", calendar.ErrReconnect
@@ -235,7 +243,7 @@ func (s *Server) googleAccess(ctx context.Context, q *dbq.Queries, c dbq.Calenda
 		if err != nil {
 			return "", err
 		}
-		if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{ID: c.ID, RefreshToken: &sealed}); err != nil {
+		if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{HouseholdID: c.HouseholdID, ID: c.ID, NewToken: &sealed, ReadToken: c.RefreshToken}); err != nil {
 			return "", err
 		}
 	}
@@ -341,8 +349,8 @@ func (s *Server) FollowGoogleCalendar(ctx context.Context, req api.FollowGoogleC
 	return api.FollowGoogleCalendar201JSONResponse(toSource(r)), nil
 }
 
-// DisconnectGoogle deletes the account and, by cascade, its calendars, then asks Google to
-// revoke the token.
+// DisconnectGoogle deletes the account and, by cascade, its calendars; once that commits, it
+// asks Google to revoke the token.
 func (s *Server) DisconnectGoogle(ctx context.Context, req api.DisconnectGoogleRequestObject) (api.DisconnectGoogleResponseObject, error) {
 	h, cmd := mustActor(ctx).HouseholdID, mustCmd(ctx)
 	sealed, err := cmd.Q.DeleteGoogleConnection(ctx, dbq.DeleteGoogleConnectionParams{HouseholdID: h, ID: req.ConnectionId,
@@ -362,7 +370,8 @@ func (s *Server) DisconnectGoogle(ctx context.Context, req api.DisconnectGoogleR
 	}
 	if s.cfg.SecretKeys != nil && sealed != nil {
 		if token, err := calendar.OpenGoogleToken(s.cfg.SecretKeys, h, req.ConnectionId, *sealed); err == nil {
-			s.revokeGoogle(ctx, token)
+			// Only once the delete has committed, and with the household lock released.
+			cmd.AfterCommit(func(ctx context.Context) { s.revokeGoogle(ctx, token) })
 		}
 	}
 	return api.DisconnectGoogle204Response{}, nil

@@ -5,7 +5,7 @@ INSERT INTO google_oauth_state (id, state_hash, household_id, adult_id, verifier
 VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: DeleteExpiredGoogleOAuthStates :exec
-DELETE FROM google_oauth_state WHERE expires_at < now();
+DELETE FROM google_oauth_state WHERE household_id = $1 AND expires_at < now();
 
 -- name: TakeGoogleOAuthState :one
 DELETE FROM google_oauth_state
@@ -49,11 +49,16 @@ ORDER BY lower(c.email), c.id;
 DELETE FROM calendar_google_connection WHERE household_id = $1 AND id = $2 AND version = @expected_version
 RETURNING refresh_token;
 
+-- Both take the token that was read: a reconnect in between (a new token) wins, and these do
+-- nothing.
+
 -- name: GoogleConnectionNeedsReconnect :exec
-UPDATE calendar_google_connection SET needs_reconnect = true WHERE id = $1;
+UPDATE calendar_google_connection SET needs_reconnect = true
+WHERE household_id = $1 AND id = $2 AND refresh_token = @read_token;
 
 -- name: SetGoogleRefreshToken :exec
-UPDATE calendar_google_connection SET refresh_token = $2 WHERE id = $1;
+UPDATE calendar_google_connection SET refresh_token = @new_token
+WHERE household_id = $1 AND id = $2 AND refresh_token = @read_token;
 
 -- name: ListGoogleRefreshTokens :many
 SELECT id, household_id, refresh_token::text FROM calendar_google_connection WHERE refresh_token IS NOT NULL ORDER BY id;

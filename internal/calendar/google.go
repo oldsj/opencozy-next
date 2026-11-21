@@ -152,7 +152,9 @@ func (g *Google) Access(ctx context.Context, refreshToken string) (Access, error
 func oauthError(err error) error {
 	var re *oauth2.RetrieveError
 	if errors.As(err, &re) {
-		if re.ErrorCode == "invalid_grant" {
+		// invalid_grant: revoked or expired. unauthorized_client: issued to another OAuth client
+		// (an import whose installation uses a new client); only connecting again helps.
+		if re.ErrorCode == "invalid_grant" || re.ErrorCode == "unauthorized_client" {
 			return ErrReconnect
 		}
 		code := 0

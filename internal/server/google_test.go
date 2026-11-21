@@ -5,9 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/oldsj/opencozy-next/internal/calendar"
 )
@@ -56,6 +58,12 @@ func (f *fakeGoogle) Revoke(_ context.Context, token string) error {
 	defer f.mu.Unlock()
 	f.revoked = append(f.revoked, token)
 	return nil
+}
+
+func (f *fakeGoogle) revokedTokens() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.revoked)
 }
 
 // callback is Google sending the browser back: a GET with the session cookie (SameSite=Lax
@@ -198,8 +206,16 @@ func TestGoogleConnectFlow(t *testing.T) {
 	if r := e.send(adult, "DELETE", "/api/calendar/google/connections/"+conn+"?expectedVersion=2", nil); r.status != 204 {
 		t.Fatalf("disconnect: %d %s", r.status, r.raw)
 	}
-	if len(g.revoked) != 1 || g.revoked[0] != "fixture-google-refresh" {
-		t.Errorf("revoked: %v", g.revoked)
+	// The revoke runs after the commit and the answer, so wait for it briefly.
+	var revoked []string
+	for range 100 {
+		if revoked = g.revokedTokens(); len(revoked) > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(revoked) != 1 || revoked[0] != "fixture-google-refresh" {
+		t.Errorf("revoked: %v", revoked)
 	}
 	var left int
 	if err := e.owner.QueryRow(t.Context(), `SELECT count(*) FROM calendar_source WHERE id = $1`, source).Scan(&left); err != nil || left != 0 {

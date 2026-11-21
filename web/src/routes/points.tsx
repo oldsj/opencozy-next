@@ -11,6 +11,7 @@ const kindTags: Record<HistoryEntry['kind'], { label: string; tone: TagTone }> =
   reversed: { label: 'Reversed', tone: 'attention' },
   redeemed: { label: 'Spent', tone: 'info' },
   refunded: { label: 'Refunded', tone: 'neutral' },
+  one_more_minute: { label: 'iPad', tone: 'neutral' },
 };
 
 const when = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -41,7 +42,7 @@ export function PointsPage({ childId }: { childId: string }) {
             {name}’s points
           </span>
         }
-        description="Every change, newest first. A reversal never deletes the original."
+        description="Every change, and each ask for one more minute on the iPad, newest first. A reversal never deletes the original."
         actions={history.data && <PointsBadge points={history.data.balance} />}
       />
       {history.isError && <Notice tone="error">{errorMessage(history.error)}</Notice>}
@@ -52,7 +53,9 @@ export function PointsPage({ childId }: { childId: string }) {
               const undone = entry.reversedBy !== undefined;
               const tag = kindTags[entry.kind];
               const at = when.format(new Date(entry.at));
-              const meta = [pointsLabel(entry.points, signed(entry.points)), at, entry.by === undefined ? null : `by ${entry.by}`, entry.reason ?? null]
+              // A shield event moves no points; it says where it happened instead.
+              const points = entry.kind === 'one_more_minute' ? null : pointsLabel(entry.points, signed(entry.points));
+              const meta = [points, at, entry.by === undefined ? null : `by ${entry.by}`, entry.device === undefined ? null : `on ${entry.device}`, entry.reason ?? null]
                 .filter(Boolean)
                 .join(' · ');
               return (
