@@ -40,12 +40,21 @@ type env struct {
 
 func newEnv(t *testing.T, mutate func(*config.Config)) *env {
 	t.Helper()
+	return newEnvWith(t, mutate, nil)
+}
+
+// newEnvWith is newEnv with prepare run on the Server before its handler is built.
+func newEnvWith(t *testing.T, mutate func(*config.Config), prepare func(*Server)) *env {
+	t.Helper()
 	db := testdb.Open(t)
 	cfg := config.Config{SessionTTL: time.Hour, AuthRatePerMinute: 1000}
 	if mutate != nil {
 		mutate(&cfg)
 	}
 	srv := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), db.Runtime)
+	if prepare != nil {
+		prepare(srv)
+	}
 	h, err := srv.Handler()
 	if err != nil {
 		t.Fatal(err)

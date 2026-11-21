@@ -109,6 +109,24 @@
         "googleClientID": {
           "type": "string",
           "pattern": "^[A-Za-z0-9._-]*$"
+        },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "pattern": "^(https://[^?#@\\s]+)?$"
+            },
+            "clientId": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
         }
       }
     },
