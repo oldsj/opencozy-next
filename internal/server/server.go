@@ -50,6 +50,7 @@ type Server struct {
 	// push enqueues pushes in commands; disabled without APNs (slice 11).
 	push      push.Outbox
 	pushNotes <-chan listen.Note
+	google    googleAPI // nil when Google calendar is off (slice 13b)
 	oidc      *oidcFlow // nil when single sign-on is off (slice 10b)
 	// oidcClient replaces the egress client for the OIDC provider, in tests only.
 	oidcClient func(context.Context) context.Context

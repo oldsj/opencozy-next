@@ -81,6 +81,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		defer pool.Close()
 		srv := server.New(cfg, log, pool)
+		var google *calendar.Google
+		if cfg.GoogleEnabled() {
+			if google, err = calendar.NewGoogle(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL()); err != nil {
+				return err
+			}
+			srv.UseGoogle(google)
+		}
 		h, err := srv.Handler()
 		if err != nil {
 			return err
@@ -94,7 +101,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 			if err != nil {
 				return err
 			}
-			background = append(background, calendar.Job(cfg.SecretKeys, fetcher, log, srv.CalendarWake()))
+			background = append(background, calendar.Job(cfg.SecretKeys, fetcher.WithGoogle(google), log, srv.CalendarWake()))
 		}
 		if cfg.PushEnabled() {
 			apns, err := push.NewAPNs(push.APNsConfig{TeamID: cfg.AppleTeamID, Topic: cfg.AppleBundleID, KeyID: cfg.APNsKeyID, Key: cfg.APNsKey}, log)
