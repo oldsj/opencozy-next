@@ -31,7 +31,9 @@ export function RewardsPage() {
   const editing = rewards.data?.rewards.find((r) => r.id === editingId);
   const closeEdit = () => { setEditingId(null); edit.reset(); };
   const save = (reward: Reward, body: RewardBody) => {
-    const attempt = `edit:${reward.id}:${JSON.stringify(body)}`;
+    // The key covers the whole request, version included: after a lost answer and a refetch, the
+    // same fields at the newer version are a new request, not a reuse of the old key.
+    const attempt = `edit:${reward.id}:${String(reward.version)}:${JSON.stringify(body)}`;
     edit.mutate(
       { params: { ...attempts.params(attempt), path: { rewardId: reward.id } }, body: { ...body, expectedVersion: reward.version } },
       { onSettled: attempts.settleIfAnswered(attempt), onSuccess: () => { setEditingId(null); } },

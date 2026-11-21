@@ -15,8 +15,9 @@ async function post<T>(request: APIRequestContext, path: string, data: unknown):
 test('manage: edit and reassign, hide, give and cancel, household', async ({ page }) => {
   const problems: string[] = [];
   page.on('console', (m) => {
-    // Chrome logs every 4xx; the household form gets a 422 on purpose.
-    if (m.type() === 'error' && !/status of 4\d\d/.test(m.text())) problems.push(m.text());
+    // Chrome logs every 4xx (the household form gets a 422 and a stale cancel a 409 on purpose),
+    // and the reset of the save whose answer the test drops.
+    if (m.type() === 'error' && !/status of 4\d\d|ERR_CONNECTION_RESET/.test(m.text())) problems.push(m.text());
   });
   page.on('pageerror', (e) => problems.push(e.message));
   const run = String(Date.now()).slice(-6);
@@ -29,10 +30,10 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
-  // Two children; Ada earns 10 points (an adult's tick counts at once) and has a chore to move.
+  // Two children; Ada earns 14 points (an adult's tick counts at once) and has a chore to move.
   const a = await post<{ id: string }>(page.request, '/api/children', { name: ada, color: 'teal' });
   await post(page.request, '/api/children', { name: noor, color: 'rose' });
-  const earned = await post<{ id: string }>(page.request, '/api/chores', { childId: a.id, title: `Water the plants ${run}`, points: 10 });
+  const earned = await post<{ id: string }>(page.request, '/api/chores', { childId: a.id, title: `Water the plants ${run}`, points: 14 });
   await post(page.request, `/api/today/chores/${earned.id}/complete`, undefined);
   await post(page.request, '/api/chores', { childId: a.id, title: `Tidy the hallway ${run}`, points: 2 });
   const reward = await post<{ id: string }>(page.request, '/api/rewards', { title: `Pick the film ${run}`, cost: 4, kind: 'item' });
@@ -55,15 +56,29 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.getByRole('button', { name: `Edit Pick the film ${run}` }).click();
   const rsheet = page.getByRole('dialog', { name: `Edit Pick the film ${run}` });
   await rsheet.getByRole('group', { name: 'Children can choose it' }).getByRole('button', { name: 'Hidden' }).click();
+  // The first save reaches the server but its answer is lost. The form refetches the newer version,
+  // and saving the same fields again must go through, not trip over the old key.
+  let lost = false;
+  await page.route('**/api/rewards/*', async (route) => {
+    if (lost || route.request().method() !== 'PUT') { await route.fallback(); return; }
+    lost = true;
+    await route.fetch();
+    await route.abort('connectionreset');
+  });
+  await rsheet.getByRole('button', { name: 'Save' }).click();
+  await expect.poll(() => lost).toBe(true);
+  await expect(rsheet.getByRole('alert')).toBeVisible();
+  await rsheet.getByRole('group', { name: 'Children can choose it' }).getByRole('button', { name: 'Hidden' }).click();
   await rsheet.getByRole('button', { name: 'Save' }).click();
   await expect(rsheet).toBeHidden();
+  await page.unroute('**/api/rewards/*');
   await expect(page.getByRole('list', { name: 'Rewards' }).getByRole('listitem').filter({ hasText: `Pick the film ${run}` })).toContainText('hidden from children');
   await page.getByRole('button', { name: `Edit Pick the film ${run}` }).click();
   await rsheet.getByRole('group', { name: 'Children can choose it' }).getByRole('button', { name: 'Shown' }).click();
   await rsheet.getByRole('button', { name: 'Save' }).click();
   await expect(rsheet).toBeHidden();
 
-  // An adult chooses it for Ada twice (approved at once): one is given, one cancelled with its points back.
+  // An adult chooses it for Ada three times (approved at once): two are given, one cancelled with its points back.
   await post(page.request, `/api/children/${a.id}/redemptions`, { rewardId: reward.id });
   await post(page.request, `/api/children/${a.id}/redemptions`, { rewardId: reward.id });
   await page.getByRole('link', { name: 'Chosen rewards' }).click();
@@ -72,12 +87,27 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await expect(toGive.getByRole('listitem').filter({ hasText: ada })).toHaveCount(2);
   await toGive.getByRole('button', { name: `Mark Pick the film ${run} as given to ${ada}` }).first().click();
   await expect(page.getByRole('list', { name: 'Given' }).getByRole('listitem').filter({ hasText: ada })).toHaveCount(1);
+  // A third, given from another tab while its cancel dialog is open: the stale cancel is refused,
+  // and the dialog closes because a given item can't be cancelled.
+  await post(page.request, `/api/children/${a.id}/redemptions`, { rewardId: reward.id });
+  await page.reload();
+  await expect(toGive.getByRole('listitem').filter({ hasText: ada })).toHaveCount(2);
+  await toGive.getByRole('button', { name: `Cancel Pick the film ${run} for ${ada} and refund` }).first().click();
+  const open = (await (await page.request.get('/api/redemptions?status=approved')).json()) as { redemptions: { id: string; version: number; child: { name: string } }[] };
+  const shown = open.redemptions.filter((r) => r.child.name === ada);
+  // The list is newest first, and so is the page: the dialog is for the first one shown.
+  await post(page.request, `/api/redemptions/${shown[0].id}/fulfil`, { expectedVersion: shown[0].version });
+  await page.getByRole('button', { name: 'Cancel and refund 4 points' }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByRole('list', { name: 'Given' }).getByRole('listitem').filter({ hasText: ada })).toHaveCount(2);
+  await expect(toGive.getByRole('listitem').filter({ hasText: ada })).toHaveCount(1);
+
   await toGive.getByRole('button', { name: `Cancel Pick the film ${run} for ${ada} and refund` }).click();
   await page.getByRole('button', { name: 'Cancel and refund 4 points' }).click();
   await expect(page.getByRole('list', { name: 'Cancelled' }).getByRole('listitem').filter({ hasText: ada })).toContainText('4 points back');
   await expect(page.getByRole('list', { name: 'Given' }).getByRole('button', { name: new RegExp(ada) })).toHaveCount(0);
 
-  // The points came back: 10 earned, 4 spent.
+  // The points came back: 14 earned, 12 spent, 4 back.
   await page.goto(`/children/${a.id}/points`);
   await expect(page.locator('.oc-points-badge')).toHaveText('6 points');
 

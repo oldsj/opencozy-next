@@ -47,7 +47,9 @@ export function ChoresPage() {
   const editing = chores.data?.find((c) => c.id === editingId);
   const closeEdit = () => { setEditingId(null); edit.reset(); };
   const save = (chore: Chore, body: ChoreBody) => {
-    const attempt = `edit:${chore.id}:${JSON.stringify(body)}`;
+    // The key covers the whole request, version included: after a lost answer and a refetch, the
+    // same fields at the newer version are a new request, not a reuse of the old key.
+    const attempt = `edit:${chore.id}:${String(chore.version)}:${JSON.stringify(body)}`;
     edit.mutate(
       { params: { ...attempts.params(attempt), path: { choreId: chore.id } }, body: { ...body, expectedVersion: chore.version } },
       { onSettled: attempts.settleIfAnswered(attempt), onSuccess: () => { setEditingId(null); } },

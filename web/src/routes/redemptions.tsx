@@ -30,20 +30,29 @@ function meta(r: RedemptionRow): string {
 // gives the points back (screen time: the share not used yet).
 export function RedemptionsPage() {
   const queryClient = useQueryClient();
-  const list = $api.useQuery('get', '/redemptions');
+  // One list per section: each has its own cap of 200, so newer history can't push a reward still
+  // to give out of view, and asks still waiting or turned down don't use up the room.
+  const approved = $api.useQuery('get', '/redemptions', { params: { query: { status: 'approved' } } });
+  const fulfilled = $api.useQuery('get', '/redemptions', { params: { query: { status: 'fulfilled' } } });
+  const cancelledList = $api.useQuery('get', '/redemptions', { params: { query: { status: 'cancelled' } } });
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['get', '/redemptions'] });
     await queryClient.invalidateQueries({ queryKey: ['get', '/today'] });
   };
   const fulfil = $api.useMutation('post', '/redemptions/{redemptionId}/fulfil', { onSettled: refresh });
   const cancel = $api.useMutation('post', '/redemptions/{redemptionId}/cancel', { onSettled: refresh });
-  const [cancelling, setCancelling] = useState<RedemptionRow | null>(null);
+  // The id, not a snapshot: after a refetch (a version conflict, say) the dialog shows the row as
+  // it is now, and closes if it can no longer be cancelled.
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const attempts = useAttempts();
 
-  const rows = list.data?.redemptions ?? [];
-  const toGive = rows.filter((r) => r.status === 'approved');
-  const given = rows.filter((r) => r.status === 'fulfilled');
-  const cancelled = rows.filter((r) => r.status === 'cancelled');
+  const toGive = approved.data?.redemptions ?? [];
+  const given = fulfilled.data?.redemptions ?? [];
+  const cancelled = cancelledList.data?.redemptions ?? [];
+  const loaded = approved.isSuccess && fulfilled.isSuccess && cancelledList.isSuccess;
+  const found = cancellingId === null ? undefined : [...toGive, ...given].find((r) => r.id === cancellingId);
+  const cancelling = found && refundFor(found) > 0 ? found : null;
+  const setCancelling = (r: RedemptionRow | null) => { setCancellingId(r?.id ?? null); };
   const avatar = (r: RedemptionRow) => <ProfileAvatar name={r.child.name} color={r.child.color} size="small" aria-hidden="true" />;
 
   const give = (r: RedemptionRow) => {
@@ -68,7 +77,7 @@ export function RedemptionsPage() {
     <section className="flex flex-col gap-6">
       <PageHeader title="Chosen rewards" description="Approved rewards to give, and what’s been given." />
       <EditError error={fulfil.error} />
-      {list.isSuccess && rows.length === 0 && <EmptyState title="Nothing chosen yet" description="Rewards you approve in the inbox show here, to give." variant="surface" />}
+      {loaded && toGive.length + given.length + cancelled.length === 0 && <EmptyState title="Nothing chosen yet" description="Rewards you approve in the inbox show here, to give." variant="surface" />}
       {toGive.length > 0 && (
         <Section title="To give" count={toGive.length}>
           <List aria-label="To give">
