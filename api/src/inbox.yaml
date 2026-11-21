@@ -101,6 +101,65 @@ reject:
         $ref: common.yaml#/responses/UnprocessableEntity
       default:
         $ref: common.yaml#/responses/Error
+answer:
+  post:
+    operationId: answerInboxItem
+    summary: Answer a child's "Ask for more time"
+    description: >
+      30 minutes, an hour, all day (until the end of today's allowed hours, or midnight), or no.
+      A yes is given at once, after anything already queued and regardless of allowed hours. Only
+      for `time_request` items: 422 `not_a_time_request` otherwise. Approving a time request
+      without a choice is 422 `choice_required`; rejecting it is "no". 409 `already_decided`, or
+      `already_until` when "all day" would add nothing.
+    tags: [inbox]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 64
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ItemId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [choice]
+            properties:
+              choice:
+                $ref: screentime.yaml#/schemas/TimeChoice
+          example: { choice: 30min }
+    responses:
+      '200':
+        description: Answered
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, state, timeRequest]
+              properties:
+                id:
+                  $ref: common.yaml#/schemas/Id
+                state:
+                  type: string
+                  enum: [approved, rejected]
+                timeRequest:
+                  $ref: screentime.yaml#/schemas/TimeRequest
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
 
 parameters:
   ItemId:

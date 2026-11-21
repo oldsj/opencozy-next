@@ -406,3 +406,85 @@ func TestTVPowerAndRouterAttempts(t *testing.T) {
 		t.Fatalf("unknown entity: %d %s", r.status, r.raw)
 	}
 }
+
+// TV time end to end: a TV reward bought on the child's device is TV time (not iPad time),
+// watched on a TV, refunded in part on cancel (ending the session it paid for), and given by a
+// parent; the child's allowed hours hold TV time too.
+func TestTVRewards(t *testing.T) {
+	e := newTVEnv(t)
+	child1 := "/api/children/" + e.h.child1.String()
+	tvSeconds := func() float64 {
+		t.Helper()
+		r := e.send(e.device, "GET", child1+"/tv", nil)
+		if r.status != 200 {
+			t.Fatalf("child TV: %d %s", r.status, r.raw)
+		}
+		return r.body["secondsRemaining"].(float64)
+	}
+	points := func() int {
+		t.Helper()
+		var n int
+		if err := e.owner.QueryRow(t.Context(), `SELECT COALESCE(sum(delta), 0) FROM point_ledger WHERE child_id = $1`, e.h.child1).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	e.exec(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id) VALUES ($1, $2, 20, 'award', 'fixture', gen_random_uuid())`, e.h.id, e.h.child1)
+	r := e.send(e.adult, "POST", "/api/rewards", map[string]any{"title": "30 min of TV", "cost": 6, "kind": "screen_time", "minutes": 30, "target": "tv"})
+	if r.status != 201 {
+		t.Fatalf("TV reward: %d %s", r.status, r.raw)
+	}
+	reward := r.body["id"].(string)
+	before := points()
+	r = e.send(e.h.actors["device-web"], "POST", child1+"/redemptions", map[string]any{"rewardId": reward})
+	if r.status != 201 || r.body["status"] != "fulfilled" {
+		t.Fatalf("buy TV time: %d %s", r.status, r.raw)
+	}
+	redemption := r.body["id"].(string)
+	if got := tvSeconds(); got != 1800 || points() != before-6 {
+		t.Fatalf("bought: %v seconds, %d points", got, points()-before)
+	}
+	if r := e.send(e.adult, "GET", child1+"/screen-time", nil); r.body["bankedSeconds"] != float64(0) {
+		t.Fatalf("TV time banked as iPad time: %s", r.raw)
+	}
+
+	// Watched for 10 minutes, then cancelled: 20 of 30 minutes come back as 4 of 6 points, and
+	// the session it paid for ends.
+	prompt := e.tvState(e.h.tv)["prompt"].(map[string]any)["id"].(string)
+	if r := e.send(e.adult, "POST", "/api/tv-prompts/"+prompt+"/answer", map[string]any{"expectedVersion": 1, "answer": "child", "childId": e.h.child1.String()}); r.status != 200 {
+		t.Fatalf("watch: %d %s", r.status, r.raw)
+	}
+	e.fake.Advance(10 * time.Minute)
+	r = e.send(e.adult, "POST", "/api/redemptions/"+redemption+"/cancel", map[string]any{"expectedVersion": 1})
+	if r.status != 200 || r.body["refundedPoints"] != float64(4) || r.body["usedMinutes"] != float64(10) {
+		t.Fatalf("cancel: %d %s", r.status, r.raw)
+	}
+	if got := tvSeconds(); got != 0 || points() != before-2 {
+		t.Fatalf("after cancel: %v seconds, %d points", got, points()-before)
+	}
+	if s := e.tvState(e.h.tv)["session"]; s != nil {
+		t.Fatalf("the session outlived its time: %v", s)
+	}
+	if r := e.send(e.adult, "POST", "/api/redemptions/"+redemption+"/cancel", map[string]any{"expectedVersion": 2}); r.status != 409 {
+		t.Fatalf("cancel twice: %d %s", r.status, r.raw)
+	}
+
+	// A parent gives TV time; outside the child's allowed hours it can't start.
+	if r := e.send(e.h.actors["phone"], "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv"}); r.status != 200 {
+		t.Fatalf("grant: %d %s", r.status, r.raw)
+	}
+	if got := tvSeconds(); got != 1200 {
+		t.Fatalf("granted: %v", got)
+	}
+	ams, _ := time.LoadLocation("Europe/Amsterdam")
+	window := map[string]any{"start": "20:00", "end": "21:00"}
+	if e.now().In(ams).Hour() >= 19 {
+		window = map[string]any{"start": "01:00", "end": "02:00"}
+	}
+	if r := e.send(e.adult, "PUT", child1+"/allowed-hours", map[string]any{"allowedHours": map[string]any{"schoolNight": window, "weekend": window}}); r.status != 200 {
+		t.Fatalf("hours: %d %s", r.status, r.raw)
+	}
+	if r := e.send(e.adult, "POST", "/api/tvs/"+e.h.tv.String()+"/session", map[string]any{"watcher": "child", "childId": e.h.child1.String()}); r.status != 409 || r.code() != "outside_hours" {
+		t.Fatalf("outside hours: %d %s", r.status, r.raw)
+	}
+}

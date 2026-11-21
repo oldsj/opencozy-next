@@ -54,7 +54,7 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	q := dbq.New(pool)
-	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute)}
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), tv: tv.Domain{Hours: allowedHours{}}, deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute)}
 }
 
 // Drain makes /readyz fail, so the load balancer stops sending traffic before shutdown.

@@ -12,6 +12,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/api"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/jobs"
+	"github.com/oldsj/opencozy-next/internal/screentime"
 	"github.com/oldsj/opencozy-next/internal/tv"
 )
 
@@ -47,12 +48,16 @@ func tvWho(a actor.Actor) tv.Who {
 	return w
 }
 
-// readNow is a read's time: the commands' clock when one is set (tests), else the database's.
-func (s *Server) readNow(ctx context.Context) (time.Time, error) {
-	if s.runner.Clock != nil {
-		return s.runner.Clock.Now(ctx, s.q)
+// allowedHours gives the TV gate each child's allowed hours (slice 8): TV time starts only
+// inside them, and a session ends when they end.
+type allowedHours struct{}
+
+func (allowedHours) Status(ctx context.Context, q *dbq.Queries, householdID, childID uuid.UUID, now time.Time) (tv.HoursStatus, error) {
+	h, err := screentime.HoursStatus(ctx, q, householdID, childID, now)
+	if err != nil {
+		return tv.HoursStatus{}, err
 	}
-	return s.q.Now(ctx)
+	return tv.HoursStatus{Rule: h.Rule, Open: h.Open, ClosesAt: h.ClosesAt, OpensAt: h.OpensAt}, nil
 }
 
 // tvRead loads the household's TVs for a read.

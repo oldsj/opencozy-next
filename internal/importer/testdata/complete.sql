@@ -6,4 +6,4 @@ DELETE FROM reward_redemption;
 DELETE FROM reward;
 DELETE FROM assistant_credential;
 ALTER TABLE household DROP COLUMN lock_message, DROP COLUMN game_portal_domains, DROP COLUMN game_domains;
-ALTER TABLE child DROP COLUMN color, DROP COLUMN school_night_start, DROP COLUMN school_night_end, DROP COLUMN weekend_start, DROP COLUMN weekend_end;
+ALTER TABLE child DROP COLUMN color;
