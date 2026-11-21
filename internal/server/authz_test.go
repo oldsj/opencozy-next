@@ -87,6 +87,8 @@ func TestAuthzMatrix(t *testing.T) {
 				u = strings.ReplaceAll(u, "{connectionId}", h.google.String())
 				u = strings.ReplaceAll(u, "{passkeyId}", h.passkey.String())
 				u = strings.ReplaceAll(u, "{deviceId}", h.device.String())
+				u = strings.ReplaceAll(u, "{tvId}", h.tv.String())
+				u = strings.ReplaceAll(u, "{promptId}", h.prompt.String())
 				u = strings.ReplaceAll(u, "{creditId}", h.credit.String())
 				return "/api" + u
 			}
@@ -187,6 +189,8 @@ func allowed(p authz.Policy, name string, kind actor.Kind) bool {
 		return displayHas(p, "meals")
 	case "display-calendar":
 		return displayHas(p, "calendar")
+	case "display-tv":
+		return displayHas(p, "tv")
 	}
 	return true
 }

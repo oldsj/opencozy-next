@@ -25,6 +25,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/httpx"
 	"github.com/oldsj/opencozy-next/internal/live"
+	"github.com/oldsj/opencozy-next/internal/tv"
 	"github.com/oldsj/opencozy-next/web"
 )
 
@@ -48,6 +49,8 @@ type Server struct {
 	oidc         *oidcFlow          // nil when single sign-on is off (slice 10b)
 	// oidcClient replaces the egress client for the OIDC provider, in tests only.
 	oidcClient func(context.Context) context.Context
+	// tv is the TV gate's rules (slice 9).
+	tv tv.Domain
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -55,7 +58,7 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	q := dbq.New(pool)
-	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute)}
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), tv: tv.Domain{Hours: allowedHours{}}, deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute)}
 }
 
 // Drain makes /readyz fail, so the load balancer stops sending traffic before shutdown.
