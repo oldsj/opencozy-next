@@ -53,13 +53,11 @@ struct LocalServerTests {
             #expect(status == 401)
         }
 
-        // Slice 8 isn't served yet: the sync treats it as missing, not as a failure.
-        do {
-            _ = try await api.screenTime(target: .personal)
-            Issue.record("Expected the old screen-time path to be missing.")
-        } catch let error as APIError {
-            #expect(error.isMissingEndpoint)
-        }
+        // The child's iPad time, signed for the device's own child.
+        let childId = try #require(info.device.childId)
+        let (screen, _) = try await api.screenTime(childId: childId)
+        #expect(screen.childId == childId)
+        #expect(screen.allowanceSeconds <= 300)
 
         // The kid view: a one-time exchange URL on this origin that sets the device cookie.
         let link = try await api.webSession()

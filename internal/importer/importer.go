@@ -163,6 +163,7 @@ var domains = []func(context.Context, *run) error{
 	importCalendars,
 	importRecipes,
 	importMeals,
+	importTV,
 	checkLedgerSources, // last: every source kind has been imported
 }
 
