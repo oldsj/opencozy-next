@@ -243,7 +243,7 @@ struct UnassignedDeviceTests {
             info.device.child = nil
             return info
         }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) { throw APIError.transport("unused") }
+        func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) { throw APIError.transport("unused") }
     }
 
     @Test func deviceWithoutAChildIsLocked() async {

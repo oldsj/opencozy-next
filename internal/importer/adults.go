@@ -97,7 +97,7 @@ func importAdults(ctx context.Context, x *run) error {
 	x.r.table("household_owner", owners, "adult", owners, adults)
 	x.r.table("auth_account", accounts, "adult (password)", withPassword, passwords)
 	if accounts > withPassword {
-		x.r.note("auth_account", fmt.Sprintf("%d other accounts (OIDC links), not carried", accounts-withPassword))
+		x.r.note("auth_account", fmt.Sprintf("%d other accounts, not carried", accounts-withPassword))
 	}
 	return nil
 }

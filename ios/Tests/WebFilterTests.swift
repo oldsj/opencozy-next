@@ -35,14 +35,15 @@ struct WebFilterTests {
     }
 
     @Test func screenTimeResponseDecodesTheLists() throws {
-        let json = #"{"serverTime":"2026-11-14T12:00:00.000Z","children":[],"webFilter":{"gamePortals":["poki.example"],"games":["kids-games.example"]}}"#
+        let base = #""serverTime":"2026-11-14T12:00:00.000Z","childId":"c1","bankedSeconds":0,"allowanceSeconds":0,"windows":[]"#
+        let json = "{\(base),\"webFilter\":{\"gamePortals\":[\"poki.example\"],\"games\":[\"kids-games.example\"]}}"
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             try Date(try decoder.singleValueContainer().decode(String.self), strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true))
         }
-        let response = try decoder.decode(ScreenTimeResponse.self, from: Data(json.utf8))
+        let response = try decoder.decode(ScreenTime.self, from: Data(json.utf8))
         #expect(response.webFilter == WebFilterLists(gamePortals: ["poki.example"], games: ["kids-games.example"]))
-        let older = try decoder.decode(ScreenTimeResponse.self, from: Data(#"{"serverTime":"2026-11-14T12:00:00.000Z","children":[]}"#.utf8))
+        let older = try decoder.decode(ScreenTime.self, from: Data("{\(base)}".utf8))
         #expect(older.webFilter == nil)
     }
 }
