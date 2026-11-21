@@ -22,6 +22,7 @@ internal/command/       State changes: transaction, household lock, time after l
 internal/ledger/        Points: award once per source, reverse, redeem, refund; never below zero
 internal/clock/         The time: the database clock, or a Fake in tests
 internal/day/           The household day: dates, times of day, windows, DST rules
+internal/occurrence/    Occurrence IDs: a UUIDv5 of definition and household day (server and importer)
 internal/testdb/        A fresh migrated Postgres database per integration test
 web/                    React + Vite app; web/src/api/schema.gen.ts is generated
 web/design/             OpenCozy's design system (@app/design): tokens, components, previews (its README; why: DESIGN.md)
