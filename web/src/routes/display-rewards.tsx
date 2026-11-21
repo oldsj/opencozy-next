@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button, ChoiceGroup, Notice, PageHeader, PointsBadge, pointsLabel, RewardTile, Sheet } from '@app/design';
 
 import { client, errorMessage, useAttempts, type Today } from '../api/client';
+import { screenTimeChanged } from '../api/native';
 
 type Reward = { id: string; title: string; cost: number; available: boolean };
 
@@ -76,6 +77,8 @@ export function DisplayRewards({ today, todayKey, childId: own }: { today: Today
       }
       attempts.settle(attemptFor(choosing));
       if (response.status === 201 && data) {
+        // On the child's iPad, iPad time bought here lifts the shields now.
+        if (own) screenTimeChanged();
         setSent(choosing);
         setProblem(null);
       } else {

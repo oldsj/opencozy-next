@@ -364,6 +364,25 @@ func TestKidPushes(t *testing.T) {
 	if got := kid()[h.child1.String()+" screentime.changed"]; got != ";" {
 		t.Errorf("ending time early: %q (%v)", got, kid())
 	}
+	// The kid view is a page in the app's web view: the app doesn't see its responses, so the
+	// child spending banked time there wakes the app. The app's own spend doesn't.
+	if r := e.send(h.actors["adult"], "POST", child1+"/screen-time/grant", map[string]any{"minutes": 30}); r.status != 200 {
+		t.Fatalf("grant: %d %s", r.status, r.raw)
+	}
+	silent := func() int { return strings.Count(kid()[h.child1.String()+" screentime.changed"], ";") }
+	before := silent()
+	if r := e.send(h.actors["device-web"], "POST", child1+"/screen-time/spend", map[string]any{"minutes": 10}); r.status != 200 {
+		t.Fatalf("kid view spend: %d %s", r.status, r.raw)
+	}
+	if got := silent(); got != before+1 {
+		t.Errorf("spending from the kid view didn't wake the app: %d pushes, %d before", got, before)
+	}
+	if r := e.send(h.actors["device"], "POST", child1+"/screen-time/spend", map[string]any{"minutes": 10}); r.status != 200 {
+		t.Fatalf("app spend: %d %s", r.status, r.raw)
+	}
+	if got := silent(); got != before+1 {
+		t.Errorf("the app's own spend pushed to it: %d pushes, %d before", got, before+1)
+	}
 	// Child 2 has no device with a push token: giving them time queues nothing.
 	if r := e.send(h.actors["adult"], "POST", "/api/children/"+h.child2.String()+"/screen-time/grant", map[string]any{"minutes": 10}); r.status != 200 {
 		t.Fatalf("grant: %d %s", r.status, r.raw)

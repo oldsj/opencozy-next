@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button, ChoiceGroup, Countdown, Notice, Panel } from '@app/design';
 
 import { $api, errorMessage, useAttempts, type Child } from '../api/client';
+import { screenTimeChanged } from '../api/native';
 import { minutesLabel, screenState, spendChoices, useServerNow, type ScreenTime } from './screen-time-logic';
 
 const clockTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -16,7 +17,7 @@ export function KidScreenTime({ kid }: { kid: Child }) {
   const query = $api.useQuery('get', '/children/{childId}/screen-time', path, { refetchInterval: 30_000 });
   const now = useServerNow(query.data?.serverTime, query.dataUpdatedAt);
   const put = (st: ScreenTime) => { queryClient.setQueryData(['get', '/children/{childId}/screen-time', path], st); };
-  const spend = $api.useMutation('post', '/children/{childId}/screen-time/spend', { onSuccess: (d) => { put(d.screenTime); } });
+  const spend = $api.useMutation('post', '/children/{childId}/screen-time/spend', { onSuccess: (d) => { put(d.screenTime); screenTimeChanged(); } });
   const ask = $api.useMutation('post', '/children/{childId}/time-requests', { onSuccess: () => void query.refetch() });
   const attempts = useAttempts('kid-screen-time');
 
