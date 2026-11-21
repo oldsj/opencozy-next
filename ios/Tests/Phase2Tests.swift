@@ -21,9 +21,9 @@ struct DeviceReassignmentTests {
             info.device.child = DeviceChild(id: id, name: id == FixtureAPI.childId ? "Robin" : "Sky", color: nil)
             return info
         }
-        func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
+        func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
             // Only the original child has time running.
-            let (response, at) = try await FixtureAPI(unlockedMinutes: unlockedMinutes).screenTime(target: target)
+            let (response, at) = try await FixtureAPI(unlockedMinutes: unlockedMinutes).screenTime(childId: childId)
             return (response, at)
         }
     }
@@ -34,8 +34,13 @@ struct DeviceReassignmentTests {
         await model.refresh()
         #expect(model.childName == "Robin")
         #expect(model.unlockedUntil != nil)
+        // Robin pressed these on the shield just before the move: they aren't Sky's to send.
+        model.lock.store.enqueue(ScreenTimeEvent(id: "00000000-0000-4000-8000-0000000000e9", kind: .oneMoreMinute, at: .now()))
+        model.lock.store.queuedTimeRequest = QueuedTimeRequest(requestId: "00000000-0000-4000-8000-0000000000f9", at: Date())
         await owner.set("00000000-0000-4000-8000-0000000000c2")
         await model.refresh()
+        #expect(model.lock.store.pendingEvents.isEmpty)
+        #expect(model.lock.store.queuedTimeRequest == nil)
         #expect(model.childId == "00000000-0000-4000-8000-0000000000c2")
         #expect(model.childName == "Sky")
         // Robin's window isn't Sky's.
@@ -45,24 +50,60 @@ struct DeviceReassignmentTests {
 
 // MARK: Parent
 
+/// This server answers the previous server's parent paths 410 `update_app`: parent mode on
+/// the phone isn't here yet, which isn't the same as the app being out of date.
+@MainActor
+struct ParentModeLaterTests {
+    struct Gone: ParentAPI {
+        static let gone = APIError.server(status: 410, message: "This app is out of date. Update OpenCozy on this device.")
+        func signIn(_ request: SignInRequest) async throws -> SignInResponse { throw Self.gone }
+        func passkeyOptions() async throws -> PasskeyOptionsResponse { throw Self.gone }
+        func signIn(passkey request: PasskeySessionRequest) async throws -> SignInResponse { throw Self.gone }
+        func session() async throws -> SessionResponse { throw Self.gone }
+        func signOut() async throws { throw Self.gone }
+        func inbox() async throws -> InboxResponse { throw Self.gone }
+        func approve(id: String, idempotencyKey: String) async throws -> Decision { throw Self.gone }
+        func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision { throw Self.gone }
+        func registerPushToken(_ request: PushTokenRequest) async throws { throw Self.gone }
+        func unregisterPushToken() async throws { throw Self.gone }
+    }
+
+    @Test func signInSaysParentModeComesLater() async {
+        let unique = UUID().uuidString
+        let store = ParentStore(keychain: Keychain(service: "org.opencozy.tests.\(unique)"), defaultsSuite: "org.opencozy.tests.\(unique)")
+        let model = ParentModel(store: store, makeAPI: { _, _ in Gone() }, notifier: .none)
+        let ok = await model.signIn(server: "https://opencozy.example.org", email: "adult@example.test", password: "x", deviceName: "Phone")
+        #expect(!ok)
+        #expect(model.errorMessage == ParentModel.parentModeLater)
+    }
+}
+
 struct ApprovalPushTests {
     @Test func pendingPayload() throws {
         let info: [AnyHashable: Any] = [
             "aps": ["badge": 3, "category": "APPROVAL"],
-            "opencozy": ["type": "approval.pending", "approvalId": "a1", "approvalVersion": 1, "pendingCount": 3],
+            "opencozy": ["type": "approval.pending", "itemId": "a1", "kind": "completion", "pendingCount": 3],
         ]
-        #expect(ApprovalPush(userInfo: info) == ApprovalPush(approvalId: "a1", event: .pending(version: 1), pendingCount: 3))
+        #expect(ApprovalPush(userInfo: info) == ApprovalPush(approvalId: "a1", event: .pending, kind: "completion", pendingCount: 3))
+        #expect(ApprovalPush(userInfo: info)?.isTimeRequest == false)
+    }
+
+    @Test func timeRequestPayload() {
+        let info: [AnyHashable: Any] = ["opencozy": ["type": "approval.pending", "itemId": "t1", "kind": "time_request", "pendingCount": 1]]
+        #expect(ApprovalPush(userInfo: info)?.isTimeRequest == true)
+        #expect(TimeChoice.allCases.map(\.wire) == ["30min", "1h", "all_day", "no"])
+        #expect(ApprovalNotifications.timeCategory == "TIME_REQUEST")
     }
 
     @Test func resolvedPayload() {
-        let info: [AnyHashable: Any] = ["opencozy": ["type": "approval.resolved", "approvalId": "a1", "state": "approved", "pendingCount": 2]]
+        let info: [AnyHashable: Any] = ["opencozy": ["type": "approval.resolved", "itemId": "a1", "state": "approved", "pendingCount": 2]]
         #expect(ApprovalPush(userInfo: info) == ApprovalPush(approvalId: "a1", event: .resolved, pendingCount: 2))
     }
 
     @Test func rejectsIncompletePayloads() {
         #expect(ApprovalPush(userInfo: [:]) == nil)
         #expect(ApprovalPush(userInfo: ["opencozy": ["type": "approval.pending", "approvalId": "a1"]]) == nil)
-        #expect(ApprovalPush(userInfo: ["opencozy": ["type": "other", "approvalId": "a1"]]) == nil)
+        #expect(ApprovalPush(userInfo: ["opencozy": ["type": "other", "itemId": "a1"]]) == nil)
     }
 
     @Test func actionIdentifiersMatchTheContract() {
@@ -143,6 +184,7 @@ actor FakeParentServer {
     var approvals: [InboxItem]
     var approves: [(id: String, key: String)] = []
     var rejects: [(id: String, request: RejectRequest, key: String)] = []
+    var answers: [(id: String, choice: String, key: String)] = []
     var pushTokens: [PushTokenRequest] = []
     var signedOut = false
     var failures: [APIError] = []
@@ -170,6 +212,12 @@ actor FakeParentServer {
         return try decide(id, .rejected)
     }
 
+    func answer(_ id: String, _ choice: String, key: String) throws -> Decision {
+        answers.append((id, choice, key))
+        if !failures.isEmpty { throw failures.removeFirst() }
+        return try decide(id, choice == "no" ? .rejected : .approved)
+    }
+
     private func decide(_ id: String, _ state: Decision.State) throws -> Decision {
         guard approvals.contains(where: { $0.id == id }) else {
             throw APIError.server(status: 409, message: "Someone already decided this one.")
@@ -190,7 +238,7 @@ struct FakeParentAPI: ParentAPI {
 
     func signIn(_ request: SignInRequest) async throws -> SignInResponse {
         guard request.password == "correct horse" else { throw APIError.server(status: 401, message: "Invalid email or password.") }
-        return SignInResponse(token: "ocp_test", session: Self.session, household: HouseholdInfo(id: "h", name: "The Example House"))
+        return SignInResponse(token: "ocp_test", session: Self.session, me: Self.me)
     }
     func passkeyOptions() async throws -> PasskeyOptionsResponse {
         PasskeyOptionsResponse(challengeId: "ch1", options: .init(challenge: Data("challenge-bytes".utf8).base64URL, rpId: "opencozy.example.org"))
@@ -200,19 +248,23 @@ struct FakeParentAPI: ParentAPI {
         guard request.challengeId == "ch1", request.credential.response.signature == "c2ln" else {
             throw APIError.server(status: 401, message: "Passkey not recognized.")
         }
-        return SignInResponse(token: "ocp_passkey", session: Self.session, household: HouseholdInfo(id: "h", name: "The Example House"))
+        return SignInResponse(token: "ocp_passkey", session: Self.session, me: Self.me)
     }
-    func session() async throws -> SessionResponse { SessionResponse(session: Self.session, household: HouseholdInfo(id: "h", name: "The Example House")) }
+    func session() async throws -> SessionResponse { SessionResponse(session: Self.session, me: Self.me, pushMutedUntil: nil) }
     func signOut() async throws { await server.signOut() }
     func inbox() async throws -> InboxResponse { try await server.list() }
     func approve(id: String, idempotencyKey: String) async throws -> Decision { try await server.approve(id, key: idempotencyKey) }
     func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision {
         try await server.reject(id, request, key: idempotencyKey)
     }
+    func answer(id: String, _ request: TimeAnswerRequest, idempotencyKey: String) async throws -> Decision {
+        try await server.answer(id, request.choice, key: idempotencyKey)
+    }
     func registerPushToken(_ request: PushTokenRequest) async throws { await server.register(request) }
     func unregisterPushToken() async throws {}
 
-    static let session = ParentSessionInfo(id: "s", deviceName: "Test phone", createdAt: Date(), expiresAt: Date().addingTimeInterval(90 * 86_400), lastUsedAt: nil)
+    static let me = ParentMe(adult: .init(id: "a", name: "Alex"), household: HouseholdInfo(id: "h", name: "The Example House"))
+    static let session = ParentSessionInfo(id: "s", name: "Test phone", createdAt: Date(), expiresAt: Date().addingTimeInterval(90 * 86_400), lastUsedAt: nil)
 }
 
 @MainActor
@@ -250,9 +302,24 @@ struct ParentModelTests {
         #expect(store.token == nil)
     }
 
+    @Test func timeActionAnswersWithAStableKey() async throws {
+        let item = InboxItem(id: "t", kind: .timeRequest, child: .init(id: "k", name: "Robin"), title: "More iPad time", points: nil,
+                             submittedAt: Date(), minutesRequested: nil)
+        let (model, server) = await signedIn([item])
+        let push = ApprovalPush(approvalId: "t", event: .pending, kind: "time_request")
+        // Approve/Reject don't apply to a time request.
+        #expect(await model.handleAction(.approve, push: push) == .failed)
+        #expect(await model.handleTimeAction(.oneHour, push: push) == .done)
+        let answer = try #require(await server.answers.first)
+        #expect(answer.id == "t" && answer.choice == "1h" && answer.key == "s:t:answer:1h")
+        #expect(model.approvals.isEmpty)
+        // Answered elsewhere: Already handled.
+        #expect(await model.handleTimeAction(.no, push: push) == .alreadyHandled)
+    }
+
     @Test func approveSendsAStableKeyAndRemovesItem() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
-        #expect(await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
+        #expect(await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending)) == .done)
         let (id, key) = try #require(await server.approves.first)
         #expect(id == "a")
         #expect(key == "s:a:approve")
@@ -267,17 +334,17 @@ struct ParentModelTests {
         #expect(model.store.sessionId == "s")
         let relaunched = ParentModel(store: model.store, makeAPI: { _, t in FakeParentAPI(server: server, token: t) }, notifier: .none)
         #expect(relaunched.session == nil)
-        #expect(await relaunched.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
+        #expect(await relaunched.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending)) == .done)
         model.store.sessionId = nil
         let forgetful = ParentModel(store: model.store, makeAPI: { _, t in FakeParentAPI(server: server, token: t) }, notifier: .none)
-        #expect(await forgetful.handleAction(.approve, push: ApprovalPush(approvalId: "b", event: .pending(version: 1))) == .done)
+        #expect(await forgetful.handleAction(.approve, push: ApprovalPush(approvalId: "b", event: .pending)) == .done)
         #expect(await server.approves.map(\.key) == ["s:a:approve", "s:b:approve"])
         #expect(model.store.sessionId == "s")
     }
 
     @Test func rejectFromANotificationHasNoReason() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
-        #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .done)
+        #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending)) == .done)
         #expect(await server.rejects.map(\.request.reason) == [nil])
         #expect(await server.rejects.map(\.key) == ["s:a:reject"])
     }
@@ -286,7 +353,7 @@ struct ParentModelTests {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         // Meanwhile the other parent approved it, so the next list is empty.
         _ = try await server.approve("a", key: "other-session:a:approve")
-        #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending(version: 1))) == .alreadyHandled)
+        #expect(await model.handleAction(.reject, push: ApprovalPush(approvalId: "a", event: .pending)) == .alreadyHandled)
         #expect(model.approvals.isEmpty)
         #expect(model.errorMessage == "Someone already decided this one.")
     }
@@ -337,7 +404,7 @@ struct ParentModelTests {
     @Test func notificationActionRetriesWithTheSameKey() async throws {
         let (model, server) = await signedIn([Self.approval("a", minutesAgo: 5)])
         await server.fail([.transport("offline")])
-        let ok = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending(version: 1)))
+        let ok = await model.handleAction(.approve, push: ApprovalPush(approvalId: "a", event: .pending))
         #expect(ok == .done)
         let approves = await server.approves
         #expect(approves.count == 2)

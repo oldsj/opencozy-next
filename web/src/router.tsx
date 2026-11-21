@@ -27,8 +27,10 @@ import { DeviceExpiredPage, KidPage } from './routes/kid';
 import { MealsPage } from './routes/meals';
 import { RecipePage, RecipesPage } from './routes/recipes';
 import { CalendarEventPage, CalendarPage, CalendarsPage } from './routes/calendar';
+import { googleOutcomes, type GoogleOutcome } from './routes/calendar-google';
 import { ConnectionsPage } from './routes/connections';
 import { LearningPage } from './routes/learning';
+import { TvsPage } from './routes/tvs';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -54,6 +56,7 @@ const nav = [
   { to: '/chores', label: 'Chores' },
   { to: '/rewards', label: 'Rewards' },
   { to: '/screen-time', label: 'Screen time' },
+  { to: '/tvs', label: 'TVs' },
   { to: '/calendar', label: 'Calendar' },
   { to: '/meals', label: 'Meals' },
   { to: '/recipes', label: 'Recipes' },
@@ -297,12 +300,21 @@ const calendarsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/calendars',
   staticData: { title: 'Calendars' },
+  // ?google=<outcome>&connection=<id>: back from connecting Google.
+  validateSearch: (search: Record<string, unknown>): { google?: GoogleOutcome; connection?: string } => {
+    const google = googleOutcomes.find((o) => o === search.google);
+    const connection = typeof search.connection === 'string' && /^[0-9a-f-]{36}$/.test(search.connection) ? search.connection : undefined;
+    return google ? { google, ...(connection ? { connection } : {}) } : {};
+  },
   beforeLoad: async ({ context }) => {
     const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
     if (!me) throw redirect({ to: '/login' });
   },
-  component: CalendarsPage,
+  component: function Calendars() {
+    const { google, connection } = calendarsRoute.useSearch();
+    return <CalendarsPage google={google} connection={connection} />;
+  },
 });
 
 // Manage: services, assistants and learning apps, each with its own key.
@@ -329,6 +341,19 @@ const learningRoute = createRoute({
     if (!me) throw redirect({ to: '/login' });
   },
   component: LearningPage,
+});
+
+// Manage: the TVs, who is watching, and opening them.
+const tvsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/tvs',
+  staticData: { title: 'TVs' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: TvsPage,
 });
 
 // Manage: the children's iPads and phones.
@@ -367,7 +392,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute, tvsRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

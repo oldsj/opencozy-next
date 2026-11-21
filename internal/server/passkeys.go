@@ -183,18 +183,35 @@ func (s *Server) PasskeySignIn(ctx context.Context, req api.PasskeySignInRequest
 	if onKidDevice(ctx) {
 		return api.PasskeySignIn409JSONResponse(errKidDevice), nil
 	}
-	refused := api.PasskeySignIn401JSONResponse{UnauthorizedJSONResponse: api.UnauthorizedJSONResponse(errPasskey)}
-	if s.wa == nil {
-		return refused, nil
-	}
-	session, ok, err := s.takeCeremony(ctx, req.Body.ChallengeId, purposeSignIn, nil)
+	adult, ok, err := s.passkeySignInAdult(ctx, req.Body.ChallengeId, req.Body.Credential)
 	if err != nil || !ok {
-		return refused, err
+		return api.PasskeySignIn401JSONResponse{UnauthorizedJSONResponse: api.UnauthorizedJSONResponse(errPasskey)}, err
 	}
-	parsed, err := parseAssertion(req.Body.Credential)
+	me, err := s.me(ctx, adult)
+	if err != nil {
+		return nil, err
+	}
+	cookie, err := s.startSession(ctx, adult.ID, nil)
+	if err != nil {
+		return nil, err
+	}
+	return api.PasskeySignIn200JSONResponse{Body: me, Headers: api.PasskeySignIn200ResponseHeaders{SetCookie: &cookie}}, nil
+}
+
+// passkeySignInAdult finishes a discoverable sign-in ceremony and returns its adult. ok is false
+// when the passkey is refused for any reason (the caller answers one 401).
+func (s *Server) passkeySignInAdult(ctx context.Context, challenge uuid.UUID, credential map[string]any) (dbq.Adult, bool, error) {
+	if s.wa == nil {
+		return dbq.Adult{}, false, nil
+	}
+	session, ok, err := s.takeCeremony(ctx, challenge, purposeSignIn, nil)
+	if err != nil || !ok {
+		return dbq.Adult{}, false, err
+	}
+	parsed, err := parseAssertion(credential)
 	if err != nil {
 		s.log.InfoContext(ctx, "passkey sign-in: unreadable response", "err", err)
-		return refused, nil
+		return dbq.Adult{}, false, nil
 	}
 	var adult dbq.Adult
 	user, cred, err := s.wa.ValidatePasskeyLogin(func(_, userHandle []byte) (webauthn.User, error) {
@@ -208,20 +225,12 @@ func (s *Server) PasskeySignIn(ctx context.Context, req api.PasskeySignInRequest
 	}, session, parsed)
 	if err != nil || user == nil {
 		s.log.InfoContext(ctx, "passkey sign-in refused", "err", err)
-		return refused, nil
+		return dbq.Adult{}, false, nil
 	}
 	if ok, err := s.usePasskey(ctx, cred); err != nil || !ok {
-		return refused, err
+		return dbq.Adult{}, false, err
 	}
-	me, err := s.me(ctx, adult)
-	if err != nil {
-		return nil, err
-	}
-	cookie, err := s.startSession(ctx, adult.ID)
-	if err != nil {
-		return nil, err
-	}
-	return api.PasskeySignIn200JSONResponse{Body: me, Headers: api.PasskeySignIn200ResponseHeaders{SetCookie: &cookie}}, nil
+	return adult, true, nil
 }
 
 // PasskeyConfirmOptions starts confirming the current sign-in with one of the adult's passkeys.

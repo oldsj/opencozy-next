@@ -102,9 +102,43 @@
         "webauthnOrigins": {
           "type": "string"
         },
+        "appleTeamID": {
+          "type": "string",
+          "pattern": "^([A-Z0-9]{10})?$"
+        },
+        "appleBundleID": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+)?$"
+        },
+        "apnsKeyID": {
+          "type": "string",
+          "pattern": "^([A-Z0-9]{10})?$"
+        },
         "publicOrigin": {
           "type": "string",
           "pattern": "^(https://[^/?#@]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)?$"
+        },
+        "googleClientID": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]*$"
+        },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "pattern": "^(https://[^?#@\\s]+)?$"
+            },
+            "clientId": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
         }
       }
     },

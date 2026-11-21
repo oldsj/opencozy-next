@@ -17,15 +17,11 @@ import (
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/occurrence"
 )
 
-// occurrenceNS namespaces occurrence ids: UUIDv5 of the definition and the household day, so a
-// read's plan and a command's row agree.
-var occurrenceNS = uuid.MustParse("6f1c2a52-6b0e-4c1e-9d63-3d1f0f7b2a10")
-
-func occurrenceID(definition uuid.UUID, d day.Date) uuid.UUID {
-	return uuid.NewSHA1(occurrenceNS, append(definition[:], d.String()...))
-}
+// occurrenceID is the occurrence of a definition on a household day (internal/occurrence).
+func occurrenceID(definition uuid.UUID, d day.Date) uuid.UUID { return occurrence.ID(definition, d) }
 
 func pgDate(d day.Date) pgtype.Date {
 	return pgtype.Date{Time: time.Date(d.Year, d.Month, d.Day, 0, 0, 0, 0, time.UTC), Valid: true}
@@ -243,7 +239,7 @@ func openOccurrence(ctx context.Context, cmd *command.Cmd, child, definition uui
 
 // finish ends today's occurrence. Done by a child (on a display), it waits for an adult's
 // approval; done by an adult, it is approved at once and the points land.
-func finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurrence, kind, title string, checked []uuid.UUID) (dbq.Occurrence, error) {
+func (s *Server) finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurrence, kind, title string, checked []uuid.UUID) (dbq.Occurrence, error) {
 	adult := a.Kind == actor.Adult || a.Kind == actor.Phone
 	state := "pending"
 	if adult {
@@ -258,10 +254,13 @@ func finish(ctx context.Context, cmd *command.Cmd, a actor.Actor, occ dbq.Occurr
 	if adult {
 		return updated, award(ctx, cmd, a.AdultID, updated)
 	}
-	_, err = cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
+	ap, err := cmd.Q.CreateApproval(ctx, dbq.CreateApprovalParams{
 		HouseholdID: cmd.HouseholdID(), ChildID: occ.ChildID, Kind: kind, OccurrenceID: &occ.ID, Title: title, Points: occ.Points,
 	})
-	return updated, err
+	if err != nil {
+		return dbq.Occurrence{}, err
+	}
+	return updated, s.pushPending(ctx, cmd, ap, ap.CreatedAt)
 }
 
 // CompleteChore marks today's chore done and asks an adult to approve it.
@@ -287,7 +286,7 @@ func (s *Server) CompleteChore(ctx context.Context, req api.CompleteChoreRequest
 	if occ.State != "open" {
 		return api.CompleteChore409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(errAlreadyDone)}, nil
 	}
-	updated, err := finish(ctx, cmd, a, *occ, "completion", c.Title, []uuid.UUID{})
+	updated, err := s.finish(ctx, cmd, a, *occ, "completion", c.Title, []uuid.UUID{})
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +329,7 @@ func (s *Server) CheckRoutineStep(ctx context.Context, req api.CheckRoutineStepR
 	}
 	var updated dbq.Occurrence
 	if len(checked) == len(steps) {
-		updated, err = finish(ctx, cmd, a, *occ, "routine", r.Title, checked)
+		updated, err = s.finish(ctx, cmd, a, *occ, "routine", r.Title, checked)
 	} else {
 		updated, err = cmd.Q.UpdateOccurrence(ctx, dbq.UpdateOccurrenceParams{
 			HouseholdID: a.HouseholdID, ID: occ.ID, State: "open", CheckedSteps: checked, Points: occ.Points, RejectedReason: occ.RejectedReason,

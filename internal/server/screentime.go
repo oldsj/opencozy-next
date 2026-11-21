@@ -15,6 +15,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/live"
+	"github.com/oldsj/opencozy-next/internal/push"
 	"github.com/oldsj/opencozy-next/internal/screentime"
 )
 
@@ -22,7 +23,7 @@ var (
 	errNothingBanked = apiError("nothing_banked", "No iPad time left to use.")
 	errNothingToEnd  = apiError("nothing_to_end", "No iPad time is running or queued.")
 	errNothingQueued = apiError("nothing_to_end", "No iPad time is queued.")
-	errTVNotReady    = apiError("tv_not_ready", "TV time isn't available yet.")
+	errTVStartNow    = apiError("start_now_tv", "TV time starts when the child watches a TV, not now.")
 )
 
 // readNow is the time for a read: the command clock when tests set one, otherwise the database's.
@@ -166,9 +167,18 @@ func toSpend(s screentime.Spent) *api.Spend {
 // Anyone but an adult counts as the child, so a caller added later is limited too.
 func childInitiated(a actor.Actor) bool { return a.Kind != actor.Adult && a.Kind != actor.Phone }
 
-// changed tells live clients the child's screen time (on Today) changed.
-func screenTimeChanged(ctx context.Context, cmd *command.Cmd, child uuid.UUID) error {
-	return live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &child})
+// screenTimeChanged tells the household's screens (live) and the child's devices that the
+// child's iPad time changed: a silent push wakes the app to sync, so the shields lift or come
+// back at once. The device's own request needs no push: its response has the answer.
+func (s *Server) screenTimeChanged(ctx context.Context, cmd *command.Cmd, child uuid.UUID) error {
+	if err := live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &child}); err != nil {
+		return err
+	}
+	if a, ok := actor.From(ctx); ok && (a.Kind == actor.Device || a.Kind == actor.DeviceWeb) {
+		return nil
+	}
+	key, n := push.ScreenTimeChanged(child)
+	return s.push.ToChild(ctx, cmd.Q, cmd.HouseholdID(), child, key, n)
 }
 
 // GetScreenTime is a child's iPad time now.
@@ -229,7 +239,7 @@ func (s *Server) SpendScreenTime(ctx context.Context, req api.SpendScreenTimeReq
 	case err != nil:
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
@@ -242,8 +252,9 @@ func (s *Server) SpendScreenTime(ctx context.Context, req api.SpendScreenTimeReq
 // GrantScreenTime gives a child screen time, and with startNow starts it.
 func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeRequestObject) (api.GrantScreenTimeResponseObject, error) {
 	a, cmd, b := mustActor(ctx), mustCmd(ctx), req.Body
-	if b.Target != nil && *b.Target == api.TargetTv {
-		return api.GrantScreenTime422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTVNotReady)}, nil
+	toTV := b.Target != nil && *b.Target == api.TargetTv
+	if toTV && b.StartNow != nil && *b.StartNow {
+		return api.GrantScreenTime422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTVStartNow)}, nil
 	}
 	if err := cmd.LockChildren(ctx, req.ChildId); errors.Is(err, command.ErrNoChild) {
 		return api.GrantScreenTime404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
@@ -253,6 +264,20 @@ func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeReq
 	now, err := cmd.Now(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if toTV {
+		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, nil, &a.AdultID, int32(b.Minutes)*60, now); err != nil { //nolint:gosec // 1-240 by the spec
+			return nil, err
+		}
+		st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+		if err != nil {
+			return nil, err
+		}
+		view, err := s.childTvNow(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+		if err != nil {
+			return nil, err
+		}
+		return api.GrantScreenTime200JSONResponse{ScreenTime: st, Tv: &view}, nil
 	}
 	cr, err := screentime.AddCredit(ctx, cmd, screentime.Credit{
 		Child: req.ChildId, Source: screentime.SourceGrant, GrantedBy: &a.AdultID, Minutes: int32(b.Minutes), //nolint:gosec // 1-240 by the spec
@@ -268,7 +293,7 @@ func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeReq
 		}
 		out.Spend = toSpend(spent)
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	if out.ScreenTime, err = screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now); err != nil {
@@ -303,7 +328,7 @@ func (s *Server) EndScreenTime(ctx context.Context, req api.EndScreenTimeRequest
 	} else if err != nil {
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
@@ -337,7 +362,7 @@ func (s *Server) SetAllowedHours(ctx context.Context, req api.SetAllowedHoursReq
 	if err := screentime.SetRule(ctx, cmd.Q, a.HouseholdID, req.ChildId, hours); err != nil {
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
@@ -364,9 +389,16 @@ func (s *Server) AskForTime(ctx context.Context, req api.AskForTimeRequestObject
 	} else if err != nil {
 		return nil, err
 	}
-	// Pushes to the parents (a new request, or a reminder) arrive with slice 11.
 	if asked.New || asked.Reminded {
-		if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+		if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+			return nil, err
+		}
+		// A new request, or asking again after RemindAfter, pushes to the parents (old #74).
+		ap, err := cmd.Q.PendingApprovalForTimeRequest(ctx, dbq.PendingApprovalForTimeRequestParams{HouseholdID: a.HouseholdID, TimeRequestID: &asked.Request.ID})
+		if err != nil {
+			return nil, err
+		}
+		if err := s.pushPending(ctx, cmd, ap, asked.Request.AskedAt); err != nil {
 			return nil, err
 		}
 	}
@@ -435,7 +467,7 @@ func (s *Server) ForfeitScreenTimeCredit(ctx context.Context, req api.ForfeitScr
 	case err != nil:
 		return nil, err
 	}
-	if err := screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
+	if err := s.screenTimeChanged(ctx, cmd, req.ChildId); err != nil {
 		return nil, err
 	}
 	st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)

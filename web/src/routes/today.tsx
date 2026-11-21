@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Gift, House, Sunrise } from 'lucide-react';
+import { ClipboardCheck, Gift, House, Sunrise, Tv } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -21,6 +21,7 @@ import type { TaskRowCheck } from '@app/design';
 
 import { client, useAttempts, type Child, type TodayGroup, type TodayItem } from '../api/client';
 import { DisplayRewards } from './display-rewards';
+import { DisplayTvs, KidTv, useDisplayTvs } from './display-tv';
 import { KidScreenTime } from './screen-time-kid';
 
 export const todayKey = ['display', 'today'] as const;
@@ -65,12 +66,21 @@ export function TodayBoard({
   const queryClient = useQueryClient();
   const [local, setLocal] = useState<Local>({});
   const attempts = useAttempts();
-  const [tab, setTab] = useState<'today' | 'rewards'>(window.location.hash === '#rewards' ? 'rewards' : 'today');
-  const show = (t: 'today' | 'rewards') => (e: { preventDefault: () => void }) => {
+  type Tab = 'today' | 'rewards' | 'tv';
+  const [tab, setTab] = useState<Tab>(window.location.hash === '#rewards' ? 'rewards' : window.location.hash === '#tv' ? 'tv' : 'today');
+  const show = (t: Tab) => (e: { preventDefault: () => void }) => {
     e.preventDefault();
-    window.history.replaceState(null, '', t === 'rewards' ? '#rewards' : '#');
+    window.history.replaceState(null, '', t === 'today' ? '#' : `#${t}`);
     setTab(t);
   };
+  // The wall display's TV tab, only for a display allowed to see TVs (its `tv` scope).
+  const scopes = useQuery({
+    queryKey: ['display', 'session'],
+    enabled: !kid,
+    queryFn: async () => (await client.GET('/display/session')).data?.scopes ?? [],
+    staleTime: 5 * 60_000,
+  }).data;
+  const tvs = useDisplayTvs(!kid && (scopes?.includes('tv') ?? false)).data ?? null;
   const today = useQuery({
     queryKey: todayKey,
     queryFn: async () => {
@@ -144,6 +154,7 @@ export function TodayBoard({
           items={[
             { href: '#today', label: 'Today', icon: House, current: tab === 'today', onClick: show('today') },
             { href: '#rewards', label: 'Rewards', icon: Gift, current: tab === 'rewards', onClick: show('rewards') },
+            ...(tvs ? [{ href: '#tv', label: 'TV', icon: Tv, current: tab === 'tv', onClick: show('tv') }] : []),
           ]}
         />
       }
@@ -155,7 +166,9 @@ export function TodayBoard({
           actions={<Button variant="secondary" onClick={() => void today.refetch()}>Try again</Button>}
         />
       )}
-      {tab === 'rewards' ? (
+      {tab === 'tv' && tvs ? (
+        <DisplayTvs tvs={tvs} />
+      ) : tab === 'rewards' ? (
         <DisplayRewards today={today.data} todayKey={todayKey} childId={kid?.id} />
       ) : kid ? (
         <>
@@ -167,6 +180,7 @@ export function TodayBoard({
           ) : (
             <EmptyState variant="surface" title="Nothing on your list today" description="When a routine or chore is ready, it will show up here." />
           )}
+          <KidTv childId={kid.id} />
           <KidScreenTime kid={kid} />
         </>
       ) : (

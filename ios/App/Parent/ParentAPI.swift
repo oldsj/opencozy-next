@@ -1,9 +1,8 @@
 import Foundation
 
-// Parent device API. The inbox is this server's (`/api/inbox`, which a phone
-// session's `ocp_` token may call). Sign-in, the phone session and push tokens are
-// still the previous server's `/api/v1/parent/*` paths until slices 10 (passkeys)
-// and 11 (phone sessions, pushes).
+// Parent device API (api/src/phones.yaml, inbox.yaml). The phone signs in with a password, a
+// passkey, or the web view's sign-in, and gets an `ocp_` phone session that acts as its adult:
+// the inbox, decisions and its APNs token.
 
 /// An inbox id as a path segment: ids are UUIDs, anything else is refused rather
 /// than put in a URL.
@@ -13,9 +12,11 @@ enum InboxPath {
     }
 }
 
+/// `PhoneSession`: this phone's session as Manage lists it.
 struct ParentSessionInfo: Decodable, Equatable, Sendable {
     var id: String
-    var deviceName: String
+    /// What the phone is called in Manage.
+    var name: String
     var createdAt: Date
     var expiresAt: Date
     var lastUsedAt: Date?
@@ -24,8 +25,16 @@ struct ParentSessionInfo: Decodable, Equatable, Sendable {
 struct HouseholdInfo: Decodable, Equatable, Sendable {
     var id: String
     var name: String
-    /// What a locked iPad says (`GET /api/v1/device` only).
-    var lockMessage: String?
+}
+
+/// `Me`: the adult and their household.
+struct ParentMe: Decodable, Equatable, Sendable {
+    struct Adult: Decodable, Equatable, Sendable {
+        var id: String
+        var name: String
+    }
+    var adult: Adult
+    var household: HouseholdInfo
 }
 
 struct SignInRequest: Encodable, Sendable {
@@ -34,15 +43,19 @@ struct SignInRequest: Encodable, Sendable {
     var deviceName: String
 }
 
+/// `PhoneSignedIn`, from every sign-in.
 struct SignInResponse: Decodable, Sendable {
     var token: String
     var session: ParentSessionInfo
-    var household: HouseholdInfo
+    var me: ParentMe
 }
 
+/// `PhoneSelf`: `GET /api/phone/session`.
 struct SessionResponse: Decodable, Sendable {
     var session: ParentSessionInfo
-    var household: HouseholdInfo
+    var me: ParentMe
+    /// While in the future, this adult's phones get no alerts (silent updates still arrive).
+    var pushMutedUntil: Date?
 }
 
 /// One thing waiting for an adult (api/src/inbox.yaml `InboxItem`). The native app
@@ -130,6 +143,7 @@ enum ProvisioningProfile {
     }
 }
 
+/// `PUT /api/phone/session/push` (and the kid's `PUT /api/device/push`).
 struct PushTokenRequest: Encodable, Equatable, Sendable {
     var token: String
     var environment: PushEnvironment
@@ -137,7 +151,7 @@ struct PushTokenRequest: Encodable, Equatable, Sendable {
 
 struct PushTokenResponse: Decodable {}
 
-/// `POST /api/v1/parent/passkey/options` → the WebAuthn request options we need.
+/// `POST /api/auth/passkey/options` → the WebAuthn request options we need.
 struct PasskeyOptionsResponse: Decodable, Sendable {
     struct Options: Decodable, Sendable {
         /// base64url
@@ -189,23 +203,16 @@ protocol ParentAPI: Sendable {
     /// `idempotencyKey` makes a retry replay the first answer instead of deciding twice.
     func approve(id: String, idempotencyKey: String) async throws -> Decision
     func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision
+    /// Answers a child's "Ask for more time" (an inbox item of kind `time_request`).
+    func answer(id: String, _ request: TimeAnswerRequest, idempotencyKey: String) async throws -> Decision
     func registerPushToken(_ request: PushTokenRequest) async throws
     func unregisterPushToken() async throws
-    /// Answers a child's "Ask for more time".
-    func answerTimeRequest(id: String, _ request: TimeAnswerRequest) async throws
 }
 
-extension ParentAPI {
-    func answerTimeRequest(id: String, _ request: TimeAnswerRequest) async throws { throw APIError.notConfigured }
-}
-
-/// `POST /api/v1/parent/time-requests/{id}/answer`.
+/// `POST /api/inbox/{id}/answer` `{ choice }`: `30min`, `1h`, `all_day` or `no`.
 struct TimeAnswerRequest: Encodable, Equatable, Sendable {
-    var requestId: String
-    var expectedVersion: Int
     var choice: String
 }
-struct TimeAnswerResponse: Decodable, Sendable {}
 
 struct HTTPParentAPI: ParentAPI {
     let baseURL: URL
@@ -216,25 +223,25 @@ struct HTTPParentAPI: ParentAPI {
 
     func signIn(_ request: SignInRequest) async throws -> SignInResponse {
         try await APITransport(baseURL: baseURL, token: nil, session: session)
-            .post("v1/parent/sessions", body: request, as: SignInResponse.self)
+            .post("phone/sessions", body: request, as: SignInResponse.self)
     }
 
     func passkeyOptions() async throws -> PasskeyOptionsResponse {
         try await APITransport(baseURL: baseURL, token: nil, session: session)
-            .post("v1/parent/passkey/options", body: EmptyRequest(), as: PasskeyOptionsResponse.self)
+            .post("auth/passkey/options", body: EmptyRequest(), as: PasskeyOptionsResponse.self)
     }
 
     func signIn(passkey request: PasskeySessionRequest) async throws -> SignInResponse {
         try await APITransport(baseURL: baseURL, token: nil, session: session)
-            .post("v1/parent/passkey/sessions", body: request, as: SignInResponse.self)
+            .post("phone/sessions/passkey", body: request, as: SignInResponse.self)
     }
 
     func session() async throws -> SessionResponse {
-        try await http.get("v1/parent/session", as: SessionResponse.self)
+        try await http.get("phone/session", as: SessionResponse.self)
     }
 
     func signOut() async throws {
-        try await http.delete("v1/parent/session")
+        try await http.delete("phone/session")
     }
 
     func inbox() async throws -> InboxResponse {
@@ -249,15 +256,17 @@ struct HTTPParentAPI: ParentAPI {
         try await http.post("inbox/\(InboxPath.id(id))/reject", body: request, headers: ["Idempotency-Key": idempotencyKey], as: Decision.self)
     }
 
-    func answerTimeRequest(id: String, _ request: TimeAnswerRequest) async throws {
-        _ = try await http.post("v1/parent/time-requests/\(id)/answer", body: request, as: TimeAnswerResponse.self)
+    func answer(id: String, _ request: TimeAnswerRequest, idempotencyKey: String) async throws -> Decision {
+        try await http.post("inbox/\(InboxPath.id(id))/answer", body: request, headers: ["Idempotency-Key": idempotencyKey], as: Decision.self)
     }
 
+    /// Commands need an Idempotency-Key; registering the same token again is harmless, so each
+    /// call gets a fresh one.
     func registerPushToken(_ request: PushTokenRequest) async throws {
-        _ = try await http.put("v1/parent/push-token", body: request, as: PushTokenResponse.self)
+        _ = try await http.put("phone/session/push", body: request, headers: ["Idempotency-Key": UUID().uuidString.lowercased()], as: PushTokenResponse.self)
     }
 
     func unregisterPushToken() async throws {
-        try await http.delete("v1/parent/push-token")
+        _ = try await http.send("DELETE", "phone/session/push", headers: ["Idempotency-Key": UUID().uuidString.lowercased()])
     }
 }

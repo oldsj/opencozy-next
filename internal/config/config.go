@@ -3,12 +3,17 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/netip"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -69,7 +74,53 @@ type Config struct {
 	// WebAuthnOrigins are the origins passkeys are used from, e.g. https://cozy.example.test.
 	// Required with WEBAUTHN_RP_ID.
 	WebAuthnOrigins []string `env:"WEBAUTHN_ORIGINS" envSeparator:","`
+
+	// Slice 11: the iOS app (design §8, §14).
+	// AppleTeamID and AppleBundleID name the iOS app. Together they serve the app's
+	// apple-app-site-association (passkeys in the app) and are the APNs topic.
+	AppleTeamID   string `env:"APPLE_TEAM_ID"`
+	AppleBundleID string `env:"APPLE_BUNDLE_ID"`
+	// APNsKeyID and APNsKey turn push on: the token-auth .p8 key's ID and its PEM. Secret (the
+	// key). Unset means no push is enqueued or sent.
+	APNsKeyID string `env:"APNS_KEY_ID"`
+	APNsKey   string `env:"APNS_KEY"`
+	// Slice 13b: Google calendar. Both or neither; neither turns Google off. The client is the
+	// installation's own OAuth client (a "Web application" in Google Cloud) whose redirect URI
+	// is GoogleRedirectURL(). Google needs PUBLIC_ORIGIN and OPENCOZY_SECRET_KEYS.
+	GoogleClientID string `env:"GOOGLE_CLIENT_ID"`
+	// GoogleClientSecret is the OAuth client's secret. Secret: no default.
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
+
+	// Slice 10b: single sign-on with an OpenID Connect provider (design §6). Set the issuer,
+	// client ID and client secret together, or none of them (single sign-on off). The provider's
+	// redirect URI is PUBLIC_ORIGIN + OIDCCallbackPath, so PUBLIC_ORIGIN is required with them.
+
+	// OIDCIssuer is the provider's issuer URL, exactly as its discovery document says it
+	// (https). Changing it later unlinks everyone: links belong to an issuer.
+	OIDCIssuer string `env:"OIDC_ISSUER"`
+	// OIDCClientID is OpenCozy's client ID at the provider.
+	OIDCClientID string `env:"OIDC_CLIENT_ID"`
+	// OIDCClientSecret is the confidential client's secret. Secret.
+	OIDCClientSecret string `env:"OIDC_CLIENT_SECRET"`
+	// OIDCName is the button's text after "Sign in with".
+	OIDCName string `env:"OIDC_NAME" envDefault:"single sign-on"`
 }
+
+// GoogleRedirectURL is where Google sends an adult back after consent; register it exactly.
+func (c Config) GoogleRedirectURL() string { return c.PublicOrigin + "/api/calendar/google/callback" }
+
+// GoogleEnabled reports whether Google calendar is configured.
+func (c Config) GoogleEnabled() bool { return c.GoogleClientID != "" }
+
+// OIDCCallbackPath is where the provider sends the browser back: the old app's path, so the
+// redirect URI registered at the provider keeps working.
+const OIDCCallbackPath = "/api/auth/callback/oidc"
+
+// OIDCEnabled reports whether single sign-on is set up.
+func (c Config) OIDCEnabled() bool { return c.OIDCIssuer != "" }
+
+// PushEnabled reports whether APNs is configured.
+func (c Config) PushEnabled() bool { return c.APNsKeyID != "" }
 
 // Load reads the environment and validates it.
 func Load() (Config, error) {
@@ -98,9 +149,12 @@ func (c Config) validate() error {
 		errs = append(errs, errors.New("MIGRATION_DATABASE_URL: sslmode=disable is only allowed for localhost"))
 	}
 	errs = append(errs, c.validateWebAuthn()...)
+	errs = append(errs, c.validateApple()...)
+	errs = append(errs, c.validateOIDC()...)
 	if c.PublicOrigin != "" && !validOrigin(c.PublicOrigin) {
 		errs = append(errs, fmt.Errorf("PUBLIC_ORIGIN: %q must be https://host[:port] (http only for localhost)", c.PublicOrigin))
 	}
+	errs = append(errs, c.validateGoogle()...)
 	if c.MigrationDatabaseURL != "" && c.DatabaseRuntimeRole == "" {
 		errs = append(errs, errors.New("DATABASE_RUNTIME_ROLE is required with MIGRATION_DATABASE_URL"))
 	}
@@ -139,6 +193,105 @@ func (c Config) validateWebAuthn() []error {
 		}
 	}
 	return errs
+}
+
+var (
+	appleID  = regexp.MustCompile(`^[A-Z0-9]{10}$`)
+	bundleID = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
+)
+
+func (c Config) validateApple() []error {
+	var errs []error
+	if (c.AppleTeamID == "") != (c.AppleBundleID == "") {
+		errs = append(errs, errors.New("APPLE_TEAM_ID and APPLE_BUNDLE_ID go together"))
+	}
+	if c.AppleTeamID != "" && !appleID.MatchString(c.AppleTeamID) {
+		errs = append(errs, errors.New("APPLE_TEAM_ID must be 10 upper-case letters or digits"))
+	}
+	if c.AppleBundleID != "" && (len(c.AppleBundleID) > 155 || !bundleID.MatchString(c.AppleBundleID)) {
+		errs = append(errs, errors.New("APPLE_BUNDLE_ID must be a bundle ID such as org.example.opencozy"))
+	}
+	if c.APNsKeyID == "" && c.APNsKey == "" {
+		return errs
+	}
+	if c.APNsKeyID == "" || c.APNsKey == "" || c.AppleTeamID == "" {
+		return append(errs, errors.New("push needs APNS_KEY_ID, APNS_KEY, APPLE_TEAM_ID and APPLE_BUNDLE_ID together"))
+	}
+	if !appleID.MatchString(c.APNsKeyID) {
+		errs = append(errs, errors.New("APNS_KEY_ID must be 10 upper-case letters or digits"))
+	}
+	if !validAPNsKey(c.APNsKey) {
+		errs = append(errs, errors.New("APNS_KEY must be the .p8 key's PEM (a P-256 PKCS #8 key)")) // never echo the key
+	}
+	return errs
+}
+
+func (c Config) validateGoogle() []error {
+	switch {
+	case c.GoogleClientID == "" && c.GoogleClientSecret == "":
+		return nil
+	case c.GoogleClientID == "" || c.GoogleClientSecret == "":
+		return []error{errors.New("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together")}
+	case c.PublicOrigin == "":
+		return []error{errors.New("GOOGLE_CLIENT_ID needs PUBLIC_ORIGIN: Google returns adults to it")}
+	case c.SecretKeys == nil:
+		return []error{errors.New("GOOGLE_CLIENT_ID needs OPENCOZY_SECRET_KEYS: Google tokens are stored encrypted")}
+	}
+	return nil
+}
+
+func (c Config) validateOIDC() []error {
+	set := 0
+	for _, v := range []string{c.OIDCIssuer, c.OIDCClientID, c.OIDCClientSecret} {
+		if v != "" {
+			set++
+		}
+	}
+	switch set {
+	case 0:
+		return nil
+	case 3:
+	default:
+		return []error{errors.New("OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together: set all three, or none")}
+	}
+	var errs []error
+	if !validIssuer(c.OIDCIssuer) {
+		errs = append(errs, fmt.Errorf("OIDC_ISSUER: %q must be an https URL with no query, fragment or user", c.OIDCIssuer))
+	}
+	if len(c.OIDCClientID) > 255 || strings.TrimSpace(c.OIDCClientID) != c.OIDCClientID {
+		errs = append(errs, errors.New("OIDC_CLIENT_ID must be at most 255 characters, with no surrounding spaces"))
+	}
+	if n := len([]rune(strings.TrimSpace(c.OIDCName))); n < 1 || n > 40 {
+		errs = append(errs, errors.New("OIDC_NAME must be 1 to 40 characters"))
+	}
+	if c.PublicOrigin == "" {
+		errs = append(errs, errors.New("PUBLIC_ORIGIN is required with OIDC_ISSUER: the provider's redirect URI is PUBLIC_ORIGIN"+OIDCCallbackPath))
+	}
+	return errs
+}
+
+// validAPNsKey reports whether k is a .p8 key: PEM, PKCS #8, P-256 (as push.ParseKey reads it).
+func validAPNsKey(k string) bool {
+	block, _ := pem.Decode([]byte(k))
+	if block == nil {
+		return false
+	}
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return false
+	}
+	ec, ok := key.(*ecdsa.PrivateKey)
+	return ok && ec.Curve == elliptic.P256()
+}
+
+// validIssuer reports whether u is an issuer URL OpenCozy will use: https, with a host and no
+// query, fragment or user info. Only an e2e build may use http on 127.0.0.1.
+func validIssuer(u string) bool {
+	p, err := url.Parse(u)
+	if err != nil || p.Host == "" || p.RawQuery != "" || p.ForceQuery || p.Fragment != "" || p.User != nil || p.Opaque != "" {
+		return false
+	}
+	return p.Scheme == "https" || (E2EBuild && p.Scheme == "http" && p.Hostname() == "127.0.0.1")
 }
 
 func isLocalDatabase(url string) bool {

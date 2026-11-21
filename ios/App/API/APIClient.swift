@@ -28,11 +28,6 @@ enum APIError: Error, Equatable, LocalizedError {
         }
     }
 
-    /// The server has no such route (404/405): a call this server doesn't serve yet.
-    var isMissingEndpoint: Bool {
-        if case .server(let status, _) = self { return status == 404 || status == 405 }
-        return false
-    }
 }
 
 /// The calls the kid device makes natively. Everything else (Today, rewards,
@@ -40,14 +35,15 @@ enum APIError: Error, Equatable, LocalizedError {
 protocol OpenCozyAPI: Sendable {
     /// This device, its current child and the server's time.
     func device() async throws -> DeviceInfo
-    /// Returns the response and the local time it arrived, for clock-skew correction.
-    func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date)
+    /// The child's iPad time, and the local time it arrived, for clock-skew correction.
+    func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date)
     /// A one-time URL that signs the web view in as this device's child.
     func webSession() async throws -> DeviceWebSession
     /// Sends shield events recorded offline; returns the IDs the server holds.
     func screenTimeEvents(_ events: [ScreenTimeEventUpload]) async throws -> Set<String>
-    /// Asks a parent for more time (a request queued on the lock screen).
-    func askForTime(requestId: String) async throws -> TimeRequestStatus
+    /// Asks a parent for more time (a request queued on the lock screen). `requestId` is the
+    /// Idempotency-Key, so a resent ask is made once.
+    func askForTime(childId: String, requestId: String) async throws -> TimeRequestStatus
     /// Registers this install's APNs token for the device's child.
     func registerPushToken(_ request: PushTokenRequest) async throws
 }
@@ -55,15 +51,14 @@ protocol OpenCozyAPI: Sendable {
 extension OpenCozyAPI {
     func webSession() async throws -> DeviceWebSession { throw APIError.notConfigured }
     func screenTimeEvents(_ events: [ScreenTimeEventUpload]) async throws -> Set<String> { Set(events.map(\.id)) }
-    func askForTime(requestId: String) async throws -> TimeRequestStatus { TimeRequestStatus(id: requestId, state: .pending) }
+    func askForTime(childId: String, requestId: String) async throws -> TimeRequestStatus { TimeRequestStatus(id: requestId, state: .pending) }
     func registerPushToken(_ request: PushTokenRequest) async throws {}
 }
 
 /// The kid device client: every request is signed by the device key.
 ///
-/// Paths are relative to `/api`. Calls still on the previous server's `v1/` paths
-/// belong to later slices (8: iPad time, 11: pushes); this server answers them 404
-/// until then, and the sync treats that as "not here yet" (see `AppModel`).
+/// Paths are relative to `/api` (api/src/devices.yaml, screentime.yaml). Kid pushes come with
+/// slice 11: until then `registerPushToken` is the protocol's no-op.
 struct HTTPOpenCozyAPI: OpenCozyAPI {
     let baseURL: URL
     let signer: DeviceRequestSigner
@@ -78,9 +73,9 @@ struct HTTPOpenCozyAPI: OpenCozyAPI {
         return info
     }
 
-    func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
-        let (data, receivedAt) = try await http.send("GET", "v1/screen-time", query: [URLQueryItem(name: "target", value: target.rawValue)])
-        return (try APITransport.decode(ScreenTimeResponse.self, from: data), receivedAt)
+    func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
+        let (data, receivedAt) = try await http.send("GET", "children/\(childId)/screen-time")
+        return (try APITransport.decode(ScreenTime.self, from: data), receivedAt)
     }
 
     func webSession() async throws -> DeviceWebSession {
@@ -88,23 +83,23 @@ struct HTTPOpenCozyAPI: OpenCozyAPI {
     }
 
     func screenTimeEvents(_ events: [ScreenTimeEventUpload]) async throws -> Set<String> {
-        Set(try await http.post("v1/device/screen-time-events", body: ScreenTimeEventsRequest(events: events), as: ScreenTimeEventsResponse.self).recorded)
+        // Each event is recorded once by its ID, so any key will do: a fresh one per send.
+        Set(try await http.post("device/screen-time-events", body: ScreenTimeEventsRequest(events: events),
+                                headers: ["Idempotency-Key": UUID().uuidString.lowercased()],
+                                as: ScreenTimeEventsResponse.self).recorded)
     }
 
-    func askForTime(requestId: String) async throws -> TimeRequestStatus {
-        try await http.post("v1/device/time-requests", body: TimeRequestAsk(requestId: requestId), as: TimeRequestReply.self).request
+    func askForTime(childId: String, requestId: String) async throws -> TimeRequestStatus {
+        try await http.post("children/\(childId)/time-requests", body: EmptyRequest(),
+                            headers: ["Idempotency-Key": requestId], as: TimeRequestStatus.self)
     }
 
     func registerPushToken(_ request: PushTokenRequest) async throws {
-        _ = try await http.put("v1/device/push-token", body: request, as: PushTokenResponse.self)
+        _ = try await http.put("device/push", body: request, headers: ["Idempotency-Key": UUID().uuidString.lowercased()], as: PushTokenResponse.self)
     }
 }
 
-/// `POST /api/v1/device/time-requests` `{ requestId }` → `{ request }` (201 new, 200 already pending).
-struct TimeRequestAsk: Encodable, Sendable { var requestId: String }
-struct TimeRequestReply: Decodable, Sendable { var request: TimeRequestStatus }
-
-/// `POST /api/v1/device/screen-time-events` → `{ recorded: [id] }`.
+/// `POST /api/device/screen-time-events` → `{ recorded: [id] }`.
 struct ScreenTimeEventUpload: Encodable, Equatable, Sendable {
     var id: String
     var kind: String
@@ -177,7 +172,8 @@ struct HTTPDevicePairingAPI: DevicePairingAPI {
 }
 
 /// Small JSON-over-HTTP helper for `/api`. Errors come back as `APIError`.
-/// `path` is relative to `/api`; the parent role's calls still use `v1/…` (slices 10, 11).
+/// `path` is relative to `/api`; the parent role's calls still use `v1/…` (slices 10, 11), which
+/// this server answers 410 `update_app` until then.
 struct APITransport: Sendable {
     enum Auth: Sendable {
         case none
@@ -209,8 +205,8 @@ struct APITransport: Sendable {
         try Self.decode(type, from: try await send("POST", path, body: body, headers: headers).0)
     }
 
-    func put<B: Encodable, T: Decodable>(_ path: String, body: B, as type: T.Type) async throws -> T {
-        try Self.decode(type, from: try await send("PUT", path, body: body).0)
+    func put<B: Encodable, T: Decodable>(_ path: String, body: B, headers: [String: String] = [:], as type: T.Type) async throws -> T {
+        try Self.decode(type, from: try await send("PUT", path, body: body, headers: headers).0)
     }
 
     func delete(_ path: String) async throws {

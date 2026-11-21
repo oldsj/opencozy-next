@@ -58,6 +58,10 @@ tags:
     description: iPad screen time, allowed hours, time requests and blocked websites
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
+  - name: phones
+    description: Parent phones (the iOS parent app) and their pushes
+  - name: tvs
+    description: The TV gate - TVs, sessions, "Who's watching?", open hours, the router and Home Assistant
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -69,6 +73,14 @@ paths:
     $ref: auth.yaml#/me
   /auth/confirm:
     $ref: auth.yaml#/confirm
+  /auth/methods:
+    $ref: oidc.yaml#/methods
+  /auth/oidc/start:
+    $ref: oidc.yaml#/start
+  /auth/callback/oidc:
+    $ref: oidc.yaml#/callback
+  /auth/oidc/link:
+    $ref: oidc.yaml#/link
   /auth/passkey/options:
     $ref: passkeys.yaml#/signInOptions
   /auth/passkey:
@@ -99,6 +111,8 @@ paths:
     $ref: displays.yaml#/pairings
   /display/pairings/claim:
     $ref: displays.yaml#/claim
+  /display/session:
+    $ref: displays.yaml#/session
   /displays:
     $ref: displays.yaml#/displays
   /displays/{displayId}:
@@ -119,6 +133,24 @@ paths:
     $ref: devices.yaml#/webSession
   /device/session:
     $ref: devices.yaml#/session
+  /device/push:
+    $ref: phones.yaml#/devicePush
+  /phone/sessions:
+    $ref: phones.yaml#/signIn
+  /phone/sessions/passkey:
+    $ref: phones.yaml#/passkeySignIn
+  /phone/sessions/web:
+    $ref: phones.yaml#/fromWeb
+  /phone/session:
+    $ref: phones.yaml#/self
+  /phone/session/push:
+    $ref: phones.yaml#/phonePush
+  /phones:
+    $ref: phones.yaml#/phones
+  /push/mute:
+    $ref: phones.yaml#/pushMute
+  /phones/{phoneSessionId}:
+    $ref: phones.yaml#/phone
   /today:
     $ref: today.yaml#/today
   /today/chores/{choreId}/complete:
@@ -197,6 +229,16 @@ paths:
     $ref: calendar.yaml#/calendars
   /calendars/{calendarId}:
     $ref: calendar.yaml#/calendarSource
+  /calendar/google/connect:
+    $ref: google.yaml#/connect
+  /calendar/google/callback:
+    $ref: google.yaml#/callback
+  /calendar/google/connections:
+    $ref: google.yaml#/connections
+  /calendar/google/connections/{connectionId}:
+    $ref: google.yaml#/connection
+  /calendar/google/connections/{connectionId}/calendars:
+    $ref: google.yaml#/connectionCalendars
   /learning/rules:
     $ref: learning.yaml#/rules
   /learning/rules/{ruleId}:
@@ -207,6 +249,42 @@ paths:
     $ref: learning.yaml#/link
   /learning/awards:
     $ref: learning.yaml#/awards
+  /tvs:
+    $ref: tvs.yaml#/tvs
+  /tvs/display:
+    $ref: tvs.yaml#/display
+  /tvs/history:
+    $ref: tvs.yaml#/history
+  /tvs/open:
+    $ref: tvs.yaml#/open
+  /tvs/extend:
+    $ref: tvs.yaml#/extend
+  /tvs/close:
+    $ref: tvs.yaml#/close
+  /tvs/{tvId}:
+    $ref: tvs.yaml#/tv
+  /tvs/{tvId}/session:
+    $ref: tvs.yaml#/session
+  /tvs/{tvId}/session/end:
+    $ref: tvs.yaml#/endSession
+  /tvs/{tvId}/ask:
+    $ref: tvs.yaml#/ask
+  /tvs/{tvId}/done:
+    $ref: tvs.yaml#/done
+  /tv-prompts/{promptId}/answer:
+    $ref: tvs.yaml#/answer
+  /children/{childId}/tv:
+    $ref: tvs.yaml#/childTv
+  /children/{childId}/tv/credits/{creditId}/forfeit:
+    $ref: tvs.yaml#/tvCreditForfeit
+  /children/{childId}/tv/watch:
+    $ref: tvs.yaml#/watch
+  /tv/allowances:
+    $ref: tvs.yaml#/allowances
+  /tv/attempts:
+    $ref: tvs.yaml#/attempts
+  /tv/power:
+    $ref: tvs.yaml#/power
 
 components:
   securitySchemes:
