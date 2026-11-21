@@ -139,12 +139,16 @@ func (q *Queries) ClearPhonePushToken(ctx context.Context, arg ClearPhonePushTok
 }
 
 const countPendingInbox = `-- name: CountPendingInbox :one
-SELECT count(*)::integer FROM approval a
-JOIN child c ON c.household_id = a.household_id AND c.id = a.child_id
-WHERE a.household_id = $1 AND a.state = 'pending' AND c.archived_at IS NULL
+SELECT ((SELECT count(*) FROM approval a
+         JOIN child c ON c.household_id = a.household_id AND c.id = a.child_id
+         WHERE a.household_id = $1 AND a.state = 'pending' AND c.archived_at IS NULL)
+      + (SELECT count(*) FROM tv_prompt p
+         JOIN tv ON tv.household_id = p.household_id AND tv.id = p.tv_id AND tv.archived_at IS NULL
+         WHERE p.household_id = $1 AND p.state = 'pending'))::integer
 `
 
-// The badge: everything waiting for an adult (the inbox), as ListPendingApprovals counts it.
+// The badge: everything waiting for an adult (the inbox): the approvals as ListPendingApprovals
+// counts them, and the TVs asking "Who's watching?" as ListPendingTvPrompts does.
 func (q *Queries) CountPendingInbox(ctx context.Context, householdID uuid.UUID) (int32, error) {
 	row := q.db.QueryRow(ctx, countPendingInbox, householdID)
 	var column_1 int32

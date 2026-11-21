@@ -2,9 +2,12 @@ package server
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/clock"
@@ -391,5 +394,83 @@ func TestKidPushes(t *testing.T) {
 		if strings.HasPrefix(k, h.child2.String()) {
 			t.Errorf("child 2 has no push device: %v", kid())
 		}
+	}
+}
+
+// TestTvWaitingPushes: a TV asking "Who's watching?" pushes every adult with a phone that can
+// receive it (old tv.pending), again at a reminder, and clears from their phones once decided.
+// Muted adults are still queued: the sender sends them only the silent clear (internal/push).
+func TestTvWaitingPushes(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.APNsKeyID = "KEY1234567" })
+	h := e.house("a", nil)
+	clk := clock.NewFake(time.Now().Add(time.Second))
+	e.srv.runner.Clock = clk
+	display := h.actors["display-tv"]
+	tvID := h.tv.String()
+	if r := e.send(h.actors["phone"], "PUT", "/api/phone/session/push", map[string]any{"token": testPushToken, "environment": "production"}); r.status != 200 {
+		t.Fatalf("register: %d %s", r.status, r.raw)
+	}
+	// A second adult with a phone hears too; one who has left the household, or has no phone
+	// with a token, doesn't.
+	adult := func(name string, removed bool, token string) uuid.UUID {
+		handle, _ := auth.NewUserHandle()
+		id := e.id(`INSERT INTO adult (household_id, email, name, webauthn_user_handle) VALUES ($1, $2, $3, $4) RETURNING id`,
+			h.id, strings.ToLower(name)+"@example.test", name, handle)
+		if token != "" {
+			e.exec(`INSERT INTO phone_session (household_id, adult_id, name, expires_at, push_token, push_environment, push_registered_at)
+				VALUES ($1, $2, 'Phone', now() + interval '1 day', $3, 'production', now())`, h.id, id, token)
+		}
+		if removed {
+			e.exec(`UPDATE adult SET removed_at = now() WHERE id = $1`, id)
+		}
+		return id
+	}
+	second := adult("Alex", false, strings.Repeat("a", 64))
+	adult("Jo", true, strings.Repeat("b", 64))
+	adult("Lee", false, "")
+	waiting := func() map[string]int {
+		out := map[string]int{}
+		for k, typ := range pushRows(e) {
+			if typ == "approval.pending" && strings.HasPrefix(k, "tv.pending/") {
+				out[k[strings.LastIndex(k, "/")+1:]]++
+			}
+		}
+		return out
+	}
+	want := func(n int) map[string]int { return map[string]int{h.adult.String(): n, second.String(): n} }
+
+	// The fixture's TV is already asking: asking again at once pushes nothing.
+	if r := e.send(display, "POST", "/api/tvs/"+tvID+"/ask", nil); r.status != 200 || r.body["asking"] != true {
+		t.Fatalf("ask: %d %s", r.status, r.raw)
+	}
+	if got := waiting(); len(got) != 0 {
+		t.Fatalf("pushed without a reminder: %v", pushRows(e))
+	}
+	// Past the reminder, both parents with phones are pushed.
+	clk.Advance(3 * time.Minute)
+	if r := e.send(display, "POST", "/api/tvs/"+tvID+"/ask", nil); r.status != 200 {
+		t.Fatalf("remind: %d %s", r.status, r.raw)
+	}
+	if got := waiting(); !maps.Equal(got, want(1)) {
+		t.Fatalf("after the reminder: %v", pushRows(e))
+	}
+	// Answered: it clears from every parent's phone.
+	if r := e.send(h.actors["adult"], "POST", "/api/tvs/"+tvID+"/session", map[string]any{"watcher": "parents"}); r.status != 200 {
+		t.Fatalf("parents: %d %s", r.status, r.raw)
+	}
+	for _, a := range []uuid.UUID{h.adult, second} {
+		if typ := pushRows(e)["approval.resolved/"+h.prompt.String()+"/"+a.String()]; typ != "approval.resolved" {
+			t.Errorf("not cleared for %s: %v", a, pushRows(e))
+		}
+	}
+	// A new prompt, raised once the TV is off again, is a new push.
+	if r := e.send(display, "POST", "/api/tvs/"+tvID+"/done", nil); r.status != 200 {
+		t.Fatalf("done: %d %s", r.status, r.raw)
+	}
+	if r := e.send(display, "POST", "/api/tvs/"+tvID+"/ask", nil); r.status != 200 || r.body["asking"] != true {
+		t.Fatalf("ask again: %d %s", r.status, r.raw)
+	}
+	if got := waiting(); !maps.Equal(got, want(2)) {
+		t.Fatalf("after a new prompt: %v", pushRows(e))
 	}
 }
