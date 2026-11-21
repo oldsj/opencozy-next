@@ -271,6 +271,10 @@ cancel:
   post:
     operationId: cancelRedemption
     summary: Cancel an approved reward, or the unused rest of given screen time, and give the points back
+    description: >
+      iPad time refunds the unused share of its cost, rounded down: 409 `already_used` when none is
+      left, `no_credit` when OpenCozy has no record of the time (so it can't tell how much was
+      used).
     tags: [rewards]
     x-actors: [adult]
     x-command: true

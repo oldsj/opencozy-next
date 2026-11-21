@@ -161,6 +161,8 @@ paths:
     $ref: screentime.yaml#/grant
   /children/{childId}/screen-time/end:
     $ref: screentime.yaml#/end
+  /children/{childId}/screen-time/credits/{creditId}/forfeit:
+    $ref: screentime.yaml#/forfeit
   /children/{childId}/allowed-hours:
     $ref: screentime.yaml#/allowedHours
   /children/{childId}/time-requests:

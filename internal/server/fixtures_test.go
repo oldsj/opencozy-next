@@ -216,6 +216,7 @@ type house struct {
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
 	tv, prompt                        uuid.UUID // a TV with one MAC, asking "Who's watching?"
+	credit                            uuid.UUID // child1's iPad grant, all used (so no banked time)
 	actors                            map[string]cred
 }
 
@@ -317,6 +318,8 @@ func (e *env) house(label string, scopes []string) house {
 	h.tv = e.id(`INSERT INTO tv (household_id, name) VALUES ($1, 'Den TV') RETURNING id`, h.id)
 	e.exec(`INSERT INTO tv_mac (household_id, tv_id, mac) VALUES ($1, $2, '02:00:5e:10:00:01')`, h.id, h.tv)
 	h.prompt = e.id(`INSERT INTO tv_prompt (household_id, tv_id, source, created_at) VALUES ($1, $2, 'display', clock_timestamp()) RETURNING id`, h.id, h.tv)
+	h.credit = e.id(`INSERT INTO screen_time_credit (household_id, child_id, source, granted_by, minutes, seconds, used_seconds, created_at)
+		VALUES ($1, $2, 'grant', $3, 1, 60, 60, now() - interval '2 days') RETURNING id`, h.id, h.child1, h.adult)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)
 
 	credential := func(kind string, scopes []string, all bool, children []uuid.UUID, extra string) (cred, uuid.UUID) {
