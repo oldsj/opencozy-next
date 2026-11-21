@@ -744,7 +744,7 @@ export interface paths {
         put?: never;
         /**
          * Spend points on a reward
-         * @description The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once.
+         * @description The points are spent at once. Asked for on a display, it waits for an adult, who approves it or says no (and the points come back); asked for by an adult, it is approved at once. Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked for the child to start later. TV time is 422 `tv_not_ready` until the TV gate arrives.
          */
         post: operations["redeemReward"];
         delete?: never;
@@ -849,6 +849,166 @@ export interface paths {
         put?: never;
         /** Send it back, with an optional reason the child sees */
         post: operations["rejectInboxItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{itemId}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a child's "Ask for more time"
+         * @description 30 minutes, an hour, all day (until the end of today's allowed hours, or midnight), or no. A yes is given at once, after anything already queued and regardless of allowed hours. Only for `time_request` items: 422 `not_a_time_request` otherwise. Approving a time request without a choice is 422 `choice_required`; rejecting it is "no". 409 `already_decided`, or `already_until` when "all day" would add nothing.
+         */
+        post: operations["answerInboxItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/screen-time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A child's iPad time now
+         * @description The banked time, the windows running or queued, where the child stands against their allowed hours, and their latest "Ask for more time" (while it waits, and for an hour after the answer). A device stays unlocked at most `allowanceSeconds` (≤ 300) past `serverTime` without asking again, so it locks when it loses the server.
+         */
+        get: operations["getScreenTime"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/screen-time/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start some of the child's banked time
+         * @description Spends up to `minutes` (what is left, when less), starting when the child's queue ends. On the child's own device it must be within their allowed hours and stops at their end (`clipped`), the rest staying banked. 409 `nothing_banked`, `outside_hours` or `hours_full`, with a message to show the child.
+         */
+        post: operations["spendScreenTime"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/screen-time/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give a child screen time
+         * @description Banks `minutes` for the child, free. With `startNow` (iPad only) it is also started at once, after anything already queued and regardless of allowed hours. TV time (`target: tv`) arrives with the TV gate; until then it is 422 `tv_not_ready`.
+         */
+        post: operations["grantScreenTime"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/screen-time/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a child's iPad time early, or cancel what is queued
+         * @description `now` locks the iPad now and cancels everything queued; `queued` lets the running window finish and cancels only what is queued after it. The unused time is forfeited, unless `refund` puts it back in the child's bank. 409 `nothing_to_end`.
+         */
+        post: operations["endScreenTime"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/allowed-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set when a child may start their own screen time
+         * @description School nights are Sunday to Thursday, weekends Friday and Saturday, in the household's time zone. Each window ends after it starts, on the same day. `allowedHours: null` removes the rule. Only a child's own spending is limited; parents' grants are not.
+         */
+        put: operations["setAllowedHours"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/children/{childId}/time-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the parents for more time
+         * @description From the child's own device, at any hour. 201 with a new request (an inbox item); 200 with the one already waiting, which reminds the parents when it was asked at least two minutes ago. 409 `asked_too_soon` within five minutes of a "no". The app's queued ask sends its own ID as the Idempotency-Key, so it is made once however often it is sent.
+         */
+        post: operations["askForTime"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/device/screen-time-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what the child did on the locked shield
+         * @description "One more minute", recorded by the app while it may have been offline and sent later, for this device's child. Each event is recorded once, `secondsAgo` before the server gets it (at most 7 days). `recorded` lists every accepted ID, including ones recorded before, so the app can drop them.
+         */
+        post: operations["recordScreenTimeEvents"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1527,6 +1687,11 @@ export interface components {
             /** @description The newest 200 */
             entries: components["schemas"]["HistoryEntry"][];
         };
+        /**
+         * @description Which screen the minutes are for (ipad when absent)
+         * @enum {string}
+         */
+        Target: "ipad" | "tv";
         Reward: {
             id: components["schemas"]["Id"];
             title: string;
@@ -1534,6 +1699,8 @@ export interface components {
             /** @enum {string} */
             kind: "item" | "screen_time";
             minutes?: number;
+            /** @description For screen_time, which screen */
+            target?: components["schemas"]["Target"];
             available: boolean;
             version: components["schemas"]["Version"];
         };
@@ -1548,6 +1715,8 @@ export interface components {
             kind: "item" | "screen_time";
             /** @description Required for screen_time, refused otherwise */
             minutes?: number;
+            /** @description For screen_time, which screen (ipad when absent); refused otherwise */
+            target?: components["schemas"]["Target"];
         };
         RewardEdit: {
             title: components["schemas"]["Title"];
@@ -1556,6 +1725,8 @@ export interface components {
             kind: "item" | "screen_time";
             /** @description Required for screen_time, refused otherwise */
             minutes?: number;
+            /** @description For screen_time, which screen (unchanged when absent); refused otherwise */
+            target?: components["schemas"]["Target"];
             /** @description false hides it from children */
             available: boolean;
             expectedVersion: components["schemas"]["Version"];
@@ -1586,7 +1757,9 @@ export interface components {
             cancelledAt?: string;
             /** @description Screen time bought */
             minutes?: number;
-            /** @description Screen time used so far (from slice 8; absent until then) */
+            /** @description For screen time, which screen */
+            target?: components["schemas"]["Target"];
+            /** @description iPad time used so far, rounded up */
             usedMinutes?: number;
             /** @description Points given back (a rejection or a cancellation) */
             refundedPoints: number;
@@ -1615,6 +1788,101 @@ export interface components {
             id: components["schemas"]["Id"];
             /** @enum {string} */
             state: "approved" | "rejected";
+        };
+        /** @enum {string} */
+        TimeChoice: "30min" | "1h" | "all_day" | "no";
+        TimeRequest: {
+            id: components["schemas"]["Id"];
+            /** @enum {string} */
+            state: "pending" | "approved" | "declined";
+            choice?: components["schemas"]["TimeChoice"];
+            /** Format: date-time */
+            askedAt: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            /**
+             * Format: date-time
+             * @description When a yes ends
+             */
+            grantedUntil?: string;
+        };
+        Window: {
+            id: components["schemas"]["Id"];
+            /** Format: date-time */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @description Its effective end, if a parent ended it early
+             */
+            endsAt: string;
+        };
+        /** @description A time of day, HH:MM, 24-hour, household time */
+        Clock: string;
+        HoursWindow: {
+            start: components["schemas"]["Clock"];
+            end: components["schemas"]["Clock"];
+        };
+        AllowedHours: {
+            schoolNight: components["schemas"]["HoursWindow"];
+            weekend: components["schemas"]["HoursWindow"];
+        };
+        /** @description Open now until `closesAt`, or closed until `opensAt` */
+        HoursNow: {
+            open: boolean;
+            /** Format: date-time */
+            closesAt?: string;
+            /** Format: date-time */
+            opensAt?: string;
+        };
+        ScreenTime: {
+            /** Format: date-time */
+            serverTime: string;
+            childId: components["schemas"]["Id"];
+            /** @description Banked, not yet spent */
+            bankedSeconds: number;
+            /**
+             * Format: date-time
+             * @description The end of the run of windows covering now; absent while locked
+             */
+            unlockedUntil?: string;
+            /** @description How long a device may stay unlocked from serverTime without asking again */
+            allowanceSeconds: number;
+            /** @description Running and queued windows, in order */
+            windows: components["schemas"]["Window"][];
+            allowedHours?: components["schemas"]["AllowedHours"];
+            hoursNow?: components["schemas"]["HoursNow"];
+            timeRequest?: components["schemas"]["TimeRequest"];
+        };
+        Minutes: number;
+        Spend: {
+            seconds: number;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @description Allowed hours cut it short; the rest stays banked */
+            clipped: boolean;
+        };
+        SpendResult: {
+            spend?: components["schemas"]["Spend"];
+            screenTime: components["schemas"]["ScreenTime"];
+        };
+        EndResult: {
+            /** @enum {string} */
+            scope: "now" | "queued";
+            /** @description Windows ended or cancelled */
+            windows: number;
+            cutSeconds: number;
+            refundedSeconds: number;
+            forfeitedSeconds: number;
+            /** Format: date-time */
+            endedAt?: string;
+            /**
+             * Format: date-time
+             * @description With `queued`, when the running window still ends
+             */
+            keptUntil?: string;
+            screenTime: components["schemas"]["ScreenTime"];
         };
         /** @description Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day. */
         Days: number[];
@@ -1970,12 +2238,13 @@ export interface components {
          */
         IdempotencyKey: string;
         ItemId: components["schemas"]["Id"];
+        ChildId: components["schemas"]["Id"];
     };
     requestBodies: never;
     headers: {
         /** @description Sets or clears the __Host-session cookie */
         SetSession: string;
-        /** @description Sets the __Secure-oidc cookie that binds the sign-in to this browser (10 minutes, sent only to the callback) */
+        /** @description Sets the __Host-oidc cookie that binds the sign-in to this browser (10 minutes; the callback clears it) */
         SetSignIn: string;
     };
     pathItems: never;
@@ -2182,7 +2451,7 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: {
-                "__Secure-oidc"?: string;
+                "__Host-oidc"?: string;
             };
         };
         requestBody?: never;
@@ -3932,6 +4201,392 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    answerInboxItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                itemId: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "choice": "30min"
+                 *     }
+                 */
+                "application/json": {
+                    choice: components["schemas"]["TimeChoice"];
+                };
+            };
+        };
+        responses: {
+            /** @description Answered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: components["schemas"]["Id"];
+                        /** @enum {string} */
+                        state: "approved" | "rejected";
+                        timeRequest: components["schemas"]["TimeRequest"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getScreenTime: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The child's iPad time */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenTime"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    spendScreenTime: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "minutes": 30
+                 *     }
+                 */
+                "application/json": {
+                    minutes: components["schemas"]["Minutes"];
+                };
+            };
+        };
+        responses: {
+            /** @description Started (or queued) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpendResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    grantScreenTime: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "minutes": 30,
+                 *       "target": "ipad",
+                 *       "startNow": true
+                 *     }
+                 */
+                "application/json": {
+                    minutes: components["schemas"]["Minutes"];
+                    target?: components["schemas"]["Target"];
+                    /** @default false */
+                    startNow?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Given */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpendResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    endScreenTime: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "scope": "now",
+                 *       "refund": false
+                 *     }
+                 */
+                "application/json": {
+                    /**
+                     * @default now
+                     * @enum {string}
+                     */
+                    scope?: "now" | "queued";
+                    /** @default false */
+                    refund?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Ended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setAllowedHours: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "allowedHours": {
+                 *         "schoolNight": {
+                 *           "start": "15:30",
+                 *           "end": "19:30"
+                 *         },
+                 *         "weekend": {
+                 *           "start": "08:00",
+                 *           "end": "20:00"
+                 *         }
+                 *       }
+                 *     }
+                 */
+                "application/json": {
+                    allowedHours: components["schemas"]["AllowedHours"] | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenTime"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    askForTime: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                childId: components["parameters"]["ChildId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {} */
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Already waiting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeRequest"];
+                };
+            };
+            /** @description Asked */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    recordScreenTimeEvents: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "events": [
+                 *         {
+                 *           "id": "0195f2d4-0000-7000-8000-0000000000e1",
+                 *           "kind": "one_more_minute",
+                 *           "secondsAgo": 90
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/json": {
+                    events: {
+                        id: components["schemas"]["Id"];
+                        /** @enum {string} */
+                        kind: "one_more_minute";
+                        secondsAgo: number;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recorded: components["schemas"]["Id"][];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Error"];
         };
     };

@@ -98,7 +98,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	got := statuses(out)
 	for table, want := range map[string]string{
 		"household":                     "pending", // lock_message and the game domains wait on later slices
-		"child":                         "pending", // the colour and allowed hours too
+		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
 		"household_owner":               "ok",
 		"auth_account":                  "ok",
@@ -148,6 +148,13 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	ctx := context.Background()
 	q := dbq.New(target.Runtime)
 	keys := testKeys(t)
+
+	// Allowed hours come with their child; children without any stay without.
+	var hours string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || '=' || COALESCE(school_night_start || '-' || school_night_end || '/' || weekend_start || '-' || weekend_end, 'none'), ' ' ORDER BY name)
+		FROM child`).Scan(&hours); err != nil || hours != "Avery=900-1140/540-1200 Mika=none Rowan=none" {
+		t.Errorf("allowed hours: %q %v", hours, err)
+	}
 
 	// The owner signs in with the old password, and is told to rehash.
 	var hash, scheme string
@@ -375,8 +382,9 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	}
 }
 
-// TestOIDCLinksCarried: the old app's OIDC accounts become single sign-on links to OIDC_ISSUER,
-// for the adult who had them, keeping the subject. Without OIDC_ISSUER they are left behind
+// TestOIDCLinksCarried: the old app's OIDC accounts become single sign-on links to the issuer
+// named with --oidc-issuer, for the adult who had them, keeping the subject; the report names
+// the issuer and warns when OIDC_ISSUER is another. Without --oidc-issuer they are left behind
 // with a note, and the rest of the import is unaffected.
 func TestOIDCLinksCarried(t *testing.T) {
 	const issuer = "https://id.example.test"
@@ -389,8 +397,11 @@ func TestOIDCLinksCarried(t *testing.T) {
 
 	target := testdb.Open(t)
 	var out bytes.Buffer
-	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer}); err != nil {
+	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer, RuntimeOIDCIssuer: issuer}); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "1 OIDC links carried as subjects at https://id.example.test") || strings.Contains(out.String(), "WARNING") {
+		t.Errorf("the report doesn't name the issuer, or warns:\n%s", out.String())
 	}
 	if got := statuses(out.String())["auth_account"]; got != "ok" {
 		t.Errorf("auth_account %q\n%s", got, out.String())
@@ -421,17 +432,45 @@ func TestOIDCLinksCarried(t *testing.T) {
 		t.Errorf("links %+v, want %+v", links, want)
 	}
 
-	// Without OIDC_ISSUER: not carried, said so, and the import still reconciles.
+	// OIDC_ISSUER is another provider: carried (they are the old provider's subjects) with a warning.
+	target = testdb.Open(t)
+	out.Reset()
+	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t), OIDCIssuer: issuer, RuntimeOIDCIssuer: "https://other.example.test"}); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), `WARNING: OIDC_ISSUER here is "https://other.example.test"`) {
+		t.Errorf("no warning:\n%s", out.String())
+	}
+
+	// Without --oidc-issuer: not carried, said so, and the import still reconciles.
 	target = testdb.Open(t)
 	out.Reset()
 	if err := Run(context.Background(), Options{SourceURL: source, Target: target.Owner, Out: &out, Keys: testKeys(t)}); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if !strings.Contains(out.String(), "2 OIDC links left behind because OIDC_ISSUER isn't set") {
+	if !strings.Contains(out.String(), "2 OIDC links left behind because --oidc-issuer isn't given") {
 		t.Errorf("no note:\n%s", out.String())
 	}
 	var n int
 	if err := target.Owner.QueryRow(context.Background(), `SELECT count(*) FROM oidc_link`).Scan(&n); err != nil || n != 0 {
 		t.Errorf("links %d (%v)", n, err)
 	}
+}
+
+// Old screen time waits on redemptions and devices: a source with any says so and can't commit.
+func TestScreenTimeWaitsOnRedemptionsAndDevices(t *testing.T) {
+	event := `SET search_path TO opencozy;
+		ALTER TABLE screen_time_event DROP CONSTRAINT screen_time_event_device_fk;
+		INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
+		  ('0190a000-0000-7000-8000-00000000000a', gen_random_uuid(), '0190a000-0000-7000-8000-0000000000c1', gen_random_uuid(),
+		   'one_more_minute', '2026-01-05T08:00:00Z', '2026-01-05T08:00:01Z');`
+	target := testdb.Open(t)
+	out, err := importOnce(t, oldDB(t, complete, event), target, false)
+	if !errors.Is(err, ErrPending) {
+		t.Fatalf("err = %v, want ErrPending\n%s", err, out)
+	}
+	if statuses(out)["screen_time_event"] != "pending" || !strings.Contains(out, "waits on the import of devices") {
+		t.Errorf("screen_time_event:\n%s", out)
+	}
+	empty(t, target)
 }

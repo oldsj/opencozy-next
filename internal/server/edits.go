@@ -14,6 +14,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/ledger"
+	"github.com/oldsj/opencozy-next/internal/screentime"
 )
 
 // Editing what adults manage. Every save names the version it was made from; a stale one gets
@@ -186,6 +187,13 @@ func (s *Server) UpdateReward(ctx context.Context, req api.UpdateRewardRequestOb
 	if screen != (b.Minutes != nil) {
 		return api.UpdateReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(apiError("minutes_mismatch", "Give minutes for iPad time, and none for other rewards."))}, nil
 	}
+	if !screen && b.Target != nil {
+		return api.UpdateReward422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(errTargetMismatch)}, nil
+	}
+	var target *string // absent: screen time keeps its screen
+	if b.Target != nil {
+		target = ptr(string(*b.Target))
+	}
 	var minutes pgtype.Int4
 	if b.Minutes != nil {
 		minutes = pgtype.Int4{Int32: int32(*b.Minutes), Valid: true} //nolint:gosec // 1-1440 by the spec
@@ -193,6 +201,7 @@ func (s *Server) UpdateReward(ctx context.Context, req api.UpdateRewardRequestOb
 	r, err := cmd.Q.UpdateReward(ctx, dbq.UpdateRewardParams{
 		HouseholdID: a.HouseholdID, ID: req.RewardId, Title: strings.TrimSpace(b.Title), Cost: int32(b.Cost), //nolint:gosec // bounded by the spec
 		Kind: string(b.Kind), Minutes: minutes, Available: b.Available, ExpectedVersion: int32(b.ExpectedVersion), //nolint:gosec // bounded by the spec
+		ScreenTimeTarget: target,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		if _, err := cmd.Q.GetLiveReward(ctx, dbq.GetLiveRewardParams{HouseholdID: a.HouseholdID, ID: req.RewardId}); errors.Is(err, pgx.ErrNoRows) {
@@ -216,6 +225,10 @@ func toRedemptionRow(r dbq.GetRedemptionRowRow) api.RedemptionRow {
 	}
 	if r.Minutes.Valid {
 		out.Minutes = ptr(int(r.Minutes.Int32))
+		out.UsedMinutes = ptr(int((r.UsedSeconds + 59) / 60))
+	}
+	if r.ScreenTimeTarget != nil {
+		out.Target = ptr(api.Target(*r.ScreenTimeTarget))
 	}
 	return out
 }
@@ -297,10 +310,6 @@ func (s *Server) FulfilRedemption(ctx context.Context, req api.FulfilRedemptionR
 	return api.FulfilRedemption200JSONResponse(row), nil
 }
 
-// usedMinutes is how much of a screen-time redemption has been used. Screen time (slice 8)
-// isn't spent through OpenCozy yet, so none has.
-func usedMinutes(dbq.Redemption) int32 { return 0 }
-
 // CancelRedemption cancels an approved reward with all its points back, or given screen time
 // with the unused share back (rounded down). A given item can't be cancelled.
 func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionRequestObject) (api.CancelRedemptionResponseObject, error) {
@@ -321,10 +330,12 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 	switch {
 	case red.State == "approved":
 	case red.State == "fulfilled" && red.Minutes.Valid:
-		left := red.Minutes.Int32 - min(usedMinutes(red), red.Minutes.Int32)
-		refund = int32(int64(red.Cost) * int64(left) / int64(red.Minutes.Int32)) //nolint:gosec // at most cost
-		if refund == 0 {
+		// The unspent rest is forfeited; its share of the cost comes back, rounded down.
+		refund, err = screentime.CancelRedemption(ctx, cmd, red.ID, red.Cost)
+		if errors.Is(err, screentime.ErrAllUsed) {
 			return refuse("already_used", "That iPad time has already been used, so there’s nothing to refund."), nil
+		} else if err != nil {
+			return nil, err
 		}
 	default:
 		return refuse("not_cancellable", "This reward has already been given or cancelled."), nil
@@ -336,8 +347,10 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 	if red.LedgerID == nil {
 		return nil, errors.New("redemption without its ledger row")
 	}
-	if _, err := ledger.Refund(ctx, cmd, *red.LedgerID, ledger.Entry{Points: refund, AdultID: &a.AdultID, Note: req.Body.Reason}); err != nil {
-		return nil, err
+	if refund > 0 {
+		if _, err := ledger.Refund(ctx, cmd, *red.LedgerID, ledger.Entry{Points: refund, AdultID: &a.AdultID, Note: req.Body.Reason}); err != nil {
+			return nil, err
+		}
 	}
 	if err := cmd.Q.CancelRedemption(ctx, dbq.CancelRedemptionParams{HouseholdID: cmd.HouseholdID(), ID: red.ID, Now: &now}); err != nil {
 		return nil, err

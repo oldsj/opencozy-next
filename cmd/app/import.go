@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -19,12 +20,23 @@ func runImport(ctx context.Context, cfg config.Config, log *slog.Logger, args []
 	fs := flag.NewFlagSet("import", flag.ContinueOnError)
 	source := fs.String("source-url", "", "the old database (a restored backup, never the live one); put its password in PGPASSWORD or a passfile, not the URL")
 	dryRun := fs.Bool("dry-run", false, "import, print the reconciliation, and roll back")
+	oidcIssuer := fs.String("oidc-issuer", "", "the old app's OPENCOZY_OIDC_ISSUER, to carry its single sign-on links (each old account's subject at that provider); without it they are left behind")
 	oldSecretFile := fs.String("old-auth-secret-file", "", "a file holding the old app's BETTER_AUTH_SECRET, to carry Google, iCloud and Home Assistant secrets; read once, never stored")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *source == "" {
 		return errors.New("import: --source-url is required")
+	}
+	if *oidcIssuer != "" {
+		if !config.ValidIssuer(*oidcIssuer) {
+			return fmt.Errorf("import: --oidc-issuer %q must be an https URL with no query, fragment or user", *oidcIssuer)
+		}
+		// Links carry the old provider's subjects. Under any other issuer they never match a
+		// sign-in: say so rather than carry dead links quietly.
+		if *oidcIssuer != cfg.OIDCIssuer {
+			log.WarnContext(ctx, "--oidc-issuer differs from OIDC_ISSUER: the carried links are only used once OIDC_ISSUER is the old provider's issuer, exactly", "oidc_issuer", *oidcIssuer, "OIDC_ISSUER", cfg.OIDCIssuer)
+		}
 	}
 	var old *oldsecret.Secret
 	if *oldSecretFile != "" {
@@ -45,5 +57,5 @@ func runImport(ctx context.Context, cfg config.Config, log *slog.Logger, args []
 		return err
 	}
 	defer owner.Close()
-	return importer.Run(ctx, importer.Options{SourceURL: *source, Target: owner, DryRun: *dryRun, Out: stdout, Keys: cfg.SecretKeys, OldSecret: old, OIDCIssuer: cfg.OIDCIssuer})
+	return importer.Run(ctx, importer.Options{SourceURL: *source, Target: owner, DryRun: *dryRun, Out: stdout, Keys: cfg.SecretKeys, OldSecret: old, OIDCIssuer: *oidcIssuer, RuntimeOIDCIssuer: cfg.OIDCIssuer})
 }
