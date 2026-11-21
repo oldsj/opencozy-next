@@ -54,7 +54,7 @@ PGPASSWORD=… app import \
   `BETTER_AUTH_SECRET`. The import reads it once, uses it to open the old Google refresh tokens, and
   seals them under `OPENCOZY_SECRET_KEYS`; it is never stored. Without it, Google accounts arrive
   as "connect again" and a Remark at the end of the report says so. (iCloud and Home Assistant
-  have no mapping yet: see Still pending.)
+  are not carried: see Not carried.)
 - **Exit status.** A run fails, and writes nothing, in any of these cases:
   - the reconciliation has a mismatch ("found mismatches; nothing was written"), in a dry
     run too;
@@ -109,11 +109,11 @@ it checks hasn't run yet.
 | --- | --- | --- |
 | `household` | `household` | ID, name, time zone, times, blocked websites (games and game portals), and the locked-iPad message |
 | `child` | `child` | ID, name, colour, times and allowed hours (minutes after local midnight). Allowed hours the old app had only partly set (which both apps read as none) arrive as none, counted. |
-| `auth_user`, `household_owner`, `auth_account` (password) | `adult` | Adults with a household, with email, name and password. Old scrypt hashes are rehashed to argon2id on the first sign-in. The old user ID becomes the passkey user handle. |
+| `auth_user`, `household_owner`, `auth_account` (password) | `adult` | Adults with a household, with email, name, password and phone push mute. Old scrypt hashes are rehashed to argon2id on the first sign-in. The old user ID becomes the passkey user handle. |
 | `parent_passkey` | `passkey` | ID, name, credential ID, public key, sign counter, transports and backed-up flag. "Backup eligible" is unknown until the first sign-in sets it. |
 | `device` | `device` | Child devices: ID, child, name, platform, key, times, and revoked ones as revoked. A paired iPad keeps working without pairing again. |
 | `service_credential`, `…_child`, `…_award_rule` | `credential`, `credential_child`, `credential_award_rule` | Service credentials (learning games) with their children and rules |
-| `assistant_credential` | `credential` (assistant) | Assistant credentials whose scopes have a new name |
+| `assistant_credential` | `credential` (assistant) | Assistant credentials, each old scope under its new name, plus the read scopes the old app always gave an assistant |
 | `award_rule`, `external_identity_link`, `external_award` | `award_rule`, `learning_link`, `learning_award` | Learning rules, each child's game link, and every award with its source event ID, so a retried event is never paid twice |
 | `point_ledger` | `point_ledger` | Every row, with its ID, child, points and time, written oldest first under the new rules |
 | `chore_award_reversal`, `chore_active_award` | `point_ledger.reverses_id`, `active_award` | An undo points at what it undoes; the awards in effect are rebuilt and compared with the old list |
@@ -156,6 +156,9 @@ Each of these is counted in the report.
 | `calendar_assignment` cleared | The old app ignored them |
 | Google calendars whose account is gone, with their series and assignments | Nothing can refresh them; connect the account again (sign-off: who those events were for) |
 | Duplicate calendar links | One of each is carried |
+| `home_assistant_connection`, `home_assistant_entity` | Home Assistant is a later slice (15): connect it again after cutover |
+| `icloud_connection`, `icloud_calendar`, `icloud_resource`, `icloud_series`, `icloud_occurrence` | iCloud calendars are a later slice (13b): connect them again after cutover; the first refresh rebuilds the events |
+| `dashboard_view` | Dashboard views are a later slice (16): set them up again after cutover |
 
 Columns dropped on purpose are listed in the mapping code next to `columnsRead`. Any other
 old column makes its table `pending`.
@@ -219,14 +222,6 @@ An adult who edits such a chore, routine or reward brings it within the new limi
 
 ## Still pending
 
-A real import refuses while any of these has rows, and the dry run marks it `pending`:
-
-- `household_owner.push_muted_until`: the phone push mute. Slice 11 has merged, so it is next.
-- `assistant_credential` scopes with no new name yet (`approvals:read`): slice 12 (#81) maps them.
-- `home_assistant_connection`, `home_assistant_entity`: no mapping yet.
-- `icloud_connection`, `icloud_calendar`, `icloud_resource`, `icloud_series`,
-  `icloud_occurrence`: no mapping yet.
-- `dashboard_view`: no mapping yet.
-
-The fixture has no rows in the last three groups, so they show as `ok` with "empty; no mapping
-yet". Before cutover, a dry run against the production backup shows whether they hold anything.
+Nothing today: every old table is carried or deliberately not carried. An old table, or column,
+that no mapping reads is `pending`, and a real import refuses while it has rows, so nothing new in
+the old app can be lost silently.

@@ -29,9 +29,10 @@ INSERT INTO auth_account (id, user_id, account_id, provider_id, access_token, re
   ('fixtureAccount0001', 'fixtureOwnerUser01', 'fixtureOwnerUser01', 'credential', NULL, NULL, NULL, NULL, NULL, NULL, '933879335a7fc39b4d252873a7b57531:fbbbba97b965bc72ddc87f02f5e813c9ff3845e8108b54708467ac11203d95b056892c06d9d3540db1f04e7a09340c57f106f200fa2246a063797b68764c8df1', '2026-01-02T08:00:00Z', '2026-01-02T08:00:00Z'),
   ('fixtureAccount0002', 'fixtureSecondUser2', 'fixture-oidc-subject', 'oidc', 'fixture-access-token', 'fixture-refresh-token', NULL, NULL, NULL, 'openid email', NULL, '2026-01-03T08:00:00Z', '2026-01-03T08:00:00Z');
 
-INSERT INTO household_owner (user_id, household_id, created_at) VALUES
-  ('fixtureOwnerUser01', '0190a000-0000-7000-8000-00000000000a', '2026-01-02T08:00:00Z'),
-  ('fixtureSecondUser2', '0190a000-0000-7000-8000-00000000000a', '2026-01-03T08:00:00Z');
+-- The second adult muted phone alerts until a fixed time.
+INSERT INTO household_owner (user_id, household_id, created_at, push_muted_until) VALUES
+  ('fixtureOwnerUser01', '0190a000-0000-7000-8000-00000000000a', '2026-01-02T08:00:00Z', NULL),
+  ('fixtureSecondUser2', '0190a000-0000-7000-8000-00000000000a', '2026-01-03T08:00:00Z', '2026-12-31T21:00:00Z');
 
 INSERT INTO child (household_id, id, name, color, created_at, archived_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000000c1', 'Avery', 'teal', '2026-01-02T09:00:00Z', NULL),

@@ -156,6 +156,15 @@ var notCarried = map[string]string{
 	"parent_session":    "phone sessions and their push tokens: phones get a new build and sign in again",
 	"owner_bootstrap":   "the first-owner setup token: an imported household already has its owner",
 	"screen_time_event": "the iPad shield event log",
+	// Coordinator, 2026-11-21: these belong to deferred slices and are set up again after cutover.
+	"home_assistant_connection": "Home Assistant (slice 15): connect it again after cutover",
+	"home_assistant_entity":     "Home Assistant entities (slice 15): chosen again after connecting",
+	"icloud_connection":         "iCloud (slice 13b): connect it again after cutover",
+	"icloud_calendar":           "iCloud calendars (slice 13b): chosen again after connecting",
+	"icloud_resource":           "iCloud's cached calendar data: the first refresh fetches it again",
+	"icloud_series":             "iCloud events: the first refresh rebuilds them",
+	"icloud_occurrence":         "iCloud events: the first refresh rebuilds them",
+	"dashboard_view":            "dashboard views (slice 16): set up again after cutover",
 }
 
 // coverage adds every old table no mapping mentioned, and checks that each mapped table's

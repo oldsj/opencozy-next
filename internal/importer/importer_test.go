@@ -102,7 +102,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"household":                     "ok",
 		"child":                         "ok",
 		"auth_user":                     "ok",
-		"household_owner":               "pending", // push_muted_until waits on slice 11
+		"household_owner":               "ok",
 		"auth_account":                  "ok",
 		"service_credential":            "ok",
 		"service_credential_child":      "ok",
@@ -156,8 +156,10 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 }
 
 func TestRealImportRefusesWhilePending(t *testing.T) {
+	// An old column no mapping reads makes its table pending (the fixture itself carries fully).
 	target := testdb.Open(t)
-	if _, err := importOnce(t, oldDB(t), target, false); !errors.Is(err, ErrPending) {
+	unmapped := `ALTER TABLE opencozy.recipe ADD COLUMN rating integer`
+	if _, err := importOnce(t, oldDB(t, unmapped), target, false); !errors.Is(err, ErrPending) {
 		t.Fatalf("err = %v, want ErrPending", err)
 	}
 	empty(t, target)
@@ -201,6 +203,12 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	var oidcOnly *string
 	if err := target.Owner.QueryRow(ctx, `SELECT password_hash FROM adult WHERE email = 'sam@example.test'`).Scan(&oidcOnly); err != nil || oidcOnly != nil {
 		t.Fatalf("OIDC-only adult: %v %v", oidcOnly, err)
+	}
+	// The phone push mute is each adult's own, carried as it was.
+	var mutes string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(email || '=' || COALESCE(to_char(push_muted_until AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI'), '-'), ' ' ORDER BY email)
+		FROM adult`).Scan(&mutes); err != nil || mutes != "owner@example.test=- sam@example.test=2026-12-31T21:00" {
+		t.Errorf("push mutes: %q %v", mutes, err)
 	}
 	// Recipes keep their IDs, steps (line breaks included), versions and archive times; meals keep
 	// their day, slot and recipe.
@@ -552,5 +560,46 @@ func TestScreenTimeEventsAreNotCarried(t *testing.T) {
 	}
 	if statuses(out)["screen_time_event"] != "not carried" || !strings.Contains(out, "screen_time_event              1") {
 		t.Errorf("screen_time_event:\n%s", out)
+	}
+}
+
+// Home Assistant, iCloud and dashboard views belong to deferred slices: their rows are counted
+// as not carried, and the import doesn't refuse (coordinator, 2026-11-21).
+func TestDeferredSlicesAreNotCarried(t *testing.T) {
+	const rows = `SET search_path TO opencozy; SET session_replication_role = replica;
+INSERT INTO home_assistant_connection (household_id, id, base_url, token_ciphertext) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000801', 'https://ha.example.test', 'aa:bb:cc');
+INSERT INTO home_assistant_entity (household_id, connection_id, entity_id) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000801', 'light.kitchen'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000801', 'sensor.hall');
+INSERT INTO icloud_connection (household_id, apple_id, credential_ciphertext) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', 'parent@example.test', 'aa:bb:cc');
+INSERT INTO icloud_calendar (household_id, id, calendar_href, name) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000811', '/cal/home/', 'Home');
+INSERT INTO icloud_resource (household_id, calendar_id, resource_href, calendar_data) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000811', '/cal/home/a.ics', 'BEGIN:VCALENDAR');
+INSERT INTO icloud_series (household_id, id, calendar_id, provider_uid, resource_href, all_day, recurring, status, content_hash) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000821', '0190a000-0000-7000-8000-000000000811', 'uid-1', '/cal/home/a.ics', true, false, 'confirmed', repeat('a', 64));
+INSERT INTO icloud_occurrence (household_id, id, calendar_id, series_id, recurrence_key, all_day, start_date, end_date, status, is_override, content_hash) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000831', '0190a000-0000-7000-8000-000000000811', '0190a000-0000-7000-8000-000000000821', 'single', true, '2026-03-01', '2026-03-02', 'confirmed', false, repeat('b', 64));
+INSERT INTO dashboard_view (household_id, id, name) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000841', 'Kitchen');`
+	target := testdb.Open(t)
+	out, err := importOnce(t, oldDB(t, complete, rows), target, true)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	got := statuses(out)
+	for table, n := range map[string]string{"home_assistant_connection": "1", "home_assistant_entity": "2", "icloud_connection": "1",
+		"icloud_calendar": "1", "icloud_resource": "1", "icloud_series": "1", "icloud_occurrence": "1", "dashboard_view": "1"} {
+		if got[table] != "not carried" {
+			t.Errorf("%s: %q, want not carried", table, got[table])
+		}
+		if !strings.Contains(out, fmt.Sprintf("\n%-30s %-5s", table, n)) {
+			t.Errorf("%s: the report doesn't count %s rows:\n%s", table, n, out)
+		}
+	}
+	if _, err := importOnce(t, oldDB(t, complete, rows), target, false); err != nil {
+		t.Errorf("a real import refused: %v", err)
 	}
 }
