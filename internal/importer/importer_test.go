@@ -156,8 +156,10 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 }
 
 func TestRealImportRefusesWhilePending(t *testing.T) {
+	// An old column no mapping reads makes its table pending (the fixture itself carries fully).
 	target := testdb.Open(t)
-	if _, err := importOnce(t, oldDB(t), target, false); !errors.Is(err, ErrPending) {
+	unmapped := `ALTER TABLE opencozy.recipe ADD COLUMN rating integer`
+	if _, err := importOnce(t, oldDB(t, unmapped), target, false); !errors.Is(err, ErrPending) {
 		t.Fatalf("err = %v, want ErrPending", err)
 	}
 	empty(t, target)
