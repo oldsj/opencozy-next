@@ -73,6 +73,30 @@ func TestLoadValidatesPublicOrigin(t *testing.T) {
 	}
 }
 
+func TestLoadGoogle(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost/app")
+	t.Setenv("GOOGLE_CLIENT_ID", "fixture-client.apps.example.test")
+	if _, err := Load(); err == nil {
+		t.Fatal("a Google client ID alone was accepted")
+	}
+	t.Setenv("GOOGLE_CLIENT_SECRET", "fixture-client-secret")
+	if _, err := Load(); err == nil {
+		t.Fatal("Google without PUBLIC_ORIGIN was accepted")
+	}
+	t.Setenv("PUBLIC_ORIGIN", "https://cozy.example.test")
+	if _, err := Load(); err == nil {
+		t.Fatal("Google without OPENCOZY_SECRET_KEYS was accepted")
+	}
+	t.Setenv("OPENCOZY_SECRET_KEYS", "k1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.GoogleEnabled() || cfg.GoogleRedirectURL() != "https://cozy.example.test/api/calendar/google/callback" {
+		t.Errorf("enabled %v, redirect %q", cfg.GoogleEnabled(), cfg.GoogleRedirectURL())
+	}
+}
+
 func TestLoadValidatesOIDC(t *testing.T) {
 	full := map[string]string{
 		"DATABASE_URL": "postgres://u:p@localhost/app", "PUBLIC_ORIGIN": "https://cozy.example.test",

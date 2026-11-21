@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -175,9 +176,12 @@ func (s *Server) CreateDisplay(ctx context.Context, req api.CreateDisplayRequest
 	if err != nil {
 		return nil, err
 	}
-	scopes := make([]string, len(req.Body.Scopes))
-	for i, sc := range req.Body.Scopes {
-		scopes[i] = string(sc)
+	// Every display shows Today: the board, its tabs and its session all need it.
+	scopes := []string{string(api.DisplayScopeToday)}
+	for _, sc := range req.Body.Scopes {
+		if !slices.Contains(scopes, string(sc)) {
+			scopes = append(scopes, string(sc))
+		}
 	}
 	d, err := cmd.Q.CreateDisplay(ctx, dbq.CreateDisplayParams{HouseholdID: h, Name: strings.TrimSpace(req.Body.Name), Scopes: scopes, Now: now})
 	if err != nil {
@@ -204,4 +208,14 @@ func (s *Server) RevokeDisplay(ctx context.Context, req api.RevokeDisplayRequest
 		return api.RevokeDisplay404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse(errNotFound)}, nil
 	}
 	return api.RevokeDisplay204Response{}, nil
+}
+
+// GetDisplaySession is the calling display's scopes.
+func (s *Server) GetDisplaySession(ctx context.Context, _ api.GetDisplaySessionRequestObject) (api.GetDisplaySessionResponseObject, error) {
+	a := mustActor(ctx)
+	out := api.GetDisplaySession200JSONResponse{Scopes: make([]api.DisplayScope, 0, len(a.Scopes))}
+	for _, sc := range a.Scopes {
+		out.Scopes = append(out.Scopes, api.DisplayScope(sc))
+	}
+	return out, nil
 }

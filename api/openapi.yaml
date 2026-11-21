@@ -1109,6 +1109,30 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
+  /display/session:
+    get:
+      operationId: getDisplaySession
+      summary: What this wall display may show
+      description: Its scopes, so the board offers only the tabs it can load.
+      tags:
+        - displays
+      x-actors:
+        - display
+      x-display-scopes:
+        - today
+      responses:
+        '200':
+          description: This display's scopes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisplaySession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
   /displays:
     get:
       operationId: listDisplays
@@ -1133,7 +1157,7 @@ paths:
     post:
       operationId: createDisplay
       summary: Pair the wall display showing this code
-      description: Needs a sign-in within the last 10 minutes.
+      description: Needs a sign-in within the last 10 minutes. Every display gets `today`, whatever else it is given.
       tags:
         - displays
       x-actors:
@@ -3759,6 +3783,240 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Error'
+  /calendar/google/connect:
+    post:
+      operationId: connectGoogle
+      summary: Start connecting a Google account
+      description: |
+        Returns Google's consent page to open in this browser. Google sends the adult back to
+        `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
+        within ten minutes. 422 `not_configured` when this server has no Google client
+        (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+        (`too_many`), since connecting an account that is already connected must still work.
+      tags:
+        - calendar
+      x-actors:
+        - adult
+      x-command: true
+      x-record-response: false
+      x-body-limit: 1
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Open authorizeUrl
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleConnectStart'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /calendar/google/callback:
+    get:
+      operationId: googleCallback
+      summary: Where Google sends the adult back after consent
+      description: |
+        Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
+        `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
+        calendar permission was unticked), `expired` (no such connect for this adult, or used or
+        older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+        token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+        connected replaces its token and clears "reconnect needed".
+      tags:
+        - calendar
+      x-actors:
+        - adult
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+            maxLength: 128
+        - name: code
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+        - name: error
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        '303':
+          description: Back to the calendars screen
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /calendar/google/connections:
+    get:
+      operationId: listGoogleConnections
+      summary: The Google accounts this household has connected
+      description: Tokens are never returned. `enabled` is false when this server has no Google client.
+      tags:
+        - calendar
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: The accounts, by address
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleConnectionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+  /calendar/google/connections/{connectionId}:
+    parameters:
+      - $ref: '#/components/parameters/ConnectionId'
+    delete:
+      operationId: disconnectGoogle
+      summary: Disconnect a Google account, with every calendar followed through it
+      description: |
+        Deletes the account's token and stops following its calendars, with their events and who
+        they were for. After the change commits, the server asks Google to revoke the token (best
+        effort). Google revokes the whole grant, so the same Google account connected in another
+        household on this server has to be connected again there.
+      tags:
+        - calendar
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: expectedVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+      responses:
+        '204':
+          description: Disconnected
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        default:
+          $ref: '#/components/responses/Error'
+  /calendar/google/connections/{connectionId}/calendars:
+    parameters:
+      - $ref: '#/components/parameters/ConnectionId'
+    get:
+      operationId: listGoogleCalendars
+      summary: The calendars a connected Google account can read
+      description: |
+        Asks Google. 422 `reconnect_needed` when Google no longer accepts the account's token;
+        502 `google_unavailable` when Google could not be reached.
+      tags:
+        - calendar
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: The account's calendars
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleCalendarList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: followGoogleCalendar
+      summary: Follow one of a connected account's calendars
+      description: |
+        The first refresh runs within a minute. 409 `calendar_exists` when the household already
+        follows it; 422 `too_many_calendars` past 50, `reconnect_needed` when the account must be
+        connected again.
+      tags:
+        - calendar
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 4096
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGoogleCalendar'
+            example:
+              googleId: family@group.calendar.example.test
+              name: Family
+              color: sky
+              showOnDisplay: true
+      responses:
+        '201':
+          description: Following
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
   /learning/rules:
     get:
       operationId: listAwardRules
@@ -5256,6 +5514,15 @@ components:
           type: string
           enum:
             - waiting
+    DisplaySession:
+      type: object
+      required:
+        - scopes
+      properties:
+        scopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisplayScope'
     NewDisplay:
       type: object
       additionalProperties: false
@@ -5841,15 +6108,310 @@ components:
           format: date-time
         minutesRequested:
           type: integer
+    TvPower:
+      type: string
+      enum:
+        - 'on'
+        - 'off'
+        - unknown
+    Clock:
+      type: string
+      description: HH:MM, household time
+      pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+    Weekday:
+      type: string
+      enum:
+        - sun
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+        - sat
+    OpenHours:
+      type: object
+      description: One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day.
+      additionalProperties: false
+      required:
+        - start
+        - end
+      properties:
+        start:
+          $ref: '#/components/schemas/Clock'
+        end:
+          $ref: '#/components/schemas/Clock'
+        days:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Weekday'
+    Tv:
+      type: object
+      required:
+        - id
+        - name
+        - room
+        - macs
+        - haEntityId
+        - power
+        - powerChangedAt
+        - openHours
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        room:
+          type:
+            - string
+            - 'null'
+        macs:
+          type: array
+          items:
+            type: string
+        haEntityId:
+          type:
+            - string
+            - 'null'
+        power:
+          $ref: '#/components/schemas/TvPower'
+        powerChangedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        openHours:
+          oneOf:
+            - $ref: '#/components/schemas/OpenHours'
+            - type: 'null'
+        version:
+          $ref: '#/components/schemas/Version'
+    WindowStatus:
+      type: object
+      description: Open until closesAt, or closed until opensAt
+      required:
+        - open
+      properties:
+        open:
+          type: boolean
+        closesAt:
+          type: string
+          format: date-time
+        opensAt:
+          type: string
+          format: date-time
+    TvSession:
+      type: object
+      required:
+        - id
+        - tvId
+        - tvName
+        - watcher
+        - childId
+        - childName
+        - startedAt
+        - endedAt
+        - endReason
+        - endsAt
+        - secondsRemaining
+        - endsWithHours
+        - watchedSeconds
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        watcher:
+          type: string
+          enum:
+            - parents
+            - child
+        childId:
+          oneOf:
+            - $ref: '#/components/schemas/Id'
+            - type: 'null'
+        childName:
+          type:
+            - string
+            - 'null'
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        endReason:
+          type:
+            - string
+            - 'null'
+          enum:
+            - tv_off
+            - time_up
+            - parent_ended
+            - done
+            - open_hours
+            - parent_override
+            - null
+        endsAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: A running session's end at the latest (parents, the 4-hour safety cap)
+        secondsRemaining:
+          type:
+            - integer
+            - 'null'
+        endsWithHours:
+          type: boolean
+          description: The child's allowed hours end it before their time runs out
+        watchedSeconds:
+          type: integer
+    TvPrompt:
+      type: object
+      required:
+        - id
+        - version
+        - source
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        version:
+          $ref: '#/components/schemas/Version'
+        source:
+          type: string
+          enum:
+            - home_assistant
+            - router
+            - display
+            - adult
+        createdAt:
+          type: string
+          format: date-time
+    TvState:
+      description: A TV and where it stands now.
+      allOf:
+        - $ref: '#/components/schemas/Tv'
+        - type: object
+          required:
+            - open
+            - openClosesAt
+            - openUntil
+            - openReason
+            - openHoursNow
+            - session
+            - prompt
+          properties:
+            open:
+              type: boolean
+              description: Online without a session (open hours, or opened by a parent)
+            openClosesAt:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: When the open TV is gated again; null while gated
+            openUntil:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: A parent's "Open TVs" end, while one is active
+            openReason:
+              type:
+                - string
+                - 'null'
+              enum:
+                - open_hours
+                - parent
+                - null
+            openHoursNow:
+              oneOf:
+                - $ref: '#/components/schemas/WindowStatus'
+                - type: 'null'
+            session:
+              oneOf:
+                - $ref: '#/components/schemas/TvSession'
+                - type: 'null'
+            prompt:
+              oneOf:
+                - $ref: '#/components/schemas/TvPrompt'
+                - type: 'null'
+    TvChild:
+      type: object
+      description: A live child as "Turn on for…" and "Who's watching?" offer them.
+      required:
+        - childId
+        - name
+        - color
+        - tvSecondsRemaining
+        - watchingTvId
+        - hours
+        - canWatch
+        - canStartOwn
+      properties:
+        childId:
+          $ref: '#/components/schemas/Id'
+        name:
+          type: string
+        color:
+          type: string
+        tvSecondsRemaining:
+          type: integer
+        watchingTvId:
+          oneOf:
+            - $ref: '#/components/schemas/Id'
+            - type: 'null'
+        hours:
+          description: The child's allowed hours now; null with no rule
+          oneOf:
+            - $ref: '#/components/schemas/WindowStatus'
+            - type: 'null'
+        canWatch:
+          type: boolean
+          description: Has TV time, is inside their hours and isn't watching another TV
+        canStartOwn:
+          type: boolean
+          description: canWatch, not watching, and has a paired device to start it from
+    TvList:
+      type: object
+      required:
+        - serverTime
+        - tvs
+        - children
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        tvs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvState'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TvChild'
     Inbox:
       type: object
       required:
         - items
+        - tvs
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/InboxItem'
+        tvs:
+          $ref: '#/components/schemas/TvList'
+          description: The TVs asking "Who's watching?" now (only those), with each child's TV time, to answer with answerTvPrompt.
     Decision:
       type: object
       required:
@@ -5913,7 +6475,7 @@ components:
           type: string
           format: date-time
           description: Its effective end, if a parent ended it early
-    Clock:
+    Clock-2:
       type: string
       pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
       description: A time of day, HH:MM, 24-hour, household time
@@ -5925,9 +6487,9 @@ components:
         - end
       properties:
         start:
-          $ref: '#/components/schemas/Clock'
+          $ref: '#/components/schemas/Clock-2'
         end:
-          $ref: '#/components/schemas/Clock'
+          $ref: '#/components/schemas/Clock-2'
     AllowedHours:
       type: object
       additionalProperties: false
@@ -6047,7 +6609,7 @@ components:
           $ref: '#/components/schemas/TimeRequest'
         credits:
           type: array
-          description: Banked time with some left, oldest first (spent in this order)
+          description: Banked time with some left, oldest first (spent in this order); the oldest 200, while bankedSeconds is the whole bank
           items:
             $ref: '#/components/schemas/Credit'
         webFilter:
@@ -6147,20 +6709,6 @@ components:
           type: integer
         endsWithHours:
           type: boolean
-    WindowStatus:
-      type: object
-      description: Open until closesAt, or closed until opensAt
-      required:
-        - open
-      properties:
-        open:
-          type: boolean
-        closesAt:
-          type: string
-          format: date-time
-        opensAt:
-          type: string
-          format: date-time
     ChildTv:
       type: object
       required:
@@ -6788,6 +7336,9 @@ components:
           format: date-time
         error:
           $ref: '#/components/schemas/CalendarErrorCode'
+        googleConnectionId:
+          $ref: '#/components/schemas/Id'
+          description: For a Google calendar, the account it is followed through
         version:
           type: integer
     CalendarList:
@@ -6843,6 +7394,93 @@ components:
           type: integer
           minimum: 1
           maximum: 2147483647
+    GoogleConnectStart:
+      type: object
+      required:
+        - authorizeUrl
+      properties:
+        authorizeUrl:
+          type: string
+          description: Google's consent page; open it in this browser tab.
+    GoogleConnection:
+      type: object
+      required:
+        - id
+        - email
+        - needsReconnect
+        - calendars
+        - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        email:
+          type: string
+        needsReconnect:
+          type: boolean
+          description: Google no longer accepts the token; connect the account again.
+        calendars:
+          type: integer
+          description: How many of its calendars the household follows
+        version:
+          type: integer
+    GoogleConnectionList:
+      type: object
+      required:
+        - enabled
+        - connections
+      properties:
+        enabled:
+          type: boolean
+        connections:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/GoogleConnection'
+    GoogleCalendar:
+      type: object
+      required:
+        - googleId
+        - name
+        - primary
+      properties:
+        googleId:
+          type: string
+        name:
+          type: string
+        primary:
+          type: boolean
+        calendarId:
+          $ref: '#/components/schemas/Id'
+          description: Set when the household follows it
+    GoogleCalendarList:
+      type: object
+      required:
+        - calendars
+      properties:
+        calendars:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/GoogleCalendar'
+    NewGoogleCalendar:
+      type: object
+      additionalProperties: false
+      required:
+        - googleId
+        - name
+        - color
+        - showOnDisplay
+      properties:
+        googleId:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        name:
+          $ref: '#/components/schemas/CalendarName'
+        color:
+          $ref: '#/components/schemas/ProfileColor'
+        showOnDisplay:
+          type: boolean
     AwardRule:
       type: object
       required:
@@ -6997,283 +7635,6 @@ components:
           type: integer
           format: int64
           description: The child's balance now
-    TvPower:
-      type: string
-      enum:
-        - 'on'
-        - 'off'
-        - unknown
-    Clock-2:
-      type: string
-      description: HH:MM, household time
-      pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
-    Weekday:
-      type: string
-      enum:
-        - sun
-        - mon
-        - tue
-        - wed
-        - thu
-        - fri
-        - sat
-    OpenHours:
-      type: object
-      description: One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day.
-      additionalProperties: false
-      required:
-        - start
-        - end
-      properties:
-        start:
-          $ref: '#/components/schemas/Clock-2'
-        end:
-          $ref: '#/components/schemas/Clock-2'
-        days:
-          type: array
-          minItems: 1
-          maxItems: 7
-          uniqueItems: true
-          items:
-            $ref: '#/components/schemas/Weekday'
-    Tv:
-      type: object
-      required:
-        - id
-        - name
-        - room
-        - macs
-        - haEntityId
-        - power
-        - powerChangedAt
-        - openHours
-        - version
-      properties:
-        id:
-          $ref: '#/components/schemas/Id'
-        name:
-          type: string
-        room:
-          type:
-            - string
-            - 'null'
-        macs:
-          type: array
-          items:
-            type: string
-        haEntityId:
-          type:
-            - string
-            - 'null'
-        power:
-          $ref: '#/components/schemas/TvPower'
-        powerChangedAt:
-          type:
-            - string
-            - 'null'
-          format: date-time
-        openHours:
-          oneOf:
-            - $ref: '#/components/schemas/OpenHours'
-            - type: 'null'
-        version:
-          $ref: '#/components/schemas/Version'
-    TvSession:
-      type: object
-      required:
-        - id
-        - tvId
-        - tvName
-        - watcher
-        - childId
-        - childName
-        - startedAt
-        - endedAt
-        - endReason
-        - endsAt
-        - secondsRemaining
-        - endsWithHours
-        - watchedSeconds
-      properties:
-        id:
-          $ref: '#/components/schemas/Id'
-        tvId:
-          $ref: '#/components/schemas/Id'
-        tvName:
-          type: string
-        watcher:
-          type: string
-          enum:
-            - parents
-            - child
-        childId:
-          oneOf:
-            - $ref: '#/components/schemas/Id'
-            - type: 'null'
-        childName:
-          type:
-            - string
-            - 'null'
-        startedAt:
-          type: string
-          format: date-time
-        endedAt:
-          type:
-            - string
-            - 'null'
-          format: date-time
-        endReason:
-          type:
-            - string
-            - 'null'
-          enum:
-            - tv_off
-            - time_up
-            - parent_ended
-            - done
-            - open_hours
-            - parent_override
-            - null
-        endsAt:
-          type:
-            - string
-            - 'null'
-          format: date-time
-          description: A running session's end at the latest (parents, the 4-hour safety cap)
-        secondsRemaining:
-          type:
-            - integer
-            - 'null'
-        endsWithHours:
-          type: boolean
-          description: The child's allowed hours end it before their time runs out
-        watchedSeconds:
-          type: integer
-    TvPrompt:
-      type: object
-      required:
-        - id
-        - version
-        - source
-        - createdAt
-      properties:
-        id:
-          $ref: '#/components/schemas/Id'
-        version:
-          $ref: '#/components/schemas/Version'
-        source:
-          type: string
-          enum:
-            - home_assistant
-            - router
-            - display
-            - adult
-        createdAt:
-          type: string
-          format: date-time
-    TvState:
-      description: A TV and where it stands now.
-      allOf:
-        - $ref: '#/components/schemas/Tv'
-        - type: object
-          required:
-            - open
-            - openClosesAt
-            - openUntil
-            - openReason
-            - openHoursNow
-            - session
-            - prompt
-          properties:
-            open:
-              type: boolean
-              description: Online without a session (open hours, or opened by a parent)
-            openClosesAt:
-              type:
-                - string
-                - 'null'
-              format: date-time
-              description: When the open TV is gated again; null while gated
-            openUntil:
-              type:
-                - string
-                - 'null'
-              format: date-time
-              description: A parent's "Open TVs" end, while one is active
-            openReason:
-              type:
-                - string
-                - 'null'
-              enum:
-                - open_hours
-                - parent
-                - null
-            openHoursNow:
-              oneOf:
-                - $ref: '#/components/schemas/WindowStatus'
-                - type: 'null'
-            session:
-              oneOf:
-                - $ref: '#/components/schemas/TvSession'
-                - type: 'null'
-            prompt:
-              oneOf:
-                - $ref: '#/components/schemas/TvPrompt'
-                - type: 'null'
-    TvChild:
-      type: object
-      description: A live child as "Turn on for…" and "Who's watching?" offer them.
-      required:
-        - childId
-        - name
-        - color
-        - tvSecondsRemaining
-        - watchingTvId
-        - hours
-        - canWatch
-        - canStartOwn
-      properties:
-        childId:
-          $ref: '#/components/schemas/Id'
-        name:
-          type: string
-        color:
-          type: string
-        tvSecondsRemaining:
-          type: integer
-        watchingTvId:
-          oneOf:
-            - $ref: '#/components/schemas/Id'
-            - type: 'null'
-        hours:
-          description: The child's allowed hours now; null with no rule
-          oneOf:
-            - $ref: '#/components/schemas/WindowStatus'
-            - type: 'null'
-        canWatch:
-          type: boolean
-          description: Has TV time, is inside their hours and isn't watching another TV
-        canStartOwn:
-          type: boolean
-          description: canWatch, not watching, and has a paired device to start it from
-    TvList:
-      type: object
-      required:
-        - serverTime
-        - tvs
-        - children
-      properties:
-        serverTime:
-          type: string
-          format: date-time
-        tvs:
-          type: array
-          items:
-            $ref: '#/components/schemas/TvState'
-        children:
-          type: array
-          items:
-            $ref: '#/components/schemas/TvChild'
     TvName:
       type: string
       minLength: 1
@@ -7863,6 +8224,12 @@ components:
         $ref: '#/components/schemas/Id'
     ChildId:
       name: childId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Id'
+    ConnectionId:
+      name: connectionId
       in: path
       required: true
       schema:
