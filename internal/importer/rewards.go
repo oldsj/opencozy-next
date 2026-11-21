@@ -5,20 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
-
-// titleMax is the new app's limit on a reward's title (the old app allowed 160 characters).
-const titleMax = 80
 
 // importRewards carries rewards and the redemptions decided on them. It runs after the ledger:
 // a redemption names its spend row.
 //
 //   - Rewards keep their IDs, cost, version and times. Screen-time rewards keep their minutes;
-//     the old "personal" target is the iPad. A title longer than the new limit is shortened, and
-//     the report counts them.
+//     the old "personal" target is the iPad. Titles up to 160 characters and costs up to 1,000,000
+//     (the old limits) are carried as they are; the API's tighter limits are for new input.
 //   - Redemptions of a reward keep their IDs, child, title, cost, minutes, version and times:
 //     a fulfilled one stays fulfilled, a cancelled one cancelled (the ledger already holds its
 //     refund). ledger_id is the old spend row, which the ledger import carried with its ID.
@@ -32,14 +28,6 @@ func importRewards(ctx context.Context, x *run) error {
 		return err
 	}
 	return importRedemptions(ctx, x)
-}
-
-// shorten cuts a title to the new limit, on a character boundary.
-func shorten(s string) (string, bool) {
-	if utf8.RuneCountInString(s) <= titleMax {
-		return s, false
-	}
-	return string([]rune(s)[:titleMax]), true
 }
 
 // screenTarget maps the old screen-time target to the new one.
@@ -89,12 +77,7 @@ func importRewardDefinitions(ctx context.Context, x *run) error {
 	if err := rows.Err(); err != nil {
 		return safe(err)
 	}
-	var shortened int64
 	for _, r := range rs {
-		title, cut := shorten(r.name)
-		if cut {
-			shortened++
-		}
 		kind := "item"
 		if r.minutes != nil {
 			kind = "screen_time"
@@ -105,15 +88,12 @@ func importRewardDefinitions(ctx context.Context, x *run) error {
 		}
 		if _, err := x.dst.Exec(ctx, `INSERT INTO reward (id, household_id, title, cost, kind, minutes, screen_time_target, version, created_at, archived_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-			r.id, r.household, title, r.cost, kind, r.minutes, target, r.version, r.created, r.archived); err != nil {
+			r.id, r.household, r.name, r.cost, kind, r.minutes, target, r.version, r.created, r.archived); err != nil {
 			return safe(err)
 		}
 	}
 	if err := reconcile(ctx, x, "reward", int64(len(rs)), "reward"); err != nil {
 		return err
-	}
-	if shortened > 0 {
-		x.r.note("reward", fmt.Sprintf("%d titles longer than %d characters shortened", shortened, titleMax))
 	}
 	return nil
 }
@@ -160,14 +140,9 @@ func importRedemptions(ctx context.Context, x *run) error {
 	if err := rows.Err(); err != nil {
 		return safe(err)
 	}
-	var shortened int64
 	for _, r := range rs {
 		if r.spend == nil {
-			return errors.New("import: a redemption of a reward has no spend in the ledger")
-		}
-		title, cut := shorten(r.name)
-		if cut {
-			shortened++
+			return fmt.Errorf("import: redemption %s of a reward has no spend in the ledger", r.id)
 		}
 		target, err := screenTarget(r.target)
 		if err != nil {
@@ -181,7 +156,7 @@ func importRedemptions(ctx context.Context, x *run) error {
 		if _, err := x.dst.Exec(ctx, `INSERT INTO redemption (id, household_id, child_id, reward_id, title, cost, minutes,
 				screen_time_target, state, ledger_id, version, fulfilled_at, cancelled_at, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-			r.id, r.household, r.child, r.reward, title, r.cost, r.minutes, target, state, r.spend, r.version,
+			r.id, r.household, r.child, r.reward, r.name, r.cost, r.minutes, target, state, r.spend, r.version,
 			r.fulfilled, cancelled, r.created); err != nil {
 			return safe(err)
 		}
@@ -208,9 +183,6 @@ func importRedemptions(ctx context.Context, x *run) error {
 	}
 	if grants > 0 {
 		x.r.note("reward_redemption", fmt.Sprintf("%d parent grants and \"yes\" answers are not redemptions here: their time is in the banked screen time", grants))
-	}
-	if shortened > 0 {
-		x.r.note("reward_redemption", fmt.Sprintf("%d titles longer than %d characters shortened", shortened, titleMax))
 	}
 
 	// The other direction of the ledger check: each redemption names its own spend, for its child.
