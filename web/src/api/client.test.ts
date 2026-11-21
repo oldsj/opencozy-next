@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { useAttempts } from './client';
 
@@ -24,5 +24,43 @@ describe('useAttempts', () => {
     expect(key(a.params('x'))).toBe(first);
     a.settleIfAnswered('x')(undefined, { error: { code: 'not_enough_points', message: 'No.' } });
     expect(key(a.params('x'))).not.toBe(first);
+  });
+});
+
+describe('useAttempts with a store', () => {
+  const key = (p: { header: { 'Idempotency-Key': string } }) => p.header['Idempotency-Key'];
+
+  it('keeps a pending key across a reload, until it is settled', () => {
+    sessionStorage.clear();
+    const before = renderHook(() => useAttempts('redeem')).result.current;
+    const first = key(before.params('child:reward'));
+    const after = renderHook(() => useAttempts('redeem')).result.current; // the page reloaded
+    expect(key(after.params('child:reward'))).toBe(first);
+    expect(key(renderHook(() => useAttempts('other')).result.current.params('child:reward'))).not.toBe(first);
+    after.settle('child:reward');
+    expect(key(renderHook(() => useAttempts('redeem')).result.current.params('child:reward'))).not.toBe(first);
+  });
+
+  it('forgets a key older than an hour', () => {
+    sessionStorage.clear();
+    sessionStorage.setItem('opencozy:attempt:redeem:x', JSON.stringify({ key: 'old', at: Date.now() - 2 * 60 * 60_000 }));
+    expect(key(renderHook(() => useAttempts('redeem')).result.current.params('x'))).not.toBe('old');
+  });
+
+  it('works in memory when storage throws', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    try {
+      const a = renderHook(() => useAttempts('redeem')).result.current;
+      const first = key(a.params('y'));
+      expect(key(a.params('y'))).toBe(first);
+    } finally {
+      spy.mockRestore();
+      set.mockRestore();
+    }
   });
 });

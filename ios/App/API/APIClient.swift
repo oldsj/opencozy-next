@@ -205,8 +205,8 @@ struct APITransport: Sendable {
         try Self.decode(type, from: try await send("GET", path).0)
     }
 
-    func post<B: Encodable, T: Decodable>(_ path: String, body: B, as type: T.Type) async throws -> T {
-        try Self.decode(type, from: try await send("POST", path, body: body).0)
+    func post<B: Encodable, T: Decodable>(_ path: String, body: B, headers: [String: String] = [:], as type: T.Type) async throws -> T {
+        try Self.decode(type, from: try await send("POST", path, body: body, headers: headers).0)
     }
 
     func put<B: Encodable, T: Decodable>(_ path: String, body: B, as type: T.Type) async throws -> T {
@@ -218,13 +218,15 @@ struct APITransport: Sendable {
     }
 
     /// Returns the body and the local time the response arrived.
-    func send(_ method: String, _ path: String, query: [URLQueryItem] = [], body: (any Encodable)? = nil) async throws -> (Data, Date) {
+    func send(_ method: String, _ path: String, query: [URLQueryItem] = [], body: (any Encodable)? = nil,
+              headers: [String: String] = [:]) async throws -> (Data, Date) {
         var url = baseURL.appending(path: "api/\(path)")
         if !query.isEmpty { url.append(queryItems: query) }
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue(Self.clientHeader, forHTTPHeaderField: "X-OpenCozy-Client")
+        for (name, value) in headers { req.setValue(value, forHTTPHeaderField: name) }
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(body)

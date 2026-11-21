@@ -18,6 +18,8 @@ import { ChoresPage } from './routes/chores';
 import { InboxPage } from './routes/inbox';
 import { PointsPage } from './routes/points';
 import { RewardsPage } from './routes/rewards';
+import { RedemptionsPage } from './routes/redemptions';
+import { HouseholdPage } from './routes/household';
 import { DevicesPage } from './routes/devices';
 import { DisplaysPage } from './routes/displays';
 import { DeviceExpiredPage, KidPage } from './routes/kid';
@@ -57,6 +59,7 @@ const nav = [
   { to: '/learning', label: 'Learning' },
   { to: '/connections', label: 'Connections' },
   { to: '/devices', label: 'Devices' },
+  { to: '/household', label: 'Household' },
 ] as const;
 
 // The manage pages' column, with the main navigation once signed in.
@@ -66,9 +69,9 @@ function PageLayout() {
     <>
       {me && (
         <header className="mx-auto max-w-2xl px-4 pt-6">
-          <nav aria-label="Main" className="flex flex-wrap gap-x-5 gap-y-2">
+          <nav aria-label="Main" className="flex flex-wrap gap-x-5">
             {nav.map((n) => (
-              <Link key={n.to} to={n.to} activeOptions={{ exact: n.to === '/' }} activeProps={{ className: 'font-semibold' }}>
+              <Link key={n.to} to={n.to} className="inline-flex min-h-11 items-center" activeOptions={{ exact: n.to === '/' }} activeProps={{ className: 'font-semibold' }}>
                 {n.label}
               </Link>
             ))}
@@ -224,6 +227,30 @@ const rewardsRoute = createRoute({
   component: RewardsPage,
 });
 
+// Manage: rewards chosen and approved, to give or cancel; and the household's settings.
+const redemptionsRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/redemptions',
+  staticData: { title: 'Chosen rewards' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: RedemptionsPage,
+});
+const householdRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/household',
+  staticData: { title: 'Household' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: HouseholdPage,
+});
+
 // Manage: the week's events, one event and who it's for, and the followed calendars.
 const calendarRoute = createRoute({
   getParentRoute: () => pageRoute,
@@ -326,7 +353,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, householdRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

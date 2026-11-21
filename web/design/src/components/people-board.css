@@ -16,6 +16,6 @@
 
 @media (max-width: 760px) {
   .oc-people-board { display: flex; flex-direction: column; overflow: visible; }
-  .oc-people-board > .oc-person-card { width: 100%; max-height: none; }
+  .oc-people-board > .oc-person-card { width: 100%; max-height: none; flex: none; }
   .oc-people-board .oc-person-card__body { overflow: visible; }
 }

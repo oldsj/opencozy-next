@@ -1,6 +1,6 @@
 .oc-app-frame {
   display: flex;
-  min-width: 20rem;
+  min-width: min(20rem, 100%);
   min-height: 100vh;
   min-height: 100dvh;
   flex-direction: column;
@@ -46,3 +46,10 @@
 :root[data-surface='kiosk'] .oc-app-frame { height: 100vh; height: 100dvh; overflow: hidden; }
 :root[data-surface='kiosk'] .oc-app-frame__content { display: flex; min-height: 0; flex-direction: column; gap: var(--space-lg); }
 :root[data-surface='kiosk'] .oc-app-frame__content > .oc-people-board { flex: 1 1 auto; }
+
+/* A narrow display (a small tablet upright, a phone): the board is one column of whole cards, so
+   the page scrolls instead; the tab bar stays in reach at the bottom (it is sticky). */
+@media (max-width: 760px) {
+  :root[data-surface='kiosk'] .oc-app-frame { height: auto; overflow: visible; }
+  :root[data-surface='kiosk'] .oc-app-frame__content > .oc-people-board { flex: none; }
+}
