@@ -162,7 +162,7 @@ func (s *Server) RedeemReward(ctx context.Context, req api.RedeemRewardRequestOb
 	}
 	switch {
 	case toTV:
-		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, &red.ID, r.Minutes.Int32*60, *fulfilled); err != nil {
+		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, &red.ID, nil, r.Minutes.Int32*60, *fulfilled); err != nil {
 			return nil, err
 		}
 	case screen:

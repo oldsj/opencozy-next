@@ -43,14 +43,24 @@ func importTV(ctx context.Context, x *run) error {
 	if err := rows.Err(); err != nil {
 		return safe(err)
 	}
+	// Power and the router's attempt run are forgotten, not copied: what reported them (the old
+	// app's Home Assistant connection or push) isn't carried, and a frozen "off" would keep a TV
+	// from ever asking again. Each TV is unknown until Home Assistant reports it here.
+	forgotten := 0
 	for _, t := range tvs {
+		if t.power != "unknown" || t.since != nil || t.last != nil {
+			forgotten++
+		}
 		if _, err := x.dst.Exec(ctx, `INSERT INTO tv (household_id, id, name, room, ha_entity_id, power, power_changed_at, attempts_since,
 			last_attempt_at, open_start, open_end, open_days, open_until, created_at, archived_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-			t.household, t.id, strings.TrimSpace(t.name), t.room, t.entity, t.power, t.changed, t.since, t.last, t.start, t.end, t.days, t.until,
+			VALUES ($1, $2, $3, $4, $5, 'unknown', NULL, NULL, NULL, $6, $7, $8, $9, $10, $11)`,
+			t.household, t.id, strings.TrimSpace(t.name), t.room, t.entity, t.start, t.end, t.days, t.until,
 			t.created, t.archived); err != nil {
 			return safe(err)
 		}
+	}
+	if forgotten > 0 {
+		x.r.note("gated_tv", fmt.Sprintf("%d TVs' power and router attempts forgotten: unknown until Home Assistant reports here", forgotten))
 	}
 	if err := reconcile(ctx, x, "gated_tv", int64(len(tvs)), "tv"); err != nil {
 		return err

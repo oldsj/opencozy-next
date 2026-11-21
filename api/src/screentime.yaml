@@ -15,7 +15,8 @@ screenTime:
       the answer). A device stays unlocked at most `allowanceSeconds` (≤ 300) past `serverTime`
       without asking again, so it locks when it loses the server.
     tags: [screentime]
-    x-actors: [adult, phone, device, device-web]
+    x-actors: [adult, phone, device, device-web, service]
+    x-scopes: ['screentime:read']
     x-child-param: childId
     parameters:
       - $ref: '#/parameters/ChildId'
@@ -419,6 +420,107 @@ forfeit:
       default:
         $ref: common.yaml#/responses/Error
 
+webFilter:
+  get:
+    operationId: getWebFilter
+    summary: The household's blocked websites
+    tags: [screentime]
+    x-actors: [adult, phone]
+    responses:
+      '200':
+        description: Both lists
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/WebFilter'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+  put:
+    operationId: setWebFilter
+    summary: Replace the household's blocked websites
+    description: >
+      Names are tidied (spaces, capitals, a trailing dot and repeats go) and sorted. 422
+      `invalid_domain` for anything that isn't a website name like example.com,
+      `too_many_domains` past 500 on a list, `on_both_lists` for a name on both. iPads apply them
+      at their next sync; the router at its next ask.
+    tags: [screentime]
+    x-actors: [adult, phone]
+    x-command: true
+    x-body-limit: 65536
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/schemas/WebFilterEdit'
+          example: { gamePortals: [games.example.test], games: [blocks.example.test] }
+    responses:
+      '200':
+        description: Saved
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/WebFilter'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '413':
+        $ref: common.yaml#/responses/TooLarge
+      '422':
+        $ref: common.yaml#/responses/UnprocessableEntity
+      default:
+        $ref: common.yaml#/responses/Error
+gamesAllowances:
+  get:
+    operationId: getGamesAllowances
+    summary: The router's games gate
+    description: >
+      Which of the credential's children have iPad time running now, and for how many more
+      seconds: at most 300, so a router that loses the server blocks games again within five
+      minutes. Children with none are left out. Nothing is spent here.
+    tags: [screentime]
+    x-actors: [service]
+    x-scopes: ['games:gate']
+    responses:
+      '200':
+        description: The allowances
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serverTime, allowances]
+              properties:
+                serverTime:
+                  type: string
+                  format: date-time
+                allowances:
+                  type: array
+                  items:
+                    type: object
+                    required: [childId, secondsRemaining]
+                    properties:
+                      childId:
+                        $ref: common.yaml#/schemas/Id
+                      secondsRemaining:
+                        type: integer
+                        minimum: 1
+                        maximum: 300
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
+
 parameters:
   ChildId:
     name: childId
@@ -510,7 +612,7 @@ schemas:
     enum: ['30min', '1h', all_day, 'no']
   ScreenTime:
     type: object
-    required: [serverTime, childId, bankedSeconds, allowanceSeconds, windows, credits]
+    required: [serverTime, childId, bankedSeconds, allowanceSeconds, windows, credits, webFilter]
     properties:
       serverTime:
         type: string
@@ -545,6 +647,8 @@ schemas:
         description: Banked time with some left, oldest first (spent in this order)
         items:
           $ref: '#/schemas/Credit'
+      webFilter:
+        $ref: '#/schemas/WebFilter'
   Credit:
     type: object
     description: Banked time with some left
@@ -596,6 +700,9 @@ schemas:
         $ref: '#/schemas/Spend'
       screenTime:
         $ref: '#/schemas/ScreenTime'
+      tv:
+        $ref: tvs.yaml#/schemas/ChildTv
+        description: "For TV time given (target tv), the child's TV time now"
   EndResult:
     type: object
     required: [scope, windows, cutSeconds, refundedSeconds, forfeitedSeconds, screenTime]
@@ -621,3 +728,33 @@ schemas:
         description: With `queued`, when the running window still ends
       screenTime:
         $ref: '#/schemas/ScreenTime'
+  Domains:
+    type: array
+    maxItems: 500
+    items:
+      type: string
+      maxLength: 300
+  WebFilterEdit:
+    type: object
+    additionalProperties: false
+    required: [gamePortals, games]
+    properties:
+      gamePortals:
+        $ref: '#/schemas/Domains'
+      games:
+        $ref: '#/schemas/Domains'
+  WebFilter:
+    type: object
+    description: >
+      Blocked websites: game portals always; games while the child has no iPad time running.
+      Lowercase names; each covers its subdomains.
+    required: [gamePortals, games]
+    properties:
+      gamePortals:
+        type: array
+        items:
+          type: string
+      games:
+        type: array
+        items:
+          type: string

@@ -4,7 +4,7 @@
 SET search_path TO opencozy;
 
 INSERT INTO household (id, name, time_zone, created_at, archived_at, lock_message, game_portal_domains, game_domains)
-VALUES ('0190a000-0000-7000-8000-00000000000a', 'Example Household', 'Europe/Amsterdam', '2026-01-02T08:00:00Z', NULL, NULL, '{}', '{}');
+VALUES ('0190a000-0000-7000-8000-00000000000a', 'Example Household', 'Europe/Amsterdam', '2026-01-02T08:00:00Z', NULL, NULL, '{games.example.test}', '{blocks.example.test,puzzles.example.test}');
 
 -- The owner signs in with a password; the second adult only with OIDC; the third account never
 -- joined a household.

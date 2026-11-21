@@ -77,9 +77,27 @@ WHERE household_id = $1 AND seconds > used_seconds
 ORDER BY child_id, created_at, id;
 
 -- name: AddTvCredit :one
-INSERT INTO tv_credit (household_id, child_id, redemption_id, granted_seconds, seconds, created_at)
-VALUES ($1, $2, $3, sqlc.arg(seconds)::integer, sqlc.arg(seconds)::integer, sqlc.arg(now)::timestamptz)
+INSERT INTO tv_credit (household_id, child_id, redemption_id, granted_by, granted_seconds, seconds, created_at)
+VALUES ($1, $2, $3, $4, sqlc.arg(seconds)::integer, sqlc.arg(seconds)::integer, sqlc.arg(now)::timestamptz)
 RETURNING *;
+
+-- name: OpenTvCredits :many
+-- A child's TV credits with time left, oldest first (spent in this order), with who gave each.
+SELECT k.id, k.redemption_id, r.title AS reward_title, k.granted_by, a.name AS granted_by_name,
+       k.granted_seconds, k.seconds, k.used_seconds, k.created_at
+FROM tv_credit k
+LEFT JOIN redemption r ON r.household_id = k.household_id AND r.id = k.redemption_id
+LEFT JOIN adult a ON a.household_id = k.household_id AND a.id = k.granted_by
+WHERE k.household_id = $1 AND k.child_id = $2 AND k.used_seconds < k.seconds
+ORDER BY k.created_at, k.id;
+
+-- name: GetTvCredit :one
+SELECT * FROM tv_credit WHERE household_id = $1 AND child_id = $2 AND id = $3;
+
+-- name: ForfeitTvCredit :exec
+UPDATE tv_credit
+SET seconds = used_seconds, forfeited_at = @now, forfeited_by = $3, forfeited_seconds = seconds - used_seconds
+WHERE household_id = $1 AND id = $2 AND used_seconds < seconds AND redemption_id IS NULL;
 
 -- name: GetTvCreditByRedemption :one
 SELECT * FROM tv_credit WHERE household_id = $1 AND redemption_id = $2;

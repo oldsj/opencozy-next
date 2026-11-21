@@ -503,7 +503,7 @@ childTv:
   get:
     operationId: childTv
     summary: A child's TV time, as the kid view shows it
-    description: Their time left, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
+    description: Their time left and where it came from, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
     tags: [tvs]
     x-actors: [device, device-web, adult, phone]
     x-child-param: childId
@@ -522,6 +522,62 @@ childTv:
         $ref: common.yaml#/responses/Forbidden
       '404':
         $ref: common.yaml#/responses/NotFound
+      default:
+        $ref: common.yaml#/responses/Error
+tvCreditForfeit:
+  post:
+    operationId: forfeitTvCredit
+    summary: Take back the unused rest of a parent's TV grant
+    description: >
+      The credit keeps what was already watched; the rest leaves the child's TV time, and a
+      session left with none ends. A reward's TV time is taken back by cancelling the reward,
+      which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+    tags: [tvs]
+    x-actors: [adult, phone]
+    x-child-param: childId
+    x-command: true
+    x-body-limit: 64
+    parameters:
+      - $ref: common.yaml#/parameters/IdempotencyKey
+      - $ref: '#/parameters/ChildId'
+      - name: creditId
+        in: path
+        required: true
+        schema:
+          $ref: common.yaml#/schemas/Id
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+          example: {}
+    responses:
+      '200':
+        description: Taken back
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [forfeitedSeconds, tv]
+              properties:
+                forfeitedSeconds:
+                  type: integer
+                tv:
+                  $ref: '#/schemas/ChildTv'
+      '400':
+        $ref: common.yaml#/responses/BadRequest
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      '404':
+        $ref: common.yaml#/responses/NotFound
+      '409':
+        $ref: common.yaml#/responses/Conflict
+      '413':
+        $ref: common.yaml#/responses/TooLarge
       default:
         $ref: common.yaml#/responses/Error
 watch:
@@ -1201,13 +1257,18 @@ schemas:
         type: boolean
   ChildTv:
     type: object
-    required: [serverTime, secondsRemaining, waiting, watching, hours]
+    required: [serverTime, secondsRemaining, credits, waiting, watching, hours]
     properties:
       serverTime:
         type: string
         format: date-time
       secondsRemaining:
         type: integer
+      credits:
+        type: array
+        description: TV time with some left, oldest first (watched in this order)
+        items:
+          $ref: '#/schemas/TvCredit'
       waiting:
         type: array
         description: TVs asking "Who's watching?" now with nobody on them, oldest first
@@ -1221,6 +1282,35 @@ schemas:
         oneOf:
           - $ref: '#/schemas/WindowStatus'
           - type: 'null'
+  TvCredit:
+    type: object
+    description: TV time with some left
+    required: [id, source, minutes, seconds, usedSeconds, createdAt]
+    properties:
+      id:
+        $ref: common.yaml#/schemas/Id
+      source:
+        type: string
+        enum: [redemption, grant]
+        description: A reward bought with points, or a parent's grant
+      redemptionId:
+        $ref: common.yaml#/schemas/Id
+      rewardTitle:
+        type: string
+      grantedBy:
+        type: string
+        description: The parent who gave it, by name
+      minutes:
+        type: integer
+        description: What it was given as
+      seconds:
+        type: integer
+        description: What it holds
+      usedSeconds:
+        type: integer
+      createdAt:
+        type: string
+        format: date-time
   WaitingTv:
     type: object
     required: [tvId, tvName, room]

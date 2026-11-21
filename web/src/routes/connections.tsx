@@ -23,6 +23,8 @@ const scopeLabels: Record<string, string> = {
   [LEARNING]: 'Give points for learning, by your award rules',
   'tv:gate': 'Let gated TVs online (your router)',
   'tv:report': 'Report TVs turning on and off (Home Assistant)',
+  'screentime:read': 'See the children’s iPad time',
+  'games:gate': 'Open game websites only while a child’s iPad time runs (a router)',
 };
 
 const kindLabels: Record<Kind, { label: string; detail: string }> = {

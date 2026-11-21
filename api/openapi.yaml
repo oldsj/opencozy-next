@@ -55,7 +55,7 @@ tags:
   - name: calendar
     description: Followed calendars, their events, and who they are for
   - name: screentime
-    description: iPad screen time, allowed hours and time requests
+    description: iPad screen time, allowed hours, time requests and blocked websites
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
   - name: tvs
@@ -2134,6 +2134,9 @@ paths:
         - phone
         - device
         - device-web
+        - service
+      x-scopes:
+        - screentime:read
       x-child-param: childId
       parameters:
         - $ref: '#/components/parameters/ChildId'
@@ -2568,6 +2571,118 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '413':
           $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
+  /household/web-filter:
+    get:
+      operationId: getWebFilter
+      summary: The household's blocked websites
+      tags:
+        - screentime
+      x-actors:
+        - adult
+        - phone
+      responses:
+        '200':
+          description: Both lists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebFilter'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: setWebFilter
+      summary: Replace the household's blocked websites
+      description: |
+        Names are tidied (spaces, capitals, a trailing dot and repeats go) and sorted. 422 `invalid_domain` for anything that isn't a website name like example.com, `too_many_domains` past 500 on a list, `on_both_lists` for a name on both. iPads apply them at their next sync; the router at its next ask.
+      tags:
+        - screentime
+      x-actors:
+        - adult
+        - phone
+      x-command: true
+      x-body-limit: 65536
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebFilterEdit'
+            example:
+              gamePortals:
+                - games.example.test
+              games:
+                - blocks.example.test
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebFilter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /games/allowances:
+    get:
+      operationId: getGamesAllowances
+      summary: The router's games gate
+      description: |
+        Which of the credential's children have iPad time running now, and for how many more seconds: at most 300, so a router that loses the server blocks games again within five minutes. Children with none are left out. Nothing is spent here.
+      tags:
+        - screentime
+      x-actors:
+        - service
+      x-scopes:
+        - games:gate
+      responses:
+        '200':
+          description: The allowances
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - serverTime
+                  - allowances
+                properties:
+                  serverTime:
+                    type: string
+                    format: date-time
+                  allowances:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - childId
+                        - secondsRemaining
+                      properties:
+                        childId:
+                          $ref: '#/components/schemas/Id'
+                        secondsRemaining:
+                          type: integer
+                          minimum: 1
+                          maximum: 300
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Error'
   /chores:
@@ -4397,7 +4512,7 @@ paths:
     get:
       operationId: childTv
       summary: A child's TV time, as the kid view shows it
-      description: Their time left, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
+      description: Their time left and where it came from, the TVs asking "Who's watching?" now, the session they are watching, and their allowed hours.
       tags:
         - tvs
       x-actors:
@@ -4421,6 +4536,65 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/tv/credits/{creditId}/forfeit:
+    post:
+      operationId: forfeitTvCredit
+      summary: Take back the unused rest of a parent's TV grant
+      description: |
+        The credit keeps what was already watched; the rest leaves the child's TV time, and a session left with none ends. A reward's TV time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+      tags:
+        - tvs
+      x-actors:
+        - adult
+        - phone
+      x-child-param: childId
+      x-command: true
+      x-body-limit: 64
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ChildId'
+        - name: creditId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Taken back
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - forfeitedSeconds
+                  - tv
+                properties:
+                  forfeitedSeconds:
+                    type: integer
+                  tv:
+                    $ref: '#/components/schemas/ChildTv'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
         default:
           $ref: '#/components/responses/Error'
   /children/{childId}/tv/watch:
@@ -5648,6 +5822,22 @@ components:
         createdAt:
           type: string
           format: date-time
+    WebFilter:
+      type: object
+      description: |
+        Blocked websites: game portals always; games while the child has no iPad time running. Lowercase names; each covers its subdomains.
+      required:
+        - gamePortals
+        - games
+      properties:
+        gamePortals:
+          type: array
+          items:
+            type: string
+        games:
+          type: array
+          items:
+            type: string
     ScreenTime:
       type: object
       required:
@@ -5657,6 +5847,7 @@ components:
         - allowanceSeconds
         - windows
         - credits
+        - webFilter
       properties:
         serverTime:
           type: string
@@ -5691,6 +5882,8 @@ components:
           description: Banked time with some left, oldest first (spent in this order)
           items:
             $ref: '#/components/schemas/Credit'
+        webFilter:
+          $ref: '#/components/schemas/WebFilter'
     Minutes:
       type: integer
       minimum: 1
@@ -5714,6 +5907,125 @@ components:
         clipped:
           type: boolean
           description: Allowed hours cut it short; the rest stays banked
+    TvCredit:
+      type: object
+      description: TV time with some left
+      required:
+        - id
+        - source
+        - minutes
+        - seconds
+        - usedSeconds
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        source:
+          type: string
+          enum:
+            - redemption
+            - grant
+          description: A reward bought with points, or a parent's grant
+        redemptionId:
+          $ref: '#/components/schemas/Id'
+        rewardTitle:
+          type: string
+        grantedBy:
+          type: string
+          description: The parent who gave it, by name
+        minutes:
+          type: integer
+          description: What it was given as
+        seconds:
+          type: integer
+          description: What it holds
+        usedSeconds:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    WaitingTv:
+      type: object
+      required:
+        - tvId
+        - tvName
+        - room
+      properties:
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        room:
+          type:
+            - string
+            - 'null'
+    Watching:
+      type: object
+      required:
+        - tvId
+        - tvName
+        - endsAt
+        - secondsRemaining
+        - endsWithHours
+      properties:
+        tvId:
+          $ref: '#/components/schemas/Id'
+        tvName:
+          type: string
+        endsAt:
+          type: string
+          format: date-time
+        secondsRemaining:
+          type: integer
+        endsWithHours:
+          type: boolean
+    WindowStatus:
+      type: object
+      description: Open until closesAt, or closed until opensAt
+      required:
+        - open
+      properties:
+        open:
+          type: boolean
+        closesAt:
+          type: string
+          format: date-time
+        opensAt:
+          type: string
+          format: date-time
+    ChildTv:
+      type: object
+      required:
+        - serverTime
+        - secondsRemaining
+        - credits
+        - waiting
+        - watching
+        - hours
+      properties:
+        serverTime:
+          type: string
+          format: date-time
+        secondsRemaining:
+          type: integer
+        credits:
+          type: array
+          description: TV time with some left, oldest first (watched in this order)
+          items:
+            $ref: '#/components/schemas/TvCredit'
+        waiting:
+          type: array
+          description: TVs asking "Who's watching?" now with nobody on them, oldest first
+          items:
+            $ref: '#/components/schemas/WaitingTv'
+        watching:
+          oneOf:
+            - $ref: '#/components/schemas/Watching'
+            - type: 'null'
+        hours:
+          oneOf:
+            - $ref: '#/components/schemas/WindowStatus'
+            - type: 'null'
     SpendResult:
       type: object
       required:
@@ -5723,6 +6035,9 @@ components:
           $ref: '#/components/schemas/Spend'
         screenTime:
           $ref: '#/components/schemas/ScreenTime'
+        tv:
+          $ref: '#/components/schemas/ChildTv'
+          description: For TV time given (target tv), the child's TV time now
     EndResult:
       type: object
       required:
@@ -5756,6 +6071,23 @@ components:
           description: With `queued`, when the running window still ends
         screenTime:
           $ref: '#/components/schemas/ScreenTime'
+    Domains:
+      type: array
+      maxItems: 500
+      items:
+        type: string
+        maxLength: 300
+    WebFilterEdit:
+      type: object
+      additionalProperties: false
+      required:
+        - gamePortals
+        - games
+      properties:
+        gamePortals:
+          $ref: '#/components/schemas/Domains'
+        games:
+          $ref: '#/components/schemas/Domains'
     Days:
       type: array
       description: Weekdays it is on, 0 (Sunday) to 6 (Saturday). Empty or missing means every day.
@@ -6578,20 +6910,6 @@ components:
             - type: 'null'
         version:
           $ref: '#/components/schemas/Version'
-    WindowStatus:
-      type: object
-      description: Open until closesAt, or closed until opensAt
-      required:
-        - open
-      properties:
-        open:
-          type: boolean
-        closesAt:
-          type: string
-          format: date-time
-        opensAt:
-          type: string
-          format: date-time
     TvSession:
       type: object
       required:
@@ -7154,68 +7472,6 @@ components:
         session:
           oneOf:
             - $ref: '#/components/schemas/TvSession'
-            - type: 'null'
-    WaitingTv:
-      type: object
-      required:
-        - tvId
-        - tvName
-        - room
-      properties:
-        tvId:
-          $ref: '#/components/schemas/Id'
-        tvName:
-          type: string
-        room:
-          type:
-            - string
-            - 'null'
-    Watching:
-      type: object
-      required:
-        - tvId
-        - tvName
-        - endsAt
-        - secondsRemaining
-        - endsWithHours
-      properties:
-        tvId:
-          $ref: '#/components/schemas/Id'
-        tvName:
-          type: string
-        endsAt:
-          type: string
-          format: date-time
-        secondsRemaining:
-          type: integer
-        endsWithHours:
-          type: boolean
-    ChildTv:
-      type: object
-      required:
-        - serverTime
-        - secondsRemaining
-        - waiting
-        - watching
-        - hours
-      properties:
-        serverTime:
-          type: string
-          format: date-time
-        secondsRemaining:
-          type: integer
-        waiting:
-          type: array
-          description: TVs asking "Who's watching?" now with nobody on them, oldest first
-          items:
-            $ref: '#/components/schemas/WaitingTv'
-        watching:
-          oneOf:
-            - $ref: '#/components/schemas/Watching'
-            - type: 'null'
-        hours:
-          oneOf:
-            - $ref: '#/components/schemas/WindowStatus'
             - type: 'null'
     WatchTv:
       type: object

@@ -121,9 +121,13 @@ func screenTime(ctx context.Context, q *dbq.Queries, h, child uuid.UUID, now tim
 	if err != nil {
 		return api.ScreenTime{}, err
 	}
+	filter, err := webFilter(ctx, q, h)
+	if err != nil {
+		return api.ScreenTime{}, err
+	}
 	out := api.ScreenTime{
 		ServerTime: now.UTC(), ChildId: child, BankedSeconds: int(banked), Windows: make([]api.Window, len(ws)),
-		AllowedHours: toAllowedHours(rule.Hours),
+		AllowedHours: toAllowedHours(rule.Hours), WebFilter: filter,
 	}
 	out.Credits = make([]api.Credit, len(credits))
 	for i, c := range credits {
@@ -252,14 +256,18 @@ func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeReq
 		return nil, err
 	}
 	if toTV {
-		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, nil, int32(b.Minutes)*60, now); err != nil { //nolint:gosec // 1-240 by the spec
+		if err := s.tv.AddCredit(ctx, cmd.Q, a.HouseholdID, req.ChildId, nil, &a.AdultID, int32(b.Minutes)*60, now); err != nil { //nolint:gosec // 1-240 by the spec
 			return nil, err
 		}
 		st, err := screenTime(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
 		if err != nil {
 			return nil, err
 		}
-		return api.GrantScreenTime200JSONResponse{ScreenTime: st}, nil
+		view, err := s.childTvNow(ctx, cmd.Q, a.HouseholdID, req.ChildId, now)
+		if err != nil {
+			return nil, err
+		}
+		return api.GrantScreenTime200JSONResponse{ScreenTime: st, Tv: &view}, nil
 	}
 	cr, err := screentime.AddCredit(ctx, cmd, screentime.Credit{
 		Child: req.ChildId, Source: screentime.SourceGrant, GrantedBy: &a.AdultID, Minutes: int32(b.Minutes), //nolint:gosec // 1-240 by the spec

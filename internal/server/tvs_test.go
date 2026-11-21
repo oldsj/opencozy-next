@@ -487,8 +487,15 @@ func TestTVRewards(t *testing.T) {
 	}
 
 	// A parent gives TV time; outside the child's allowed hours it can't start.
-	if r := e.send(e.h.actors["phone"], "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv"}); r.status != 200 {
+	r = e.send(e.h.actors["phone"], "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv"})
+	if r.status != 200 || r.body["tv"].(map[string]any)["secondsRemaining"] != 1200.0 {
 		t.Fatalf("grant: %d %s", r.status, r.raw)
+	}
+	// The grant is listed with who gave it.
+	credits := r.body["tv"].(map[string]any)["credits"].([]any)
+	grant := credits[len(credits)-1].(map[string]any)
+	if len(credits) != 1 || grant["source"] != "grant" || grant["grantedBy"] != "Sam" || grant["minutes"] != 20.0 {
+		t.Fatalf("credits: %s", r.raw)
 	}
 	if got := tvSeconds(); got != 1200 {
 		t.Fatalf("granted: %v", got)
@@ -503,6 +510,30 @@ func TestTVRewards(t *testing.T) {
 	}
 	if r := e.send(e.adult, "POST", "/api/tvs/"+e.h.tv.String()+"/session", map[string]any{"watcher": "child", "childId": e.h.child1.String()}); r.status != 409 || r.code() != "outside_hours" {
 		t.Fatalf("outside hours: %d %s", r.status, r.raw)
+	}
+	// A parent takes the grant back; a reward's TV time is taken back by cancelling the reward.
+	forfeit := func(id string) resp {
+		return e.send(e.adult, "POST", child1+"/tv/credits/"+id+"/forfeit", map[string]any{})
+	}
+	if r := forfeit(grant["id"].(string)); r.status != 200 || r.body["forfeitedSeconds"] != 1200.0 || r.body["tv"].(map[string]any)["secondsRemaining"] != 0.0 {
+		t.Fatalf("forfeit: %d %s", r.status, r.raw)
+	}
+	if r := forfeit(grant["id"].(string)); r.status != 409 || r.code() != "nothing_left" {
+		t.Fatalf("forfeit twice: %d %s", r.status, r.raw)
+	}
+	var rewardCredit string
+	if err := e.srv.pool.QueryRow(context.Background(), `SELECT id FROM tv_credit WHERE household_id = $1 AND redemption_id IS NOT NULL LIMIT 1`, e.h.id).Scan(&rewardCredit); err != nil {
+		t.Fatal(err)
+	}
+	if r := forfeit(rewardCredit); r.status != 409 || r.code() != "cancel_the_reward" {
+		t.Fatalf("forfeit a reward's: %d %s", r.status, r.raw)
+	}
+	if r := forfeit(e.h.credit.String()); r.status != 404 {
+		t.Fatalf("forfeit an iPad credit: %d %s", r.status, r.raw)
+	}
+	var by, seconds int
+	if err := e.srv.pool.QueryRow(context.Background(), `SELECT count(*) FILTER (WHERE forfeited_by = $2), coalesce(sum(forfeited_seconds), 0) FROM tv_credit WHERE household_id = $1`, e.h.id, e.h.adult).Scan(&by, &seconds); err != nil || by != 1 || seconds != 1200 {
+		t.Fatalf("recorded: %d %d %v", by, seconds, err)
 	}
 }
 

@@ -252,13 +252,15 @@ type DisplayPairing struct {
 }
 
 type Household struct {
-	ID          uuid.UUID
-	Name        string
-	TimeZone    string
-	ArchivedAt  *time.Time
-	CreatedAt   time.Time
-	LockMessage *string
-	Version     int32
+	ID                uuid.UUID
+	Name              string
+	TimeZone          string
+	ArchivedAt        *time.Time
+	CreatedAt         time.Time
+	LockMessage       *string
+	Version           int32
+	GamePortalDomains []string
+	GameDomains       []string
 }
 
 type JobLease struct {
@@ -518,14 +520,18 @@ type Tv struct {
 }
 
 type TvCredit struct {
-	ID             uuid.UUID
-	HouseholdID    uuid.UUID
-	ChildID        uuid.UUID
-	RedemptionID   *uuid.UUID
-	GrantedSeconds int32
-	Seconds        int32
-	UsedSeconds    int32
-	CreatedAt      time.Time
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	ChildID          uuid.UUID
+	RedemptionID     *uuid.UUID
+	GrantedSeconds   int32
+	Seconds          int32
+	UsedSeconds      int32
+	CreatedAt        time.Time
+	GrantedBy        *uuid.UUID
+	ForfeitedAt      *time.Time
+	ForfeitedBy      *uuid.UUID
+	ForfeitedSeconds pgtype.Int4
 }
 
 type TvMac struct {

@@ -97,7 +97,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                     "pending", // lock_message and the game domains wait on later slices
+		"household":                     "pending", // lock_message waits on the devices import
 		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
 		"household_owner":               "ok",
@@ -155,6 +155,12 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	q := dbq.New(target.Runtime)
 	keys := testKeys(t)
 
+	// Blocked websites come with their household.
+	var filter string
+	if err := target.Owner.QueryRow(ctx, `SELECT game_portal_domains::text || ' ' || game_domains::text FROM household`).Scan(&filter); err != nil ||
+		filter != "{games.example.test} {blocks.example.test,puzzles.example.test}" {
+		t.Errorf("web filter: %q %v", filter, err)
+	}
 	// Allowed hours come with their child; children without any stay without.
 	var hours string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || '=' || COALESCE(school_night_start || '-' || school_night_end || '/' || weekend_start || '-' || weekend_end, 'none'), ' ' ORDER BY name)
@@ -268,8 +274,13 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	var tvs string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || ' ' || power || ' ' || coalesce(open_start::text, '-') || '-' || coalesce(open_end::text, '-') || ' ' ||
 		coalesce(open_days::text, '-') || ' ' || (archived_at IS NOT NULL) || ' ' || (SELECT count(*) FROM tv_mac m WHERE m.tv_id = tv.id), ', ' ORDER BY name) FROM tv`).Scan(&tvs); err != nil ||
-		tvs != "Den TV off 1260-420 62 false 2, Old TV unknown --- - true 0" {
+		tvs != "Den TV unknown 1260-420 62 false 2, Old TV unknown --- - true 0" {
 		t.Errorf("tvs: %q %v", tvs, err)
+	}
+	// Power and the attempt run are forgotten: nothing reports them here yet.
+	var remembered int
+	if err := target.Owner.QueryRow(ctx, `SELECT count(*) FROM tv WHERE power_changed_at IS NOT NULL OR attempts_since IS NOT NULL OR last_attempt_at IS NOT NULL`).Scan(&remembered); err != nil || remembered != 0 {
+		t.Errorf("tv power remembered: %d %v", remembered, err)
 	}
 	var sessions string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(s.watcher || ' ' || s.end_reason || ' ' || coalesce(a.email, '-') || ' ' || coalesce(s.started_by_device::text, '-') || ' ' ||
