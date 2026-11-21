@@ -94,6 +94,16 @@ func (r *Report) check(name string, want, got int64) {
 	r.Checks = append(r.Checks, l)
 }
 
+// waitingCheck is a check that may fail only because a later importer hasn't carried its rows
+// yet: a difference makes it pending (so a real import refuses), not a mismatch.
+func (r *Report) waitingCheck(name string, want, got int64, why string) {
+	l := Line{Old: name, SourceRows: want, TargetRows: got, Status: OK}
+	if want != got {
+		l.Status, l.Notes = Pending, []string{why}
+	}
+	r.Checks = append(r.Checks, l)
+}
+
 // Failed reports whether any line or check mismatched.
 func (r *Report) Failed() bool {
 	return slices.ContainsFunc(append(slices.Clone(r.Lines), r.Checks...), func(l Line) bool { return l.Status == Mismatch })
@@ -101,7 +111,7 @@ func (r *Report) Failed() bool {
 
 // Pending reports whether anything waits on a later slice.
 func (r *Report) Pending() bool {
-	return slices.ContainsFunc(r.Lines, func(l Line) bool { return l.Status == Pending })
+	return slices.ContainsFunc(append(slices.Clone(r.Lines), r.Checks...), func(l Line) bool { return l.Status == Pending })
 }
 
 // Print writes the reconciliation.
@@ -117,10 +127,10 @@ func (r *Report) Print(w io.Writer) {
 		_, _ = fmt.Fprintf(tw, "%s\t%d\t%s\t%s\t%s\t%s\n", l.Old, l.SourceRows, l.New, newRows, l.Status, strings.Join(l.Notes, "; "))
 	}
 	if len(r.Checks) > 0 {
-		_, _ = fmt.Fprintln(tw, "\nCHECK\tWANT\t\tGOT\tSTATUS\t")
+		_, _ = fmt.Fprintln(tw, "\nCHECK\tWANT\t\tGOT\tSTATUS\tNOTES")
 	}
 	for _, c := range r.Checks {
-		_, _ = fmt.Fprintf(tw, "%s\t%d\t\t%d\t%s\t\n", c.Old, c.SourceRows, c.TargetRows, c.Status)
+		_, _ = fmt.Fprintf(tw, "%s\t%d\t\t%d\t%s\t%s\n", c.Old, c.SourceRows, c.TargetRows, c.Status, strings.Join(c.Notes, "; "))
 	}
 	_ = tw.Flush()
 	for _, m := range r.Remarks {

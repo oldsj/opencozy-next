@@ -44,7 +44,8 @@ tools/go.mod            Pinned Go tools (oapi-codegen, sqlc, golangci-lint, govu
 - **SQL only in `internal/db/queries/*.sql`**, through sqlc. Never build SQL from strings. Every
   query on household data takes the actor's household id (`WHERE household_id = $1 AND ...`).
 - **Points only through `internal/ledger`**, under the child's lock; `point_ledger` is
-  append-only. **Household days and hours only through `internal/day`.**
+  append-only. (One exception: `internal/importer` writes old rows with their IDs and times into
+  an empty database, with every ledger trigger on.) **Household days and hours only through `internal/day`.**
 - **Schema changes are new goose migrations** (`internal/db/migrations/NNNNN_name.sql`); never edit
   one that has been merged.
 - **The web app calls the API only through `web/src/api/client.ts`** (`$api` hooks, or `client`).

@@ -58,6 +58,8 @@ type newEntry struct {
 	reverses               *uuid.UUID
 	adult                  *uuid.UUID
 	fromChore, fromLearner bool
+	// The completion's approver is not an adult here (e.g. no longer in the household).
+	lostApprover bool
 }
 
 // importLedger carries the points ledger (design §5, §13): every old row keeps its ID, child,
@@ -171,6 +173,15 @@ func importLedger(ctx context.Context, x *run) error {
 	}
 	x.r.table("point_ledger", src, "point_ledger", int64(len(entries)), got)
 	x.r.check("point_ledger rows read = carried + spends on waiting rewards", src, int64(len(entries))+waiting)
+	var lost int64
+	for _, e := range entries {
+		if e.lostApprover {
+			lost++
+		}
+	}
+	if lost > 0 {
+		x.r.note("point_ledger", fmt.Sprintf("%d awards approved by someone who is not an adult here: approver left empty", lost))
+	}
 	if waiting > 0 {
 		x.r.note("point_ledger", fmt.Sprintf("%d spends on rewards still waiting for an answer not carried: %d points go back to the children", waiting, returned))
 	}
@@ -255,7 +266,13 @@ func (x *run) mapEntry(o oldEntry) (newEntry, error) {
 			e.kind = kindReversal
 		}
 		if o.approver != nil {
-			if a, ok := x.adults[*o.approver]; ok {
+			a, ok := x.adults[*o.approver]
+			switch {
+			case !ok:
+				e.lostApprover = true
+			case a.household != o.household:
+				return e, errors.New("import: a completion was approved by an adult of another household")
+			default:
 				e.adult = &a.id
 			}
 		}
@@ -386,8 +403,39 @@ func importExternalAwards(ctx context.Context, x *run, entries []newEntry) error
 	if err := reconcile(ctx, x, "external_award", n, "learning_award"); err != nil {
 		return err
 	}
+	x.carried[sourceLearning] = true
 	if unlinked > 0 {
 		x.r.note("external_award", fmt.Sprintf("%d for a child with no learner link: external ID left empty", unlinked))
+	}
+	return nil
+}
+
+// ledgerSources says, for each ledger source kind, where its rows live and which import carries
+// them. (point_ledger.source_id has no foreign key: §13's "every foreign key resolves" is
+// checked here.)
+var ledgerSources = []struct{ kind, table, importer string }{
+	{sourceOccurrence, "occurrence", "chores and routines"},
+	{sourceRedemption, "redemption", "rewards"},
+	{sourceLearning, "learning_award", "learning awards"},
+}
+
+// checkLedgerSources runs after every domain: each ledger row's source must exist, for the same
+// child. Until the import of a kind's rows has run, a missing source is pending, not a mismatch.
+func checkLedgerSources(ctx context.Context, x *run) error {
+	for _, s := range ledgerSources {
+		var rows, found int64
+		q := `SELECT count(*), count(t.id) FROM point_ledger l LEFT JOIN ` + pgx.Identifier{s.table}.Sanitize() + ` t
+			ON t.household_id = l.household_id AND t.id = l.source_id AND t.child_id = l.child_id
+			WHERE l.source_kind = $1`
+		if err := x.dst.QueryRow(ctx, q, s.kind).Scan(&rows, &found); err != nil {
+			return safe(err)
+		}
+		name := "ledger rows whose " + s.table + " exists"
+		if x.carried[s.kind] {
+			x.r.check(name, rows, found)
+		} else {
+			x.r.waitingCheck(name, rows, found, "waits on the import of "+s.importer)
+		}
 	}
 	return nil
 }
