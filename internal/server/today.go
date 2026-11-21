@@ -17,15 +17,11 @@ import (
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
+	"github.com/oldsj/opencozy-next/internal/occurrence"
 )
 
-// occurrenceNS namespaces occurrence ids: UUIDv5 of the definition and the household day, so a
-// read's plan and a command's row agree.
-var occurrenceNS = uuid.MustParse("6f1c2a52-6b0e-4c1e-9d63-3d1f0f7b2a10")
-
-func occurrenceID(definition uuid.UUID, d day.Date) uuid.UUID {
-	return uuid.NewSHA1(occurrenceNS, append(definition[:], d.String()...))
-}
+// occurrenceID is the occurrence of a definition on a household day (internal/occurrence).
+func occurrenceID(definition uuid.UUID, d day.Date) uuid.UUID { return occurrence.ID(definition, d) }
 
 func pgDate(d day.Date) pgtype.Date {
 	return pgtype.Date{Time: time.Date(d.Year, d.Month, d.Day, 0, 0, 0, 0, time.UTC), Valid: true}

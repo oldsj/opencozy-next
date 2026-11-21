@@ -24,7 +24,6 @@ import (
 //
 //	screen_time_grant      -> screen_time_window (same id; credit by redemption_id)
 //	screen_time_grant_cut  -> screen_time_cut (window_id = grant_id; cut_by mapped to the adult)
-//	screen_time_event      -> screen_time_event (same id; device_id)
 //	time_request           -> time_request (credit by redemption_id) and, while pending, its
 //	                          time_request approval
 //
@@ -34,7 +33,6 @@ var screenTimeTables = []struct{ table, waits string }{
 	{"personal_credit", "redemptions"},
 	{"screen_time_grant", "redemptions"},
 	{"screen_time_grant_cut", "redemptions"},
-	{"screen_time_event", "devices"},
 	{"time_request", "devices and redemptions"},
 }
 

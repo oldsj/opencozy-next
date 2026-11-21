@@ -40,12 +40,21 @@ type env struct {
 
 func newEnv(t *testing.T, mutate func(*config.Config)) *env {
 	t.Helper()
+	return newEnvWith(t, mutate, nil)
+}
+
+// newEnvWith is newEnv with prepare run on the Server before its handler is built.
+func newEnvWith(t *testing.T, mutate func(*config.Config), prepare func(*Server)) *env {
+	t.Helper()
 	db := testdb.Open(t)
 	cfg := config.Config{SessionTTL: time.Hour, AuthRatePerMinute: 1000}
 	if mutate != nil {
 		mutate(&cfg)
 	}
 	srv := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), db.Runtime)
+	if prepare != nil {
+		prepare(srv)
+	}
 	h, err := srv.Handler()
 	if err != nil {
 		t.Fatal(err)
@@ -215,13 +224,14 @@ type house struct {
 	passkey                           uuid.UUID // the adult's only passkey
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
+	tv, prompt                        uuid.UUID // a TV with one MAC, asking "Who's watching?"
 	credit                            uuid.UUID // child1's iPad grant, all used (so no banked time)
 	actors                            map[string]cred
 }
 
 // actorNames are the actors every house has. Kinds are what Policy.Check compares.
 var actorNames = []string{
-	"adult", "adult-stale", "phone", "display-today", "display-meals", "display-calendar", "display-none",
+	"adult", "adult-stale", "phone", "display-today", "display-meals", "display-calendar", "display-tv", "display-none",
 	"service-all", "service-none", "service-child1", "assistant", "device", "device-web",
 	"revoked", "malformed", "expired", "none",
 }
@@ -232,7 +242,7 @@ func actorKind(name string) (actor.Kind, bool) {
 		return actor.Adult, true
 	case "phone":
 		return actor.Phone, true
-	case "display-today", "display-meals", "display-calendar", "display-none":
+	case "display-today", "display-meals", "display-calendar", "display-tv", "display-none":
 		return actor.Display, true
 	case "service-all", "service-none", "service-child1":
 		return actor.Service, true
@@ -282,6 +292,7 @@ func (e *env) house(label string, scopes []string) house {
 	h.actors["display-today"] = display([]string{"today"})
 	h.actors["display-meals"] = display([]string{"meals"})
 	h.actors["display-calendar"] = display([]string{"calendar"})
+	h.actors["display-tv"] = display([]string{"tv"})
 	h.actors["display-none"] = display([]string{})
 	h.calendar = e.id(`INSERT INTO calendar_source (household_id, provider, name, color, feed_url, feed_url_mac)
 		VALUES ($1, 'ics', 'School', 'butter', 'v1.k1.fixture.fixture', 'h1.k1.' || gen_random_uuid()::text) RETURNING id`, h.id)
@@ -313,6 +324,9 @@ func (e *env) house(label string, scopes []string) house {
 		VALUES ($1, $2, -3, 'redemption', 'redemption', $3) RETURNING id`, h.id, h.child1, h.redemption)
 	e.exec(`UPDATE redemption SET ledger_id = $2 WHERE id = $1`, h.redemption, spent)
 	h.passkey = e.id(`INSERT INTO passkey (household_id, adult_id, credential_id, public_key, backup_eligible, backed_up, name) VALUES ($1, $2, decode(md5(random()::text) || md5(random()::text), 'hex'), '\\x00', true, true, 'Laptop') RETURNING id`, h.id, h.adult)
+	h.tv = e.id(`INSERT INTO tv (household_id, name) VALUES ($1, 'Den TV') RETURNING id`, h.id)
+	e.exec(`INSERT INTO tv_mac (household_id, tv_id, mac) VALUES ($1, $2, '02:00:5e:10:00:01')`, h.id, h.tv)
+	h.prompt = e.id(`INSERT INTO tv_prompt (household_id, tv_id, source, created_at) VALUES ($1, $2, 'display', clock_timestamp()) RETURNING id`, h.id, h.tv)
 	h.credit = e.id(`INSERT INTO screen_time_credit (household_id, child_id, source, granted_by, minutes, seconds, used_seconds, created_at)
 		VALUES ($1, $2, 'grant', $3, 1, 60, 60, now() - interval '2 days') RETURNING id`, h.id, h.child1, h.adult)
 	h.step = e.id(`INSERT INTO routine_step (household_id, routine_id, title, position) VALUES ($1, $2, 'Brush teeth', 0) RETURNING id`, h.id, h.routine)

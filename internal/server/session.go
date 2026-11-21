@@ -13,13 +13,15 @@ import (
 )
 
 // startSession stores a new adult web session and returns its Set-Cookie value.
-func (s *Server) startSession(ctx context.Context, adultID uuid.UUID) (string, error) {
+// startSession signs adultID in. authenticatedAt is when they last proved who they are, if
+// earlier than now (a single sign-on's auth_time); nil is now.
+func (s *Server) startSession(ctx context.Context, adultID uuid.UUID, authenticatedAt *time.Time) (string, error) {
 	token, hash, err := auth.NewSessionToken()
 	if err != nil {
 		return "", err
 	}
 	expires := time.Now().Add(s.cfg.SessionTTL)
-	if err := s.q.CreateAdultSession(ctx, dbq.CreateAdultSessionParams{TokenHash: hash, AdultID: adultID, ExpiresAt: expires}); err != nil {
+	if err := s.q.CreateAdultSession(ctx, dbq.CreateAdultSessionParams{TokenHash: hash, AdultID: adultID, ExpiresAt: expires, AuthenticatedAt: authenticatedAt}); err != nil {
 		return "", err
 	}
 	return sessionCookie(token, int(s.cfg.SessionTTL.Seconds())), nil
@@ -54,6 +56,9 @@ func (s *Server) SweepSessions(ctx context.Context) {
 		}
 		if _, err := s.q.DeleteExpiredChallenges(ctx); err != nil && ctx.Err() == nil {
 			s.log.WarnContext(ctx, "passkey challenge sweep", "err", err)
+		}
+		if _, err := s.q.DeleteExpiredOIDCSignIns(ctx); err != nil && ctx.Err() == nil {
+			s.log.WarnContext(ctx, "single sign-on sweep", "err", err)
 		}
 		select {
 		case <-ctx.Done():
