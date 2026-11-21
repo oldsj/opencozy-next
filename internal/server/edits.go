@@ -223,6 +223,8 @@ func toRedemptionRow(r dbq.GetRedemptionRowRow) api.RedemptionRow {
 		RefundedPoints: int(r.RefundedPoints), Version: int(r.Version),
 		Child:       api.RedemptionChild{Id: r.ChildID, Name: r.ChildName, Color: api.ProfileColor(r.ChildColor)},
 		FulfilledAt: r.FulfilledAt, CancelledAt: r.CancelledAt,
+		// As CancelRedemption decides: given screen time needs its own credit to refund from.
+		Cancellable: r.State == "approved" || (r.State == "fulfilled" && r.Minutes.Valid && r.HasCredit),
 	}
 	if r.Minutes.Valid {
 		out.Minutes = ptr(int(r.Minutes.Int32))

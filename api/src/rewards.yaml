@@ -425,7 +425,7 @@ schemas:
   RedemptionRow:
     type: object
     description: A redemption as an adult sees it. approved is waiting to be given; fulfilled has been given.
-    required: [id, child, title, cost, status, requestedAt, refundedPoints, version]
+    required: [id, child, title, cost, status, requestedAt, refundedPoints, cancellable, version]
     properties:
       id:
         $ref: common.yaml#/schemas/Id
@@ -458,6 +458,12 @@ schemas:
       refundedPoints:
         type: integer
         description: Points given back (a rejection or a cancellation)
+      cancellable:
+        type: boolean
+        description: >-
+          Whether cancelRedemption can take it back: approved, or given screen time with its own
+          record of the time. Imported screen time has none (its time is in the child's balance),
+          so it isn't. Time already all used is refused too (usedMinutes).
       version:
         $ref: common.yaml#/schemas/Version
   Redemption:

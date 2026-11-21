@@ -231,7 +231,9 @@ SELECT r.id, r.household_id, r.child_id, r.reward_id, r.title, r.cost, r.minutes
        (COALESCE((SELECT k.used_seconds FROM screen_time_credit k
                   WHERE k.household_id = r.household_id AND k.redemption_id = r.id), 0)
         + COALESCE((SELECT t.used_seconds FROM tv_credit t
-                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds
+                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds,
+       (EXISTS (SELECT 1 FROM screen_time_credit k WHERE k.household_id = r.household_id AND k.redemption_id = r.id)
+        OR EXISTS (SELECT 1 FROM tv_credit t WHERE t.household_id = r.household_id AND t.redemption_id = r.id))::boolean AS has_credit
 FROM redemption r
 JOIN child c ON c.household_id = r.household_id AND c.id = r.child_id
 WHERE r.household_id = $1 AND r.id = $2
@@ -261,6 +263,7 @@ type GetRedemptionRowRow struct {
 	ChildColor       string
 	RefundedPoints   int64
 	UsedSeconds      int32
+	HasCredit        bool
 }
 
 func (q *Queries) GetRedemptionRow(ctx context.Context, arg GetRedemptionRowParams) (GetRedemptionRowRow, error) {
@@ -285,6 +288,7 @@ func (q *Queries) GetRedemptionRow(ctx context.Context, arg GetRedemptionRowPara
 		&i.ChildColor,
 		&i.RefundedPoints,
 		&i.UsedSeconds,
+		&i.HasCredit,
 	)
 	return i, err
 }
@@ -296,7 +300,9 @@ SELECT r.id, r.household_id, r.child_id, r.reward_id, r.title, r.cost, r.minutes
        (COALESCE((SELECT k.used_seconds FROM screen_time_credit k
                   WHERE k.household_id = r.household_id AND k.redemption_id = r.id), 0)
         + COALESCE((SELECT t.used_seconds FROM tv_credit t
-                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds
+                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds,
+       (EXISTS (SELECT 1 FROM screen_time_credit k WHERE k.household_id = r.household_id AND k.redemption_id = r.id)
+        OR EXISTS (SELECT 1 FROM tv_credit t WHERE t.household_id = r.household_id AND t.redemption_id = r.id))::boolean AS has_credit
 FROM redemption r
 JOIN child c ON c.household_id = r.household_id AND c.id = r.child_id
 WHERE r.household_id = $1
@@ -329,6 +335,7 @@ type ListRedemptionsRow struct {
 	ChildColor       string
 	RefundedPoints   int64
 	UsedSeconds      int32
+	HasCredit        bool
 }
 
 // What adults see: the newest first, with the points that came back.
@@ -360,6 +367,7 @@ func (q *Queries) ListRedemptions(ctx context.Context, arg ListRedemptionsParams
 			&i.ChildColor,
 			&i.RefundedPoints,
 			&i.UsedSeconds,
+			&i.HasCredit,
 		); err != nil {
 			return nil, err
 		}
