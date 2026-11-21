@@ -19,6 +19,8 @@ const scopeLabels: Record<string, string> = {
   'household:read': 'See the household’s name and settings',
   'children:read': 'See the children, their points and their day',
   [LEARNING]: 'Give points for learning, by your award rules',
+  'screentime:read': 'See the children’s iPad time',
+  'games:gate': 'Open game websites only while a child’s iPad time runs (a router)',
 };
 
 const kindLabels: Record<Kind, { label: string; detail: string }> = {
