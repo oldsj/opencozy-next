@@ -83,15 +83,8 @@ func Run(ctx context.Context, o Options) error {
 		return err
 	}
 
-	r := &Report{}
-	run := &run{src: src.tx, dst: tx, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret}
-	for _, d := range domains {
-		if err := d(ctx, run); err != nil {
-			return err
-		}
-	}
-	run.remarkOldSecret()
-	if err := coverage(ctx, src.tx, r); err != nil {
+	r, err := importAll(ctx, o, src.tx, tx)
+	if err != nil {
 		return err
 	}
 	r.Print(o.Out)
@@ -110,6 +103,22 @@ func Run(ctx context.Context, o Options) error {
 	}
 	_, _ = fmt.Fprintln(o.Out, "Imported and committed.")
 	return nil
+}
+
+// importAll runs every domain from src into dst and reconciles; it neither prints nor commits.
+func importAll(ctx context.Context, o Options, src, dst pgx.Tx) (*Report, error) {
+	r := &Report{}
+	run := &run{src: src, dst: dst, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret}
+	for _, d := range domains {
+		if err := d(ctx, run); err != nil {
+			return nil, err
+		}
+	}
+	run.remarkOldSecret()
+	if err := coverage(ctx, src, r); err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 // run is one import's state.
@@ -139,6 +148,7 @@ var domains = []func(context.Context, *run) error{
 	importAdults,
 	importCredentials,
 	importLearning,
+	importLedger,
 	importCalendars,
 	importRecipes,
 	importMeals,
