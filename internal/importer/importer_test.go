@@ -126,7 +126,8 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
 	}
-	if !strings.Contains(out, "tv:gate (1)") || !strings.Contains(out, "1 without a household") {
+	if !strings.Contains(out, "tv:gate (1)") || !strings.Contains(out, "1 without a household") ||
+		!strings.Contains(out, "1 with partly set allowed hours, carried as none") {
 		t.Errorf("missing notes:\n%s", out)
 	}
 }
