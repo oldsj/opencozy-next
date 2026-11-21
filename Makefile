@@ -129,6 +129,10 @@ security: ## govulncheck, pnpm audit, and osv-scanner (every lockfile, tools inc
 	$(PNPM) audit --audit-level=moderate
 	$(GOTOOL) osv-scanner scan source --recursive .
 
+.PHONY: import-rehearsal
+import-rehearsal: ## Rehearse the old app's import with fictional data (Docker); ALLOW_PENDING=1 leaves out unmapped tables
+	scripts/import-rehearsal.sh
+
 .PHONY: image
 image: ## Build the multi-arch image (no push)
 	@# Multi-platform builds need a docker-container builder; Docker Desktop's default can't.
