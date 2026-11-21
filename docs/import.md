@@ -74,7 +74,7 @@ The report has a table of old tables, then a table of checks, then Remarks.
 
 ```text
 OLD TABLE        ROWS  NEW TABLE     ROWS  STATUS       NOTES
-reward           6     reward        6     ok           1 titles longer than 80 characters shortened
+reward           6     reward        6     ok
 time_request     2                         not carried  1 answered (a yes is in the balance), 1 still waiting …
 
 CHECK                                   WANT    GOT   STATUS  NOTES
@@ -161,8 +161,6 @@ old column makes its table `pending`.
 
 - **One-off chores arrive archived.** The new app has only repeating chores; the report counts
   those never done, which you add again.
-- **Titles over 80 characters are shortened.** This covers reward and redemption titles; the
-  old limit was 160.
 - **Banked iPad and TV time is one balance per child** (James), shown as a grant from no one in
   particular. A parent can still take back what's left.
 - **An imported screen-time or TV redemption can't be cancelled for a partial refund.** It has
@@ -204,16 +202,17 @@ old column makes its table `pending`.
 
 ## Limits
 
-The new schema is stricter than the old app in a few places, and the import fails if old data
-exceeds them:
+The new app accepts less for new input than the old app did. The database allows the old
+limits (migrations 00024 and 00025), so old rows are carried as they are, without shortening:
 
-- chore and routine titles over 80 characters;
-- routines with more than 20 steps;
-- more than 1000 points per chore or routine;
-- reward costs over 100,000 points.
+| | Old app | New input |
+| --- | --- | --- |
+| Chore, routine, step, approval and reward titles | 160 characters | 80 |
+| Points per chore or routine | 1,000,000 | 1,000 |
+| Steps per routine | 32 | 20 |
+| Reward cost | 1,000,000 | 100,000 |
 
-Run a dry run against a production backup early to find such rows. What to do about them is
-waiting on James.
+An adult who edits such a chore, routine or reward brings it within the new limits then.
 
 ## Still pending
 
