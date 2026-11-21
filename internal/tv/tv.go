@@ -461,6 +461,9 @@ func (d Domain) AddCredit(ctx context.Context, q *dbq.Queries, householdID, chil
 	return s.Notify(ctx)
 }
 
+// ErrNoCredit means a TV redemption has no TV credit to cancel.
+var ErrNoCredit = conflict("no_credit", "There’s no record of how much of this TV time was watched, so it can’t be refunded here.")
+
 // ErrCreditUsed means a TV credit being cancelled has no unused time left.
 var ErrCreditUsed = conflict("tv_time_used", "That TV time has already been used.")
 
@@ -477,7 +480,9 @@ func (d Domain) CancelCredit(ctx context.Context, q *dbq.Queries, householdID, r
 	}
 	c, err := q.GetTvCreditByRedemption(ctx, dbq.GetTvCreditByRedemptionParams{HouseholdID: householdID, RedemptionID: &redemptionID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return cost, nil // bought before TV time was kept here: nothing was watched through OpenCozy
+		// Bought before TV time was kept here: nobody knows what was watched, so nothing is
+		// refunded automatically.
+		return 0, ErrNoCredit
 	} else if err != nil {
 		return 0, err
 	}

@@ -337,9 +337,12 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 			return nil, err
 		}
 		refund, err = s.tv.CancelCredit(ctx, cmd.Q, cmd.HouseholdID(), red.ID, red.Cost, now)
-		if errors.Is(err, tv.ErrCreditUsed) {
+		switch {
+		case errors.Is(err, tv.ErrCreditUsed):
 			return refuse("already_used", "That TV time has already been watched, so there’s nothing to refund."), nil
-		} else if err != nil {
+		case errors.Is(err, tv.ErrNoCredit):
+			return refuse(tv.ErrNoCredit.Code, tv.ErrNoCredit.Message), nil
+		case err != nil:
 			return nil, err
 		}
 	case red.State == "fulfilled" && red.Minutes.Valid:
