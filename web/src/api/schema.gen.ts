@@ -2212,6 +2212,14 @@ export interface components {
         SignInMethods: {
             /** @description Passkeys are set up on this server (WEBAUTHN_RP_ID) */
             passkeys: boolean;
+            /**
+             * @description The passkeys' relying party ID (WEBAUTHN_RP_ID), when passkeys are set up. It is public
+             *     anyway (every ceremony carries it); a deploy check compares it with the site's host,
+             *     since passkeys made for another name can't sign in here.
+             */
+            passkeyRpId?: string;
+            /** @description The origins passkeys may be used from (WEBAUTHN_ORIGINS), when passkeys are set up */
+            passkeyOrigins?: string[];
             /** @description The single sign-on provider's button name ("Sign in with <name>"), or null when it isn't set up */
             oidc: components["schemas"]["OidcProvider"] | null;
         };
