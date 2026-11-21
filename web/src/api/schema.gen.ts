@@ -2559,7 +2559,7 @@ export interface components {
             allowedHours?: components["schemas"]["AllowedHours"];
             hoursNow?: components["schemas"]["HoursNow"];
             timeRequest?: components["schemas"]["TimeRequest"];
-            /** @description Banked time with some left, oldest first (spent in this order) */
+            /** @description Banked time with some left, oldest first (spent in this order); the oldest 200, while bankedSeconds is the whole bank */
             credits: components["schemas"]["Credit"][];
             webFilter: components["schemas"]["WebFilter"];
         };

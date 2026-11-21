@@ -61,11 +61,11 @@ func TestLedgerImport(t *testing.T) {
 		}
 	}
 
-	// Each ledger row's source exists: learning awards now; occurrences and redemptions once their
-	// importers run (until then the check is pending, so a real import can't commit).
+	// Each ledger row's source exists: learning awards and occurrences now; redemptions once their
+	// importer runs (until then the check is pending, so a real import can't commit).
 	for check, want := range map[string]string{
 		"ledger rows whose learning_award exists": "ok",
-		"ledger rows whose occurrence exists":     "pending",
+		"ledger rows whose occurrence exists":     "ok",
 		"ledger rows whose redemption exists":     "pending",
 	} {
 		if got := checkStatus(out.String(), check); got != want {

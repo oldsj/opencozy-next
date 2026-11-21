@@ -23,6 +23,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -109,6 +110,9 @@ func Run(ctx context.Context, o Options) error {
 func importAll(ctx context.Context, o Options, src, dst pgx.Tx) (*Report, error) {
 	r := &Report{}
 	run := &run{src: src, dst: dst, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret, carried: map[string]bool{}}
+	if err := dst.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&run.started); err != nil {
+		return nil, safe(err)
+	}
 	for _, d := range domains {
 		if err := d(ctx, run); err != nil {
 			return nil, err
@@ -130,6 +134,8 @@ type run struct {
 	adults map[string]adultRef
 	keys   *keyring.Keyring
 	old    *oldsecret.Secret
+	// started is when the import began (the target's clock), for rows the import itself archives.
+	started time.Time
 	// carried lists the ledger source kinds whose rows this import has written.
 	carried map[string]bool
 }
@@ -152,6 +158,7 @@ var domains = []func(context.Context, *run) error{
 	importCredentials,
 	importLearning,
 	importLedger,
+	importChores,
 	importCalendars,
 	importRecipes,
 	importMeals,
