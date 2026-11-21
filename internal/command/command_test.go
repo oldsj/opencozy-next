@@ -1,13 +1,18 @@
 package command_test
 
 import (
+	"context"
 	"errors"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/oldsj/opencozy-next/internal/actor"
 	"github.com/oldsj/opencozy-next/internal/clock"
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
@@ -104,5 +109,61 @@ func TestLockForJobs(t *testing.T) {
 	}
 	if _, err := command.Lock(ctx, other, house, nil); err == nil || !strings.Contains(err.Error(), "lock timeout") {
 		t.Fatalf("second lock: %v", err)
+	}
+}
+
+// AfterCommit hooks run once the command committed with a 2xx answer, after the response, and
+// never when it rolled back, was refused or was replayed.
+func TestAfterCommit(t *testing.T) {
+	db := testdb.Open(t)
+	ctx := t.Context()
+	var house uuid.UUID
+	if err := db.Owner.QueryRow(ctx, `INSERT INTO household (name, time_zone) VALUES ('Fictional', 'UTC') RETURNING id`).Scan(&house); err != nil {
+		t.Fatal(err)
+	}
+	rn := command.Runner{Pool: db.Runtime, Log: slog.New(slog.DiscardHandler)}
+	ran := 0
+	adult := uuid.New()
+	handler := func(status int) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cmd, _ := command.From(r.Context())
+			cmd.AfterCommit(func(ctx context.Context) {
+				// The household lock is free again: another transaction takes it at once.
+				tx, err := db.Runtime.Begin(ctx)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				defer tx.Rollback(ctx) //nolint:errcheck // test cleanup
+				if _, err := tx.Exec(ctx, `SET LOCAL lock_timeout = '1s'`); err != nil {
+					t.Error(err)
+					return
+				}
+				if _, err := tx.Exec(ctx, `SELECT id FROM household WHERE id = $1 FOR UPDATE`, house); err != nil {
+					t.Errorf("household still locked: %v", err)
+				}
+				ran++
+			})
+			w.WriteHeader(status)
+		})
+	}
+	send := func(key string, status int) int {
+		r := httptest.NewRequest(http.MethodPost, "/api/x", nil).WithContext(actor.With(ctx, actor.Actor{Kind: actor.Adult, HouseholdID: house, AdultID: adult}))
+		r.Header.Set(command.KeyHeader, key)
+		w := httptest.NewRecorder()
+		rn.Wrap(command.Spec{Op: "x", RecordResponse: true}, handler(status), w, r)
+		return w.Code
+	}
+	if code := send("k-fail", http.StatusInternalServerError); code != 500 || ran != 0 {
+		t.Fatalf("rolled back: %d, hooks ran %d", code, ran)
+	}
+	if code := send("k-conflict", http.StatusConflict); code != 409 || ran != 0 {
+		t.Fatalf("refused: %d, hooks ran %d", code, ran)
+	}
+	if code := send("k-ok", http.StatusNoContent); code != 204 || ran != 1 {
+		t.Fatalf("committed: %d, hooks ran %d", code, ran)
+	}
+	if code := send("k-ok", http.StatusNoContent); code != 204 || ran != 1 {
+		t.Fatalf("replayed: %d, hooks ran %d", code, ran)
 	}
 }

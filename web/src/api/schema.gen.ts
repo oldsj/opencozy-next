@@ -1398,6 +1398,129 @@ export interface paths {
         patch: operations["updateCalendar"];
         trace?: never;
     };
+    "/calendar/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start connecting a Google account
+         * @description Returns Google's consent page to open in this browser. Google sends the adult back to
+         *     `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
+         *     within ten minutes. 422 `not_configured` when this server has no Google client
+         *     (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+         *     (`too_many`), since connecting an account that is already connected must still work.
+         */
+        post: operations["connectGoogle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where Google sends the adult back after consent
+         * @description Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
+         *     `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
+         *     calendar permission was unticked), `expired` (no such connect for this adult, or used or
+         *     older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+         *     token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+         *     connected replaces its token and clears "reconnect needed".
+         */
+        get: operations["googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Google accounts this household has connected
+         * @description Tokens are never returned. `enabled` is false when this server has no Google client.
+         */
+        get: operations["listGoogleConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect a Google account, with every calendar followed through it
+         * @description Deletes the account's token and stops following its calendars, with their events and who
+         *     they were for. After the change commits, the server asks Google to revoke the token (best
+         *     effort). Google revokes the whole grant, so the same Google account connected in another
+         *     household on this server has to be connected again there.
+         */
+        delete: operations["disconnectGoogle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calendar/google/connections/{connectionId}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The calendars a connected Google account can read
+         * @description Asks Google. 422 `reconnect_needed` when Google no longer accepts the account's token;
+         *     502 `google_unavailable` when Google could not be reached.
+         */
+        get: operations["listGoogleCalendars"];
+        put?: never;
+        /**
+         * Follow one of a connected account's calendars
+         * @description The first refresh runs within a minute. 409 `calendar_exists` when the household already
+         *     follows it; 422 `too_many_calendars` past 50, `reconnect_needed` when the account must be
+         *     connected again.
+         */
+        post: operations["followGoogleCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/learning/rules": {
         parameters: {
             query?: never;
@@ -2699,6 +2822,8 @@ export interface components {
             /** Format: date-time */
             lastSyncAt?: string;
             error?: components["schemas"]["CalendarErrorCode"];
+            /** @description For a Google calendar, the account it is followed through */
+            googleConnectionId?: components["schemas"]["Id"];
             version: number;
         };
         CalendarList: {
@@ -2717,6 +2842,39 @@ export interface components {
             color: components["schemas"]["ProfileColor"];
             showOnDisplay: boolean;
             expectedVersion: number;
+        };
+        GoogleConnectStart: {
+            /** @description Google's consent page; open it in this browser tab. */
+            authorizeUrl: string;
+        };
+        GoogleConnection: {
+            id: components["schemas"]["Id"];
+            email: string;
+            /** @description Google no longer accepts the token; connect the account again. */
+            needsReconnect: boolean;
+            /** @description How many of its calendars the household follows */
+            calendars: number;
+            version: number;
+        };
+        GoogleConnectionList: {
+            enabled: boolean;
+            connections: components["schemas"]["GoogleConnection"][];
+        };
+        GoogleCalendar: {
+            googleId: string;
+            name: string;
+            primary: boolean;
+            /** @description Set when the household follows it */
+            calendarId?: components["schemas"]["Id"];
+        };
+        GoogleCalendarList: {
+            calendars: components["schemas"]["GoogleCalendar"][];
+        };
+        NewGoogleCalendar: {
+            googleId: string;
+            name: components["schemas"]["CalendarName"];
+            color: components["schemas"]["ProfileColor"];
+            showOnDisplay: boolean;
         };
         AwardRule: {
             id: components["schemas"]["Id"];
@@ -3058,6 +3216,7 @@ export interface components {
         IdempotencyKey: string;
         ItemId: components["schemas"]["Id"];
         ChildId: components["schemas"]["Id"];
+        ConnectionId: components["schemas"]["Id"];
         TvId: components["schemas"]["Id"];
     };
     requestBodies: never;
@@ -6435,6 +6594,199 @@ export interface operations {
         responses: {
             /** @description Updated */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSource"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    connectGoogle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open authorizeUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectStart"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    googleCallback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the calendars screen */
+            303: {
+                headers: {
+                    Location: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accounts, by address */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleConnectionList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    disconnectGoogle: {
+        parameters: {
+            query: {
+                expectedVersion: number;
+            };
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listGoogleCalendars: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account's calendars */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleCalendarList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+            default: components["responses"]["Error"];
+        };
+    };
+    followGoogleCalendar: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                connectionId: components["parameters"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "googleId": "family@group.calendar.example.test",
+                 *       "name": "Family",
+                 *       "color": "sky",
+                 *       "showOnDisplay": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["NewGoogleCalendar"];
+            };
+        };
+        responses: {
+            /** @description Following */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

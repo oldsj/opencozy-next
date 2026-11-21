@@ -209,6 +209,16 @@ paths:
     $ref: calendar.yaml#/calendars
   /calendars/{calendarId}:
     $ref: calendar.yaml#/calendarSource
+  /calendar/google/connect:
+    $ref: google.yaml#/connect
+  /calendar/google/callback:
+    $ref: google.yaml#/callback
+  /calendar/google/connections:
+    $ref: google.yaml#/connections
+  /calendar/google/connections/{connectionId}:
+    $ref: google.yaml#/connection
+  /calendar/google/connections/{connectionId}/calendars:
+    $ref: google.yaml#/connectionCalendars
   /learning/rules:
     $ref: learning.yaml#/rules
   /learning/rules/{ruleId}:

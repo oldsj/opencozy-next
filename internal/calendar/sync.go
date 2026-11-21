@@ -76,7 +76,7 @@ const (
 	parseTimeout = 20 * time.Second // the recurrence expansion of one feed
 )
 
-// Job refreshes due ICS feeds every minute (each feed every 15 minutes once it succeeds, backing
+// Job refreshes due calendars (ICS feeds and, with f.WithGoogle, Google calendars) every minute (each feed every 15 minutes once it succeeds, backing
 // off up to 6 hours while it fails). wake starts a run early, after a feed is added.
 func Job(kr *keyring.Keyring, f Fetcher, log *slog.Logger, wake <-chan struct{}) jobs.Job {
 	return jobs.Job{Name: "calendar-refresh", Every: time.Minute, Timeout: 5 * time.Minute, Wake: wake,
@@ -130,6 +130,9 @@ func syncOne(ctx context.Context, fence Txer, kr *keyring.Keyring, f Fetcher, lo
 		return failed(CodeInvalidCalendar, err)
 	}
 	w := WindowAround(day.Of(now, zone))
+	if row.Provider == "google" {
+		return syncGoogle(ctx, fence, kr, f.google, log, now, row, zone, w, failed)
+	}
 	if kr == nil || row.FeedUrl == nil {
 		return failed(CodeInvalidCalendar, errors.New("no keyring or feed URL"))
 	}
@@ -233,7 +236,7 @@ func store(ctx context.Context, q *dbq.Queries, row dbq.ClaimDueFeedsRow, feed F
 		code = &c
 	}
 	if err := q.FeedSynced(ctx, dbq.FeedSyncedParams{ID: row.ID, ErrorCode: code, Etag: nonEmpty(got.ETag),
-		LastModified: nonEmpty(got.LastModified), FeedHash: &hash, WindowStart: pgDate(w.From)}); err != nil {
+		LastModified: nonEmpty(got.LastModified), FeedHash: nonEmpty(hash), WindowStart: pgDate(w.From)}); err != nil {
 		return err
 	}
 	return live.Notify(ctx, q, row.HouseholdID, live.Event{Topic: live.Calendar})
