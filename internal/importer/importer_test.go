@@ -97,14 +97,20 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                     "pending", // lock_message and the game domains wait on later slices
+		"household":                     "pending", // lock_message waits on the devices import
 		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
 		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
-		"service_credential":            "pending", // the router's tv:gate has no new name yet
-		"service_credential_child":      "pending",
-		"assistant_credential":          "pending",
+		"service_credential":            "ok",
+		"service_credential_child":      "ok",
+		"assistant_credential":          "pending", // approvals:read has no new name yet
+		"gated_tv":                      "ok",
+		"gated_tv_mac":                  "ok",
+		"tv_session":                    "ok",
+		"tv_open_event":                 "ok",
+		"tv_credit":                     "ok",
+		"tv_prompt":                     "not carried",
 		"auth_session":                  "not carried",
 		"recipe":                        "ok",
 		"meal_plan_entry":               "ok",
@@ -137,7 +143,10 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
 	}
-	if !strings.Contains(out, "tv:gate (1)") || !strings.Contains(out, "1 without a household") {
+	if !strings.Contains(out, "1 open sessions dropped") || !strings.Contains(out, "power and router attempts forgotten") {
+		t.Errorf("the report doesn't count the dropped TV sessions or forgotten power:\n%s", out)
+	}
+	if !strings.Contains(out, "approvals:read (1)") || !strings.Contains(out, "1 without a household") {
 		t.Errorf("missing notes:\n%s", out)
 	}
 }
@@ -160,6 +169,12 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	q := dbq.New(target.Runtime)
 	keys := testKeys(t)
 
+	// Blocked websites come with their household.
+	var filter string
+	if err := target.Owner.QueryRow(ctx, `SELECT game_portal_domains::text || ' ' || game_domains::text FROM household`).Scan(&filter); err != nil ||
+		filter != "{games.example.test} {blocks.example.test,puzzles.example.test}" {
+		t.Errorf("web filter: %q %v", filter, err)
+	}
 	// Allowed hours come with their child; children without any stay without.
 	var hours string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || '=' || COALESCE(school_night_start || '-' || school_night_end || '/' || weekend_start || '-' || weekend_end, 'none'), ' ' ORDER BY name)
@@ -259,6 +274,40 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	a, ok, err = actor.Resolver{Q: q}.Resolve(ctx, r)
 	if err != nil || !ok || a.Kind != actor.Service || len(a.Children) != 1 || !slices.Equal(a.Scopes, []string{"learning:award"}) {
 		t.Fatalf("old learning secret: %+v ok=%v err=%v", a, ok, err)
+	}
+
+	// The router's old secret authenticates with tv:gate. TVs keep their IDs, open hours, power
+	// and MACs; sessions their starters (an adult, a child's device) and enders; openings their
+	// adult and ended session.
+	r, _ = http.NewRequest(http.MethodGet, "/api/tv/allowances", nil)
+	r.Header.Set("Authorization", "Bearer "+fixtureGateToken)
+	a, ok, err = actor.Resolver{Q: q}.Resolve(ctx, r)
+	if err != nil || !ok || a.Kind != actor.Service || !slices.Equal(a.Scopes, []string{"tv:gate"}) {
+		t.Fatalf("old router secret: %+v ok=%v err=%v", a, ok, err)
+	}
+	var tvs string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || ' ' || power || ' ' || coalesce(open_start::text, '-') || '-' || coalesce(open_end::text, '-') || ' ' ||
+		coalesce(open_days::text, '-') || ' ' || (archived_at IS NOT NULL) || ' ' || (SELECT count(*) FROM tv_mac m WHERE m.tv_id = tv.id), ', ' ORDER BY name) FROM tv`).Scan(&tvs); err != nil ||
+		tvs != "Den TV unknown 1260-420 62 false 2, Old TV unknown --- - true 0" {
+		t.Errorf("tvs: %q %v", tvs, err)
+	}
+	// Power and the attempt run are forgotten: nothing reports them here yet.
+	var remembered int
+	if err := target.Owner.QueryRow(ctx, `SELECT count(*) FROM tv WHERE power_changed_at IS NOT NULL OR attempts_since IS NOT NULL OR last_attempt_at IS NOT NULL`).Scan(&remembered); err != nil || remembered != 0 {
+		t.Errorf("tv power remembered: %d %v", remembered, err)
+	}
+	var sessions string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(s.watcher || ' ' || s.end_reason || ' ' || coalesce(a.email, '-') || ' ' || coalesce(s.started_by_device::text, '-') || ' ' ||
+		coalesce(e.email, '-'), ', ' ORDER BY s.started_at)
+		FROM tv_session s LEFT JOIN adult a ON a.id = s.started_by_adult LEFT JOIN adult e ON e.id = s.ended_by_adult`).Scan(&sessions); err != nil ||
+		sessions != "child time_up - 0190a000-0000-7000-8000-0000000009e1 -, parents parent_override owner@example.test - owner@example.test" {
+		t.Errorf("tv sessions: %q %v", sessions, err)
+	}
+	var openings string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(o.action || ' ' || a.email || ' ' || coalesce(o.ended_session_id::text, '-'), ', ' ORDER BY o.at)
+		FROM tv_open_event o JOIN adult a ON a.id = o.by_adult`).Scan(&openings); err != nil ||
+		openings != "open owner@example.test 0190a000-0000-7000-8000-0000000009b2, close owner@example.test -" {
+		t.Errorf("tv openings: %q %v", openings, err)
 	}
 
 	// bootstrap-owner and a second import both refuse now.
