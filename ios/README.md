@@ -132,9 +132,10 @@ hand: Product → Archive, then Distribute App → TestFlight & App Store. The a
 `ITSAppUsesNonExemptEncryption = NO` (HTTPS and request signing only), so no compliance
 question is asked.
 
-After installing on the iPad: unpair if it was paired with the previous server, then pair again
-from this server's Manage → Devices (step 4 below). A build from before this change gets 410
-`update_app` from this server.
+Installed over the old app's build, the iPad stays paired if this build has the installed app's
+bundle ID: the keychain item (`device-key.v1`) is the same, and the importer carries the
+device. Pair again from this server's Manage → Devices (step 4 below) only if it shows the
+pairing screen, then revoke the old entry. A build from before this change gets 410 `update_app` from this server.
 
 ### Passkeys on a LAN-only server
 

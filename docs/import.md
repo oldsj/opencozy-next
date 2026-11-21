@@ -29,6 +29,11 @@ Rehearse first, with fictional data: `make import-rehearsal` runs two dry runs, 
 and a second import against a throwaway Postgres, and checks each child's points and banked time
 independently. It must pass with nothing pending.
 
+Then try a real backup on your own machine: `scripts/local-dry-run.sh ./old-backup.dump
+./old-auth-secret` restores a `pg_dump` (any format, optionally gzipped) into a throwaway
+Postgres container, its data in memory, and runs the dry run below against it, then removes
+everything. It fails on any MISMATCH or pending table. The secret file is optional.
+
 The new installation's environment is the same as for `app serve` (every setting is in
 [deploy.md](deploy.md)):
 
@@ -54,8 +59,9 @@ PGPASSWORD=… app import \
   --source-url 'postgres://opencozy@old-restore.example.test:5432/opencozy?sslmode=require' \
   --old-auth-secret-file ./old-auth-secret
 
-# 4. Start the app, then run the read-only smoke test against it.
-scripts/smoke.sh https://cozy.example.test
+# 4. Start the app, then run the read-only smoke test against it. The tokens come from the
+#    environment: an assistant credential's secret and the router's service credential.
+OPENCOZY_SMOKE_MCP_TOKEN=… OPENCOZY_SMOKE_ROUTER_TOKEN=… scripts/smoke.sh https://cozy.example.test
 ```
 
 - **Google calendars** keep working only with the old app's OAuth client: reuse its client ID
@@ -213,9 +219,10 @@ old column makes its table `pending`.
 ## Passkeys and devices after cutover
 
 - **Passkeys** work only if the new installation keeps the old hostname: `WEBAUTHN_RP_ID`
-  must be the old hostname (or a parent domain of it), and `WEBAUTHN_ORIGINS` must include the
-  old origin. The smoke test checks that the passkey domain fits the site. Otherwise adults sign
-  in with their password and add a passkey again.
+  must be exactly the old app's passkey domain (its hostname), and `WEBAUTHN_ORIGINS` must
+  include the old origin. A parent domain is a different passkey domain: new passkeys work there,
+  imported ones don't. The smoke test checks only that the passkey domain fits the site.
+  Otherwise adults sign in with their password and add a passkey again.
 - **An imported iPad** stays paired if the new kids' build keeps the same bundle ID, keychain
   item and host. If someone pairs it again anyway, revoke the old entry in Manage → Devices.
 
