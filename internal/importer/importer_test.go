@@ -97,8 +97,8 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                     "pending", // lock_message waits on the devices import
-		"child":                         "pending", // the colour too
+		"household":                     "ok",
+		"child":                         "ok",
 		"auth_user":                     "ok",
 		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
