@@ -143,6 +143,7 @@ var domains = []func(context.Context, *run) error{
 	importCalendars,
 	importRecipes,
 	importMeals,
+	importTV,
 }
 
 type source struct {
