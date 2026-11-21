@@ -121,9 +121,13 @@ func screenTime(ctx context.Context, q *dbq.Queries, h, child uuid.UUID, now tim
 	if err != nil {
 		return api.ScreenTime{}, err
 	}
+	filter, err := webFilter(ctx, q, h)
+	if err != nil {
+		return api.ScreenTime{}, err
+	}
 	out := api.ScreenTime{
 		ServerTime: now.UTC(), ChildId: child, BankedSeconds: int(banked), Windows: make([]api.Window, len(ws)),
-		AllowedHours: toAllowedHours(rule.Hours),
+		AllowedHours: toAllowedHours(rule.Hours), WebFilter: filter,
 	}
 	out.Credits = make([]api.Credit, len(credits))
 	for i, c := range credits {

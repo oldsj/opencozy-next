@@ -5,5 +5,5 @@ ALTER TABLE reward_redemption DISABLE TRIGGER reward_redemption_protect; -- the 
 DELETE FROM reward_redemption;
 DELETE FROM reward;
 DELETE FROM assistant_credential;
-ALTER TABLE household DROP COLUMN lock_message, DROP COLUMN game_portal_domains, DROP COLUMN game_domains;
+ALTER TABLE household DROP COLUMN lock_message;
 ALTER TABLE child DROP COLUMN color;
