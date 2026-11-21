@@ -77,10 +77,9 @@ func (n Notification) APNs(pending int) map[string]any {
 	return map[string]any{"aps": aps, "opencozy": app}
 }
 
-// Events that push today. Slices 8 (screen time) and 9 (TV) add theirs here: a child's time
-// request is an inbox item, so it pushes as an approval; "Who's watching?" prompts and the kid
-// device's pushes (time ended, time answered, TV waiting or ending) follow the same pattern with
-// ToAdults or ToChild in the event's own command.
+// Events that push today. The kid device's TV pushes (a TV waiting for "Who's watching?", 5
+// minutes of TV time left) and the parents' "Who's watching?" prompt follow the same pattern
+// with ToAdults or ToChild in the event's own command (slice 9, w-slice9).
 
 // ApprovalPending tells the parents something is waiting in the inbox: a finished chore or
 // routine, a reward to approve, or a request for more time. askedAt is when it was asked: a
@@ -114,6 +113,38 @@ func ApprovalResolved(id uuid.UUID, state string) (key string, n Notification) {
 	}
 }
 
+// ScreenTimeChanged is the silent push that wakes a child's devices to sync after a parent
+// changes their iPad time (gives or ends time, forfeits or cancels banked time, changes allowed
+// hours), so the shields lift or come back at once rather than at the app's next sync. Each
+// event is its own row; the collapse ID is the child's, so only the latest is kept on the way.
+func ScreenTimeChanged(child uuid.UUID) (key string, n Notification) {
+	return "screentime.changed/" + child.String() + "/" + uuid.NewString(), Notification{
+		Type: "screentime.changed", Collapse: "screentime/" + child.String(),
+		Data: map[string]string{"childId": child.String()},
+	}
+}
+
+// TimeAnswered tells the child a parent answered their "Ask for more time", and wakes the app
+// to sync so a yes lifts the shields at once.
+func TimeAnswered(tr dbq.TimeRequest) (key string, n Notification) {
+	title, body := "Not now", "No more iPad time for now."
+	if tr.State == "approved" && tr.Choice != nil {
+		title = "More iPad time"
+		switch *tr.Choice {
+		case "30min":
+			body = "You have 30 more minutes."
+		case "1h":
+			body = "You have 1 more hour."
+		default: // all_day
+			body = "You have iPad time for the rest of the day."
+		}
+	}
+	return "time.answered/" + tr.ID.String(), Notification{
+		Type: "time.answered", Collapse: tr.ID.String(), Title: title, Body: body, Wake: true,
+		Thread: "opencozy-time", Data: map[string]string{"requestId": tr.ID.String(), "state": tr.State},
+	}
+}
+
 func points(n int32) string {
 	if n == 1 {
 		return "1 point"
@@ -139,8 +170,16 @@ func (o Outbox) ToAdults(ctx context.Context, q *dbq.Queries, household uuid.UUI
 	return nil
 }
 
-// ToChild enqueues n for a child's paired devices, in the event's transaction (q).
+// ToChild enqueues n for a child's paired devices, in the event's transaction (q). A child
+// without a device that registered for push gets nothing queued.
 func (o Outbox) ToChild(ctx context.Context, q *dbq.Queries, household, child uuid.UUID, key string, n Notification) error {
+	if !o.Enabled {
+		return nil
+	}
+	targets, err := q.ChildPushTargets(ctx, dbq.ChildPushTargetsParams{HouseholdID: household, ChildID: &child})
+	if err != nil || len(targets) == 0 {
+		return err
+	}
 	n.Badge = false // a kid's app has no inbox
 	return o.Enqueue(ctx, q, Message{HouseholdID: household, ChildID: &child, DedupeKey: key, Notification: n})
 }

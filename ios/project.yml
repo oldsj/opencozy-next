@@ -36,6 +36,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: OpenCozy
+        # Only HTTPS and request signing (exempt): no export-compliance question per TestFlight build.
+        ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}

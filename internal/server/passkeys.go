@@ -191,7 +191,7 @@ func (s *Server) PasskeySignIn(ctx context.Context, req api.PasskeySignInRequest
 	if err != nil {
 		return nil, err
 	}
-	cookie, err := s.startSession(ctx, adult.ID)
+	cookie, err := s.startSession(ctx, adult.ID, nil)
 	if err != nil {
 		return nil, err
 	}

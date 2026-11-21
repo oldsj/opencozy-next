@@ -7,11 +7,16 @@ A thin native shell around the OpenCozy web app, with two roles chosen on first 
 
 The OpenCozy server is the source of truth for the unlock window, the device's child and the inbox. Screen time uses Apple's **Family Controls** (authorization and the app picker), **ManagedSettings** (shields) and **DeviceActivity** (re-locking on schedule).
 
-> **Status.** The child's device pairs, signs its requests and opens the kid view on this
-> server's API (`api/src/devices.yaml`, slice 7). Its screen-time calls are still the previous
-> server's (`/api/v1/screen-time`, `/api/v1/device/...`) until slice 8: this server answers them
-> 404, so the device stays locked and keeps "One more minute" and "Ask for more time" queued
-> without reporting a failed sync. The parent's device is fully on this server's API
+> **Status.** The child's device runs entirely on this server's API: pairing and signed
+> requests (`api/src/devices.yaml`), and its iPad time (`api/src/screentime.yaml`): it reads
+> `GET /api/children/{childId}/screen-time`, sends "One more minute" to
+> `POST /api/device/screen-time-events` and "Ask for more time" to
+> `POST /api/children/{childId}/time-requests` (its queued request ID is the `Idempotency-Key`).
+> It locks at the end of the running window or `allowanceSeconds` (≤ 300 s) after the server's
+> answer, whichever is sooner (design §3 rule 6), and re-syncs before then while open. Blocked
+> websites come with the screen-time answer once slice 8b is served. It registers its APNs
+> token at `PUT /api/device/push` and syncs on every push (slice 11).
+> The parent's device is fully on this server's API
 > (`api/src/phones.yaml`, slice 11): it signs in with a password or passkey
 > (`/api/phone/sessions[/passkey]`), or from the web view's own sign-in
 > (`/api/phone/sessions/web`, so the parent signs in once), keeps an `ocp_` phone session, and
@@ -19,7 +24,7 @@ The OpenCozy server is the source of truth for the unlock window, the device's c
 > (`/api/inbox/{id}/approve|reject`) and answer a request for more time
 > (`/api/inbox/{id}/answer`), with an `Idempotency-Key` of
 > `<phone session id>:<item id>:approve|reject|answer:<choice>`; a 409 is shown as Already
-> handled. The kid device registers its own token at `PUT /api/device/push`.
+> handled.
 
 ## Layout
 
@@ -93,6 +98,43 @@ With automatic signing, Xcode registers the IDs.
 
 - **Development** builds can use the Family Controls (Development) entitlement once the team is a paid Apple Developer Program member.
 - **TestFlight and App Store** builds need Apple to approve the Family Controls *distribution* entitlement, [requested per bundle ID](https://developer.apple.com/contact/request/family-controls-distribution) including each extension. Ad-hoc or development installs are enough for one household.
+
+### TestFlight
+
+What to run to sign a build and upload it, on a Mac with Xcode signed in to the team's Apple
+account (Xcode → Settings → Accounts). Nothing here goes into the repository.
+
+Once per Mac and team:
+
+1. `Config/Local.xcconfig` with the real values (see [Signing](#signing)).
+2. In App Store Connect, an app record for `OPENCOZY_BUNDLE_ID` (My Apps → + → New App).
+3. Apple's approval of the **Family Controls (Distribution)** entitlement for the app and its
+   three extensions (`.monitor`, `.shield-configuration`, `.shield-action`). Without it the
+   upload is refused, or the build can't lock apps.
+
+Each build (from the repository root). The build number must be higher than any already
+uploaded, so it is the time, given on the command line:
+
+```sh
+cd ios
+xcodegen generate
+xcodebuild -project OpenCozy.xcodeproj -scheme OpenCozy -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath build/OpenCozy.xcarchive \
+  -allowProvisioningUpdates CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M)" archive
+xcodebuild -exportArchive -archivePath build/OpenCozy.xcarchive \
+  -exportOptionsPlist Config/ExportOptions-TestFlight.plist -exportPath build/export \
+  -allowProvisioningUpdates
+```
+
+The export uploads the build to App Store Connect (`destination: upload`). After processing it
+appears under TestFlight, where it is added to the internal testing group. The same works by
+hand: Product → Archive, then Distribute App → TestFlight & App Store. The app declares
+`ITSAppUsesNonExemptEncryption = NO` (HTTPS and request signing only), so no compliance
+question is asked.
+
+After installing on the iPad: unpair if it was paired with the previous server, then pair again
+from this server's Manage → Devices (step 4 below). A build from before this change gets 410
+`update_app` from this server.
 
 ### Passkeys on a LAN-only server
 
@@ -201,7 +243,7 @@ Today a spend opens a wall-clock window: 30 minutes is 30 minutes whether the ch
 
 ### Notifications (child's device)
 
-A paired child's device asks for notification permission at launch (and after pairing), registers its APNs token with the server (`PUT /api/v1/device/push-token`), and syncs whenever a push arrives. Pushes: a TV turned on and the child can start their own time, 5 minutes of TV time left, and a parent's answer to **Ask for more time** (which wakes the app to lift its shields).
+A paired child's device asks for notification permission at launch (and after pairing), registers its APNs token with the server (`PUT /api/device/push`), and syncs whenever a push arrives. The server sends a parent's answer to **Ask for more time** (`time.answered`, an alert that also wakes the app to lift its shields) and a silent `screentime.changed` whenever a parent gives, ends, forfeits or cancels iPad time or changes allowed hours, so the device shields or unshields at once. The TV pushes (a TV turned on and the child can start their own time, 5 minutes of TV time left) are still to come (slice 9, w-slice9).
 
 ### Communication apps are never locked
 
@@ -222,7 +264,7 @@ Family Controls tokens are opaque. In the app and the monitor extension, an app 
 - **Minimum interval of 15 minutes.** Apple documents [a 15-minute minimum interval](https://developer.apple.com/documentation/deviceactivity/deviceactivitycenter/monitoringerror/intervaltooshort) for DeviceActivity schedules (`intervalTooShort`). For a window under 16 minutes, the app stretches the schedule to 16 minutes and sets [`warningTime`](https://developer.apple.com/documentation/deviceactivity/deviceactivityschedule/warningtime) so that `intervalWillEndWarning` fires at the real end. `intervalDidEnd` is a backstop. `warningTime` is in whole minutes, so the schedule end is padded to keep the warning on the real end. This approach is suggested on Apple's developer forums. It still needs testing on a device.
 - **Maximum of one week.** The forums report a one-week maximum interval (`intervalTooLong`). Plans are capped just below a week. Real windows are far shorter.
 - **Callback timing.** The system delivers DeviceActivity callbacks, and they can be late, typically by seconds and occasionally longer. The forums also report occasional missed callbacks. The app re-checks whenever it's opened, but a missed callback while the app is closed leaves apps unlocked until OpenCozy is next opened.
-- **No push from the server.** If an adult cancels a running screen-time redemption, the device re-locks at the next sync, when OpenCozy is opened or foregrounded, not instantly. A 401 or 403 locks at the next sync. The monitor extension doesn't call the API. Apple documents that the shield configuration extension can't make network requests, but says nothing either way for the monitor extension.
+- **Pushes are best effort.** A parent's change wakes the device with a push, but Apple throttles background pushes, so without one the device re-locks at the next sync, when OpenCozy is opened or foregrounded. A 401 or 403 locks at the next sync. The monitor extension doesn't call the API. Apple documents that the shield configuration extension can't make network requests, but says nothing either way for the monitor extension.
 - **Clock and time-zone changes.** Clock jumps, reboots and time-zone changes are detected whenever the app or the extension runs, and they lock. Apple doesn't document whether DeviceActivity honours `.timeZone` in schedule components, so this needs a device check. If it doesn't and the clock is set back while the app is closed, the end callback can still arrive late. On a child account, Screen Time normally stops the child changing the date and time.
 - **Opaque tokens.** The picker's selection is a set of opaque tokens that only work on this device. It's stored in the App Group, never sent to the server, and has to be chosen again on each device.
 - **Opening OpenCozy from the shield.** `ShieldActionResponse.openParentalControlsApp` needs iOS 26.5. On older versions, the shield shows only **OK**.

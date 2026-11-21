@@ -97,14 +97,20 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	empty(t, target)
 	got := statuses(out)
 	for table, want := range map[string]string{
-		"household":                     "pending", // lock_message and the game domains wait on later slices
+		"household":                     "pending", // lock_message waits on the devices import
 		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
-		"household_owner":               "ok",
+		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
-		"service_credential":            "pending", // the router's tv:gate has no new name yet
-		"service_credential_child":      "pending",
-		"assistant_credential":          "pending",
+		"service_credential":            "ok",
+		"service_credential_child":      "ok",
+		"assistant_credential":          "pending", // approvals:read has no new name yet
+		"gated_tv":                      "ok",
+		"gated_tv_mac":                  "ok",
+		"tv_session":                    "ok",
+		"tv_open_event":                 "ok",
+		"tv_credit":                     "pending", // its redemption waits for the rewards import
+		"tv_prompt":                     "not carried",
 		"auth_session":                  "not carried",
 		"recipe":                        "ok",
 		"meal_plan_entry":               "ok",
@@ -116,17 +122,32 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"calendar_assignment":           "ok",
 		"calendar_assignment_person":    "ok",
 		"calendar_occurrence":           "not carried",
+		"point_ledger":                  "ok",
+		"chore_award_reversal":          "ok",
+		"chore_active_award":            "ok",
+		"external_award":                "ok",
+		"chore_definition":              "ok",
+		"chore_occurrence":              "ok",
+		"routine_definition":            "ok",
+		"routine_occurrence":            "ok",
+		"completion_approval":           "ok",
+		"reward":                        "pending", // rewards wait on their importer
+		"reward_redemption":             "pending",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine", "Bed not made", "Water the plants"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
 	}
-	if !strings.Contains(out, "tv:gate (1)") || !strings.Contains(out, "1 without a household") {
+	if !strings.Contains(out, "1 open sessions dropped") || !strings.Contains(out, "power and router attempts forgotten") {
+		t.Errorf("the report doesn't count the dropped TV sessions or forgotten power:\n%s", out)
+	}
+	if !strings.Contains(out, "approvals:read (1)") || !strings.Contains(out, "1 without a household") ||
+		!strings.Contains(out, "1 with partly set allowed hours, carried as none") {
 		t.Errorf("missing notes:\n%s", out)
 	}
 }
@@ -149,6 +170,12 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	q := dbq.New(target.Runtime)
 	keys := testKeys(t)
 
+	// Blocked websites come with their household.
+	var filter string
+	if err := target.Owner.QueryRow(ctx, `SELECT game_portal_domains::text || ' ' || game_domains::text FROM household`).Scan(&filter); err != nil ||
+		filter != "{games.example.test} {blocks.example.test,puzzles.example.test}" {
+		t.Errorf("web filter: %q %v", filter, err)
+	}
 	// Allowed hours come with their child; children without any stay without.
 	var hours string
 	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || '=' || COALESCE(school_night_start || '-' || school_night_end || '/' || weekend_start || '-' || weekend_end, 'none'), ' ' ORDER BY name)
@@ -250,6 +277,40 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 		t.Fatalf("old learning secret: %+v ok=%v err=%v", a, ok, err)
 	}
 
+	// The router's old secret authenticates with tv:gate. TVs keep their IDs, open hours, power
+	// and MACs; sessions their starters (an adult, a child's device) and enders; openings their
+	// adult and ended session.
+	r, _ = http.NewRequest(http.MethodGet, "/api/tv/allowances", nil)
+	r.Header.Set("Authorization", "Bearer "+fixtureGateToken)
+	a, ok, err = actor.Resolver{Q: q}.Resolve(ctx, r)
+	if err != nil || !ok || a.Kind != actor.Service || !slices.Equal(a.Scopes, []string{"tv:gate"}) {
+		t.Fatalf("old router secret: %+v ok=%v err=%v", a, ok, err)
+	}
+	var tvs string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || ' ' || power || ' ' || coalesce(open_start::text, '-') || '-' || coalesce(open_end::text, '-') || ' ' ||
+		coalesce(open_days::text, '-') || ' ' || (archived_at IS NOT NULL) || ' ' || (SELECT count(*) FROM tv_mac m WHERE m.tv_id = tv.id), ', ' ORDER BY name) FROM tv`).Scan(&tvs); err != nil ||
+		tvs != "Den TV unknown 1260-420 62 false 2, Old TV unknown --- - true 0" {
+		t.Errorf("tvs: %q %v", tvs, err)
+	}
+	// Power and the attempt run are forgotten: nothing reports them here yet.
+	var remembered int
+	if err := target.Owner.QueryRow(ctx, `SELECT count(*) FROM tv WHERE power_changed_at IS NOT NULL OR attempts_since IS NOT NULL OR last_attempt_at IS NOT NULL`).Scan(&remembered); err != nil || remembered != 0 {
+		t.Errorf("tv power remembered: %d %v", remembered, err)
+	}
+	var sessions string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(s.watcher || ' ' || s.end_reason || ' ' || coalesce(a.email, '-') || ' ' || coalesce(s.started_by_device::text, '-') || ' ' ||
+		coalesce(e.email, '-'), ', ' ORDER BY s.started_at)
+		FROM tv_session s LEFT JOIN adult a ON a.id = s.started_by_adult LEFT JOIN adult e ON e.id = s.ended_by_adult`).Scan(&sessions); err != nil ||
+		sessions != "child time_up - 0190a000-0000-7000-8000-0000000009e1 -, parents parent_override owner@example.test - owner@example.test" {
+		t.Errorf("tv sessions: %q %v", sessions, err)
+	}
+	var openings string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(o.action || ' ' || a.email || ' ' || coalesce(o.ended_session_id::text, '-'), ', ' ORDER BY o.at)
+		FROM tv_open_event o JOIN adult a ON a.id = o.by_adult`).Scan(&openings); err != nil ||
+		openings != "open owner@example.test 0190a000-0000-7000-8000-0000000009b2, close owner@example.test -" {
+		t.Errorf("tv openings: %q %v", openings, err)
+	}
+
 	// bootstrap-owner and a second import both refuse now.
 	if _, err := importOnce(t, oldDB(t, complete), target, true); err == nil || !strings.Contains(err.Error(), "not empty") {
 		t.Fatalf("second import: %v", err)
@@ -344,9 +405,9 @@ func TestCalendarLinksNeedKeys(t *testing.T) {
 func TestRefusesAnotherVersion(t *testing.T) {
 	target := testdb.Open(t)
 	for name, arrange := range map[string]string{
-		"older":   `DELETE FROM opencozy.schema_migrations WHERE version = '0044_screen_time_grant_cut_guards'`,
+		"older":   `DELETE FROM opencozy.schema_migrations WHERE version = '0045_parent_push_mute'`,
 		"edited":  `UPDATE opencozy.schema_migrations SET checksum = repeat('0', 64) WHERE version = '0010_screen_time_fulfillment'`,
-		"newer":   `INSERT INTO opencozy.schema_migrations (version, checksum) VALUES ('0045_next', repeat('0', 64))`,
+		"newer":   `INSERT INTO opencozy.schema_migrations (version, checksum) VALUES ('0046_next', repeat('0', 64))`,
 		"missing": `DROP TABLE opencozy.schema_migrations`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -382,20 +443,18 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	}
 }
 
-// Old screen time waits on redemptions and devices: a source with any says so and can't commit.
-func TestScreenTimeWaitsOnRedemptionsAndDevices(t *testing.T) {
+// The iPad shield event log is not carried (James): the import says how many and commits.
+func TestScreenTimeEventsAreNotCarried(t *testing.T) {
 	event := `SET search_path TO opencozy;
 		ALTER TABLE screen_time_event DROP CONSTRAINT screen_time_event_device_fk;
 		INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
 		  ('0190a000-0000-7000-8000-00000000000a', gen_random_uuid(), '0190a000-0000-7000-8000-0000000000c1', gen_random_uuid(),
 		   'one_more_minute', '2026-01-05T08:00:00Z', '2026-01-05T08:00:01Z');`
-	target := testdb.Open(t)
-	out, err := importOnce(t, oldDB(t, complete, event), target, false)
-	if !errors.Is(err, ErrPending) {
-		t.Fatalf("err = %v, want ErrPending\n%s", err, out)
+	out, err := importOnce(t, oldDB(t, complete, event), testdb.Open(t), false)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
 	}
-	if statuses(out)["screen_time_event"] != "pending" || !strings.Contains(out, "waits on the import of devices") {
+	if statuses(out)["screen_time_event"] != "not carried" || !strings.Contains(out, "screen_time_event              1") {
 		t.Errorf("screen_time_event:\n%s", out)
 	}
-	empty(t, target)
 }

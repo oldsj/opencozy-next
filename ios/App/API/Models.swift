@@ -49,31 +49,15 @@ enum DevicePlatform {
     static let current = "ios"
 }
 
-enum ScreenTimeTarget: String, Codable, Sendable {
-    case personal
-    case tv
-}
-
-struct ScreenTimeGrant: Decodable, Equatable, Sendable {
-    var redemptionId: String
-    var minutes: Int
+/// A running or queued unlock window (`Window`).
+struct ScreenTimeWindow: Decodable, Equatable, Sendable {
+    var id: String
     var startsAt: Date
+    /// Its effective end, if a parent ended it early.
     var endsAt: Date
 }
 
-struct ChildScreenTime: Decodable, Equatable, Sendable {
-    var childId: String
-    var target: String
-    var activeGrants: [ScreenTimeGrant]
-    var unlockedUntil: Date?
-    /// Banked iPad time not yet spent.
-    var secondsRemaining: Int?
-    var allowedHours: AllowedHours?
-    /// The child's latest "Ask for more time", while pending or for an hour after the answer.
-    var timeRequest: TimeRequestStatus?
-}
-
-/// A request for more time and, once a parent answers, the outcome.
+/// A request for more time and, once a parent answers, the outcome (`TimeRequest`).
 struct TimeRequestStatus: Decodable, Equatable, Sendable {
     enum State: String, Decodable, Sendable { case pending, approved, declined }
     var id: String
@@ -81,19 +65,51 @@ struct TimeRequestStatus: Decodable, Equatable, Sendable {
     var grantedUntil: Date?
 }
 
-/// `{ open, closesAt, opensAt }`, or null when the child has no rule.
-struct AllowedHours: Decodable, Equatable, Sendable {
+/// Where the child stands against their allowed hours (`HoursNow`): open until
+/// `closesAt`, or closed until `opensAt`. Absent when the child has no rule.
+struct HoursNow: Decodable, Equatable, Sendable {
     var open: Bool
     var closesAt: Date?
     var opensAt: Date?
 }
 
-/// `GET /api/v1/screen-time?target=personal` (slice 8: not on the new server yet) → `{ serverTime, children: [...] }`.
-struct ScreenTimeResponse: Decodable, Equatable, Sendable {
+/// `GET /api/children/{childId}/screen-time` (`ScreenTime`), signed by the device for
+/// its own child.
+struct ScreenTime: Decodable, Equatable, Sendable {
     var serverTime: Date
-    var children: [ChildScreenTime]
-    /// The household's blocked websites (personal target only).
+    var childId: String
+    /// Banked, not yet spent.
+    var bankedSeconds: Int
+    /// The end of the run of windows covering now; absent while locked.
+    var unlockedUntil: Date?
+    /// How long past `serverTime` the device may stay unlocked without asking again (≤ 300 s).
+    var allowanceSeconds: Int
+    var windows: [ScreenTimeWindow]
+    var hoursNow: HoursNow?
+    /// The latest "Ask for more time", while it waits and for an hour after the answer.
+    var timeRequest: TimeRequestStatus?
+    /// The household's blocked websites (slice 8b); absent from a server without them.
     var webFilter: WebFilterLists?
+
+    /// Whether the device locks within the allowance (design §3 rule 6: a device that can't
+    /// reach the server locks within 300 s) rather than at the end of the window. While the app
+    /// is open it syncs before then and stays unlocked; in the background nothing can sync, so
+    /// the child opens OpenCozy to carry on. The one switch for that trade-off.
+    static let locksWithinAllowance = true
+
+    /// When the device locks, in server time: the end of the running window, capped at the
+    /// allowance past `serverTime` (`locksWithinAllowance`). Nil while locked.
+    var lockAt: Date? {
+        guard let unlockedUntil else { return nil }
+        guard Self.locksWithinAllowance else { return unlockedUntil }
+        return min(unlockedUntil, serverTime.addingTimeInterval(TimeInterval(max(0, allowanceSeconds))))
+    }
+
+    /// Whether `lockAt` comes before the window's end: more time follows a sync.
+    var isCapped: Bool {
+        guard let lockAt, let unlockedUntil else { return false }
+        return lockAt < unlockedUntil
+    }
 }
 
 /// `POST /api/device/web-session` → a one-time exchange URL (relative to the

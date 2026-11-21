@@ -56,7 +56,9 @@ export function DisplaysPage() {
             <label key={s} className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={scopes.includes(s)}
+                // Today is always on: every display shows it.
+                checked={s === 'today' || scopes.includes(s)}
+                disabled={s === 'today'}
                 onChange={(e) => { setScopes(e.target.checked ? [...scopes, s] : scopes.filter((x) => x !== s)); }}
               />
               {scopeLabels[s]}

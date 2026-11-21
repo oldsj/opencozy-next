@@ -22,11 +22,13 @@ internal/command/       State changes: transaction, household lock, time after l
 internal/ledger/        Points: award once per source, reverse, redeem, refund; never below zero
 internal/clock/         The time: the database clock, or a Fake in tests
 internal/day/           The household day: dates, times of day, windows, DST rules
+internal/occurrence/    Occurrence IDs: a UUIDv5 of definition and household day (server and importer)
 internal/testdb/        A fresh migrated Postgres database per integration test
 web/                    React + Vite app; web/src/api/schema.gen.ts is generated
 web/design/             OpenCozy's design system (@app/design): tokens, components, previews (its README; why: DESIGN.md)
 web/*.go                Go package that embeds web/dist (build tag embedweb) and serves it
 ios/                    iOS app (XcodeGen, Swift): its own README; CI in .github/workflows/ios.yml
+android/                The wall display's WebView shell (Gradle, Java): its own README; CI in .github/workflows/android.yml
 charts/<app>/           Helm chart, published to oci://ghcr.io/oldsj/charts
 tools/go.mod            Pinned Go tools (oapi-codegen, sqlc, golangci-lint, govulncheck, air)
 ```
@@ -43,7 +45,8 @@ tools/go.mod            Pinned Go tools (oapi-codegen, sqlc, golangci-lint, govu
 - **SQL only in `internal/db/queries/*.sql`**, through sqlc. Never build SQL from strings. Every
   query on household data takes the actor's household id (`WHERE household_id = $1 AND ...`).
 - **Points only through `internal/ledger`**, under the child's lock; `point_ledger` is
-  append-only. **Household days and hours only through `internal/day`.**
+  append-only. (One exception: `internal/importer` writes old rows with their IDs and times into
+  an empty database, with every ledger trigger on.) **Household days and hours only through `internal/day`.**
 - **Schema changes are new goose migrations** (`internal/db/migrations/NNNNN_name.sql`); never edit
   one that has been merged.
 - **The web app calls the API only through `web/src/api/client.ts`** (`$api` hooks, or `client`).

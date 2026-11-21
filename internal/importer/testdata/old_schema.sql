@@ -1,6 +1,6 @@
--- The old app's schema at commit e717170 (migration 0044_screen_time_grant_cut_guards),
+-- The old app's schema at commit d7fead8 (migration 0045_parent_push_mute),
 -- for the importer's fixture tests. Made with pg_dump --schema-only --no-owner --no-privileges
--- --no-comments -n opencozy after applying the old migrations 0000-0044, plus the
+-- --no-comments -n opencozy after applying the old migrations 0000-0045, plus the
 -- schema_migrations rows the old migrator writes (version and SHA-256 of each file). No rows of
 -- any other table: old_seed.sql adds fictional ones.
 SET statement_timeout = 0;
@@ -679,7 +679,8 @@ CREATE TABLE opencozy.household (
 CREATE TABLE opencozy.household_owner (
     user_id text NOT NULL,
     household_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    push_muted_until timestamp with time zone
 );
 CREATE TABLE opencozy.icloud_calendar (
     household_id uuid NOT NULL,
@@ -1658,3 +1659,4 @@ INSERT INTO opencozy.schema_migrations VALUES ('0041_games_gate_scope', '342a7ab
 INSERT INTO opencozy.schema_migrations VALUES ('0042_household_web_filter', '4033b1db0c57bf8ab0299caaf19bc0de685aaf80b4f64cac099330d310d2f153', '2026-01-01 00:00:00+00');
 INSERT INTO opencozy.schema_migrations VALUES ('0043_screen_time_grant_cuts', '25f0de5d3f46b69d27ff0175e15856679d936fa16fb4bb3367f86686b0038fd6', '2026-01-01 00:00:00+00');
 INSERT INTO opencozy.schema_migrations VALUES ('0044_screen_time_grant_cut_guards', '92287594438b41bbf9ae2b84022684af5eea7911d4b0e7ff4c33f10b93245fe5', '2026-01-01 00:00:00+00');
+INSERT INTO opencozy.schema_migrations VALUES ('0045_parent_push_mute', '2ec04f32e0b2d1682fa3b92ffe498adffcc7450ed44f2cf14e8ce701c92dd0da', '2026-01-01 00:00:00+00');

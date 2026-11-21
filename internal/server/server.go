@@ -27,6 +27,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/listen"
 	"github.com/oldsj/opencozy-next/internal/live"
 	"github.com/oldsj/opencozy-next/internal/push"
+	"github.com/oldsj/opencozy-next/internal/tv"
 	"github.com/oldsj/opencozy-next/web"
 )
 
@@ -49,6 +50,11 @@ type Server struct {
 	// push enqueues pushes in commands; disabled without APNs (slice 11).
 	push      push.Outbox
 	pushNotes <-chan listen.Note
+	oidc      *oidcFlow // nil when single sign-on is off (slice 10b)
+	// oidcClient replaces the egress client for the OIDC provider, in tests only.
+	oidcClient func(context.Context) context.Context
+	// tv is the TV gate's rules (slice 9).
+	tv tv.Domain
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -56,7 +62,7 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // New makes a Server.
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 	q := dbq.New(pool)
-	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute),
+	return &Server{cfg: cfg, log: log, pool: pool, q: q, actors: actor.Resolver{Q: q}, runner: command.Runner{Pool: pool, Log: log}, calendarWake: make(chan struct{}, 1), tv: tv.Domain{Hours: allowedHours{}}, deviceLinks: httpx.NewRateLimiter(deviceLinkRatePerMinute),
 		push: push.Outbox{Enabled: cfg.PushEnabled()}}
 }
 
@@ -72,6 +78,13 @@ func (s *Server) Handler() (http.Handler, error) {
 		}
 		s.wa = wa
 	}
+	if s.cfg.OIDCEnabled() {
+		f, err := newOIDCFlow(s.cfg, s.oidcClient)
+		if err != nil {
+			return nil, fmt.Errorf("single sign-on: %w", err)
+		}
+		s.oidc = f
+	}
 	apiHandler, err := s.apiHandler()
 	if err != nil {
 		return nil, err
@@ -79,6 +92,11 @@ func (s *Server) Handler() (http.Handler, error) {
 
 	app := http.NewServeMux()
 	app.Handle("/api/", http.StripPrefix("/api", apiHandler))
+	// The previous server's API: its apps (the iOS app before slice 17) are told to update,
+	// rather than getting a 404 they can't tell from a missing feature.
+	app.HandleFunc("/api/v1/", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.WriteError(w, http.StatusGone, "update_app", "This app is out of date. Update OpenCozy on this device.")
+	})
 	app.HandleFunc("GET /device/session", s.deviceSessionPage)
 	if s.cfg.AppleTeamID != "" {
 		app.HandleFunc("GET /.well-known/apple-app-site-association", s.appleAppSiteAssociation)
@@ -170,7 +188,7 @@ func (s *Server) apiHandler() (http.Handler, error) {
 			switch {
 			case r.Method != http.MethodPost:
 				next.ServeHTTP(w, r)
-			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/auth/passkey"),
+			case r.URL.Path == "/auth/login" || r.URL.Path == "/auth/confirm" || strings.HasPrefix(r.URL.Path, "/auth/passkey") || r.URL.Path == "/auth/oidc/start",
 				strings.HasPrefix(r.URL.Path, "/phone/sessions"):
 				auth.ServeHTTP(w, r)
 			case strings.HasPrefix(r.URL.Path, "/display/pairings"):

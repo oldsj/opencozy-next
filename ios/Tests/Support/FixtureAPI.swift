@@ -14,15 +14,22 @@ struct FixtureAPI: OpenCozyAPI {
                    serverTime: Date())
     }
 
-    func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) {
-        let now = Date()
-        let grants = unlockedMinutes.map { minutes in
-            [ScreenTimeGrant(redemptionId: "00000000-0000-4000-8000-0000000000d1", minutes: 15,
-                             startsAt: now.addingTimeInterval(Double(minutes * 60 - 15 * 60)),
-                             endsAt: now.addingTimeInterval(Double(minutes * 60)))]
+    func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) {
+        (Self.screenTime(unlockedMinutes: unlockedMinutes), Date())
+    }
+
+    /// The child's iPad time now: a window ending in `unlockedMinutes` (the allowance as the
+    /// server caps it), or locked.
+    static func screenTime(unlockedMinutes: Int?, now: Date = Date(), allowance: Int = 300) -> ScreenTime {
+        let windows = unlockedMinutes.map { minutes in
+            [ScreenTimeWindow(id: "00000000-0000-4000-8000-0000000000d1",
+                              startsAt: now.addingTimeInterval(Double(minutes * 60 - 15 * 60)),
+                              endsAt: now.addingTimeInterval(Double(minutes * 60)))]
         } ?? []
-        let entry = ChildScreenTime(childId: Self.childId, target: target.rawValue, activeGrants: grants, unlockedUntil: grants.last?.endsAt)
-        return (ScreenTimeResponse(serverTime: now, children: [entry]), now)
+        let until = windows.last?.endsAt
+        return ScreenTime(serverTime: now, childId: childId, bankedSeconds: 0, unlockedUntil: until,
+                          allowanceSeconds: until.map { min(Int($0.timeIntervalSince(now)), allowance) } ?? 0,
+                          windows: windows)
     }
 
     func webSession() async throws -> DeviceWebSession {

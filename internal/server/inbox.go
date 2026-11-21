@@ -12,6 +12,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/ledger"
+	"github.com/oldsj/opencozy-next/internal/live"
 	"github.com/oldsj/opencozy-next/internal/push"
 	"github.com/oldsj/opencozy-next/internal/screentime"
 )
@@ -33,12 +34,19 @@ func (s *Server) GetInbox(ctx context.Context, _ api.GetInboxRequestObject) (api
 	}
 	out := api.Inbox{Items: make([]api.InboxItem, len(rows))}
 	for i, r := range rows {
-		it := api.InboxItem{Id: r.ID, Kind: api.InboxItemKind(r.Kind), Title: r.Title, SubmittedAt: r.CreatedAt}
+		it := api.InboxItem{Id: r.ID, Kind: api.InboxItemKind(r.Kind), Title: r.Title, SubmittedAt: r.CreatedAt.UTC()}
 		it.Child.Id, it.Child.Name, it.Child.Color = r.ChildID, r.ChildName, api.ProfileColor(r.ChildColor)
 		if r.Points > 0 {
 			it.Points = ptr(int(r.Points))
 		}
 		out.Items[i] = it
+	}
+	snap, err := s.tvRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if out.Tvs, err = snap.Asking(ctx); err != nil {
+		return nil, err
 	}
 	return api.GetInbox200JSONResponse(out), nil
 }
@@ -264,7 +272,13 @@ func (s *Server) answerTimeRequest(ctx context.Context, cmd *command.Cmd, d *dec
 	if err := s.pushResolved(ctx, cmd, decided); err != nil {
 		return dbq.Approval{}, dbq.TimeRequest{}, err
 	}
-	return decided, tr, screenTimeChanged(ctx, cmd, tr.ChildID)
+	// The child hears the answer (an alert that also wakes the app to sync), so no separate
+	// silent push.
+	if err := live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &tr.ChildID}); err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	key, n := push.TimeAnswered(tr)
+	return decided, tr, s.push.ToChild(ctx, cmd.Q, cmd.HouseholdID(), tr.ChildID, key, n)
 }
 
 // AnswerInboxItem answers a child's "Ask for more time".

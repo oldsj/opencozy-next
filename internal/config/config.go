@@ -84,7 +84,28 @@ type Config struct {
 	// key). Unset means no push is enqueued or sent.
 	APNsKeyID string `env:"APNS_KEY_ID"`
 	APNsKey   string `env:"APNS_KEY"`
+
+	// Slice 10b: single sign-on with an OpenID Connect provider (design §6). Set the issuer,
+	// client ID and client secret together, or none of them (single sign-on off). The provider's
+	// redirect URI is PUBLIC_ORIGIN + OIDCCallbackPath, so PUBLIC_ORIGIN is required with them.
+
+	// OIDCIssuer is the provider's issuer URL, exactly as its discovery document says it
+	// (https). Changing it later unlinks everyone: links belong to an issuer.
+	OIDCIssuer string `env:"OIDC_ISSUER"`
+	// OIDCClientID is OpenCozy's client ID at the provider.
+	OIDCClientID string `env:"OIDC_CLIENT_ID"`
+	// OIDCClientSecret is the confidential client's secret. Secret.
+	OIDCClientSecret string `env:"OIDC_CLIENT_SECRET"`
+	// OIDCName is the button's text after "Sign in with".
+	OIDCName string `env:"OIDC_NAME" envDefault:"single sign-on"`
 }
+
+// OIDCCallbackPath is where the provider sends the browser back: the old app's path, so the
+// redirect URI registered at the provider keeps working.
+const OIDCCallbackPath = "/api/auth/callback/oidc"
+
+// OIDCEnabled reports whether single sign-on is set up.
+func (c Config) OIDCEnabled() bool { return c.OIDCIssuer != "" }
 
 // PushEnabled reports whether APNs is configured.
 func (c Config) PushEnabled() bool { return c.APNsKeyID != "" }
@@ -117,6 +138,7 @@ func (c Config) validate() error {
 	}
 	errs = append(errs, c.validateWebAuthn()...)
 	errs = append(errs, c.validateApple()...)
+	errs = append(errs, c.validateOIDC()...)
 	if c.PublicOrigin != "" && !validOrigin(c.PublicOrigin) {
 		errs = append(errs, fmt.Errorf("PUBLIC_ORIGIN: %q must be https://host[:port] (http only for localhost)", c.PublicOrigin))
 	}
@@ -191,6 +213,36 @@ func (c Config) validateApple() []error {
 	return errs
 }
 
+func (c Config) validateOIDC() []error {
+	set := 0
+	for _, v := range []string{c.OIDCIssuer, c.OIDCClientID, c.OIDCClientSecret} {
+		if v != "" {
+			set++
+		}
+	}
+	switch set {
+	case 0:
+		return nil
+	case 3:
+	default:
+		return []error{errors.New("OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together: set all three, or none")}
+	}
+	var errs []error
+	if !validIssuer(c.OIDCIssuer) {
+		errs = append(errs, fmt.Errorf("OIDC_ISSUER: %q must be an https URL with no query, fragment or user", c.OIDCIssuer))
+	}
+	if len(c.OIDCClientID) > 255 || strings.TrimSpace(c.OIDCClientID) != c.OIDCClientID {
+		errs = append(errs, errors.New("OIDC_CLIENT_ID must be at most 255 characters, with no surrounding spaces"))
+	}
+	if n := len([]rune(strings.TrimSpace(c.OIDCName))); n < 1 || n > 40 {
+		errs = append(errs, errors.New("OIDC_NAME must be 1 to 40 characters"))
+	}
+	if c.PublicOrigin == "" {
+		errs = append(errs, errors.New("PUBLIC_ORIGIN is required with OIDC_ISSUER: the provider's redirect URI is PUBLIC_ORIGIN"+OIDCCallbackPath))
+	}
+	return errs
+}
+
 // validAPNsKey reports whether k is a .p8 key: PEM, PKCS #8, P-256 (as push.ParseKey reads it).
 func validAPNsKey(k string) bool {
 	block, _ := pem.Decode([]byte(k))
@@ -203,6 +255,16 @@ func validAPNsKey(k string) bool {
 	}
 	ec, ok := key.(*ecdsa.PrivateKey)
 	return ok && ec.Curve == elliptic.P256()
+}
+
+// validIssuer reports whether u is an issuer URL OpenCozy will use: https, with a host and no
+// query, fragment or user info. Only an e2e build may use http on 127.0.0.1.
+func validIssuer(u string) bool {
+	p, err := url.Parse(u)
+	if err != nil || p.Host == "" || p.RawQuery != "" || p.ForceQuery || p.Fragment != "" || p.User != nil || p.Opaque != "" {
+		return false
+	}
+	return p.Scheme == "https" || (E2EBuild && p.Scheme == "http" && p.Hostname() == "127.0.0.1")
 }
 
 func isLocalDatabase(url string) bool {
