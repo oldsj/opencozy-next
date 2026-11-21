@@ -50,7 +50,7 @@ test('pair a child’s iPad, open the kid view, tick a chore, unpair it', async 
   await adult.goto('/login');
   await adult.getByLabel('Email').fill(owner.email);
   await adult.getByLabel('Password').fill(owner.password);
-  await adult.getByRole('button', { name: 'Sign in' }).click();
+  await adult.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
   // A child with a chore on every day.

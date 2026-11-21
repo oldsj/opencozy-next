@@ -34,7 +34,7 @@ test('the chore loop: pair the display, do a chore, approve it, spend the points
   await adult.goto('/login');
   await adult.getByLabel('Email').fill(owner.email);
   await adult.getByLabel('Password').fill(owner.password);
-  await adult.getByRole('button', { name: 'Sign in' }).click();
+  await adult.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await adult.goto('/displays');
   await adult.getByLabel('Code on the display').fill(shown);

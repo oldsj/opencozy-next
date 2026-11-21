@@ -1,10 +1,13 @@
 import { execFileSync } from 'node:child_process';
 
 import { serveFeeds } from './feed';
+import { serveOIDC } from './oidc';
+import { owner } from './owner';
+
+export { owner };
 
 // There is no sign-up: the e2e owner is made with the CLI, as a real installation's would be.
 // A rerun against the same database finds the owner already there.
-export const owner = { email: 'e2e-owner@example.test', password: 'a long enough password' };
 
 export default async function globalSetup() {
   // bin/app is an e2e build (make build-e2e), which refuses to run without OPENCOZY_E2E_BUILD.
@@ -21,6 +24,6 @@ export default async function globalSetup() {
     const { stdout, stderr } = e as { stdout?: Buffer; stderr?: Buffer };
     if (!`${String(stdout ?? '')}${String(stderr ?? '')}`.includes('already exists')) throw e;
   }
-  const feeds = await serveFeeds();
-  return () => new Promise<void>((resolve) => { feeds.close(() => { resolve(); }); });
+  const servers = [await serveFeeds(), await serveOIDC()];
+  return () => Promise.all(servers.map((s) => new Promise<void>((resolve) => { s.close(() => { resolve(); }); }))).then(() => undefined);
 }

@@ -110,7 +110,7 @@ build: ## The single binary with the SPA embedded, in bin/app
 	CGO_ENABLED=0 go build -tags embedweb -trimpath -o bin/app ./cmd/app
 
 .PHONY: build-e2e
-build-e2e: ## bin/app as an e2e build: its calendar client may reach 127.0.0.1 (never ship it)
+build-e2e: ## bin/app as an e2e build: its calendar and single sign-on clients may reach 127.0.0.1 (never ship it)
 	$(PNPM) build
 	CGO_ENABLED=0 go build -tags embedweb,e2e -trimpath -o bin/app ./cmd/app
 
