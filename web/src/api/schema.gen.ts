@@ -2141,8 +2141,114 @@ export interface components {
             submittedAt: string;
             minutesRequested?: number;
         };
+        /** @enum {string} */
+        TvPower: "on" | "off" | "unknown";
+        /** @description HH:MM, household time */
+        Clock: string;
+        /** @enum {string} */
+        Weekday: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+        /** @description One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day. */
+        OpenHours: {
+            start: components["schemas"]["Clock"];
+            end: components["schemas"]["Clock"];
+            days?: components["schemas"]["Weekday"][];
+        };
+        Tv: {
+            id: components["schemas"]["Id"];
+            name: string;
+            room: string | null;
+            macs: string[];
+            haEntityId: string | null;
+            power: components["schemas"]["TvPower"];
+            /** Format: date-time */
+            powerChangedAt: string | null;
+            openHours: components["schemas"]["OpenHours"] | null;
+            version: components["schemas"]["Version"];
+        };
+        /** @description Open until closesAt, or closed until opensAt */
+        WindowStatus: {
+            open: boolean;
+            /** Format: date-time */
+            closesAt?: string;
+            /** Format: date-time */
+            opensAt?: string;
+        };
+        TvSession: {
+            id: components["schemas"]["Id"];
+            tvId: components["schemas"]["Id"];
+            tvName: string;
+            /** @enum {string} */
+            watcher: "parents" | "child";
+            childId: components["schemas"]["Id"] | null;
+            childName: string | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** @enum {string|null} */
+            endReason: "tv_off" | "time_up" | "parent_ended" | "done" | "open_hours" | "parent_override" | null;
+            /**
+             * Format: date-time
+             * @description A running session's end at the latest (parents, the 4-hour safety cap)
+             */
+            endsAt: string | null;
+            secondsRemaining: number | null;
+            /** @description The child's allowed hours end it before their time runs out */
+            endsWithHours: boolean;
+            watchedSeconds: number;
+        };
+        TvPrompt: {
+            id: components["schemas"]["Id"];
+            version: components["schemas"]["Version"];
+            /** @enum {string} */
+            source: "home_assistant" | "router" | "display" | "adult";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description A TV and where it stands now. */
+        TvState: components["schemas"]["Tv"] & {
+            /** @description Online without a session (open hours, or opened by a parent) */
+            open: boolean;
+            /**
+             * Format: date-time
+             * @description When the open TV is gated again; null while gated
+             */
+            openClosesAt: string | null;
+            /**
+             * Format: date-time
+             * @description A parent's "Open TVs" end, while one is active
+             */
+            openUntil: string | null;
+            /** @enum {string|null} */
+            openReason: "open_hours" | "parent" | null;
+            openHoursNow: components["schemas"]["WindowStatus"] | null;
+            session: components["schemas"]["TvSession"] | null;
+            prompt: components["schemas"]["TvPrompt"] | null;
+        };
+        /** @description A live child as "Turn on for…" and "Who's watching?" offer them. */
+        TvChild: {
+            childId: components["schemas"]["Id"];
+            name: string;
+            color: string;
+            tvSecondsRemaining: number;
+            watchingTvId: components["schemas"]["Id"] | null;
+            /** @description The child's allowed hours now; null with no rule */
+            hours: components["schemas"]["WindowStatus"] | null;
+            /** @description Has TV time, is inside their hours and isn't watching another TV */
+            canWatch: boolean;
+            /** @description canWatch, not watching, and has a paired device to start it from */
+            canStartOwn: boolean;
+        };
+        TvList: {
+            /** Format: date-time */
+            serverTime: string;
+            tvs: components["schemas"]["TvState"][];
+            children: components["schemas"]["TvChild"][];
+        };
         Inbox: {
             items: components["schemas"]["InboxItem"][];
+            /** @description The TVs asking "Who's watching?" now (only those), with each child's TV time, to answer with answerTvPrompt. */
+            tvs: components["schemas"]["TvList"];
         };
         Decision: {
             id: components["schemas"]["Id"];
@@ -2177,10 +2283,10 @@ export interface components {
             endsAt: string;
         };
         /** @description A time of day, HH:MM, 24-hour, household time */
-        Clock: string;
+        "Clock-2": string;
         HoursWindow: {
-            start: components["schemas"]["Clock"];
-            end: components["schemas"]["Clock"];
+            start: components["schemas"]["Clock-2"];
+            end: components["schemas"]["Clock-2"];
         };
         AllowedHours: {
             schoolNight: components["schemas"]["HoursWindow"];
@@ -2282,14 +2388,6 @@ export interface components {
             endsAt: string;
             secondsRemaining: number;
             endsWithHours: boolean;
-        };
-        /** @description Open until closesAt, or closed until opensAt */
-        WindowStatus: {
-            open: boolean;
-            /** Format: date-time */
-            closesAt?: string;
-            /** Format: date-time */
-            opensAt?: string;
         };
         ChildTv: {
             /** Format: date-time */
@@ -2583,102 +2681,6 @@ export interface components {
              * @description The child's balance now
              */
             balance: number;
-        };
-        /** @enum {string} */
-        TvPower: "on" | "off" | "unknown";
-        /** @description HH:MM, household time */
-        "Clock-2": string;
-        /** @enum {string} */
-        Weekday: "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
-        /** @description One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day. */
-        OpenHours: {
-            start: components["schemas"]["Clock-2"];
-            end: components["schemas"]["Clock-2"];
-            days?: components["schemas"]["Weekday"][];
-        };
-        Tv: {
-            id: components["schemas"]["Id"];
-            name: string;
-            room: string | null;
-            macs: string[];
-            haEntityId: string | null;
-            power: components["schemas"]["TvPower"];
-            /** Format: date-time */
-            powerChangedAt: string | null;
-            openHours: components["schemas"]["OpenHours"] | null;
-            version: components["schemas"]["Version"];
-        };
-        TvSession: {
-            id: components["schemas"]["Id"];
-            tvId: components["schemas"]["Id"];
-            tvName: string;
-            /** @enum {string} */
-            watcher: "parents" | "child";
-            childId: components["schemas"]["Id"] | null;
-            childName: string | null;
-            /** Format: date-time */
-            startedAt: string;
-            /** Format: date-time */
-            endedAt: string | null;
-            /** @enum {string|null} */
-            endReason: "tv_off" | "time_up" | "parent_ended" | "done" | "open_hours" | "parent_override" | null;
-            /**
-             * Format: date-time
-             * @description A running session's end at the latest (parents, the 4-hour safety cap)
-             */
-            endsAt: string | null;
-            secondsRemaining: number | null;
-            /** @description The child's allowed hours end it before their time runs out */
-            endsWithHours: boolean;
-            watchedSeconds: number;
-        };
-        TvPrompt: {
-            id: components["schemas"]["Id"];
-            version: components["schemas"]["Version"];
-            /** @enum {string} */
-            source: "home_assistant" | "router" | "display" | "adult";
-            /** Format: date-time */
-            createdAt: string;
-        };
-        /** @description A TV and where it stands now. */
-        TvState: components["schemas"]["Tv"] & {
-            /** @description Online without a session (open hours, or opened by a parent) */
-            open: boolean;
-            /**
-             * Format: date-time
-             * @description When the open TV is gated again; null while gated
-             */
-            openClosesAt: string | null;
-            /**
-             * Format: date-time
-             * @description A parent's "Open TVs" end, while one is active
-             */
-            openUntil: string | null;
-            /** @enum {string|null} */
-            openReason: "open_hours" | "parent" | null;
-            openHoursNow: components["schemas"]["WindowStatus"] | null;
-            session: components["schemas"]["TvSession"] | null;
-            prompt: components["schemas"]["TvPrompt"] | null;
-        };
-        /** @description A live child as "Turn on for…" and "Who's watching?" offer them. */
-        TvChild: {
-            childId: components["schemas"]["Id"];
-            name: string;
-            color: string;
-            tvSecondsRemaining: number;
-            watchingTvId: components["schemas"]["Id"] | null;
-            /** @description The child's allowed hours now; null with no rule */
-            hours: components["schemas"]["WindowStatus"] | null;
-            /** @description Has TV time, is inside their hours and isn't watching another TV */
-            canWatch: boolean;
-            /** @description canWatch, not watching, and has a paired device to start it from */
-            canStartOwn: boolean;
-        };
-        TvList: {
-            /** Format: date-time */
-            serverTime: string;
-            tvs: components["schemas"]["TvState"][];
-            children: components["schemas"]["TvChild"][];
         };
         TvName: string;
         Room: string | null;

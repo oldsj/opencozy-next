@@ -165,6 +165,12 @@ func TestTVChildSessionSpendsTimeAndEnds(t *testing.T) {
 	mac := "02:00:5e:10:00:01"
 	state := e.tvState(e.h.tv)
 	prompt := state["prompt"].(map[string]any)
+	// The inbox carries the TV asking, with the children to choose from (the iOS app reads only it).
+	inbox := e.send(e.adult, "GET", "/api/inbox", nil)
+	if tvs, _ := inbox.body["tvs"].(map[string]any); inbox.status != 200 || tvs == nil || len(tvs["tvs"].([]any)) != 1 || len(tvs["children"].([]any)) == 0 ||
+		tvs["tvs"].([]any)[0].(map[string]any)["prompt"].(map[string]any)["id"] != prompt["id"] {
+		t.Fatalf("inbox: %d %s", inbox.status, inbox.raw)
+	}
 	if len(e.allowances()) != 0 {
 		t.Fatal("a gated TV is allowed")
 	}

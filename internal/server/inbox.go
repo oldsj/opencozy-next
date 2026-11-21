@@ -38,6 +38,13 @@ func (s *Server) GetInbox(ctx context.Context, _ api.GetInboxRequestObject) (api
 		}
 		out.Items[i] = it
 	}
+	snap, err := s.tvRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if out.Tvs, err = snap.Asking(ctx); err != nil {
+		return nil, err
+	}
 	return api.GetInbox200JSONResponse(out), nil
 }
 

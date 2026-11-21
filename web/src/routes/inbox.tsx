@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button, EmptyState, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type InboxItem } from '../api/client';
+import { TV_REFRESH_MS } from './tv';
 import { TvsAsking } from './tvs';
 
 export const REJECT_REASON_MAX = 200;
@@ -21,7 +22,8 @@ const when = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numer
 // leaves the chore on the child's list with the reason beside it.
 export function InboxPage() {
   const queryClient = useQueryClient();
-  const inbox = $api.useQuery('get', '/inbox', {}, { refetchInterval: 30_000 });
+  // As often as the TVs page: a TV asking "Who's watching?" is waiting to go online.
+  const inbox = $api.useQuery('get', '/inbox', {}, { refetchInterval: TV_REFRESH_MS });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['get', '/inbox'] });
   const approve = $api.useMutation('post', '/inbox/{itemId}/approve', { onSettled: refresh });
   const reject = $api.useMutation('post', '/inbox/{itemId}/reject', { onSettled: refresh });
@@ -45,7 +47,7 @@ export function InboxPage() {
     <section className="flex flex-col gap-6">
       <PageHeader title="Inbox" description="Approve what the children finished. Oldest first." />
       {error && <Notice tone="error">{errorMessage(error)}</Notice>}
-      <TvsAsking />
+      <TvsAsking list={inbox.data?.tvs} />
       {items.length > 0 ? (
         <Section title="Waiting for you" count={items.length}>
           <List aria-label="Waiting for you">
@@ -81,7 +83,7 @@ export function InboxPage() {
           </List>
         </Section>
       ) : (
-        inbox.isSuccess && <EmptyState title="Nothing waiting" description="When a child finishes a chore or routine, it shows here." variant="surface" />
+        inbox.isSuccess && !inbox.data.tvs.tvs.length && <EmptyState title="Nothing waiting" description="When a child finishes a chore or routine, it shows here." variant="surface" />
       )}
       <Sheet
         open={sendingBack !== null}

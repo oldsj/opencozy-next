@@ -42,6 +42,7 @@ import {
   whoChoices,
   type OpenDuration,
   type TvChild,
+  type TvList,
   type TvState,
   type WhoChoice,
 } from './tv';
@@ -61,7 +62,8 @@ export function useTvs() {
  */
 export function WhoIsWatching({ tv, kids }: { tv: TvState; kids: readonly TvChild[] }) {
   const queryClient = useQueryClient();
-  const refresh = () => queryClient.invalidateQueries(tvsKey);
+  // Answered here, on the TVs page or in the inbox: both show it.
+  const refresh = () => Promise.all([queryClient.invalidateQueries(tvsKey), queryClient.invalidateQueries({ queryKey: ['get', '/inbox'] })]);
   // A tap retried after a lost answer reuses its key, so the server answers it once.
   const attempts = useAttempts();
   const answer = $api.useMutation('post', '/tv-prompts/{promptId}/answer', { onSettled: refresh });
@@ -93,12 +95,11 @@ export function WhoIsWatching({ tv, kids }: { tv: TvState; kids: readonly TvChil
   );
 }
 
-/** The TVs asking "Who's watching?", for the top of the inbox. Nothing when none are. */
-export function TvsAsking() {
-  const { tvs } = useTvs();
-  const asking = tvs.data?.tvs.filter((t) => t.prompt) ?? [];
+/** The TVs asking "Who's watching?" (the inbox's `tvs`), for its top. Nothing when none are. */
+export function TvsAsking({ list }: { list: TvList | undefined }) {
+  const asking = list?.tvs.filter((t) => t.prompt) ?? [];
   if (!asking.length) return null;
-  const kids = tvs.data?.children ?? [];
+  const kids = list?.children ?? [];
   return (
     <Section title="Who’s watching?" count={asking.length} description="These TVs are on, and stay offline until you choose.">
       <List aria-label="TVs asking who’s watching">

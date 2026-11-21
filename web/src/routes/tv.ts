@@ -4,6 +4,7 @@ import type { Choice } from '@app/design';
 
 import type { components } from '../api/schema.gen';
 
+export type TvList = components['schemas']['TvList'];
 export type TvState = components['schemas']['TvState'];
 export type TvChild = components['schemas']['TvChild'];
 export type TvSession = components['schemas']['TvSession'];
