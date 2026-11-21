@@ -116,7 +116,8 @@ it they skip locally and fail in CI.
 
 ## Deploying
 
-The chart in `charts/<app>/` is the deploy artifact. Any change under it needs a `version` bump
+Every setting a deployment needs (env, chart values, router, Home Assistant, Google, Apple,
+apps) is in `docs/deploy.md`; keep it current when you add one. The chart in `charts/<app>/` is the deploy artifact. Any change under it needs a `version` bump
 in `Chart.yaml` (`make chart` checks). A release sets `appVersion` to the image tag (the commit
 SHA) and `image.digest` in the deployment's values file, which lives outside this repository.
 Don't deploy from this repository.

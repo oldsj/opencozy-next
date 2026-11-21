@@ -104,7 +104,7 @@ func TestEditRewardsAndRedemptions(t *testing.T) {
 		}
 		return r.body["redemptions"].([]any)
 	}
-	if got := list("approved"); len(got) != 1 || got[0].(map[string]any)["child"].(map[string]any)["id"] != h.child1.String() {
+	if got := list("approved"); len(got) != 1 || got[0].(map[string]any)["child"].(map[string]any)["id"] != h.child1.String() || got[0].(map[string]any)["cancellable"] != true {
 		t.Fatalf("approved: %v", got)
 	}
 	red := "/api/redemptions/" + h.redemption.String()
@@ -112,7 +112,7 @@ func TestEditRewardsAndRedemptions(t *testing.T) {
 		t.Errorf("stale fulfil: %d %s", r.status, r.raw)
 	}
 	r = e.send(adult, "POST", red+"/fulfil", map[string]any{"expectedVersion": 1})
-	if r.status != 200 || r.body["status"] != "fulfilled" || r.body["fulfilledAt"] == nil {
+	if r.status != 200 || r.body["status"] != "fulfilled" || r.body["fulfilledAt"] == nil || r.body["cancellable"] != false {
 		t.Fatalf("fulfil: %d %s", r.status, r.raw)
 	}
 	if r := e.send(adult, "POST", red+"/fulfil", map[string]any{"expectedVersion": 2}); r.status != 409 || r.code() != "not_approved" {
