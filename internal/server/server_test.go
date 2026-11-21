@@ -463,8 +463,9 @@ func TestDisplayPairing(t *testing.T) {
 		t.Fatalf("stale sign-in: %d %s", r.status, r.raw)
 	}
 	// Typed loosely: lower case, with spaces.
-	created := pair(h.actors["adult"], strings.ToLower(code[:3]+" "+code[3:]))
-	if created.status != 201 {
+	// Given only tv, it gets today too: every display shows Today.
+	created := e.send(h.actors["adult"], "POST", "/api/displays", map[string]any{"code": strings.ToLower(code[:3] + " " + code[3:]), "name": "Kitchen", "scopes": []string{"tv"}})
+	if created.status != 201 || fmt.Sprint(created.body["scopes"]) != "[today tv]" {
 		t.Fatalf("pair: %d %s", created.status, created.raw)
 	}
 	if r := pair(h.actors["adult"], code); r.status != 404 {

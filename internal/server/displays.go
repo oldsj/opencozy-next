@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -175,9 +176,12 @@ func (s *Server) CreateDisplay(ctx context.Context, req api.CreateDisplayRequest
 	if err != nil {
 		return nil, err
 	}
-	scopes := make([]string, len(req.Body.Scopes))
-	for i, sc := range req.Body.Scopes {
-		scopes[i] = string(sc)
+	// Every display shows Today: the board, its tabs and its session all need it.
+	scopes := []string{string(api.DisplayScopeToday)}
+	for _, sc := range req.Body.Scopes {
+		if !slices.Contains(scopes, string(sc)) {
+			scopes = append(scopes, string(sc))
+		}
 	}
 	d, err := cmd.Q.CreateDisplay(ctx, dbq.CreateDisplayParams{HouseholdID: h, Name: strings.TrimSpace(req.Body.Name), Scopes: scopes, Now: now})
 	if err != nil {

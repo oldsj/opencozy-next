@@ -378,7 +378,7 @@ export interface paths {
         put?: never;
         /**
          * Pair the wall display showing this code
-         * @description Needs a sign-in within the last 10 minutes.
+         * @description Needs a sign-in within the last 10 minutes. Every display gets `today`, whatever else it is given.
          */
         post: operations["createDisplay"];
         delete?: never;
