@@ -1,6 +1,18 @@
 -- Fictional rows for the importer's fixture tests, in the old app's schema (old_schema.sql).
 -- Names come from the old app's fictional dev seed; addresses use example.test. The credential
 -- secrets and the password were made for this fixture and are in importer_test.go.
+--
+-- IDs are 0190a000-0000-7000-8000-000000000NNN. To keep branches from colliding, each group adds
+-- new rows only in its own range (rows already here keep their IDs):
+--   0000xx  households, children, adults, credentials (the base)
+--   0001xx  the ledger (#59) and chores, routines, approvals (#65)
+--   0002xx  calendars and Google connections (#60)
+--   0003xx  rewards and redemptions (#68)
+--   0004xx  child devices and passkeys (#70)
+--   0005xx  banked iPad time, grants, requests (#75)
+--   0006xx  banked TV time (#78)
+--   0007xx  phone push (slice 11)
+--   0009xx  TVs (#56)
 SET search_path TO opencozy;
 
 INSERT INTO household (id, name, time_zone, created_at, archived_at, lock_message, game_portal_domains, game_domains)
@@ -145,6 +157,19 @@ INSERT INTO chore_active_award (household_id, occurrence_id, ledger_id) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000112', '0190a000-0000-7000-8000-000000000144');
 INSERT INTO completion_approval (household_id, id, child_id, chore_occurrence_id, title_snapshot, points_snapshot, local_day, state, version, request_command_id, requested_at, decided_at, decided_by, ledger_id) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000181', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-000000000111', 'Feed the cat', 5, '2026-03-09', 'approved', 2, '0190a000-0000-7000-8000-000000000182', '2026-03-09T17:00:00Z', '2026-03-09T18:00:00Z', 'fixtureOwnerUser01', '0190a000-0000-7000-8000-000000000141');
+
+-- Slices 2/3: more chores and approvals. Rowan waters the plants on Mondays, Wednesdays and
+-- Sundays, and is waiting for an answer on Wednesday's (an earlier ask was taken back). Avery
+-- has a one-off chore never done. Rowan's Tuesday routine, undone, was then sent back.
+INSERT INTO chore_definition (household_id, id, assigned_child_id, title, points, schedule_kind, scheduled_day, weekdays, version, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000107', '0190a000-0000-7000-8000-0000000000c2', 'Water the plants', 2, 'weekdays', NULL, '{1,3,7}', 3, '2026-03-02T08:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000108', '0190a000-0000-7000-8000-0000000000c1', 'Return library books', 4, 'once', '2026-03-20', NULL, 1, '2026-03-02T08:00:00Z');
+INSERT INTO chore_occurrence (household_id, id, chore_id, assigned_child_id, local_day, time_zone_snapshot, title_snapshot, points_snapshot, schedule_kind_snapshot, weekdays_snapshot, definition_version, version, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000113', '0190a000-0000-7000-8000-000000000107', '0190a000-0000-7000-8000-0000000000c2', '2026-03-11', 'Europe/Amsterdam', 'Water the plants', 2, 'weekdays', '{1,3,7}', 3, 3, '2026-03-11T06:00:00Z');
+INSERT INTO completion_approval (household_id, id, child_id, chore_occurrence_id, routine_occurrence_id, title_snapshot, points_snapshot, local_day, state, version, request_command_id, requested_at, decided_at, decided_by, reason) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000184', '0190a000-0000-7000-8000-0000000000c2', '0190a000-0000-7000-8000-000000000113', NULL, 'Water the plants', 2, '2026-03-11', 'withdrawn', 2, '0190a000-0000-7000-8000-000000000186', '2026-03-11T15:00:00Z', '2026-03-11T15:01:00Z', NULL, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000183', '0190a000-0000-7000-8000-0000000000c2', '0190a000-0000-7000-8000-000000000113', NULL, 'Water the plants', 2, '2026-03-11', 'pending', 1, '0190a000-0000-7000-8000-000000000187', '2026-03-11T16:00:00Z', NULL, NULL, NULL),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000185', '0190a000-0000-7000-8000-0000000000c2', NULL, '0190a000-0000-7000-8000-000000000122', 'Morning routine', 3, '2026-03-10', 'rejected', 2, '0190a000-0000-7000-8000-000000000188', '2026-03-10T08:00:00Z', '2026-03-10T08:10:00Z', 'fixtureSecondUser2', 'Bed not made');
 
 -- Slice 9: a TV with open hours and two MACs, a removed TV, two ended sessions (a child's
 -- started from her device, a parents one a parent ended by opening the TV), the opening and
