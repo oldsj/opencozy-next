@@ -25,10 +25,12 @@ const everyDay = 127
 //   - Routine steps become routine_step rows with their old IDs, in order.
 //   - Every old occurrence becomes the new occurrence of the same definition and household day
 //     (internal/occurrence), the ID the ledger import already points at. Its state follows from
-//     its history: complete while it has an award not reversed, pending while it waits for an
-//     adult, otherwise open, with the reason if an adult last sent it back.
-//   - Approvals keep their IDs, child, title, points, state, reason, times and who decided.
-//     Requests the child took back (withdrawn) are not carried: nobody decided them.
+//     its history: complete while it has an award not reversed, otherwise open, with the reason
+//     if an adult last sent it back.
+//   - Decided approvals keep their IDs, child, title, points, state, reason, times and who
+//     decided. Requests still waiting for an adult are not carried (James, 2026-11-21): the
+//     report counts them and their points, and the child marks the chore done again. Requests
+//     the child took back (withdrawn) are not carried either: nobody decided them.
 func importChores(ctx context.Context, x *run) error {
 	if err := importChoreDefinitions(ctx, x); err != nil {
 		return err
@@ -264,8 +266,6 @@ func importOccurrences(ctx context.Context, x *run) error {
 		switch {
 		case o.awarded:
 			state = "complete"
-		case o.approval != nil && *o.approval == "pending":
-			state = "pending"
 		case o.approval != nil && *o.approval == "rejected":
 			rejected = o.reason
 		}
@@ -332,7 +332,7 @@ func importApprovals(ctx context.Context, x *run) error {
 		FROM opencozy.completion_approval a
 		LEFT JOIN opencozy.chore_occurrence co ON co.household_id = a.household_id AND co.id = a.chore_occurrence_id
 		LEFT JOIN opencozy.routine_occurrence ro ON ro.household_id = a.household_id AND ro.id = a.routine_occurrence_id
-		WHERE a.state <> 'withdrawn'
+		WHERE a.state IN ('approved', 'rejected')
 		ORDER BY a.requested_at, a.id`)
 	if err != nil {
 		return safe(err)
@@ -358,32 +358,25 @@ func importApprovals(ctx context.Context, x *run) error {
 	if err := rows.Err(); err != nil {
 		return safe(err)
 	}
-	var n, pending, pendingPoints, unknownDecider int64
+	var n, unknownDecider int64
 	for _, a := range all {
 		kind := "routine"
 		if a.chore {
 			kind = "completion"
 		}
-		version := int32(1)
 		var by *uuid.UUID
-		if a.state != "pending" {
-			version = 2
-			if a.decidedBy != nil {
-				if ad, ok := x.adults[*a.decidedBy]; ok {
-					by = &ad.id
-				} else {
-					unknownDecider++
-				}
+		if a.decidedBy != nil {
+			if ad, ok := x.adults[*a.decidedBy]; ok {
+				by = &ad.id
+			} else {
+				unknownDecider++
 			}
-		} else {
-			pending++
-			pendingPoints += int64(a.points)
 		}
 		d := day.Date{Year: a.localDay.Year(), Month: a.localDay.Month(), Day: a.localDay.Day()}
 		if _, err := x.dst.Exec(ctx, `INSERT INTO approval (id, household_id, child_id, kind, occurrence_id, title, points, state, reason,
 			version, decided_at, decided_by, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 			a.id, a.household, a.child, kind, occurrence.ID(a.definition, d), a.title, a.points, a.state, a.reason,
-			version, a.decided, by, a.requested); err != nil {
+			2, a.decided, by, a.requested); err != nil {
 			return safe(err)
 		}
 		n++
@@ -397,27 +390,21 @@ func importApprovals(ctx context.Context, x *run) error {
 		return err
 	}
 	x.r.table("completion_approval", src, "approval", n, got)
-	if src > n {
-		x.r.note("completion_approval", fmt.Sprintf("%d withdrawn (taken back before anyone decided), not carried", src-n))
+	var waiting, withdrawn, waitingPoints int64
+	if err := x.src.QueryRow(ctx, `SELECT count(*) FILTER (WHERE state = 'pending'), count(*) FILTER (WHERE state = 'withdrawn'),
+		COALESCE(sum(points_snapshot) FILTER (WHERE state = 'pending'), 0)::bigint FROM opencozy.completion_approval`).
+		Scan(&waiting, &withdrawn, &waitingPoints); err != nil {
+		return safe(err)
+	}
+	x.r.check("completion_approval rows read = carried + waiting + withdrawn", src, n+waiting+withdrawn)
+	if waiting > 0 {
+		x.r.note("completion_approval", fmt.Sprintf("%d still waiting for an adult (%d points) not carried: the chore is open again, the child marks it done again", waiting, waitingPoints))
+	}
+	if withdrawn > 0 {
+		x.r.note("completion_approval", fmt.Sprintf("%d withdrawn (taken back before anyone decided), not carried", withdrawn))
 	}
 	if unknownDecider > 0 {
 		x.r.note("completion_approval", fmt.Sprintf("%d decided by someone who is not an adult here: decider left empty", unknownDecider))
-	}
-
-	// §13: pending approvals and the points they hold.
-	var oldPending, oldPoints, newPending, newPoints int64
-	if err := x.src.QueryRow(ctx, `SELECT count(*), COALESCE(sum(points_snapshot), 0)::bigint FROM opencozy.completion_approval
-		WHERE state = 'pending'`).Scan(&oldPending, &oldPoints); err != nil {
-		return safe(err)
-	}
-	if err := x.dst.QueryRow(ctx, `SELECT count(*), COALESCE(sum(points), 0)::bigint FROM approval
-		WHERE state = 'pending' AND kind IN ('completion', 'routine')`).Scan(&newPending, &newPoints); err != nil {
-		return safe(err)
-	}
-	x.r.check("pending chore and routine approvals", oldPending, newPending)
-	x.r.check("points they hold", oldPoints, newPoints)
-	if pending != newPending || pendingPoints != newPoints {
-		x.r.check("pending approvals written", pending, newPending)
 	}
 	return nil
 }

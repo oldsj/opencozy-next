@@ -20,7 +20,7 @@ func TestChoresRoutinesAndApprovalsCommit(t *testing.T) {
 	}
 	ctx := context.Background()
 	db := target.Owner
-	for _, note := range []string{"1 live one-off chores arrive archived", "1 of them never done", "1 withdrawn"} {
+	for _, note := range []string{"1 live one-off chores arrive archived", "1 of them never done", "1 withdrawn", "1 still waiting for an adult (2 points) not carried"} {
 		if !strings.Contains(out, note) {
 			t.Errorf("the report does not say %q\n%s", note, out)
 		}
@@ -51,7 +51,7 @@ func TestChoresRoutinesAndApprovalsCommit(t *testing.T) {
 	}{
 		{occ("000000000101", 9), "complete", "", 0},          // approved
 		{occ("000000000101", 10), "complete", "", 0},         // paid, undone, paid again
-		{occ("000000000107", 11), "pending", "", 0},          // waiting for an adult
+		{occ("000000000107", 11), "open", "", 0},             // was waiting for an adult: open again
 		{occ("000000000102", 9), "complete", "", 2},          // routine paid
 		{occ("000000000102", 10), "open", "Bed not made", 1}, // undone, then sent back
 	} {
@@ -63,16 +63,11 @@ func TestChoresRoutinesAndApprovalsCommit(t *testing.T) {
 		}
 	}
 
-	// Approvals keep IDs, state and who decided; the withdrawn one is gone; the pending one is in
-	// the inbox for its occurrence.
+	// Decided approvals keep IDs, state and who decided; the waiting and withdrawn ones are gone.
 	var approvals string
 	if err := db.QueryRow(ctx, `SELECT string_agg(right(a.id::text, 3) || ':' || a.kind || ':' || a.state || ':' || a.version || ':' || COALESCE(ad.email, '-'), ' ' ORDER BY a.id)
 		FROM approval a LEFT JOIN adult ad ON ad.id = a.decided_by`).Scan(&approvals); err != nil ||
-		approvals != "181:completion:approved:2:owner@example.test 183:completion:pending:1:- 185:routine:rejected:2:sam@example.test" {
+		approvals != "181:completion:approved:2:owner@example.test 185:routine:rejected:2:sam@example.test" {
 		t.Errorf("approvals: %q %v", approvals, err)
-	}
-	var pendingOcc uuid.UUID
-	if err := db.QueryRow(ctx, `SELECT occurrence_id FROM approval WHERE state = 'pending'`).Scan(&pendingOcc); err != nil || pendingOcc != occ("000000000107", 11) {
-		t.Errorf("pending approval's occurrence: %s %v", pendingOcc, err)
 	}
 }
