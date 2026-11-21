@@ -28,7 +28,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.goto('/login');
   await page.getByLabel('Email').fill(owner.email);
   await page.getByLabel('Password').fill(owner.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
   // Two children; Ada earns 14 points (an adult's tick counts at once) and has a chore to move.
@@ -134,8 +134,12 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   const tvRow = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: tv }) });
   await expect(tvRow.getByText('Offline until someone is watching')).toBeVisible();
   await page.getByRole('button', { name: 'Open TVs…' }).click();
+  // Only this TV: other specs (the journey) have TVs in the same household, which must stay gated.
+  for (const label of await page.getByRole('dialog').locator('label').filter({ has: page.getByRole('checkbox') }).all()) {
+    await label.getByRole('checkbox').setChecked((await label.innerText()).includes(tv));
+  }
   await page.getByRole('button', { name: '1 hour' }).click();
-  await page.getByRole('button', { name: /^Open (all TVs|Den TV)/ }).click();
+  await page.getByRole('button', { name: `Open ${tv}`, exact: true }).click();
   await expect(tvRow.getByText(/^Open until/)).toBeVisible();
   // "+1 hr" whose answer is lost after the server kept the TV open longer: tapping again is the
   // same command, so the TV is open one hour longer, not two.

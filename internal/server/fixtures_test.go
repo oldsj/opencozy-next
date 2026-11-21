@@ -221,9 +221,11 @@ type house struct {
 	reward                            uuid.UUID // costs 3
 	redemption                        uuid.UUID // child1 bought the reward; approved, waiting to be given
 	calendar, event                   uuid.UUID // an ICS calendar shown on displays, with one event
+	google                            uuid.UUID // a Google account that needs connecting again (no token)
 	passkey                           uuid.UUID // the adult's only passkey
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
+	phone                             uuid.UUID // a second parent phone, to sign out (not one of the actors)
 	tv, prompt                        uuid.UUID // a TV with one MAC, asking "Who's watching?"
 	credit                            uuid.UUID // child1's iPad grant, all used (so no banked time)
 	actors                            map[string]cred
@@ -282,6 +284,8 @@ func (e *env) house(label string, scopes []string) house {
 	e.exec(`INSERT INTO phone_session (household_id, adult_id, name, token_hash, expires_at)
 		VALUES ($1, $2, 'Phone', $3, now() + interval '90 days')`, h.id, h.adult, hash)
 	h.actors["phone"] = cred{bearer: tok}
+	h.phone = e.id(`INSERT INTO phone_session (household_id, adult_id, name, expires_at)
+		VALUES ($1, $2, 'Second phone', now() + interval '90 days') RETURNING id`, h.id, h.adult)
 
 	display := func(scopes []string) cred {
 		tok, hash, _ := auth.NewSessionToken()
@@ -299,6 +303,8 @@ func (e *env) house(label string, scopes []string) house {
 	series := e.id(`INSERT INTO calendar_series (household_id, source_id, uid, recurring) VALUES ($1, $2, 'picture-day@example.test', false) RETURNING id`, h.id, h.calendar)
 	h.event = e.id(`INSERT INTO calendar_event (household_id, source_id, series_id, recurrence_key, all_day, start_date, end_date, title, status)
 		VALUES ($1, $2, $3, 'single', true, '2026-09-16', '2026-09-17', 'Picture day', 'confirmed') RETURNING id`, h.id, h.calendar, series)
+	h.google = e.id(`INSERT INTO calendar_google_connection (household_id, subject, email, scope, needs_reconnect)
+		VALUES ($1, gen_random_uuid()::text, 'parent@example.test', 'openid', true) RETURNING id`, h.id)
 	h.rule = e.id(`INSERT INTO award_rule (household_id, activity_key, points, daily_limit) VALUES ($1, 'build_house', 5, 20) RETURNING id`, h.id)
 	h.link = e.id(`INSERT INTO learning_link (household_id, child_id, provider, external_id) VALUES ($1, $2, 'minecraft', 'Builder_42') RETURNING id`, h.id, h.child1)
 	h.recipe = e.id(`INSERT INTO recipe (household_id, title, servings) VALUES ($1, 'Soup', 2) RETURNING id`, h.id)

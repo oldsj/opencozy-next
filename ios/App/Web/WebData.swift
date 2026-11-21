@@ -75,10 +75,10 @@ final class WebDataGate {
 }
 
 /// Cookies from the web view's store, for the one native call that uses the web
-/// sign-in (`POST /api/parent-sessions`).
+/// sign-in (`POST /api/phone/sessions/web`).
 enum WebCookies {
-    /// The kid device's web-session cookie (`device-web.ts`).
-    static let deviceCookieNames: Set<String> = ["opencozy-device", "__Host-opencozy-device"]
+    /// The kid device's web-session cookie (`internal/actor` DeviceWebCookie).
+    static let deviceCookieNames: Set<String> = ["__Host-device", "opencozy-device", "__Host-opencozy-device"]
 
     /// The cookies a browser would send to `url`.
     static func matching(_ cookies: [HTTPCookie], url: URL, now: Date = Date()) -> [HTTPCookie] {
@@ -106,12 +106,12 @@ enum WebCookies {
     }
 }
 
-/// `POST /api/parent-sessions`: this phone's `ocp_` notification session from the
+/// `POST /api/phone/sessions/web`: this phone's `ocp_` notification session from the
 /// adult web sign-in. Sent natively (not from page JavaScript) with the web
 /// view's cookie and the canonical `Origin`, so the token never enters the page.
 enum ParentSessionMint {
     static func request(origin: URL, cookie: String, deviceName: String) throws -> URLRequest {
-        var request = URLRequest(url: origin.appending(path: "api/parent-sessions"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        var request = URLRequest(url: origin.appending(path: "api/phone/sessions/web"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.httpMethod = "POST"
         request.httpShouldHandleCookies = false
         request.setValue(cookie, forHTTPHeaderField: "Cookie")

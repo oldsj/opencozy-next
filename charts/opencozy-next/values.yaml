@@ -32,6 +32,13 @@ config:
   # The origin people reach OpenCozy at, e.g. https://cozy.example.test. Kid devices are told
   # it when they pair; empty means devices can't be paired.
   publicOrigin: ""
+  # Google calendar: the installation's own OAuth client ("Web application") in Google Cloud,
+  # with publicOrigin + /api/calendar/google/callback as its redirect URI. Empty turns Google off.
+  # It needs publicOrigin, egress.internet, OPENCOZY_SECRET_KEYS and the client's secret in
+  # secrets.env: `- name: GOOGLE_CLIENT_SECRET` / `key: google-client-secret`.
+  # After an import from the old app, reuse its OAuth client (and add the redirect URI above):
+  # imported tokens only work with the client that issued them.
+  googleClientID: ""
   # Passkeys: the site's hostname, which must never change once passkeys exist, and the
   # comma-separated origins they are used from. Empty turns passkeys off.
   webauthnRPID: ""
@@ -47,6 +54,13 @@ config:
     issuer: ""
     clientId: ""
     name: ""
+  # The iOS apps (slice 11). Team and bundle ID serve /.well-known/apple-app-site-association
+  # so the parent app can use this site's passkeys. With apnsKeyID too, and APNS_KEY (the .p8
+  # key's PEM) in secrets.env, the app pushes to parent phones and kid devices; that needs
+  # egress.internet for api.push.apple.com.
+  appleTeamID: ""
+  appleBundleID: ""
+  apnsKeyID: ""
 
 database:
   # cnpg.enabled: the chart makes a CloudNativePG Cluster named <fullname>-db, and the app
@@ -84,6 +98,8 @@ secrets:
   existingSecret: ""
   # - name: SMTP_PASSWORD
   #   key: smtp-password
+  # - name: APNS_KEY
+  #   key: apns-key
   env: []
 
 onepassword:

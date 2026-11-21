@@ -236,48 +236,18 @@ func importTVOpenEvents(ctx context.Context, x *run) error {
 	return reconcile(ctx, x, "tv_open_event", int64(len(all)), "tv_open_event")
 }
 
-// importTVCredits carries TV time whose redemption is imported; the rest waits for the rewards
-// import (pending). Each credit gets a new ID; granted_seconds is the redemption's minutes.
+// importTVCredits carries each child's banked TV time as one balance (James, 2026-11-21), as
+// importScreenTime does for the iPad: what the old credits still hold (seconds - used_seconds),
+// in day-sized credits, a grant from no one in particular (redemption and granted_by NULL), so a
+// parent can still take it back. The old app charged a session as it ran, so the balance already
+// holds an open session's rest.
 func importTVCredits(ctx context.Context, x *run) error {
-	x.r.columnsRead("tv_credit", "household_id", "redemption_id", "child_id", "target", "minutes", "seconds", "used_seconds", "created_at")
-	rows, err := x.src.Query(ctx, `SELECT household_id, redemption_id, child_id, minutes, seconds, used_seconds, created_at
-		FROM opencozy.tv_credit WHERE target = 'tv' ORDER BY household_id, created_at, redemption_id`)
-	if err != nil {
-		return safe(err)
-	}
-	type creditRow struct {
-		household, redemption, child uuid.UUID
-		minutes, seconds, used       int32
-		created                      time.Time
-	}
-	var all []creditRow
-	for rows.Next() {
-		var c creditRow
-		if err := rows.Scan(&c.household, &c.redemption, &c.child, &c.minutes, &c.seconds, &c.used, &c.created); err != nil {
-			return safe(err)
-		}
-		all = append(all, c)
-	}
-	if err := rows.Err(); err != nil {
-		return safe(err)
-	}
-	var carried, waiting int64
-	for _, c := range all {
-		id, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
-		res, err := x.dst.Exec(ctx, `INSERT INTO tv_credit (household_id, id, child_id, redemption_id, granted_seconds, seconds, used_seconds, created_at)
-			SELECT $1, $2, $3, $4, $5, $6, $7, $8 WHERE EXISTS (SELECT 1 FROM redemption WHERE household_id = $1 AND id = $4)`,
-			c.household, id, c.child, c.redemption, c.minutes*60, c.seconds, c.used, c.created)
-		if err != nil {
-			return safe(err)
-		}
-		if res.RowsAffected() == 0 {
-			waiting++
-			continue
-		}
-		carried++
-	}
-	return reconcileKind(ctx, x, "tv_credit", carried, "tv_credit", waiting, "rows wait with their redemptions (the rewards import)")
+	x.r.columnsRead("tv_credit", "household_id", "child_id", "seconds", "used_seconds",
+		// Dropped: one balance per child replaces the per-redemption credits.
+		"redemption_id", "target", "minutes", "created_at")
+	return bankBalances(ctx, x, "tv_credit", "tv_credit", "TV", func(h, c uuid.UUID, s int64) error {
+		_, err := x.dst.Exec(ctx, `INSERT INTO tv_credit (household_id, child_id, granted_seconds, seconds, created_at)
+			VALUES ($1, $2, $3, $3, $4)`, h, c, s, x.started)
+		return err
+	})
 }
