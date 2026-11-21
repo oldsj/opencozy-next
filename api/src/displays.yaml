@@ -29,6 +29,27 @@ pairings:
               $ref: common.yaml#/schemas/Error
       default:
         $ref: common.yaml#/responses/Error
+session:
+  get:
+    operationId: getDisplaySession
+    summary: What this wall display may show
+    description: Its scopes, so the board offers only the tabs it can load.
+    tags: [displays]
+    x-actors: [display]
+    x-display-scopes: [today]
+    responses:
+      '200':
+        description: This display's scopes
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/DisplaySession'
+      '401':
+        $ref: common.yaml#/responses/Unauthorized
+      '403':
+        $ref: common.yaml#/responses/Forbidden
+      default:
+        $ref: common.yaml#/responses/Error
 claim:
   post:
     operationId: claimDisplayPairing
@@ -88,7 +109,7 @@ displays:
   post:
     operationId: createDisplay
     summary: Pair the wall display showing this code
-    description: Needs a sign-in within the last 10 minutes.
+    description: Needs a sign-in within the last 10 minutes. Every display gets `today`, whatever else it is given.
     tags: [displays]
     x-actors: [adult]
     x-recent-auth: true
@@ -151,6 +172,14 @@ display:
         $ref: common.yaml#/responses/Error
 
 schemas:
+  DisplaySession:
+    type: object
+    required: [scopes]
+    properties:
+      scopes:
+        type: array
+        items:
+          $ref: '#/schemas/DisplayScope'
   DisplayScope:
     type: string
     enum: [today, tv, calendar, meals, dashboard]

@@ -1,0 +1,53 @@
+name: Android
+
+# Builds the wall display's WebView shell (android/), runs lint and its unit tests. No signing:
+# release keys never reach CI. What needs a real device is listed in android/README.md.
+#
+# Public repository: GitHub-hosted runners only, never self-hosted.
+
+on:
+  push:
+    branches: [main]
+    paths: [android/**, .github/workflows/android.yml]
+  pull_request:
+    paths: [android/**, .github/workflows/android.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build, lint and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # The official Gradle wrapper jar (the checksum services.gradle.org publishes for 8.11.1 and
+      # 8.12); the distribution it fetches, 8.14.6, is pinned in
+      # gradle-wrapper.properties (distributionSha256Sum).
+      WRAPPER_JAR_SHA256: 2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the Gradle wrapper
+        run: echo "${WRAPPER_JAR_SHA256}  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+      - name: Build, lint, test
+        # The runner image has JDK 17 and the Android SDK.
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-reports
+          path: android/app/build/reports
+          retention-days: 7
