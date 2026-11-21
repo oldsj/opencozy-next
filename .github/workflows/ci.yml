@@ -138,11 +138,11 @@ jobs:
       # `make e2e` without its Compose database reset (the service above is a fresh app_e2e), spelled
       # out here. Keep in step with the build-e2e and e2e targets.
       - run: pnpm --dir web build
-      # An e2e build: its calendar client may reach 127.0.0.1, where the tests serve a fixture feed.
+      # An e2e build: its calendar and single sign-on clients may reach 127.0.0.1, where the tests serve a fixture feed and a fake OIDC provider.
       - run: CGO_ENABLED=0 go build -tags embedweb,e2e -trimpath -o bin/app ./cmd/app
       - name: The release check refuses this e2e binary
         run: "! scripts/check-release-binary.sh bin/app"
-      - name: The e2e build opens only the calendar client's 127.0.0.1 and ::1
+      - name: The e2e build opens 127.0.0.1 and ::1 only to the calendar and single sign-on clients
         run: go test -tags e2e -run TestE2EBuild ./internal/egress/
       - run: pnpm exec playwright test
         working-directory: web

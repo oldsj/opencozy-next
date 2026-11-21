@@ -10,8 +10,9 @@ import {
   useMatches,
 } from '@tanstack/react-router';
 
-import { meQuery, onSignedOut } from './api/client';
-import { LoginPage } from './routes/login';
+import { $api, meQuery, onSignedOut } from './api/client';
+import { LoginPage, isSsoError, type SsoError } from './routes/login';
+import { AccountPage } from './routes/account';
 import { HomePage } from './routes/home';
 import { DisplayPage } from './routes/display';
 import { ChoresPage } from './routes/chores';
@@ -65,17 +66,21 @@ const nav = [
   { to: '/connections', label: 'Connections' },
   { to: '/devices', label: 'Devices' },
   { to: '/household', label: 'Household' },
+  { to: '/account', label: 'Account' },
 ] as const;
 
 // The manage pages' column, with the main navigation once signed in.
 function PageLayout() {
   const me = useQuery(meQuery).data;
+  // Account has only single sign-on so far (slice 10b): list it when that is set up.
+  const sso = $api.useQuery('get', '/auth/methods', {}, { enabled: !!me }).data?.oidc;
+  const links = nav.filter((n) => n.to !== '/account' || sso);
   return (
     <>
       {me && (
         <header className="mx-auto max-w-2xl px-4 pt-6">
           <nav aria-label="Main" className="flex flex-wrap gap-x-5">
-            {nav.map((n) => (
+            {links.map((n) => (
               <Link key={n.to} to={n.to} className="inline-flex min-h-11 items-center" activeOptions={{ exact: n.to === '/' }} activeProps={{ className: 'font-semibold' }}>
                 {n.label}
               </Link>
@@ -118,10 +123,14 @@ const loginRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/login',
   staticData: { title: 'Sign in' },
-  // ?ended=true: sent here because the session ended.
-  validateSearch: (search: Record<string, unknown>): { ended?: boolean } => (search.ended === true ? { ended: true } : {}),
+  // ?ended=true: sent here because the session ended. ?error=<code>: back from single sign-on.
+  validateSearch: (search: Record<string, unknown>): { ended?: boolean; error?: SsoError } => ({
+    ...(search.ended === true ? { ended: true } : {}),
+    ...(isSsoError(search.error) ? { error: search.error } : {}),
+  }),
   component: function Login() {
-    return <LoginPage ended={loginRoute.useSearch().ended === true} />;
+    const search = loginRoute.useSearch();
+    return <LoginPage ended={search.ended === true} ssoError={search.error} />;
   },
 });
 
@@ -255,6 +264,18 @@ const screenTimeRoute = createRoute({
     if (!me) throw redirect({ to: '/login' });
   },
   component: ScreenTimePage,
+});
+// Account: how the signed-in adult signs in.
+const accountRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/account',
+  staticData: { title: 'Account' },
+  beforeLoad: async ({ context }) => {
+    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+    if (!me) throw redirect({ to: '/login' });
+  },
+  component: AccountPage,
 });
 const householdRoute = createRoute({
   getParentRoute: () => pageRoute,
@@ -392,7 +413,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute, tvsRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute, tvsRoute, accountRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

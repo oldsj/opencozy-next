@@ -42,7 +42,7 @@ test('a household’s day: chores, approval, points, rewards, screen time, TV', 
   await adult.goto('/login');
   await adult.getByLabel('Email').fill(owner.email);
   await adult.getByLabel('Password').fill(owner.password);
-  await adult.getByRole('button', { name: 'Sign in' }).click();
+  await adult.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await adult.goto('/displays');
   await adult.getByLabel('Code on the display').fill(shown);

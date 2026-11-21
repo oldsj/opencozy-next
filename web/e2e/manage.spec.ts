@@ -28,7 +28,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.goto('/login');
   await page.getByLabel('Email').fill(owner.email);
   await page.getByLabel('Password').fill(owner.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
   // Two children; Ada earns 14 points (an adult's tick counts at once) and has a chore to move.

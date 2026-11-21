@@ -167,6 +167,9 @@ func TestLoadValidatesOIDC(t *testing.T) {
 		"long name":        {"OIDC_NAME": "a name far too long to fit on the sign-in button"},
 		"spaced client":    {"OIDC_CLIENT_ID": " opencozy"},
 	} {
+		if name == "loopback http" && E2EBuild {
+			continue // an e2e build's fake provider (validIssuer)
+		}
 		set(over)
 		if _, err := Load(); err == nil {
 			t.Errorf("%s accepted", name)

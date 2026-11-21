@@ -63,7 +63,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(log)
 	if config.E2EBuild {
-		log.Warn("e2e build: the calendar client may fetch from 127.0.0.1; for browser tests only, never a household")
+		log.Warn("e2e build: the calendar and single sign-on clients may fetch from 127.0.0.1; for browser tests only, never a household")
 	}
 
 	switch cmd {
