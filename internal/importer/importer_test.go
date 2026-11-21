@@ -388,20 +388,18 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	}
 }
 
-// Old screen time waits on redemptions and devices: a source with any says so and can't commit.
-func TestScreenTimeWaitsOnRedemptionsAndDevices(t *testing.T) {
+// The iPad shield event log is not carried (James): the import says how many and commits.
+func TestScreenTimeEventsAreNotCarried(t *testing.T) {
 	event := `SET search_path TO opencozy;
 		ALTER TABLE screen_time_event DROP CONSTRAINT screen_time_event_device_fk;
 		INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
 		  ('0190a000-0000-7000-8000-00000000000a', gen_random_uuid(), '0190a000-0000-7000-8000-0000000000c1', gen_random_uuid(),
 		   'one_more_minute', '2026-01-05T08:00:00Z', '2026-01-05T08:00:01Z');`
-	target := testdb.Open(t)
-	out, err := importOnce(t, oldDB(t, complete, event), target, false)
-	if !errors.Is(err, ErrPending) {
-		t.Fatalf("err = %v, want ErrPending\n%s", err, out)
+	out, err := importOnce(t, oldDB(t, complete, event), testdb.Open(t), false)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
 	}
-	if statuses(out)["screen_time_event"] != "pending" || !strings.Contains(out, "waits on the import of devices") {
+	if statuses(out)["screen_time_event"] != "not carried" || !strings.Contains(out, "screen_time_event              1") {
 		t.Errorf("screen_time_event:\n%s", out)
 	}
-	empty(t, target)
 }

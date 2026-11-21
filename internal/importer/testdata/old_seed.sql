@@ -88,7 +88,8 @@ INSERT INTO calendar_assignment_person (household_id, assignment_id, child_id) V
 -- Slice 0b: the points ledger and what it points at (chores, routines, rewards and learning
 -- awards, which later slices carry). Avery: a chore paid on approval; a chore paid, undone and
 -- paid again; a reward spent, another spent and refunded; two learning awards, one undone: 11
--- points. Rowan: a routine paid, another paid and undone, a reward waiting: 0 points.
+-- points. Rowan: a routine paid, another paid and undone, a reward waiting: 0 points (3 after
+-- import: a reward still waiting for an answer is not carried, so its points come back).
 INSERT INTO chore_definition (household_id, id, assigned_child_id, title, points, schedule_kind, version, created_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000101', '0190a000-0000-7000-8000-0000000000c1', 'Feed the cat', 5, 'daily', 1, '2026-03-01T08:00:00Z');
 INSERT INTO chore_occurrence (household_id, id, chore_id, assigned_child_id, local_day, time_zone_snapshot, title_snapshot, points_snapshot, schedule_kind_snapshot, definition_version, version, created_at) VALUES

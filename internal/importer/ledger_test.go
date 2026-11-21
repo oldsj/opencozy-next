@@ -55,7 +55,7 @@ func TestLedgerImport(t *testing.T) {
 			t.Errorf("%s: %q\n%s", table, st[table], out.String())
 		}
 	}
-	for _, c := range []string{"children whose balance matches", "points held, all children", "active awards (awards not reversed)", "active chore awards rebuilt = old"} {
+	for _, c := range []string{"children whose balance matches", "points held, all children", "1 spends on rewards still waiting for an answer not carried: 3 points go back", "active awards (awards not reversed)", "active chore awards rebuilt = old"} {
 		if !strings.Contains(out.String(), c) {
 			t.Errorf("no check %q", c)
 		}
@@ -68,8 +68,8 @@ func TestLedgerImport(t *testing.T) {
 		}
 		return b
 	}
-	if a, r := balance("0000000000c1"), balance("0000000000c2"); a != 11 || r != 0 {
-		t.Errorf("balances: Avery %d, Rowan %d; want 11, 0", a, r)
+	if a, r := balance("0000000000c1"), balance("0000000000c2"); a != 11 || r != 3 {
+		t.Errorf("balances: Avery %d, Rowan %d; want 11, 3 (the waiting Sticker's 3 points come back)", a, r)
 	}
 
 	type row struct {
@@ -115,6 +115,12 @@ func TestLedgerImport(t *testing.T) {
 		t.Errorf("learning reversal: %+v", x)
 	}
 
+	// The spend on the reward still waiting isn't carried.
+	var waiting int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM point_ledger WHERE id = $1`, id("00000000014b")).Scan(&waiting); err != nil || waiting != 0 {
+		t.Errorf("waiting spend: %d %v", waiting, err)
+	}
+
 	// Active awards: the two paid chores, the routine not undone and the learning award not undone.
 	var active string
 	if err := tx.QueryRow(ctx, `SELECT string_agg(right(ledger_id::text, 3), ',' ORDER BY ledger_id) FROM active_award`).Scan(&active); err != nil ||
@@ -141,10 +147,10 @@ func TestLedgerImport(t *testing.T) {
 }
 
 func TestLedgerRefusesAHistoryBelowZero(t *testing.T) {
-	// Rowan spends 10 points they never had.
+	// Rowan spends 10 points they never had, on a reward they were given.
 	const overspend = `SET search_path TO opencozy;
-INSERT INTO reward_redemption (household_id, id, reward_id, child_id, name_snapshot, cost_snapshot, reward_version, version, state, created_at) VALUES
-  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000134', '0190a000-0000-7000-8000-000000000104', '0190a000-0000-7000-8000-0000000000c2', 'Sticker', 10, 1, 1, 'pending', '2026-03-11T13:00:00Z');
+INSERT INTO reward_redemption (household_id, id, reward_id, child_id, name_snapshot, cost_snapshot, reward_version, version, state, created_at, settled_at, fulfilled_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000134', '0190a000-0000-7000-8000-000000000104', '0190a000-0000-7000-8000-0000000000c2', 'Sticker', 10, 1, 2, 'fulfilled', '2026-03-11T13:00:00Z', '2026-03-11T13:05:00Z', '2026-03-11T13:05:00Z');
 INSERT INTO point_ledger (household_id, id, child_id, redemption_id, reward_entry_type, command_id, delta, description_snapshot, created_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-00000000014f', '0190a000-0000-7000-8000-0000000000c2', '0190a000-0000-7000-8000-000000000134', 'spend', '0190a000-0000-7000-8000-00000000016f', -10, 'Sticker', '2026-03-11T13:00:00Z');`
 	_, _, err := importInTx(t, oldDB(t, overspend), testdb.Open(t))
