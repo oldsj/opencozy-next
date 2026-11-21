@@ -98,7 +98,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 	got := statuses(out)
 	for table, want := range map[string]string{
 		"household":                     "pending", // lock_message and the game domains wait on later slices
-		"child":                         "pending", // the colour and allowed hours too
+		"child":                         "pending", // the colour too
 		"auth_user":                     "ok",
 		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
@@ -154,6 +154,13 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	ctx := context.Background()
 	q := dbq.New(target.Runtime)
 	keys := testKeys(t)
+
+	// Allowed hours come with their child; children without any stay without.
+	var hours string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(name || '=' || COALESCE(school_night_start || '-' || school_night_end || '/' || weekend_start || '-' || weekend_end, 'none'), ' ' ORDER BY name)
+		FROM child`).Scan(&hours); err != nil || hours != "Avery=900-1140/540-1200 Mika=none Rowan=none" {
+		t.Errorf("allowed hours: %q %v", hours, err)
+	}
 
 	// The owner signs in with the old password, and is told to rehash.
 	var hash, scheme string
@@ -379,4 +386,22 @@ func TestSafeErrorsHideRows(t *testing.T) {
 	if strings.Contains(err.Error(), "alex") {
 		t.Errorf("other: %v", err)
 	}
+}
+
+// Old screen time waits on redemptions and devices: a source with any says so and can't commit.
+func TestScreenTimeWaitsOnRedemptionsAndDevices(t *testing.T) {
+	event := `SET search_path TO opencozy;
+		ALTER TABLE screen_time_event DROP CONSTRAINT screen_time_event_device_fk;
+		INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
+		  ('0190a000-0000-7000-8000-00000000000a', gen_random_uuid(), '0190a000-0000-7000-8000-0000000000c1', gen_random_uuid(),
+		   'one_more_minute', '2026-01-05T08:00:00Z', '2026-01-05T08:00:01Z');`
+	target := testdb.Open(t)
+	out, err := importOnce(t, oldDB(t, complete, event), target, false)
+	if !errors.Is(err, ErrPending) {
+		t.Fatalf("err = %v, want ErrPending\n%s", err, out)
+	}
+	if statuses(out)["screen_time_event"] != "pending" || !strings.Contains(out, "waits on the import of devices") {
+		t.Errorf("screen_time_event:\n%s", out)
+	}
+	empty(t, target)
 }
