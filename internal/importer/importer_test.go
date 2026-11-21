@@ -120,14 +120,19 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"chore_award_reversal":          "ok",
 		"chore_active_award":            "ok",
 		"external_award":                "ok",
-		"chore_definition":              "pending", // chores, routines, approvals and rewards wait on their importers
+		"chore_definition":              "ok",
+		"chore_occurrence":              "ok",
+		"routine_definition":            "ok",
+		"routine_occurrence":            "ok",
+		"completion_approval":           "ok",
+		"reward":                        "pending", // rewards wait on their importer
 		"reward_redemption":             "pending",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
 		}
 	}
-	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine"} {
+	for _, secret := range []string{"fixture-access-token", "fixture-refresh-token", "Alex", "example.test", "Avery", "Kitchen", "Lentil", "Builder_42", "build_house", "fixture-feed-token", "School", "swim@", "Swimming", "Feed the cat", "Ice cream", "Morning routine", "Bed not made", "Water the plants"} {
 		if strings.Contains(out, secret) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
