@@ -348,9 +348,12 @@ func (s *Server) CancelRedemption(ctx context.Context, req api.CancelRedemptionR
 	case red.State == "fulfilled" && red.Minutes.Valid:
 		// The unspent rest is forfeited; its share of the cost comes back, rounded down.
 		refund, err = screentime.CancelRedemption(ctx, cmd, red.ID, red.Cost)
-		if errors.Is(err, screentime.ErrAllUsed) {
+		switch {
+		case errors.Is(err, screentime.ErrAllUsed):
 			return refuse("already_used", "That iPad time has already been used, so there’s nothing to refund."), nil
-		} else if err != nil {
+		case errors.Is(err, screentime.ErrNoCredit):
+			return refuse("no_credit", "OpenCozy has no record of how much of this iPad time was used, so it can’t be cancelled."), nil
+		case err != nil:
 			return nil, err
 		}
 	default:
