@@ -33,6 +33,10 @@ func newTVEnv(t *testing.T) tvEnv {
 		if r.status != 201 {
 			t.Fatalf("credential %s: %d %s", scope, r.status, r.raw)
 		}
+		// Only a home server may hold it, never an assistant.
+		if r := e.send(h.actors["adult"], "POST", "/api/credentials", map[string]any{"kind": "assistant", "name": scope, "scopes": []string{scope}, "allChildren": true}); r.status != 400 || r.code() != "unknown_scope" {
+			t.Fatalf("assistant %s: %d %s", scope, r.status, r.raw)
+		}
 		return cred{bearer: r.body["secret"].(string)}
 	}
 	return tvEnv{env: e, h: h, fake: fake, router: service("tv:gate"), hass: service("tv:report"), adult: h.actors["adult"], device: h.actors["device"]}
