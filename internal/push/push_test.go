@@ -19,6 +19,10 @@ import (
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
+func note(title string) Notification {
+	return Notification{Type: "test", Collapse: "c", Title: title}
+}
+
 func household(t *testing.T, owner *pgxpool.Pool) (h, adult uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
@@ -55,7 +59,7 @@ func TestEnqueue(t *testing.T) {
 	ctx := context.Background()
 	h, adult := household(t, db.Owner)
 	q := dbq.New(db.Runtime)
-	m := Message{HouseholdID: h, AdultID: &adult, DedupeKey: "approval/1", Payload: map[string]any{"title": "Feed the cat"}}
+	m := Message{HouseholdID: h, AdultID: &adult, DedupeKey: "approval/1", Notification: note("Feed the cat")}
 
 	// Without a push service nothing is written.
 	if err := (Outbox{}).Enqueue(ctx, q, m); err != nil || len(rows(t, db.Runtime)) != 0 {
@@ -71,11 +75,12 @@ func TestEnqueue(t *testing.T) {
 		t.Fatalf("rows: %d", len(got))
 	}
 	for name, bad := range map[string]Message{
-		"no recipient":   {HouseholdID: h, DedupeKey: "k", Payload: map[string]any{}},
-		"two recipients": {HouseholdID: h, AdultID: &adult, ChildID: &adult, DedupeKey: "k", Payload: map[string]any{}},
-		"no key":         {HouseholdID: h, AdultID: &adult, Payload: map[string]any{}},
-		"no payload":     {HouseholdID: h, AdultID: &adult, DedupeKey: "k"},
-		"too large":      {HouseholdID: h, AdultID: &adult, DedupeKey: "k", Payload: map[string]any{"x": string(make([]byte, MaxPayload))}},
+		"no recipient":   {HouseholdID: h, DedupeKey: "k", Notification: note("x")},
+		"two recipients": {HouseholdID: h, AdultID: &adult, ChildID: &adult, DedupeKey: "k", Notification: note("x")},
+		"no key":         {HouseholdID: h, AdultID: &adult, Notification: note("x")},
+		"no type":        {HouseholdID: h, AdultID: &adult, DedupeKey: "k", Notification: Notification{Collapse: "c"}},
+		"no collapse":    {HouseholdID: h, AdultID: &adult, DedupeKey: "k", Notification: Notification{Type: "t"}},
+		"too large":      {HouseholdID: h, AdultID: &adult, DedupeKey: "k", Notification: note(string(make([]byte, MaxPayload)))},
 	} {
 		if err := on.Enqueue(ctx, q, bad); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -92,7 +97,7 @@ func TestEnqueueFollowsTheTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := (Outbox{Enabled: true}).Enqueue(ctx, dbq.New(tx), Message{HouseholdID: h, AdultID: &adult, DedupeKey: "k", Payload: map[string]any{}}); err != nil {
+	if err := (Outbox{Enabled: true}).Enqueue(ctx, dbq.New(tx), Message{HouseholdID: h, AdultID: &adult, DedupeKey: "k", Notification: note("x")}); err != nil {
 		t.Fatal(err)
 	}
 	_ = tx.Rollback(ctx)
@@ -107,7 +112,7 @@ type fakeSender struct {
 	sent   []string
 }
 
-func (f *fakeSender) Send(_ context.Context, row dbq.PushOutbox) error {
+func (f *fakeSender) Send(_ context.Context, _ *dbq.Queries, row dbq.PushOutbox) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, row.DedupeKey)
@@ -121,7 +126,7 @@ func TestSenderJob(t *testing.T) {
 	q := dbq.New(db.Runtime)
 	on := Outbox{Enabled: true}
 	for _, k := range []string{"ok", "refused", "flaky", "last-try"} {
-		if err := on.Enqueue(ctx, q, Message{HouseholdID: h, AdultID: &adult, DedupeKey: k, Payload: map[string]any{}}); err != nil {
+		if err := on.Enqueue(ctx, q, Message{HouseholdID: h, AdultID: &adult, DedupeKey: k, Notification: note(k)}); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -36,6 +36,13 @@ config:
   # comma-separated origins they are used from. Empty turns passkeys off.
   webauthnRPID: ""
   webauthnOrigins: ""
+  # The iOS apps (slice 11). Team and bundle ID serve /.well-known/apple-app-site-association
+  # so the parent app can use this site's passkeys. With apnsKeyID too, and APNS_KEY (the .p8
+  # key's PEM) in secrets.env, the app pushes to parent phones and kid devices; that needs
+  # egress.internet for api.push.apple.com.
+  appleTeamID: ""
+  appleBundleID: ""
+  apnsKeyID: ""
 
 database:
   # cnpg.enabled: the chart makes a CloudNativePG Cluster named <fullname>-db, and the app
@@ -73,6 +80,8 @@ secrets:
   existingSecret: ""
   # - name: SMTP_PASSWORD
   #   key: smtp-password
+  # - name: APNS_KEY
+  #   key: apns-key
   env: []
 
 onepassword:

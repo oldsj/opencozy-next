@@ -11,6 +11,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/ledger"
+	"github.com/oldsj/opencozy-next/internal/push"
 )
 
 // SourceOccurrence is the ledger source kind for points from a chore or routine done on a day.
@@ -131,6 +132,9 @@ func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemR
 	if err != nil {
 		return nil, err
 	}
+	if err := s.pushResolved(ctx, cmd, decided); err != nil {
+		return nil, err
+	}
 	if d.red != nil {
 		if err := cmd.Q.SetRedemptionState(ctx, dbq.SetRedemptionStateParams{HouseholdID: a.HouseholdID, ID: d.red.ID, State: "approved"}); err != nil {
 			return nil, err
@@ -172,6 +176,9 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 	if err != nil {
 		return nil, err
 	}
+	if err := s.pushResolved(ctx, cmd, decided); err != nil {
+		return nil, err
+	}
 	if d.red != nil {
 		if err := cmd.Q.SetRedemptionState(ctx, dbq.SetRedemptionStateParams{HouseholdID: a.HouseholdID, ID: d.red.ID, State: "rejected"}); err != nil {
 			return nil, err
@@ -188,4 +195,23 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 		return nil, err
 	}
 	return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
+}
+
+// pushPending tells the parents' phones about a new inbox item, in its command.
+func (s *Server) pushPending(ctx context.Context, cmd *command.Cmd, ap dbq.Approval) error {
+	if !s.push.Enabled {
+		return nil
+	}
+	child, err := cmd.Q.GetChild(ctx, dbq.GetChildParams{HouseholdID: ap.HouseholdID, ID: ap.ChildID})
+	if err != nil {
+		return err
+	}
+	key, n := push.ApprovalPending(ap, child.Name, ap.CreatedAt)
+	return s.push.ToAdults(ctx, cmd.Q, ap.HouseholdID, key, n)
+}
+
+// pushResolved clears a decided item from every parent's phone, silently.
+func (s *Server) pushResolved(ctx context.Context, cmd *command.Cmd, ap dbq.Approval) error {
+	key, n := push.ApprovalResolved(ap.ID, ap.State)
+	return s.push.ToAdults(ctx, cmd.Q, ap.HouseholdID, key, n)
 }

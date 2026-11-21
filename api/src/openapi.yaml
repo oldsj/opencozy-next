@@ -56,6 +56,8 @@ tags:
     description: Followed calendars, their events, and who they are for
   - name: learning
     description: Learning-app awards, their rules and children's linked accounts
+  - name: phones
+    description: Parent phones (the iOS parent app) and their pushes
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -117,6 +119,22 @@ paths:
     $ref: devices.yaml#/webSession
   /device/session:
     $ref: devices.yaml#/session
+  /device/push:
+    $ref: phones.yaml#/devicePush
+  /phone/sessions:
+    $ref: phones.yaml#/signIn
+  /phone/sessions/passkey:
+    $ref: phones.yaml#/passkeySignIn
+  /phone/session:
+    $ref: phones.yaml#/self
+  /phone/session/push:
+    $ref: phones.yaml#/phonePush
+  /phones:
+    $ref: phones.yaml#/phones
+  /push/mute:
+    $ref: phones.yaml#/pushMute
+  /phones/{phoneSessionId}:
+    $ref: phones.yaml#/phone
   /today:
     $ref: today.yaml#/today
   /today/chores/{choreId}/complete:

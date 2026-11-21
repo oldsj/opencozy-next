@@ -126,9 +126,13 @@ func (s *Server) RedeemReward(ctx context.Context, req api.RedeemRewardRequestOb
 		return nil, err
 	}
 	if !adult {
-		if _, err := cmd.Q.CreateRedemptionApproval(ctx, dbq.CreateRedemptionApprovalParams{
+		ap, err := cmd.Q.CreateRedemptionApproval(ctx, dbq.CreateRedemptionApprovalParams{
 			HouseholdID: a.HouseholdID, ChildID: req.ChildId, RedemptionID: &red.ID, Title: r.Title, Points: r.Cost,
-		}); err != nil {
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := s.pushPending(ctx, cmd, ap); err != nil {
 			return nil, err
 		}
 	}

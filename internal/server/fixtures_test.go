@@ -215,6 +215,7 @@ type house struct {
 	passkey                           uuid.UUID // the adult's only passkey
 	device                            uuid.UUID // child2's tablet, to rename or unpair (not one of the actors)
 	rule, link                        uuid.UUID // build_house (5 points, 20 a day); child1 linked as Builder_42
+	phone                             uuid.UUID // a second parent phone, to sign out (not one of the actors)
 	actors                            map[string]cred
 }
 
@@ -271,6 +272,8 @@ func (e *env) house(label string, scopes []string) house {
 	e.exec(`INSERT INTO phone_session (household_id, adult_id, name, token_hash, expires_at)
 		VALUES ($1, $2, 'Phone', $3, now() + interval '90 days')`, h.id, h.adult, hash)
 	h.actors["phone"] = cred{bearer: tok}
+	h.phone = e.id(`INSERT INTO phone_session (household_id, adult_id, name, expires_at)
+		VALUES ($1, $2, 'Second phone', now() + interval '90 days') RETURNING id`, h.id, h.adult)
 
 	display := func(scopes []string) cred {
 		tok, hash, _ := auth.NewSessionToken()
