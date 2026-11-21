@@ -16,8 +16,8 @@ type adultRef struct {
 // importAdults turns Better Auth users who belong to a household into adults (design §6): a new
 // UUID each, the old text ID's bytes as the WebAuthn user handle, the email lowercased, and the
 // password hash kept as scrypt-ba (rehashed to argon2id at the next sign-in). Users with no
-// household are not carried. OIDC accounts become single sign-on links (importOIDCLinks); their
-// token columns are never read.
+// household are not carried. Other accounts (OIDC links) are not carried either: OIDC links to
+// an adult by verified email. Their token columns are never read.
 func importAdults(ctx context.Context, x *run) error {
 	x.r.columnsRead("auth_user", "id", "name", "email", "created_at", "email_verified", "image", "updated_at")
 	x.r.columnsRead("household_owner", "user_id", "household_id", "created_at")
@@ -95,88 +95,9 @@ func importAdults(ctx context.Context, x *run) error {
 		x.r.note("auth_user", fmt.Sprintf("%d without a household, not carried", users-written))
 	}
 	x.r.table("household_owner", owners, "adult", owners, adults)
-	links, skipped, err := importOIDCLinks(ctx, x)
-	if err != nil {
-		return err
-	}
-	linked, err := countNew(ctx, x.dst, "oidc_link")
-	if err != nil {
-		return err
-	}
-	x.r.table("auth_account", accounts, "adult (password) + oidc_link", withPassword+links, passwords+linked)
-	if skipped > 0 {
-		x.r.note("auth_account", fmt.Sprintf("%d other accounts in all, not carried (the notes above, and users with no household)", skipped))
+	x.r.table("auth_account", accounts, "adult (password)", withPassword, passwords)
+	if accounts > withPassword {
+		x.r.note("auth_account", fmt.Sprintf("%d other accounts (OIDC links), not carried", accounts-withPassword))
 	}
 	return nil
-}
-
-// importOIDCLinks carries the old app's OIDC accounts (provider "oidc", whose account ID is the
-// provider's subject) as single sign-on links for OIDC_ISSUER, the provider the old app used.
-// The link's email is the adult's own, the one it was made with. Without OIDC_ISSUER they are
-// not carried, and each adult links again by verified email at their first sign-in. It returns
-// the links written and the old non-password accounts not carried.
-func importOIDCLinks(ctx context.Context, x *run) (written, skipped int64, err error) {
-	rows, err := x.src.Query(ctx, `
-		SELECT user_id, provider_id, account_id, created_at FROM opencozy.auth_account
-		WHERE provider_id <> 'credential' ORDER BY created_at, id`)
-	if err != nil {
-		return 0, 0, safe(err)
-	}
-	defer rows.Close()
-	var noIssuer, otherProvider, twice int64
-	for rows.Next() {
-		var (
-			user, provider, subject string
-			created                 time.Time
-		)
-		if err := rows.Scan(&user, &provider, &subject, &created); err != nil {
-			return 0, 0, safe(err)
-		}
-		a, ok := x.adults[user]
-		switch {
-		case !ok:
-			skipped++ // a user with no household: not an adult here
-			continue
-		case provider != "oidc":
-			otherProvider++
-			skipped++
-			continue
-		case x.oidcIssuer == "":
-			noIssuer++
-			skipped++
-			continue
-		}
-		// An adult with two accounts at the provider keeps the first: the new app allows one.
-		tag, err := x.dst.Exec(ctx, `INSERT INTO oidc_link (household_id, adult_id, issuer, subject, email, created_at)
-			SELECT household_id, id, $3, $4, email, $5 FROM adult WHERE household_id = $1 AND id = $2
-			ON CONFLICT (adult_id, issuer) DO NOTHING`, a.household, a.id, x.oidcIssuer, subject, created)
-		if err != nil {
-			return 0, 0, safe(err)
-		}
-		if tag.RowsAffected() == 0 {
-			twice++
-			skipped++
-			continue
-		}
-		written++
-	}
-	if err := rows.Err(); err != nil {
-		return 0, 0, safe(err)
-	}
-	if noIssuer > 0 {
-		x.r.note("auth_account", fmt.Sprintf("%d OIDC links left behind because --oidc-issuer isn't given; those adults link again by verified email at their first single sign-on", noIssuer))
-	}
-	if written > 0 {
-		x.r.note("auth_account", fmt.Sprintf("%d OIDC links carried as subjects at %s (--oidc-issuer)", written, x.oidcIssuer))
-		if x.oidcIssuer != x.runtimeOIDCIssuer {
-			x.r.note("auth_account", fmt.Sprintf("WARNING: OIDC_ISSUER here is %q, not %s: the carried links are used only once OIDC_ISSUER is exactly the old provider's issuer", x.runtimeOIDCIssuer, x.oidcIssuer))
-		}
-	}
-	if otherProvider > 0 {
-		x.r.note("auth_account", fmt.Sprintf("%d accounts of an unknown provider, not carried", otherProvider))
-	}
-	if twice > 0 {
-		x.r.note("auth_account", fmt.Sprintf("%d second OIDC accounts of an adult, not carried (the first is)", twice))
-	}
-	return written, skipped, nil
 }
