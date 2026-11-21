@@ -109,7 +109,7 @@ it checks hasn't run yet.
 | --- | --- | --- |
 | `household` | `household` | ID, name, time zone, times, blocked websites (games and game portals), and the locked-iPad message |
 | `child` | `child` | ID, name, colour, times and allowed hours (minutes after local midnight). Allowed hours the old app had only partly set (which both apps read as none) arrive as none, counted. |
-| `auth_user`, `household_owner`, `auth_account` (password) | `adult` | Adults with a household, with email, name and password. Old scrypt hashes are rehashed to argon2id on the first sign-in. The old user ID becomes the passkey user handle. |
+| `auth_user`, `household_owner`, `auth_account` (password) | `adult` | Adults with a household, with email, name, password and phone push mute. Old scrypt hashes are rehashed to argon2id on the first sign-in. The old user ID becomes the passkey user handle. |
 | `parent_passkey` | `passkey` | ID, name, credential ID, public key, sign counter, transports and backed-up flag. "Backup eligible" is unknown until the first sign-in sets it. |
 | `device` | `device` | Child devices: ID, child, name, platform, key, times, and revoked ones as revoked. A paired iPad keeps working without pairing again. |
 | `service_credential`, `…_child`, `…_award_rule` | `credential`, `credential_child`, `credential_award_rule` | Service credentials (learning games) with their children and rules |
@@ -221,7 +221,6 @@ An adult who edits such a chore, routine or reward brings it within the new limi
 
 A real import refuses while any of these has rows, and the dry run marks it `pending`:
 
-- `household_owner.push_muted_until`: the phone push mute. Slice 11 has merged, so it is next.
 - `assistant_credential` scopes with no new name yet (`approvals:read`): slice 12 (#81) maps them.
 - `home_assistant_connection`, `home_assistant_entity`: no mapping yet.
 - `icloud_connection`, `icloud_calendar`, `icloud_resource`, `icloud_series`,

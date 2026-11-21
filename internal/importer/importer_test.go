@@ -102,7 +102,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"household":                     "ok",
 		"child":                         "ok",
 		"auth_user":                     "ok",
-		"household_owner":               "pending", // push_muted_until waits on slice 11
+		"household_owner":               "ok",
 		"auth_account":                  "ok",
 		"service_credential":            "ok",
 		"service_credential_child":      "ok",
@@ -201,6 +201,12 @@ func TestImportCommitsAndOldSecretsWork(t *testing.T) {
 	var oidcOnly *string
 	if err := target.Owner.QueryRow(ctx, `SELECT password_hash FROM adult WHERE email = 'sam@example.test'`).Scan(&oidcOnly); err != nil || oidcOnly != nil {
 		t.Fatalf("OIDC-only adult: %v %v", oidcOnly, err)
+	}
+	// The phone push mute is each adult's own, carried as it was.
+	var mutes string
+	if err := target.Owner.QueryRow(ctx, `SELECT string_agg(email || '=' || COALESCE(to_char(push_muted_until AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI'), '-'), ' ' ORDER BY email)
+		FROM adult`).Scan(&mutes); err != nil || mutes != "owner@example.test=- sam@example.test=2026-12-31T21:00" {
+		t.Errorf("push mutes: %q %v", mutes, err)
 	}
 	// Recipes keep their IDs, steps (line breaks included), versions and archive times; meals keep
 	// their day, slot and recipe.
