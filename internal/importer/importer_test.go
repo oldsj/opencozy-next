@@ -143,6 +143,9 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 			t.Errorf("the report shows row contents (%q)", secret)
 		}
 	}
+	if !strings.Contains(out, "1 open sessions dropped") || !strings.Contains(out, "power and router attempts forgotten") {
+		t.Errorf("the report doesn't count the dropped TV sessions or forgotten power:\n%s", out)
+	}
 	if !strings.Contains(out, "approvals:read (1)") || !strings.Contains(out, "1 without a household") {
 		t.Errorf("missing notes:\n%s", out)
 	}

@@ -158,8 +158,16 @@ func importTVSessions(ctx context.Context, x *run) error {
 	if err := rows.Err(); err != nil {
 		return safe(err)
 	}
-	var nobody int
+	// Open sessions are dropped, counted (James, 2026-11-21): the TV goes offline at cutover and
+	// the child starts again. The old app charged a session as it ran, so its credit already
+	// holds what is left, less the few seconds since the last charge.
+	var nobody, open, carried int
 	for _, s := range all {
+		if s.ended == nil {
+			open++
+			continue
+		}
+		carried++
 		adult, device := x.oldActor(s.household, s.startedBy)
 		if adult == nil && device == nil {
 			nobody++
@@ -172,8 +180,20 @@ func importTVSessions(ctx context.Context, x *run) error {
 			return safe(err)
 		}
 	}
-	if err := reconcile(ctx, x, "tv_session", int64(len(all)), "tv_session"); err != nil {
+	src, err := count(ctx, x.src, "tv_session")
+	if err != nil {
 		return err
+	}
+	got, err := countNew(ctx, x.dst, "tv_session")
+	if err != nil {
+		return err
+	}
+	x.r.table("tv_session", src, "tv_session", int64(carried), got)
+	if src != int64(len(all)) {
+		x.r.check("tv_session rows read", src, int64(len(all)))
+	}
+	if open > 0 {
+		x.r.note("tv_session", fmt.Sprintf("%d open sessions dropped: those TVs go offline at cutover and start again", open))
 	}
 	if nobody > 0 {
 		x.r.note("tv_session", fmt.Sprintf("%d started by no adult or device of the household: started_by left empty", nobody))
