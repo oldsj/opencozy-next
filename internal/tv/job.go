@@ -2,6 +2,8 @@ package tv
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,7 +30,9 @@ func (d Domain) Job(clk clock.Clock) jobs.Job {
 }
 
 // SettleAll settles each household with TV work, one transaction each, under its household lock
-// (the order a command takes). A nil clk is the database clock.
+// (the order a command takes). One household failing doesn't hold up the others: its error is
+// returned with theirs at the end. Losing the lease or the context stops the run. A nil clk is
+// the database clock.
 func (d Domain) SettleAll(ctx context.Context, f Txer, clk clock.Clock) error {
 	if clk == nil {
 		clk = clock.DB{}
@@ -40,6 +44,7 @@ func (d Domain) SettleAll(ctx context.Context, f Txer, clk clock.Clock) error {
 	}); err != nil {
 		return err
 	}
+	var failed []error
 	for _, h := range households {
 		if err := f.Tx(ctx, func(q *dbq.Queries) error {
 			if _, err := q.LockHousehold(ctx, h); err != nil {
@@ -51,8 +56,11 @@ func (d Domain) SettleAll(ctx context.Context, f Txer, clk clock.Clock) error {
 			}
 			return d.SettleHousehold(ctx, q, h, now)
 		}); err != nil {
-			return err
+			if errors.Is(err, jobs.ErrLeaseLost) || ctx.Err() != nil {
+				return err
+			}
+			failed = append(failed, fmt.Errorf("household %s: %w", h, err))
 		}
 	}
-	return nil
+	return errors.Join(failed...)
 }
