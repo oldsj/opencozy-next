@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
-// An e2e build opens exactly 127.0.0.1 and ::1, to the calendar client only, on feed ports only.
-func TestE2EBuildOpensOnlyCalendarLoopback(t *testing.T) {
+// An e2e build opens exactly 127.0.0.1 and ::1, to the calendar and single sign-on clients only,
+// on their own ports only.
+func TestE2EBuildOpensOnlyCalendarAndOIDCLoopback(t *testing.T) {
 	for _, tc := range []struct {
 		name, addr string
 		want       bool
@@ -22,7 +23,10 @@ func TestE2EBuildOpensOnlyCalendarLoopback(t *testing.T) {
 		{CalendarClient, "10.0.0.1", false},
 		{CalendarClient, "169.254.169.254", false},
 		{"home-assistant", "127.0.0.1", false},
-		{"oidc", "::1", false},
+		{OIDCClient, "127.0.0.1", true},
+		{OIDCClient, "::1", true},
+		{OIDCClient, "127.0.0.2", false},
+		{OIDCClient, "10.0.0.1", false},
 	} {
 		if got := e2eLoopback(tc.name, netip.MustParseAddr(tc.addr)); got != tc.want {
 			t.Errorf("%s %s: %v, want %v", tc.name, tc.addr, got, tc.want)
