@@ -543,6 +543,89 @@ type TimeRequest struct {
 	CreatedAt    time.Time
 }
 
+type Tv struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	Name           string
+	Room           *string
+	HaEntityID     *string
+	Power          string
+	PowerChangedAt *time.Time
+	AttemptsSince  *time.Time
+	LastAttemptAt  *time.Time
+	OpenStart      pgtype.Int2
+	OpenEnd        pgtype.Int2
+	OpenDays       pgtype.Int2
+	OpenUntil      *time.Time
+	Version        int32
+	CreatedAt      time.Time
+	ArchivedAt     *time.Time
+}
+
+type TvCredit struct {
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	ChildID          uuid.UUID
+	RedemptionID     *uuid.UUID
+	GrantedSeconds   int32
+	Seconds          int32
+	UsedSeconds      int32
+	CreatedAt        time.Time
+	GrantedBy        *uuid.UUID
+	ForfeitedAt      *time.Time
+	ForfeitedBy      *uuid.UUID
+	ForfeitedSeconds pgtype.Int4
+}
+
+type TvMac struct {
+	HouseholdID uuid.UUID
+	TvID        uuid.UUID
+	Mac         string
+}
+
+type TvOpenEvent struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	TvID           uuid.UUID
+	Action         string
+	Until          *time.Time
+	At             time.Time
+	ByAdult        *uuid.UUID
+	ViaCredential  *uuid.UUID
+	EndedSessionID *uuid.UUID
+}
+
+type TvPrompt struct {
+	ID              uuid.UUID
+	HouseholdID     uuid.UUID
+	TvID            uuid.UUID
+	Source          string
+	State           string
+	Version         int32
+	CreatedAt       time.Time
+	DecidedAt       *time.Time
+	DecidedByAdult  *uuid.UUID
+	DecidedByDevice *uuid.UUID
+	SessionID       *uuid.UUID
+}
+
+type TvSession struct {
+	ID              uuid.UUID
+	HouseholdID     uuid.UUID
+	TvID            uuid.UUID
+	Watcher         string
+	ChildID         *uuid.UUID
+	ChargedSeconds  int32
+	EndsBy          *time.Time
+	StartedAt       time.Time
+	EndedAt         *time.Time
+	EndReason       *string
+	StartedByAdult  *uuid.UUID
+	StartedByDevice *uuid.UUID
+	EndedByAdult    *uuid.UUID
+	WarnedAt        *time.Time
+}
+
 type WebauthnChallenge struct {
 	ID        uuid.UUID
 	Purpose   string
