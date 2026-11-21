@@ -12,8 +12,8 @@
 #    that aren't carried), then import-rehearsal/pending.sql (tables the importer can't map yet).
 # 3. Runs `app import --dry-run` twice (the two reports must be the same), then `app import` into a
 #    fresh database, migrated by its owner as in production, with a row-only runtime role.
-#    Independently of the importer's own checks, each child's points and banked iPad seconds must
-#    match.
+#    Independently of the importer's own checks, each child's points and banked iPad and TV
+#    seconds must match.
 # 4. Runs `app import` again: it must refuse the non-empty target and change nothing.
 #
 # Any MISMATCH, a failed check, a report that differs between dry runs, or a second run that
@@ -161,14 +161,19 @@ else
   paste -d ' ' "$work/balance-old.txt" "$work/balance-new.txt" | awk '{ printf "  %s  old %s  new %s\n", $1, $2, $4 }'
   diff -q "$work/balance-old.txt" "$work/balance-new.txt" > /dev/null || fail "points per child differ: $(diff "$work/balance-old.txt" "$work/balance-new.txt" | tr '\n' ' ')"
 
-  echo "== Banked iPad seconds per child, old and new"
-  # Unused seconds of every personal credit, old, against the new credits'.
-  psql_in -d old -At -c "SELECT child_id || ' ' || sum(seconds - used_seconds) FROM opencozy.personal_credit
-    GROUP BY child_id HAVING sum(seconds - used_seconds) > 0 ORDER BY child_id" > "$work/banked-old.txt"
-  psql_in -d cozy -At -c "SELECT child_id || ' ' || sum(seconds - used_seconds) FROM screen_time_credit
-    GROUP BY child_id HAVING sum(seconds - used_seconds) > 0 ORDER BY child_id" > "$work/banked-new.txt"
-  paste -d ' ' "$work/banked-old.txt" "$work/banked-new.txt" | awk '{ printf "  %s  old %s  new %s\n", $1, $2, $4 }'
-  diff -q "$work/banked-old.txt" "$work/banked-new.txt" > /dev/null || fail "banked seconds per child differ: $(diff "$work/banked-old.txt" "$work/banked-new.txt" | tr '\n' ' ')"
+  # Unused seconds of every banked-time credit per child, old against new: iPad (personal_credit
+  # -> screen_time_credit) and TV (tv_credit -> tv_credit).
+  banked() { # banked <label> <old table> <new table>
+    echo "== Banked $1 seconds per child, old and new"
+    psql_in -d old -At -c "SELECT child_id || ' ' || sum(seconds - used_seconds) FROM opencozy.$2
+      GROUP BY child_id HAVING sum(seconds - used_seconds) > 0 ORDER BY child_id" > "$work/banked-old.txt"
+    psql_in -d cozy -At -c "SELECT child_id || ' ' || sum(seconds - used_seconds) FROM $3
+      GROUP BY child_id HAVING sum(seconds - used_seconds) > 0 ORDER BY child_id" > "$work/banked-new.txt"
+    paste -d ' ' "$work/banked-old.txt" "$work/banked-new.txt" | awk '{ printf "  %s  old %s  new %s\n", $1, $2, $4 }'
+    diff -q "$work/banked-old.txt" "$work/banked-new.txt" > /dev/null || fail "banked $1 seconds per child differ: $(diff "$work/banked-old.txt" "$work/banked-new.txt" | tr '\n' ' ')"
+  }
+  banked iPad personal_credit screen_time_credit
+  banked TV tv_credit tv_credit
 fi
 
 echo "== Second import (must refuse a non-empty target, or change nothing)"
