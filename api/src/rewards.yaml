@@ -3,7 +3,8 @@ rewards:
     operationId: listRewards
     summary: The rewards children can spend points on
     tags: [rewards]
-    x-actors: [adult, phone, display, device-web]
+    x-actors: [adult, phone, display, device-web, assistant]
+    x-scopes: [rewards:read]
     x-display-scopes: [today]
     responses:
       '200':
@@ -187,7 +188,8 @@ adultRedemptions:
     operationId: listRedemptions
     summary: Rewards asked for, newest first (at most 200)
     tags: [rewards]
-    x-actors: [adult]
+    x-actors: [adult, assistant]
+    x-scopes: [rewards:read]
     parameters:
       - name: status
         in: query

@@ -80,7 +80,7 @@ func (q *Queries) ChildScreenTimeEvents(ctx context.Context, arg ChildScreenTime
 const createTimeRequestApproval = `-- name: CreateTimeRequestApproval :one
 INSERT INTO approval (household_id, child_id, kind, time_request_id, title, points)
 VALUES ($1, $2, 'time_request', $3, $4, 0)
-RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id
+RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id, decided_via
 `
 
 type CreateTimeRequestApprovalParams struct {
@@ -114,12 +114,13 @@ func (q *Queries) CreateTimeRequestApproval(ctx context.Context, arg CreateTimeR
 		&i.CreatedAt,
 		&i.RedemptionID,
 		&i.TimeRequestID,
+		&i.DecidedVia,
 	)
 	return i, err
 }
 
 const creditForRedemption = `-- name: CreditForRedemption :one
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit WHERE household_id = $1 AND redemption_id = $2
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds, granted_via FROM screen_time_credit WHERE household_id = $1 AND redemption_id = $2
 `
 
 type CreditForRedemptionParams struct {
@@ -144,6 +145,7 @@ func (q *Queries) CreditForRedemption(ctx context.Context, arg CreditForRedempti
 		&i.ForfeitedAt,
 		&i.ForfeitedBy,
 		&i.ForfeitedSeconds,
+		&i.GrantedVia,
 	)
 	return i, err
 }
@@ -258,7 +260,7 @@ func (q *Queries) GetChildHours(ctx context.Context, arg GetChildHoursParams) (G
 }
 
 const getCredit = `-- name: GetCredit :one
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit WHERE household_id = $1 AND id = $2
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds, granted_via FROM screen_time_credit WHERE household_id = $1 AND id = $2
 `
 
 type GetCreditParams struct {
@@ -283,6 +285,7 @@ func (q *Queries) GetCredit(ctx context.Context, arg GetCreditParams) (ScreenTim
 		&i.ForfeitedAt,
 		&i.ForfeitedBy,
 		&i.ForfeitedSeconds,
+		&i.GrantedVia,
 	)
 	return i, err
 }
@@ -304,9 +307,9 @@ func (q *Queries) GetWebFilter(ctx context.Context, id uuid.UUID) (GetWebFilterR
 }
 
 const insertCredit = `-- name: InsertCredit :one
-INSERT INTO screen_time_credit (household_id, child_id, source, redemption_id, granted_by, minutes, seconds, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds
+INSERT INTO screen_time_credit (household_id, child_id, source, redemption_id, granted_by, granted_via, minutes, seconds, created_at)
+VALUES ($1, $2, $3, $4, $5, $8, $6, $7, $9)
+RETURNING id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds, granted_via
 `
 
 type InsertCreditParams struct {
@@ -317,6 +320,7 @@ type InsertCreditParams struct {
 	GrantedBy    *uuid.UUID
 	Minutes      int32
 	Seconds      int32
+	GrantedVia   *uuid.UUID
 	Now          time.Time
 }
 
@@ -329,6 +333,7 @@ func (q *Queries) InsertCredit(ctx context.Context, arg InsertCreditParams) (Scr
 		arg.GrantedBy,
 		arg.Minutes,
 		arg.Seconds,
+		arg.GrantedVia,
 		arg.Now,
 	)
 	var i ScreenTimeCredit
@@ -346,6 +351,7 @@ func (q *Queries) InsertCredit(ctx context.Context, arg InsertCreditParams) (Scr
 		&i.ForfeitedAt,
 		&i.ForfeitedBy,
 		&i.ForfeitedSeconds,
+		&i.GrantedVia,
 	)
 	return i, err
 }
@@ -516,7 +522,7 @@ func (q *Queries) LatestTimeRequest(ctx context.Context, arg LatestTimeRequestPa
 }
 
 const lockCredit = `-- name: LockCredit :one
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit WHERE household_id = $1 AND child_id = $2 AND id = $3 FOR UPDATE
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds, granted_via FROM screen_time_credit WHERE household_id = $1 AND child_id = $2 AND id = $3 FOR UPDATE
 `
 
 type LockCreditParams struct {
@@ -542,6 +548,7 @@ func (q *Queries) LockCredit(ctx context.Context, arg LockCreditParams) (ScreenT
 		&i.ForfeitedAt,
 		&i.ForfeitedBy,
 		&i.ForfeitedSeconds,
+		&i.GrantedVia,
 	)
 	return i, err
 }
@@ -695,7 +702,7 @@ func (q *Queries) OpenWindows(ctx context.Context, arg OpenWindowsParams) ([]Ope
 }
 
 const pendingApprovalForTimeRequest = `-- name: PendingApprovalForTimeRequest :one
-SELECT id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id FROM approval WHERE household_id = $1 AND time_request_id = $2 AND state = 'pending'
+SELECT id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id, decided_via FROM approval WHERE household_id = $1 AND time_request_id = $2 AND state = 'pending'
 `
 
 type PendingApprovalForTimeRequestParams struct {
@@ -722,6 +729,7 @@ func (q *Queries) PendingApprovalForTimeRequest(ctx context.Context, arg Pending
 		&i.CreatedAt,
 		&i.RedemptionID,
 		&i.TimeRequestID,
+		&i.DecidedVia,
 	)
 	return i, err
 }
@@ -841,7 +849,7 @@ func (q *Queries) SetWebFilter(ctx context.Context, arg SetWebFilterParams) (Set
 }
 
 const unspentCredits = `-- name: UnspentCredits :many
-SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds FROM screen_time_credit
+SELECT id, household_id, child_id, source, redemption_id, granted_by, minutes, seconds, used_seconds, created_at, forfeited_at, forfeited_by, forfeited_seconds, granted_via FROM screen_time_credit
 WHERE household_id = $1 AND child_id = $2 AND used_seconds < seconds
 ORDER BY created_at, id
 `
@@ -875,6 +883,7 @@ func (q *Queries) UnspentCredits(ctx context.Context, arg UnspentCreditsParams) 
 			&i.ForfeitedAt,
 			&i.ForfeitedBy,
 			&i.ForfeitedSeconds,
+			&i.GrantedVia,
 		); err != nil {
 			return nil, err
 		}

@@ -201,10 +201,14 @@ INSERT INTO chore_active_award (household_id, occurrence_id, ledger_id) VALUES
 		{name: "award and spend at one instant", sql: sameInstant},
 		{name: "undo older than its award", err: "older than the row it undoes",
 			sql: edit + `UPDATE point_ledger SET created_at = '2026-03-10T16:00:00Z' WHERE id = '0190a000-0000-7000-8000-000000000143';`},
-		{name: "chore reversal with no pairing row", err: "import:",
+		{name: "chore reversal with no pairing row", err: "a point_ledger reversal does not name the row it undoes",
 			sql: edit + `DELETE FROM chore_award_reversal;`},
 		{name: "old active awards disagree", mismatch: "active chore awards rebuilt = old",
 			sql: edit + `DELETE FROM chore_active_award WHERE ledger_id = '0190a000-0000-7000-8000-000000000141';`},
+		{name: "approver from another household", err: "approved by an adult of another household",
+			sql: edit + `INSERT INTO household (id, name, time_zone, created_at) VALUES ('0190a000-0000-7000-8000-00000000000b', 'Other Household', 'Europe/Amsterdam', '2026-01-04T08:00:00Z');
+INSERT INTO household_owner (user_id, household_id, created_at) VALUES ('fixtureNoHousehold', '0190a000-0000-7000-8000-00000000000b', '2026-01-04T08:00:00Z');
+UPDATE completion_approval SET decided_by = 'fixtureNoHousehold' WHERE id = '0190a000-0000-7000-8000-000000000181';`},
 		{name: "approver no longer an adult here", note: "1 awards approved by someone who is not an adult here",
 			sql: edit + `UPDATE completion_approval SET decided_by = 'goneUser' WHERE id = '0190a000-0000-7000-8000-000000000181';`},
 		{name: "learning award with no learner link", note: "2 for a child with no learner link",

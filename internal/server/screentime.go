@@ -164,8 +164,9 @@ func toSpend(s screentime.Spent) *api.Spend {
 }
 
 // childInitiated reports whether spending is the child's own, so limited by allowed hours.
-// Anyone but an adult counts as the child, so a caller added later is limited too.
-func childInitiated(a actor.Actor) bool { return a.Kind != actor.Adult && a.Kind != actor.Phone }
+// Anyone but an adult (or an assistant acting for one) counts as the child, so a caller added
+// later is limited too.
+func childInitiated(a actor.Actor) bool { return !a.ActsAsAdult() }
 
 // screenTimeChanged tells the household's screens (live) and the child's devices that the
 // child's iPad time changed: a silent push wakes the app to sync, so the shields lift or come
@@ -281,7 +282,7 @@ func (s *Server) GrantScreenTime(ctx context.Context, req api.GrantScreenTimeReq
 		return api.GrantScreenTime200JSONResponse{ScreenTime: st, Tv: &view}, nil
 	}
 	cr, err := screentime.AddCredit(ctx, cmd, screentime.Credit{
-		Child: req.ChildId, Source: screentime.SourceGrant, GrantedBy: &a.AdultID, Minutes: int32(b.Minutes), //nolint:gosec // 1-240 by the spec
+		Child: req.ChildId, Source: screentime.SourceGrant, GrantedBy: &a.AdultID, GrantedVia: a.Via(), Minutes: int32(b.Minutes), //nolint:gosec // 1-240 by the spec
 	})
 	if err != nil {
 		return nil, err

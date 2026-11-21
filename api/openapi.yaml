@@ -62,6 +62,8 @@ tags:
     description: Parent phones (the iOS parent app) and their pushes
   - name: tvs
     description: The TV gate - TVs, sessions, "Who's watching?", open hours, the router and Home Assistant
+  - name: mcp
+    description: The assistant's Model Context Protocol endpoint
 paths:
   /auth/login:
     post:
@@ -1992,6 +1994,9 @@ paths:
         - phone
         - display
         - device-web
+        - assistant
+      x-scopes:
+        - today:read
       x-display-scopes:
         - today
       responses:
@@ -2018,6 +2023,9 @@ paths:
         - phone
         - display
         - device-web
+        - assistant
+      x-scopes:
+        - today:complete
       x-display-scopes:
         - today
       x-command: true
@@ -2059,6 +2067,9 @@ paths:
         - phone
         - display
         - device-web
+        - assistant
+      x-scopes:
+        - today:complete
       x-display-scopes:
         - today
       x-command: true
@@ -2103,6 +2114,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - points:read
       x-child-param: childId
       parameters:
         - name: childId
@@ -2189,6 +2203,9 @@ paths:
         - phone
         - display
         - device-web
+        - assistant
+      x-scopes:
+        - rewards:read
       x-display-scopes:
         - today
       responses:
@@ -2397,6 +2414,9 @@ paths:
         - rewards
       x-actors:
         - adult
+        - assistant
+      x-scopes:
+        - rewards:read
       parameters:
         - name: status
           in: query
@@ -2552,6 +2572,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - inbox:read
       responses:
         '200':
           description: The inbox
@@ -2572,6 +2595,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - inbox:decide
       x-command: true
       x-body-limit: 64
       parameters:
@@ -2615,6 +2641,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - inbox:decide
       x-command: true
       x-body-limit: 1024
       parameters:
@@ -2667,6 +2696,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - inbox:decide
       x-command: true
       x-body-limit: 64
       parameters:
@@ -2735,6 +2767,7 @@ paths:
         - device
         - device-web
         - service
+        - assistant
       x-scopes:
         - screentime:read
       x-child-param: childId
@@ -2820,6 +2853,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - screentime:grant
       x-child-param: childId
       x-command: true
       x-body-limit: 256
@@ -2879,6 +2915,9 @@ paths:
       x-actors:
         - adult
         - phone
+        - assistant
+      x-scopes:
+        - screentime:grant
       x-child-param: childId
       x-command: true
       x-body-limit: 256
@@ -3641,6 +3680,9 @@ paths:
         - adult
         - phone
         - display
+        - assistant
+      x-scopes:
+        - meals:read
       x-display-scopes:
         - meals
       parameters:
@@ -3940,6 +3982,9 @@ paths:
         - adult
         - phone
         - display
+        - assistant
+      x-scopes:
+        - calendar:read
       x-display-scopes:
         - calendar
       parameters:
@@ -5597,6 +5642,67 @@ paths:
           $ref: '#/components/responses/TooLarge'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Error'
+  /mcp:
+    post:
+      operationId: callMcp
+      summary: Model Context Protocol (Streamable HTTP, stateless, JSON answers)
+      description: |
+        One JSON-RPC message per request: `initialize`, `tools/list`, `tools/call`, `ping`, or a notification (answered 202 with no body). Only an assistant credential (`oca_` bearer) may call it; cookies never do. `tools/list` shows only the tools the credential's scopes allow. Each tool runs one operation of this API as the credential's adult, with that operation's rules: a tool that changes something takes a `requestId` (a UUID, sent as its Idempotency-Key), so a retry with the same `requestId` and arguments gets the recorded answer. A tool's error is a result with `isError` and `structuredContent.error {code, status, message}`. There are no sessions and no event stream; GET and DELETE are 405. Rate limited per address and per credential.
+      tags:
+        - mcp
+      x-actors:
+        - assistant
+      x-scopes: []
+      x-body-limit: 65536
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: A JSON-RPC 2.0 request or notification
+              type: object
+              required:
+                - jsonrpc
+                - method
+              properties:
+                jsonrpc:
+                  type: string
+                  const: '2.0'
+                id:
+                  oneOf:
+                    - type: string
+                      maxLength: 128
+                    - type: integer
+                method:
+                  type: string
+                  maxLength: 64
+                params:
+                  type: object
+            example:
+              jsonrpc: '2.0'
+              id: 1
+              method: tools/list
+      responses:
+        '200':
+          description: The JSON-RPC response
+          content:
+            application/json:
+              schema:
+                type: object
+        '202':
+          description: A notification, accepted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Error'
 components:

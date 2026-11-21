@@ -15,7 +15,7 @@ screenTime:
       the answer). A device stays unlocked at most `allowanceSeconds` (≤ 300) past `serverTime`
       without asking again, so it locks when it loses the server.
     tags: [screentime]
-    x-actors: [adult, phone, device, device-web, service]
+    x-actors: [adult, phone, device, device-web, service, assistant]
     x-scopes: ['screentime:read']
     x-child-param: childId
     parameters:
@@ -94,7 +94,8 @@ grant:
       once, after anything already queued and regardless of allowed hours. TV time (`target: tv`)
       is added to the child's TV time, spent when they watch a TV; `startNow` is 422 with it.
     tags: [screentime]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [screentime:grant]
     x-child-param: childId
     x-command: true
     x-body-limit: 256
@@ -148,7 +149,8 @@ end:
       finish and cancels only what is queued after it. The unused time is forfeited, unless
       `refund` puts it back in the child's bank. 409 `nothing_to_end`.
     tags: [screentime]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [screentime:grant]
     x-child-param: childId
     x-command: true
     x-body-limit: 256

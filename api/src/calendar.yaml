@@ -7,7 +7,8 @@ calendar:
       household's time zone; all-day events are dates with an exclusive end. Cancelled events are
       never sent. A display sees only calendars shown on displays.
     tags: [calendar]
-    x-actors: [adult, phone, display]
+    x-actors: [adult, phone, display, assistant]
+    x-scopes: [calendar:read]
     x-display-scopes: [calendar]
     parameters:
       - name: from

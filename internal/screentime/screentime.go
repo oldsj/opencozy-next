@@ -206,7 +206,9 @@ type Credit struct {
 	Source       string
 	RedemptionID *uuid.UUID
 	GrantedBy    *uuid.UUID
-	Minutes      int32
+	// GrantedVia is the assistant credential a grant came through, if any.
+	GrantedVia *uuid.UUID
+	Minutes    int32
 	// Seconds defaults to the whole minutes; less when a grant ends at an exact time.
 	Seconds int32
 }
@@ -225,7 +227,7 @@ func AddCredit(ctx context.Context, c *command.Cmd, cr Credit) (dbq.ScreenTimeCr
 	}
 	return c.Q.InsertCredit(ctx, dbq.InsertCreditParams{
 		HouseholdID: c.HouseholdID(), ChildID: cr.Child, Source: cr.Source, RedemptionID: cr.RedemptionID,
-		GrantedBy: cr.GrantedBy, Minutes: cr.Minutes, Seconds: cr.Seconds, Now: now,
+		GrantedBy: cr.GrantedBy, GrantedVia: cr.GrantedVia, Minutes: cr.Minutes, Seconds: cr.Seconds, Now: now,
 	})
 }
 

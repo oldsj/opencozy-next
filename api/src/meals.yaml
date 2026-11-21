@@ -6,7 +6,8 @@ week:
       A week runs Monday to Sunday, in the household's time zone. Without `week`, it is the
       current week. At most one meal per slot per day.
     tags: [meals]
-    x-actors: [adult, phone, display]
+    x-actors: [adult, phone, display, assistant]
+    x-scopes: [meals:read]
     x-display-scopes: [meals]
     parameters:
       - name: week

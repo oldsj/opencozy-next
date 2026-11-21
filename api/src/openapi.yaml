@@ -62,6 +62,8 @@ tags:
     description: Parent phones (the iOS parent app) and their pushes
   - name: tvs
     description: The TV gate - TVs, sessions, "Who's watching?", open hours, the router and Home Assistant
+  - name: mcp
+    description: The assistant's Model Context Protocol endpoint
 
 # One line per path; the operations live in the domain files.
 paths:
@@ -285,6 +287,8 @@ paths:
     $ref: tvs.yaml#/attempts
   /tv/power:
     $ref: tvs.yaml#/power
+  /mcp:
+    $ref: mcp.yaml#/mcp
 
 components:
   securitySchemes:

@@ -3,7 +3,8 @@ history:
     operationId: getPointsHistory
     summary: A child's balance and points history, newest first
     tags: [points]
-    x-actors: [adult, phone]
+    x-actors: [adult, phone, assistant]
+    x-scopes: [points:read]
     x-child-param: childId
     parameters:
       - name: childId
