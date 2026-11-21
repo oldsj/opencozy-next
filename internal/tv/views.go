@@ -226,6 +226,16 @@ func (s *Snapshot) List(ctx context.Context) (api.TvList, error) {
 	return out, nil
 }
 
+// Asking is List with only the TVs asking "Who's watching?", for the inbox.
+func (s *Snapshot) Asking(ctx context.Context) (api.TvList, error) {
+	out, err := s.List(ctx)
+	if err != nil {
+		return out, err
+	}
+	out.Tvs = slices.DeleteFunc(out.Tvs, func(t api.TvState) bool { return t.Prompt == nil })
+	return out, nil
+}
+
 // Display is what a wall display sees: names and state, no MACs or entities.
 func (s *Snapshot) Display() api.DisplayTvList {
 	out := api.DisplayTvList{ServerTime: s.Now, Tvs: make([]api.DisplayTv, 0, len(s.TVs))}

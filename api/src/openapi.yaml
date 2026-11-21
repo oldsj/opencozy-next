@@ -109,6 +109,8 @@ paths:
     $ref: displays.yaml#/pairings
   /display/pairings/claim:
     $ref: displays.yaml#/claim
+  /display/session:
+    $ref: displays.yaml#/session
   /displays:
     $ref: displays.yaml#/displays
   /displays/{displayId}:
