@@ -1,4 +1,4 @@
-// Package importer copies the frozen old app (commit e717170, migration 0044) into a
+// Package importer copies the frozen old app (commit d7fead8, migration 0045) into a
 // new, empty installation, in one transaction (design §12, §13).
 //
 //   - The source is opened read-only: default_transaction_read_only=on and one REPEATABLE READ
@@ -178,7 +178,7 @@ func (s *source) close(ctx context.Context) {
 	_ = s.conn.Close(ctx)
 }
 
-// checkVersion refuses any source other than the old app at e717170.
+// checkVersion refuses any source other than the old app at d7fead8.
 func checkVersion(ctx context.Context, src pgx.Tx) error {
 	rows, err := src.Query(ctx, "SELECT version, checksum FROM opencozy.schema_migrations ORDER BY version")
 	if err != nil {
@@ -196,7 +196,7 @@ func checkVersion(ctx context.Context, src pgx.Tx) error {
 		if len(got) > 0 {
 			last = got[len(got)-1].version
 		}
-		return fmt.Errorf("import: the source is not the old app at e717170 (it has %d migrations, the last %s; want %d ending %s, with matching checksums)",
+		return fmt.Errorf("import: the source is not the old app at d7fead8 (it has %d migrations, the last %s; want %d ending %s, with matching checksums)",
 			len(got), last, len(oldMigrations), oldMigrations[len(oldMigrations)-1].version)
 	}
 	return nil

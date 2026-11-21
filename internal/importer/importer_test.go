@@ -100,7 +100,7 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"household":                     "pending", // lock_message and the game domains wait on later slices
 		"child":                         "pending", // the colour and allowed hours too
 		"auth_user":                     "ok",
-		"household_owner":               "ok",
+		"household_owner":               "pending", // push_muted_until waits on slice 11
 		"auth_account":                  "ok",
 		"service_credential":            "pending", // the router's tv:gate has no new name yet
 		"service_credential_child":      "pending",
