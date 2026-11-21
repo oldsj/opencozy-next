@@ -113,7 +113,7 @@ it checks hasn't run yet.
 | `parent_passkey` | `passkey` | ID, name, credential ID, public key, sign counter, transports and backed-up flag. "Backup eligible" is unknown until the first sign-in sets it. |
 | `device` | `device` | Child devices: ID, child, name, platform, key, times, and revoked ones as revoked. A paired iPad keeps working without pairing again. |
 | `service_credential`, `…_child`, `…_award_rule` | `credential`, `credential_child`, `credential_award_rule` | Service credentials (learning games) with their children and rules |
-| `assistant_credential` | `credential` (assistant) | Assistant credentials whose scopes have a new name |
+| `assistant_credential` | `credential` (assistant) | Assistant credentials, each old scope under its new name, plus the read scopes the old app always gave an assistant |
 | `award_rule`, `external_identity_link`, `external_award` | `award_rule`, `learning_link`, `learning_award` | Learning rules, each child's game link, and every award with its source event ID, so a retried event is never paid twice |
 | `point_ledger` | `point_ledger` | Every row, with its ID, child, points and time, written oldest first under the new rules |
 | `chore_award_reversal`, `chore_active_award` | `point_ledger.reverses_id`, `active_award` | An undo points at what it undoes; the awards in effect are rebuilt and compared with the old list |
@@ -222,9 +222,6 @@ An adult who edits such a chore, routine or reward brings it within the new limi
 
 ## Still pending
 
-A real import refuses while any of these has rows, and the dry run marks it `pending`:
-
-- `assistant_credential` scopes with no new name yet (`approvals:read`): slice 12 (#81) maps them.
-
-Any other old table with rows and no mapping is `pending` too, so a new old table is never lost
-silently.
+Nothing today: every old table is carried or deliberately not carried. An old table, or column,
+that no mapping reads is `pending`, and a real import refuses while it has rows, so nothing new in
+the old app can be lost silently.

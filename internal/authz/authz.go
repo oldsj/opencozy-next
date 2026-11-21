@@ -156,6 +156,12 @@ func New(spec *openapi3.T) (*Table, error) {
 	return t, nil
 }
 
+// PolicyOf returns an operation's policy, by the operation as the spec loaded it.
+func (t *Table) PolicyOf(op *openapi3.Operation) (Policy, bool) {
+	p, ok := t.byOp[op]
+	return p, ok
+}
+
 // Scopes lists every credential scope some operation requires, the vocabulary credentials may
 // be issued with.
 func (t *Table) Scopes() []string { return t.scopes }

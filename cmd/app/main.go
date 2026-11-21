@@ -5,6 +5,7 @@
 //	app bootstrap-owner  create the first household and its first adult (once only)
 //	app add-adult        add an adult to a household
 //	app rekey            re-encrypt stored secrets under the first OPENCOZY_SECRET_KEYS key
+//	app mcp              MCP over stdio, as the assistant credential in OPENCOZY_MCP_TOKEN
 //
 // bootstrap-owner and add-adult read the password from stdin, so it stays out of the process
 // list and shell history.
@@ -26,6 +27,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/oldsj/opencozy-next/internal/auth"
 	"github.com/oldsj/opencozy-next/internal/calendar"
@@ -60,7 +62,11 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
+	logTo := io.Writer(os.Stdout)
+	if cmd == "mcp" {
+		logTo = os.Stderr // stdout carries the protocol
+	}
+	log := slog.New(slog.NewJSONHandler(logTo, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(log)
 	if config.E2EBuild {
 		log.Warn("e2e build: the calendar and single sign-on clients may fetch from 127.0.0.1; for browser tests only, never a household")
@@ -112,6 +118,16 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		go jobs.Runner{Pool: pool, Log: log}.Run(ctx, background...)
 		return server.Serve(ctx, log, cfg.ListenAddr, h, srv.Drain)
+	case "mcp": // the assistant's tools over stdio (design §9)
+		if cfg.MCPToken == "" {
+			return errors.New("mcp: set OPENCOZY_MCP_TOKEN to an assistant credential's secret (oca_...)")
+		}
+		pool, err := db.Open(ctx, cfg.DatabaseURL)
+		if err != nil {
+			return err
+		}
+		defer pool.Close()
+		return server.New(cfg, log, pool).ServeMCP(ctx, cfg.MCPToken, &mcp.StdioTransport{})
 	case "import": // copy the old app's data into this empty installation
 		return runImport(ctx, cfg, log, args, stdout)
 	case "bootstrap-owner", "add-adult", "rekey":
@@ -128,7 +144,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 		}
 		return addAdult(ctx, pool, args, stdin, stdout)
 	default:
-		return fmt.Errorf("unknown command %q (want serve, migrate, bootstrap-owner, add-adult, rekey or import)", cmd)
+		return fmt.Errorf("unknown command %q (want serve, migrate, bootstrap-owner, add-adult, rekey, mcp or import)", cmd)
 	}
 }
 

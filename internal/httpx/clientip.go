@@ -64,3 +64,9 @@ func ClientIPFrom(ctx context.Context) string {
 	s, _ := ctx.Value(clientIPKey{}).(string)
 	return s
 }
+
+// WithClientIP returns ctx carrying ip as the client address, for requests made inside the
+// process on behalf of an outside caller (an MCP tool call runs as the caller's request).
+func WithClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, clientIPKey{}, ip)
+}

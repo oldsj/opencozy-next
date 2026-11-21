@@ -49,9 +49,27 @@ deployment's values file; every value in it is a placeholder. Installation-speci
 secrets live with the deployment, never in this repository.
 
 After a deploy, `scripts/smoke.sh https://cozy.example.test` checks the installation without
-changing anything: health, that the new server answers, the sign-in and error contract, the iOS
+changing anything: health, that the new server answers, the sign-in and error contract (including that the passkey domain fits the site, so imported passkeys sign in), the iOS
 apps' passkey file, MCP `tools/list` and the router's gates (tokens from the environment; see the
 script). It then prints a checklist for what only a person can check.
+
+## Assistants (MCP)
+
+An adult issues an assistant key in Manage → Connections and picks what it may do. The
+assistant acts as that adult, for every child, and what it does is recorded as the adult "via"
+the assistant. Its tools are the API's own operations (`internal/server/mcp_tools.go`), so they
+follow the same rules; `tools/list` shows only what the key's scopes allow. A tool that changes
+something takes a `requestId` (a new UUID per action; repeat it only to retry).
+
+Over HTTP (stateless, JSON answers), with placeholder values:
+
+```json
+{ "mcpServers": { "opencozy": { "type": "http", "url": "https://cozy.example.test/api/mcp",
+  "headers": { "Authorization": "Bearer <assistant key>" } } } }
+```
+
+Over stdio, the same tools: `OPENCOZY_MCP_TOKEN=<assistant key> app mcp` (with the usual
+`DATABASE_URL`; logs go to standard error).
 
 ## Choices
 

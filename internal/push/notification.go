@@ -115,7 +115,7 @@ func ApprovalResolved(id uuid.UUID, state string) (key string, n Notification) {
 
 // ScreenTimeChanged is the silent push that wakes a child's devices to sync after a parent
 // changes their iPad time (gives or ends time, forfeits or cancels banked time, changes allowed
-// hours), so the shields lift or come back at once rather than at the app's next sync. Each
+// hours), or the child spends it from the kid view in the app's web view, so the shields lift or come back at once rather than at the app's next sync. Each
 // event is its own row; the collapse ID is the child's, so only the latest is kept on the way.
 func ScreenTimeChanged(child uuid.UUID) (key string, n Notification) {
 	return "screentime.changed/" + child.String() + "/" + uuid.NewString(), Notification{

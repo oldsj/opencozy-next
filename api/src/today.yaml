@@ -3,7 +3,8 @@ today:
     operationId: getToday
     summary: Today for every child, as the wall display shows it
     tags: [today]
-    x-actors: [adult, phone, display, device-web]
+    x-actors: [adult, phone, display, device-web, assistant]
+    x-scopes: [today:read]
     x-display-scopes: [today]
     responses:
       '200':
@@ -23,7 +24,8 @@ completeChore:
     operationId: completeChore
     summary: Mark today's chore done; it waits for an adult's approval
     tags: [today]
-    x-actors: [adult, phone, display, device-web]
+    x-actors: [adult, phone, display, device-web, assistant]
+    x-scopes: [today:complete]
     x-display-scopes: [today]
     x-command: true
     x-body-limit: 1
@@ -58,7 +60,8 @@ checkStep:
     operationId: checkRoutineStep
     summary: Tick a step of today's routine; the last one sends the routine for approval
     tags: [today]
-    x-actors: [adult, phone, display, device-web]
+    x-actors: [adult, phone, display, device-web, assistant]
+    x-scopes: [today:complete]
     x-display-scopes: [today]
     x-command: true
     x-body-limit: 1

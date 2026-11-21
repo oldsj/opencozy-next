@@ -284,3 +284,20 @@ func TestPasskeyFollowUps(t *testing.T) {
 		t.Fatalf("archived household: %d %s", r.status, r.raw)
 	}
 }
+
+// The sign-in methods name the passkeys' relying party and origins, so a deploy check can see
+// they match the site (imported passkeys sign in only on their own name); without passkeys,
+// neither is sent.
+func TestSignInMethodsPasskeyDomain(t *testing.T) {
+	e := newEnv(t, withPasskeys)
+	r := e.send(cred{}, "GET", "/api/auth/methods", nil)
+	origins, _ := r.body["passkeyOrigins"].([]any)
+	if r.status != 200 || r.body["passkeyRpId"] != rpID || len(origins) != 1 || origins[0] != rpOrigin {
+		t.Fatalf("with passkeys: %d %s", r.status, r.raw)
+	}
+	off := newEnv(t, nil)
+	r = off.send(cred{}, "GET", "/api/auth/methods", nil)
+	if _, ok := r.body["passkeyRpId"]; r.status != 200 || ok || r.body["passkeyOrigins"] != nil {
+		t.Fatalf("without passkeys: %d %s", r.status, r.raw)
+	}
+}

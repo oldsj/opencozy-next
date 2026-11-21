@@ -291,6 +291,10 @@ func oidcBindingCookie(value string, maxAge int) string {
 // GetSignInMethods says which ways of signing in the sign-in page should offer.
 func (s *Server) GetSignInMethods(_ context.Context, _ api.GetSignInMethodsRequestObject) (api.GetSignInMethodsResponseObject, error) {
 	m := api.SignInMethods{Passkeys: s.wa != nil}
+	if s.wa != nil {
+		rp, origins := s.cfg.WebAuthnRPID, s.cfg.WebAuthnOrigins
+		m.PasskeyRpId, m.PasskeyOrigins = &rp, &origins
+	}
 	if s.oidc != nil {
 		m.Oidc = &api.OidcProvider{Name: s.oidc.name}
 	}

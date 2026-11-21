@@ -67,6 +67,20 @@ func (a Actor) MayActFor(child uuid.UUID) bool {
 // IsAdult reports whether the actor is an adult, on the web or on a phone.
 func (a Actor) IsAdult() bool { return a.Kind == Adult || a.Kind == Phone }
 
+// ActsAsAdult reports whether what the actor does counts as an adult's: an adult, or an
+// assistant acting for its adult (within its scopes).
+func (a Actor) ActsAsAdult() bool { return a.IsAdult() || a.Kind == Assistant }
+
+// Via is the assistant credential an adult's action came through, or nil when the adult acted
+// themselves. Records keep it next to the adult ("via assistant").
+func (a Actor) Via() *uuid.UUID {
+	if a.Kind != Assistant {
+		return nil
+	}
+	id := a.CredentialID
+	return &id
+}
+
 type key struct{}
 
 // With returns ctx carrying a.

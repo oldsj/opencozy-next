@@ -104,6 +104,10 @@ type Config struct {
 	OIDCClientSecret string `env:"OIDC_CLIENT_SECRET"`
 	// OIDCName is the button's text after "Sign in with".
 	OIDCName string `env:"OIDC_NAME" envDefault:"single sign-on"`
+
+	// Slice 12: MCPToken is the assistant credential (oca_) `app mcp` acts as over stdio. Only
+	// that command reads it; the server never does. Secret: no default.
+	MCPToken string `env:"OPENCOZY_MCP_TOKEN"`
 }
 
 // GoogleRedirectURL is where Google sends an adult back after consent; register it exactly.
