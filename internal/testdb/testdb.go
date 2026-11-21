@@ -5,8 +5,9 @@
 // where it fails: a silent skip would hide missing coverage. `make test` starts one in Docker
 // Compose.
 //
-// Like production, the schema is migrated by its owner (the admin role) and the application
-// connects as a runtime role that can only read and write rows.
+// Like production, PUBLIC has no CONNECT on the database, the schema is migrated by its owner
+// (the admin role), and the application connects as a runtime role that can only read and write
+// rows.
 package testdb
 
 import (
@@ -65,6 +66,11 @@ func Open(t testing.TB) DB {
 	defer func() { _ = conn.Close(ctx) }()
 	if _, err := conn.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
 		t.Fatalf("testdb: create: %v", err)
+	}
+	// As production's databases (the CNPG bootstraps): no CONNECT for PUBLIC, so the runtime
+	// role connects only because migrations grant it.
+	if _, err := conn.Exec(ctx, "REVOKE ALL ON DATABASE "+pgx.Identifier{name}.Sanitize()+" FROM PUBLIC"); err != nil {
+		t.Fatalf("testdb: revoke: %v", err)
 	}
 	// The password is random hex, so quoting it is safe.
 	if _, err := conn.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" LOGIN PASSWORD '"+password+"'"); err != nil {

@@ -30,6 +30,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/day"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/live"
+	"github.com/oldsj/opencozy-next/internal/push"
 )
 
 // ParentsMax caps a parents session, so a missed "off" cannot leave a TV online overnight.
@@ -100,9 +101,11 @@ type Who struct {
 	Device     *uuid.UUID
 }
 
-// Domain is the TV gate's rules, with the household's allowed hours plugged in.
+// Domain is the TV gate's rules, with the household's allowed hours plugged in, and the push
+// outbox for the parents' "Who's watching?" (the zero Outbox pushes nothing).
 type Domain struct {
 	Hours Hours
+	Push  push.Outbox
 }
 
 func (d Domain) hours() Hours {
@@ -391,7 +394,9 @@ func (s *Snapshot) resolve(ctx context.Context, tvID uuid.UUID, state string, wh
 	}
 	s.Prompts = slices.DeleteFunc(s.Prompts, func(o dbq.TvPrompt) bool { return o.TvID == tvID })
 	s.changed = true
-	return &p, nil
+	// Every parent's phone removes the "Who's watching?" alert, silently.
+	key, n := push.ApprovalResolved(p.ID, state)
+	return &p, s.d.Push.ToAdults(ctx, s.q, s.H, key, n)
 }
 
 // Settle ends every open session that is over: run out (time_up), its child archived

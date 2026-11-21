@@ -64,6 +64,7 @@ struct ParentModeLaterTests {
         func inbox() async throws -> InboxResponse { throw Self.gone }
         func approve(id: String, idempotencyKey: String) async throws -> Decision { throw Self.gone }
         func reject(id: String, _ request: RejectRequest, idempotencyKey: String) async throws -> Decision { throw Self.gone }
+        func answer(id: String, _ request: TimeAnswerRequest, idempotencyKey: String) async throws -> Decision { throw Self.gone }
         func registerPushToken(_ request: PushTokenRequest) async throws { throw Self.gone }
         func unregisterPushToken() async throws { throw Self.gone }
     }

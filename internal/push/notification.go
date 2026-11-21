@@ -78,8 +78,23 @@ func (n Notification) APNs(pending int) map[string]any {
 }
 
 // Events that push today. The kid device's TV pushes (a TV waiting for "Who's watching?", 5
-// minutes of TV time left) and the parents' "Who's watching?" prompt follow the same pattern
-// with ToAdults or ToChild in the event's own command (slice 9, w-slice9).
+// minutes of TV time left) and the parents' "Started watching" follow the same pattern with
+// ToAdults or ToChild in the event's own command.
+
+// TvWaiting tells the parents a TV is asking "Who's watching?" (old tv.pending). It is a plain
+// alert that opens the app on the inbox, where the TV is answered: no category, so no actions
+// on the notification. It goes as an inbox item (approval.pending, kind tv_prompt) because
+// that is what the shipped app shows and clears; ApprovalResolved with the prompt's ID removes
+// it once the prompt is decided anywhere. askedAt is the prompt's created_at: a reminder
+// pushes again and replaces the first.
+func TvWaiting(p dbq.TvPrompt, tvName string) (key string, n Notification) {
+	return "tv.pending/" + p.ID.String() + "/" + strconv.FormatInt(p.CreatedAt.Unix(), 10), Notification{
+		Type: "approval.pending", Collapse: p.ID.String(),
+		Title: tvName + ": who's watching?", Body: "It stays offline until someone chooses in the inbox.",
+		Thread: "opencozy-tv", Badge: true,
+		Data: map[string]string{"itemId": p.ID.String(), "kind": "tv_prompt"},
+	}
+}
 
 // ApprovalPending tells the parents something is waiting in the inbox: a finished chore or
 // routine, a reward to approve, or a request for more time. askedAt is when it was asked: a
