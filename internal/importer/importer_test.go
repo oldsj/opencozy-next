@@ -125,8 +125,8 @@ func TestDryRunReconcilesAndRollsBack(t *testing.T) {
 		"routine_definition":            "ok",
 		"routine_occurrence":            "ok",
 		"completion_approval":           "ok",
-		"reward":                        "pending", // rewards wait on their importer
-		"reward_redemption":             "pending",
+		"reward":                        "ok",
+		"reward_redemption":             "ok",
 	} {
 		if got[table] != want {
 			t.Errorf("%s: %q, want %q\n%s", table, got[table], want, out)
