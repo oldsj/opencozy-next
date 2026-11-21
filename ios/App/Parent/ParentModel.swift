@@ -72,6 +72,7 @@ final class ParentModel {
     var errorMessage: String?
 
     static let unreachableMessage = WebShell.unreachableMessage
+    static let parentModeLater = "Parent mode on the iPhone comes in a later update. Use OpenCozy in the browser for now."
     static let addressHint = "Enter the OpenCozy address, for example https://opencozy.example.org."
 
     let store: ParentStore
@@ -478,6 +479,10 @@ final class ParentModel {
         case APIError.transport:
             isUnreachable = true
             errorMessage = Self.unreachableMessage
+        case APIError.server(410, _):
+            // This server answers the previous server's parent paths `update_app`; parent
+            // mode on the phone moves to this server in a later update (slices 10 and 11).
+            errorMessage = Self.parentModeLater
         case APIError.server(401, let message) where signingIn:
             errorMessage = message
         case APIError.server(401, _):
