@@ -260,11 +260,15 @@ func (s *Server) AssignEventChildren(ctx context.Context, req api.AssignEventChi
 
 func toSource(r dbq.CalendarSource) api.CalendarSource {
 	src := api.CalendarSource{Id: r.ID, Name: r.Name, Provider: api.CalendarSourceProvider(r.Provider), Color: api.ProfileColor(r.Color),
-		ShowOnDisplay: r.ShowOnDisplay, Status: api.CalendarSourceStatusOk, LastSyncAt: r.LastSuccessAt, Version: int(r.Version)}
+		ShowOnDisplay: r.ShowOnDisplay, Status: api.CalendarSourceStatusOk, LastSyncAt: r.LastSuccessAt, Version: int(r.Version),
+		GoogleConnectionId: r.GoogleConnectionID}
 	if r.ErrorCode != nil {
 		code := api.CalendarErrorCode(*r.ErrorCode)
 		src.Error = &code
-		if r.ConsecutiveFailures > 0 { // too_many_events alone still syncs
+		switch {
+		case *r.ErrorCode == calendar.CodeTokenExpired:
+			src.Status = api.CalendarSourceStatusNeedsReauth
+		case r.ConsecutiveFailures > 0: // too_many_events alone still syncs
 			src.Status = api.CalendarSourceStatusError
 		}
 	}
