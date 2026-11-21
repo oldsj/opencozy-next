@@ -283,10 +283,23 @@ func TestPhoneSignInFromWeb(t *testing.T) {
 	h := e.house("a", nil)
 	body := map[string]any{"deviceName": "Sam's iPhone"}
 	// A stale web sign-in isn't enough for a 90-day phone credential.
-	if r := e.send(h.actors["adult-stale"], "POST", "/api/phone/sessions/web", body); r.status != 403 {
+	if r := e.send(h.actors["adult-stale"], "POST", "/api/phone/sessions/web", body, "Sec-Fetch-Site", ""); r.status != 403 {
 		t.Errorf("stale: %d %s", r.status, r.raw)
 	}
-	r := e.send(h.actors["adult"], "POST", "/api/phone/sessions/web", body)
+	// A web page can't mint one, even same-origin: the browser marks its requests, and only the
+	// app's native request (no Sec-Fetch-Site) is served. Cross-origin is refused earlier.
+	if r := e.send(h.actors["adult"], "POST", "/api/phone/sessions/web", body); r.status != 403 || r.code() != "use_the_app" {
+		t.Errorf("same-origin page: %d %s", r.status, r.raw)
+	}
+	for _, site := range []string{"same-site", "cross-site"} {
+		if r := e.send(h.actors["adult"], "POST", "/api/phone/sessions/web", body, "Sec-Fetch-Site", site); r.status != 403 {
+			t.Errorf("Sec-Fetch-Site %s: %d %s", site, r.status, r.raw)
+		}
+	}
+	if r := e.send(h.actors["adult"], "POST", "/api/phone/sessions/web", body, "Sec-Fetch-Site", "none"); r.status != 201 {
+		t.Errorf("Sec-Fetch-Site none: %d %s", r.status, r.raw)
+	}
+	r := e.send(h.actors["adult"], "POST", "/api/phone/sessions/web", body, "Sec-Fetch-Site", "")
 	if r.status != 201 {
 		t.Fatalf("from web: %d %s", r.status, r.raw)
 	}
@@ -295,7 +308,7 @@ func TestPhoneSignInFromWeb(t *testing.T) {
 		t.Errorf("session: %d %s", r.status, r.raw)
 	}
 	// A phone can't mint another phone.
-	if r := e.send(phone, "POST", "/api/phone/sessions/web", body); r.status != 403 {
+	if r := e.send(phone, "POST", "/api/phone/sessions/web", body, "Sec-Fetch-Site", ""); r.status != 403 {
 		t.Errorf("phone: %d %s", r.status, r.raw)
 	}
 }
