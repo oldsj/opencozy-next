@@ -543,6 +543,41 @@ func TestTVRewards(t *testing.T) {
 	}
 }
 
+// Taking back a grant the child is watching on charges what they watched, forfeits only the
+// rest, ends the session and takes the TV off the router at once.
+func TestTVForfeitWhileWatching(t *testing.T) {
+	e := newTVEnv(t)
+	mac := "02:00:5e:10:00:01"
+	r := e.send(e.adult, "POST", "/api/children/"+e.h.child1.String()+"/screen-time/grant", map[string]any{"minutes": 20, "target": "tv"})
+	if r.status != 200 {
+		t.Fatalf("grant: %d %s", r.status, r.raw)
+	}
+	credits := r.body["tv"].(map[string]any)["credits"].([]any)
+	grant := credits[len(credits)-1].(map[string]any)["id"].(string)
+	prompt := e.tvState(e.h.tv)["prompt"].(map[string]any)["id"].(string)
+	if r := e.send(e.adult, "POST", "/api/tv-prompts/"+prompt+"/answer", map[string]any{"expectedVersion": 1, "answer": "child", "childId": e.h.child1.String()}); r.status != 200 {
+		t.Fatalf("watch: %d %s", r.status, r.raw)
+	}
+	if a := e.allowances(); a[mac] != 300 {
+		t.Fatalf("allowance: %v", a)
+	}
+	e.fake.Advance(5 * time.Minute)
+	r = e.send(e.adult, "POST", "/api/children/"+e.h.child1.String()+"/tv/credits/"+grant+"/forfeit", map[string]any{})
+	if r.status != 200 || r.body["forfeitedSeconds"] != 900.0 || r.body["tv"].(map[string]any)["secondsRemaining"] != 0.0 {
+		t.Fatalf("forfeit: %d %s", r.status, r.raw)
+	}
+	if s := e.tvState(e.h.tv)["session"]; s != nil {
+		t.Fatalf("the session outlived its time: %v", s)
+	}
+	if a := e.allowances(); len(a) != 0 {
+		t.Fatalf("still allowed after the forfeit: %v", a)
+	}
+	var used, forfeited int
+	if err := e.owner.QueryRow(t.Context(), `SELECT used_seconds, forfeited_seconds FROM tv_credit WHERE id = $1`, grant).Scan(&used, &forfeited); err != nil || used != 300 || forfeited != 900 {
+		t.Fatalf("credit: used %d, forfeited %d, %v", used, forfeited, err)
+	}
+}
+
 // failFirst fails the first household's transaction (the second call: the first lists them).
 type failFirst struct {
 	poolTx
