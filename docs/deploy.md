@@ -8,8 +8,6 @@ deployment's own values file and its Secret, outside this repository.
 The chart is `charts/opencozy-next`, published to `oci://ghcr.io/oldsj/charts`. A values file to
 start from: `charts/opencozy-next/ci/example.yaml`.
 
-Settings marked **(with #NN)** arrive with that pull request and are not on main until it merges.
-
 ## Server environment
 
 The server reads only its environment (`internal/config`). It refuses to start on an invalid
@@ -38,12 +36,12 @@ from `secrets.env` (below).
 | `OIDC_CLIENT_SECRET` | `secrets.env` | none | **Secret.** The client's secret. |
 | `OIDC_NAME` | `config.oidc.name` | `single sign-on` | Button text after "Sign in with", e.g. `Example ID`. |
 | `OIDC_ALLOWED_PRIVATE_CIDRS` | `egress.oidc.cidrs` | none | Private ranges a self-hosted provider may be reached on. |
-| `GOOGLE_CLIENT_ID` | `config.googleClientID` | off | **(with #60)** Google calendars: an OAuth client ID, `000000000000-example.apps.googleusercontent.com`. |
-| `GOOGLE_CLIENT_SECRET` | `secrets.env` | none | **(with #60)** **Secret.** |
-| `APPLE_TEAM_ID` | `config.appleTeamID` | off | **(with #64)** Serves `/.well-known/apple-app-site-association`, so the iOS app can use this site's passkeys: `ABCDE12345`. |
-| `APPLE_BUNDLE_ID` | `config.appleBundleID` | none | **(with #64)** The iOS app's bundle ID, `org.example.opencozy`. Required with the team ID. |
-| `APNS_KEY_ID` | `config.apnsKeyID` | off | **(with #64)** APNs auth key ID, `KEY1234567`. With `APNS_KEY`, pushes to parent phones and kid devices. |
-| `APNS_KEY` | `secrets.env` | none | **(with #64)** **Secret.** The `.p8` key's PEM. Checked at startup, never logged. |
+| `GOOGLE_CLIENT_ID` | `config.googleClientID` | off | Google calendars: an OAuth client ID, `000000000000-example.apps.googleusercontent.com`. |
+| `GOOGLE_CLIENT_SECRET` | `secrets.env` | none | **Secret.** |
+| `APPLE_TEAM_ID` | `config.appleTeamID` | off | Serves `/.well-known/apple-app-site-association`, so the iOS app can use this site's passkeys: `ABCDE12345`. |
+| `APPLE_BUNDLE_ID` | `config.appleBundleID` | none | The iOS app's bundle ID, `org.example.opencozy`. Required with the team ID. |
+| `APNS_KEY_ID` | `config.apnsKeyID` | off | APNs auth key ID, `KEY1234567`. With `APNS_KEY`, pushes to parent phones and kid devices. |
+| `APNS_KEY` | `secrets.env` | none | **Secret.** The `.p8` key's PEM. Checked at startup, never logged. |
 
 ## Chart values
 
@@ -66,9 +64,9 @@ Beyond the `config.*` values above (defaults in `charts/opencozy-next/values.yam
         key: secret-keys
       - name: OIDC_CLIENT_SECRET
         key: oidc-client-secret
-      - name: GOOGLE_CLIENT_SECRET   # with #60
+      - name: GOOGLE_CLIENT_SECRET
         key: google-client-secret
-      - name: APNS_KEY               # with #64
+      - name: APNS_KEY
         key: apns-key
   onepassword:
     itemPath: vaults/example/items/opencozy
@@ -81,8 +79,8 @@ Beyond the `config.*` values above (defaults in `charts/opencozy-next/values.yam
   the cluster, because ipBlock doesn't match Service IPs on most CNIs).
 - **`egress`**: what the app may reach outside the cluster. The app checks every address itself
   (`internal/egress`); this adds the matching NetworkPolicy.
-  - `internet: false` by default. Set `true` for anything public: a public OIDC provider, Google
-    (#60), APNs at `api.push.apple.com` (#64), ICS calendar feeds. The chart refuses an OIDC issuer
+  - `internet: false` by default. Set `true` for anything public: a public OIDC provider, Google,
+    APNs at `api.push.apple.com`, ICS calendar feeds. The chart refuses an OIDC issuer
     with network policy on and neither `internet` nor `oidc.cidrs`.
   - `homeAssistant.cidrs` / `ports` (`[8123]`); `oidc.cidrs` / `ports` (`[443]`).
 - **`resources`**: requests and limits for the app container.
@@ -95,7 +93,7 @@ Register `PUBLIC_ORIGIN/api/auth/callback/oidc`, e.g.
 `https://opencozy.example.test/api/auth/callback/oidc`, as the client's redirect URI. OpenCozy asks for
 `openid email profile`. Adults are linked by their verified email at first sign-in; nothing is imported.
 
-### Google calendars (with #60)
+### Google calendars
 - An OAuth client of type "Web application" in Google Cloud, with redirect URI
   `PUBLIC_ORIGIN/api/calendar/google/callback`. Scopes: `openid email` and
   `https://www.googleapis.com/auth/calendar.readonly`. Nothing writes to Google.
@@ -149,7 +147,7 @@ automation:
 
 Each TV's Home Assistant entity is set on the TVs page (Edit).
 
-### Apple: passkeys in the app and pushes (with #64)
+### Apple: passkeys in the app and pushes
 - `APPLE_TEAM_ID` and `APPLE_BUNDLE_ID` must match the iOS build's team and bundle ID
   (`ios/Config/Local.xcconfig`), and the app's associated domain is `OPENCOZY_WEB_HOST` = the
   passkey RP ID's host.
@@ -164,7 +162,7 @@ Signing values live in `ios/Config/Local.xcconfig` (gitignored): `DEVELOPMENT_TE
 Controls distribution entitlement they need: `ios/README.md#testflight`. A kid iPad pairs from
 Manage → Devices; the server it pairs with is `PUBLIC_ORIGIN`.
 
-### Android wall display (with #74)
+### Android wall display
 No server address is built in: on first start the display asks for the server's origin
 (`https://opencozy.example.test`) and opens `/display`, which pairs with a code. Application ID
 `org.opencozy.display`. Release builds take their signing from the environment only:
@@ -187,5 +185,5 @@ What changes for things outside this server when a household moves from the old 
 - **Google:** reuse the old OAuth client (above).
 - **Every `/api/v1/` path answers 410 `update_app`**, so an old app says it is out of date.
 - **iPads:** install the new build, then re-pair from Manage → Devices if the device asks.
-- **Android display (with #74):** it is a new application ID, so install it next to the old app,
+- **Android display:** it is a new application ID, so install it next to the old app,
   pair it, then remove the old one.
