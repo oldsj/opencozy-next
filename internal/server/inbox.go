@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/oldsj/opencozy-next/internal/command"
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/ledger"
+	"github.com/oldsj/opencozy-next/internal/live"
+	"github.com/oldsj/opencozy-next/internal/push"
 	"github.com/oldsj/opencozy-next/internal/screentime"
 )
 
@@ -153,6 +156,9 @@ func (s *Server) ApproveInboxItem(ctx context.Context, req api.ApproveInboxItemR
 	if err != nil {
 		return nil, err
 	}
+	if err := s.pushResolved(ctx, cmd, decided); err != nil {
+		return nil, err
+	}
 	if d.red != nil {
 		if err := cmd.Q.SetRedemptionState(ctx, dbq.SetRedemptionStateParams{HouseholdID: a.HouseholdID, ID: d.red.ID, State: "approved"}); err != nil {
 			return nil, err
@@ -185,7 +191,7 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 		return api.RejectInboxItem409JSONResponse{ConflictJSONResponse: api.ConflictJSONResponse(*refusal)}, nil
 	}
 	if d.tr != nil {
-		decided, _, err := answerTimeRequest(ctx, cmd, d, screentime.ChoiceNo, req.Body.Reason)
+		decided, _, err := s.answerTimeRequest(ctx, cmd, d, screentime.ChoiceNo, req.Body.Reason)
 		if err != nil {
 			return nil, err
 		}
@@ -199,6 +205,9 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 		HouseholdID: a.HouseholdID, ID: d.approval.ID, State: "rejected", Reason: req.Body.Reason, DecidedBy: &a.AdultID, Now: &now,
 	})
 	if err != nil {
+		return nil, err
+	}
+	if err := s.pushResolved(ctx, cmd, decided); err != nil {
 		return nil, err
 	}
 	if d.red != nil {
@@ -219,8 +228,28 @@ func (s *Server) RejectInboxItem(ctx context.Context, req api.RejectInboxItemReq
 	return api.RejectInboxItem200JSONResponse{Id: decided.ID, State: api.DecisionStateRejected}, nil
 }
 
+// pushPending tells the parents' phones about a new inbox item, in its command. askedAt is when
+// it was (last) asked: asking again later is a new push that replaces the first (old #74).
+func (s *Server) pushPending(ctx context.Context, cmd *command.Cmd, ap dbq.Approval, askedAt time.Time) error {
+	if !s.push.Enabled {
+		return nil
+	}
+	child, err := cmd.Q.GetChild(ctx, dbq.GetChildParams{HouseholdID: ap.HouseholdID, ID: ap.ChildID})
+	if err != nil {
+		return err
+	}
+	key, n := push.ApprovalPending(ap, child.Name, askedAt)
+	return s.push.ToAdults(ctx, cmd.Q, ap.HouseholdID, key, n)
+}
+
+// pushResolved clears a decided item from every parent's phone, silently.
+func (s *Server) pushResolved(ctx context.Context, cmd *command.Cmd, ap dbq.Approval) error {
+	key, n := push.ApprovalResolved(ap.ID, ap.State)
+	return s.push.ToAdults(ctx, cmd.Q, ap.HouseholdID, key, n)
+}
+
 // answerTimeRequest decides a locked time request and its approval: a yes gives the time at once.
-func answerTimeRequest(ctx context.Context, cmd *command.Cmd, d *decision, choice string, reason *string) (dbq.Approval, dbq.TimeRequest, error) {
+func (s *Server) answerTimeRequest(ctx context.Context, cmd *command.Cmd, d *decision, choice string, reason *string) (dbq.Approval, dbq.TimeRequest, error) {
 	a := mustActor(ctx)
 	tr, err := screentime.Answer(ctx, cmd, *d.tr, choice, a.AdultID)
 	if err != nil {
@@ -240,8 +269,16 @@ func answerTimeRequest(ctx context.Context, cmd *command.Cmd, d *decision, choic
 	if err != nil {
 		return dbq.Approval{}, dbq.TimeRequest{}, err
 	}
-	// The kid's device hears through its next sync; pushes arrive with slice 11.
-	return decided, tr, screenTimeChanged(ctx, cmd, tr.ChildID)
+	if err := s.pushResolved(ctx, cmd, decided); err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	// The child hears the answer (an alert that also wakes the app to sync), so no separate
+	// silent push.
+	if err := live.Notify(ctx, cmd.Q, cmd.HouseholdID(), live.Event{Topic: live.Today, ChildID: &tr.ChildID}); err != nil {
+		return dbq.Approval{}, dbq.TimeRequest{}, err
+	}
+	key, n := push.TimeAnswered(tr)
+	return decided, tr, s.push.ToChild(ctx, cmd.Q, cmd.HouseholdID(), tr.ChildID, key, n)
 }
 
 // AnswerInboxItem answers a child's "Ask for more time".
@@ -261,7 +298,7 @@ func (s *Server) AnswerInboxItem(ctx context.Context, req api.AnswerInboxItemReq
 		return api.AnswerInboxItem422JSONResponse{UnprocessableEntityJSONResponse: api.UnprocessableEntityJSONResponse(
 			apiError("not_a_time_request", "Only a request for more time is answered this way."))}, nil
 	}
-	decided, tr, err := answerTimeRequest(ctx, cmd, d, string(req.Body.Choice), nil)
+	decided, tr, err := s.answerTimeRequest(ctx, cmd, d, string(req.Body.Choice), nil)
 	var until screentime.ErrAlreadyUntil
 	if errors.As(err, &until) {
 		rule, rerr := screentime.ChildRule(ctx, cmd.Q, cmd.HouseholdID(), d.tr.ChildID)

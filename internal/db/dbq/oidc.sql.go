@@ -94,7 +94,7 @@ func (q *Queries) DeleteOIDCLink(ctx context.Context, arg DeleteOIDCLinkParams) 
 }
 
 const getAdultByOIDCSubject = `-- name: GetAdultByOIDCSubject :one
-SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at FROM oidc_link l
+SELECT a.id, a.household_id, a.email, a.name, a.password_hash, a.password_scheme, a.webauthn_user_handle, a.removed_at, a.created_at, a.push_muted_until FROM oidc_link l
 JOIN adult a ON a.household_id = l.household_id AND a.id = l.adult_id
 JOIN household h ON h.id = a.household_id
 WHERE l.issuer = $1 AND l.subject = $2 AND a.removed_at IS NULL AND h.archived_at IS NULL
@@ -119,6 +119,7 @@ func (q *Queries) GetAdultByOIDCSubject(ctx context.Context, arg GetAdultByOIDCS
 		&i.WebauthnUserHandle,
 		&i.RemovedAt,
 		&i.CreatedAt,
+		&i.PushMutedUntil,
 	)
 	return i, err
 }

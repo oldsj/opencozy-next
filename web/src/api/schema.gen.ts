@@ -629,6 +629,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/device/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this kid device's APNs token
+         * @description Pushes go to the device's current child. A token moves here from any other device or phone session that had it.
+         */
+        put: operations["registerDevicePush"];
+        post?: never;
+        /** Stop pushes to this kid device */
+        delete: operations["unregisterDevicePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in with an email and password
+         * @description The token is in this response only. Every failure is the same 401.
+         */
+        post: operations["phoneSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/sessions/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in with a passkey
+         * @description Start with `POST /auth/passkey/options`, then send the authenticator's response here with
+         *     the phone's name. The token is in this response only.
+         */
+        post: operations["phoneSignInWithPasskey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This phone's session */
+        get: operations["getPhoneSession"];
+        put?: never;
+        post?: never;
+        /** Sign this phone out; its token stops working and it gets no more pushes */
+        delete: operations["phoneSignOut"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone/session/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this phone's APNs token
+         * @description A token is one app install, so it moves here from any other phone session or device that had it.
+         */
+        put: operations["registerPhonePush"];
+        post?: never;
+        /** Stop pushes to this phone (it stays signed in) */
+        delete: operations["unregisterPhonePush"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The household's signed-in parent phones */
+        get: operations["listPhoneSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether your phone alerts are paused */
+        get: operations["getPushMute"];
+        /**
+         * Pause your phone alerts until a time, or turn them back on
+         * @description While paused, your phones get no alerts; silent updates (an answered item leaving, the
+         *     badge) still arrive, and other adults and the children's devices are unaffected. Alerts
+         *     come back on their own at that time. At most 90 days ahead.
+         */
+        put: operations["setPushMute"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phones/{phoneSessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phoneSessionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Sign a parent phone out; it stops working at once */
+        delete: operations["revokePhoneSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/today": {
         parameters: {
             query?: never;
@@ -2196,6 +2356,64 @@ export interface components {
             proof: string;
             platform: components["schemas"]["Platform"];
             name: components["schemas"]["DeviceName"];
+        };
+        PushRegistration: {
+            /** @description The APNs device token in hex */
+            token: string;
+            /**
+             * @description The APNs environment the app was built for
+             * @enum {string}
+             */
+            environment: "development" | "production";
+        };
+        PushRegistered: {
+            /** @enum {string} */
+            environment: "development" | "production";
+            /** Format: date-time */
+            registeredAt: string;
+        };
+        /** @description What the phone is called in Manage, e.g. "Alex's iPhone" */
+        PhoneName: string;
+        PhoneSession: {
+            id: components["schemas"]["Id"];
+            adultId: components["schemas"]["Id"];
+            adultName: string;
+            name: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description Coarse (within 5 minutes); null until first used
+             */
+            lastUsedAt: string | null;
+            /** @description The phone gets pushes */
+            pushRegistered: boolean;
+            /** @description This is the phone making the request */
+            current: boolean;
+        };
+        PhoneSignedIn: {
+            /** @description The `ocp_` bearer secret; shown once */
+            token: string;
+            session: components["schemas"]["PhoneSession"];
+            me: components["schemas"]["Me"];
+        };
+        PhoneSelf: {
+            session: components["schemas"]["PhoneSession"];
+            me: components["schemas"]["Me"];
+            /**
+             * Format: date-time
+             * @description While in the future, this adult's phones get no alerts (silent updates still arrive)
+             */
+            pushMutedUntil: string | null;
+        };
+        PushMute: {
+            /**
+             * Format: date-time
+             * @description Alerts are paused until then; null when they are on
+             */
+            mutedUntil: string | null;
         };
         TodayItem: {
             id: components["schemas"]["Id"];
@@ -4593,6 +4811,394 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            default: components["responses"]["Error"];
+        };
+    };
+    registerDevicePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "token": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+                 *       "environment": "production"
+                 *     }
+                 */
+                "application/json": components["schemas"]["PushRegistration"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRegistered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unregisterDevicePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No more pushes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "email": "alex@example.test",
+                 *       "password": "correct horse battery staple",
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    password: string;
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignInWithPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "challengeId": "0195f2d4-0000-7000-8000-000000000000",
+                 *       "credential": {},
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    challengeId: components["schemas"]["Id"];
+                    /** @description PublicKeyCredential.toJSON() */
+                    credential: {
+                        [key: string]: unknown;
+                    };
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["TooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPhoneSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session, its adult and household */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSelf"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    registerPhonePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "token": "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+                 *       "environment": "production"
+                 *     }
+                 */
+                "application/json": components["schemas"]["PushRegistration"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRegistered"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    unregisterPhonePush: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No more pushes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listPhoneSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phones, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PhoneSession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getPushMute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushMute"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    setPushMute: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "until": "2026-12-01T08:00:00Z"
+                 *     }
+                 */
+                "application/json": {
+                    /**
+                     * Format: date-time
+                     * @description When alerts come back; null turns them back on now
+                     */
+                    until: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Your alerts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushMute"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
+            default: components["responses"]["Error"];
+        };
+    };
+    revokePhoneSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required on every state change. A retry with the same key, from the same caller with the
+                 *     same body, gets the first answer (for 30 days) instead of doing it again.
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                phoneSessionId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             default: components["responses"]["Error"];
         };
     };

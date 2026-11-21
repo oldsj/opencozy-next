@@ -120,6 +120,16 @@ spec:
               value: {{ . | quote }}
             {{- end }}
             {{- end }}
+            {{- with .Values.config.appleTeamID }}
+            - name: APPLE_TEAM_ID
+              value: {{ . | quote }}
+            - name: APPLE_BUNDLE_ID
+              value: {{ required "config.appleBundleID is required with config.appleTeamID" $.Values.config.appleBundleID | quote }}
+            {{- end }}
+            {{- with .Values.config.apnsKeyID }}
+            - name: APNS_KEY_ID
+              value: {{ . | quote }}
+            {{- end }}
             # Migrations run in the init container.
             - name: MIGRATE_ON_START
               value: "false"

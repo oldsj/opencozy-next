@@ -28,6 +28,7 @@ type Adult struct {
 	WebauthnUserHandle []byte
 	RemovedAt          *time.Time
 	CreatedAt          time.Time
+	PushMutedUntil     *time.Time
 }
 
 type AdultSession struct {
@@ -206,15 +207,18 @@ type CredentialChild struct {
 }
 
 type Device struct {
-	ID          uuid.UUID
-	HouseholdID uuid.UUID
-	ChildID     *uuid.UUID
-	Name        string
-	Platform    string
-	PublicKey   []byte
-	PairedAt    time.Time
-	LastSeenAt  *time.Time
-	RevokedAt   *time.Time
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	ChildID          *uuid.UUID
+	Name             string
+	Platform         string
+	PublicKey        []byte
+	PairedAt         time.Time
+	LastSeenAt       *time.Time
+	RevokedAt        *time.Time
+	PushToken        *string
+	PushEnvironment  *string
+	PushRegisteredAt *time.Time
 }
 
 type DeviceNonce struct {
@@ -383,14 +387,18 @@ type Passkey struct {
 }
 
 type PhoneSession struct {
-	ID          uuid.UUID
-	HouseholdID uuid.UUID
-	AdultID     uuid.UUID
-	Name        string
-	TokenHash   []byte
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
-	RevokedAt   *time.Time
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	AdultID          uuid.UUID
+	Name             string
+	TokenHash        []byte
+	CreatedAt        time.Time
+	ExpiresAt        time.Time
+	RevokedAt        *time.Time
+	LastUsedAt       *time.Time
+	PushToken        *string
+	PushEnvironment  *string
+	PushRegisteredAt *time.Time
 }
 
 type PointLedger struct {

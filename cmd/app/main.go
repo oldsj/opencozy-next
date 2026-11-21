@@ -35,6 +35,7 @@ import (
 	"github.com/oldsj/opencozy-next/internal/db/dbq"
 	"github.com/oldsj/opencozy-next/internal/jobs"
 	"github.com/oldsj/opencozy-next/internal/keyring"
+	"github.com/oldsj/opencozy-next/internal/push"
 	"github.com/oldsj/opencozy-next/internal/server"
 )
 
@@ -101,6 +102,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) 
 				return err
 			}
 			background = append(background, calendar.Job(cfg.SecretKeys, fetcher.WithGoogle(google), log, srv.CalendarWake()))
+		}
+		if cfg.PushEnabled() {
+			apns, err := push.NewAPNs(push.APNsConfig{TeamID: cfg.AppleTeamID, Topic: cfg.AppleBundleID, KeyID: cfg.APNsKeyID, Key: cfg.APNsKey}, log)
+			if err != nil {
+				return err
+			}
+			background = append(background, push.Job(apns, srv.PushNotes(), log))
 		}
 		go jobs.Runner{Pool: pool, Log: log}.Run(ctx, background...)
 		return server.Serve(ctx, log, cfg.ListenAddr, h, srv.Drain)
