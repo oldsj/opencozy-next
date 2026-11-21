@@ -171,6 +171,20 @@ INSERT INTO completion_approval (household_id, id, child_id, chore_occurrence_id
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000183', '0190a000-0000-7000-8000-0000000000c2', '0190a000-0000-7000-8000-000000000113', NULL, 'Water the plants', 2, '2026-03-11', 'pending', 1, '0190a000-0000-7000-8000-000000000187', '2026-03-11T16:00:00Z', NULL, NULL, NULL),
   ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000185', '0190a000-0000-7000-8000-0000000000c2', NULL, '0190a000-0000-7000-8000-000000000122', 'Morning routine', 3, '2026-03-10', 'rejected', 2, '0190a000-0000-7000-8000-000000000188', '2026-03-10T08:00:00Z', '2026-03-10T08:10:00Z', 'fixtureSecondUser2', 'Bed not made');
 
+-- Slice 5: more rewards. iPad time (30 minutes) Avery bought and an adult cancelled with all 2
+-- points back; TV time, archived; a reward whose name and cost are over the new input limits;
+-- and a parent's grant of 20 minutes (a redemption with no reward, no points).
+INSERT INTO reward (household_id, id, name, cost, version, created_at, archived_at, screen_time_minutes, screen_time_target) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000109', 'iPad time', 2, 2, '2026-03-02T08:00:00Z', NULL, 30, 'personal'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-00000000010a', 'TV time', 5, 1, '2026-03-02T08:00:00Z', '2026-03-05T08:00:00Z', 20, 'tv'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-00000000010b', 'A trip to the big playground by the river, with a picnic and the long way home through the woods', 250000, 1, '2026-03-02T08:00:00Z', NULL, NULL, NULL);
+INSERT INTO reward_redemption (household_id, id, reward_id, child_id, name_snapshot, cost_snapshot, reward_version, version, state, created_at, settled_at, fulfilled_at, refunded_points, screen_time_minutes_snapshot, screen_time_target_snapshot) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000136', '0190a000-0000-7000-8000-000000000109', '0190a000-0000-7000-8000-0000000000c1', 'iPad time', 2, 2, 3, 'canceled', '2026-03-12T08:00:00Z', '2026-03-12T08:30:00Z', '2026-03-12T08:00:00Z', 2, 30, 'personal'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-000000000137', NULL, '0190a000-0000-7000-8000-0000000000c1', 'Extra time', 0, NULL, 1, 'fulfilled', '2026-03-12T09:00:00Z', '2026-03-12T09:00:00Z', '2026-03-12T09:00:00Z', NULL, 20, 'personal');
+INSERT INTO point_ledger (household_id, id, child_id, redemption_id, reward_entry_type, command_id, delta, description_snapshot, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001a1', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-000000000136', 'spend', '0190a000-0000-7000-8000-0000000001a3', -2, 'iPad time', '2026-03-12T08:00:00Z'),
+  ('0190a000-0000-7000-8000-00000000000a', '0190a000-0000-7000-8000-0000000001a2', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-000000000136', 'refund', '0190a000-0000-7000-8000-0000000001a4', 2, 'iPad time', '2026-03-12T08:30:00Z');
+
 -- Slice 13b (IDs ...0002xx): two Google accounts (fictional; the token opens with oldsecret's fixture secret), one
 -- connected and one the old app already needed connected again. A calendar of each, a recurring
 -- series on the first with an assignment for one child, and a calendar whose account is gone.
