@@ -1,0 +1,154 @@
+import { expect, test, type Page } from '@playwright/test';
+
+import { FakeDevice } from './device';
+import { owner } from './global-setup';
+
+type ScreenTime = { bankedSeconds: number; unlockedUntil?: string };
+
+// A household's whole day on the packaged binary, nothing stubbed: the wall display and a child's
+// iPad are paired, the child does a chore on the wall, an adult approves it in the inbox, the
+// points land, the child spends them on a reward (an adult says yes) and on iPad time (banked at
+// once, spent from the iPad, ended early with the rest refunded).
+test('a household’s day: chores, approval, points, rewards, screen time', async ({ browser, playwright, baseURL }) => {
+  const problems: string[] = [];
+  const watch = (page: Page) => {
+    page.on('console', (m) => {
+      // Chrome logs every 4xx (a display not yet paired gets 401 from /household) and the request
+      // the test drops on purpose (net::ERR_FAILED).
+      if (m.type() === 'error' && !/status of 40[14]|net::ERR_FAILED/.test(m.text())) problems.push(m.text());
+    });
+    page.on('pageerror', (e) => problems.push(e.message));
+  };
+  const run = String(Date.now()).slice(-6); // reruns against the same database stay apart
+  const child = `Robin ${run}`;
+  const chore = `Feed the cat ${run}`;
+  const game = `Choose a game ${run}`;
+  const ipadTime = `20 min of iPad ${run}`;
+
+  const adult = await (await browser.newContext()).newPage();
+  const wall = await (await browser.newContext()).newPage();
+  watch(adult);
+  watch(wall);
+
+  // The wall display asks for a code; an adult signs in and enters it.
+  await wall.goto('/display');
+  const code = wall.getByLabel(/^Pairing code/);
+  await expect(code).toHaveText(/^[A-Z2-9]{6}$/);
+  const shown = (await code.textContent()) ?? '';
+  await adult.goto('/login');
+  await adult.getByLabel('Email').fill(owner.email);
+  await adult.getByLabel('Password').fill(owner.password);
+  await adult.getByRole('button', { name: 'Sign in' }).click();
+  await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
+  await adult.goto('/displays');
+  await adult.getByLabel('Code on the display').fill(shown);
+  await adult.getByLabel('Name').fill(`Kitchen ${run}`);
+  await adult.getByRole('button', { name: 'Pair display' }).click();
+  await expect(adult.getByRole('list', { name: 'Paired displays' })).toContainText(`Kitchen ${run}`);
+  await expect(wall.getByText('The Example Family')).toBeVisible({ timeout: 15_000 });
+
+  // A child, then their iPad, paired while the sign-in is fresh (pairing needs a recent one).
+  await adult.goto('/chores');
+  await adult.getByLabel("Child's name").fill(child);
+  await adult.getByRole('button', { name: 'Add child' }).click();
+  await expect(adult.getByRole('list', { name: 'Children' })).toContainText(child);
+  await adult.goto('/devices');
+  await adult.getByRole('button', { name: 'Pair a device' }).click();
+  await adult.getByRole('button', { name: child }).click();
+  const sheet = adult.getByRole('dialog', { name: `Pair a device for ${child}` });
+  const pairing = (await sheet.getByLabel(/^Code /).textContent()) ?? '';
+  const ipad = new FakeDevice(await playwright.request.newContext({ baseURL }));
+  await ipad.pair(pairing, `${child}’s iPad`);
+  await expect(adult.getByText(`${child}’s iPad is paired.`)).toBeVisible({ timeout: 10_000 });
+  const children = (await (await adult.request.get('/api/children')).json()) as { items: { id: string; name: string }[] };
+  const childId = children.items.find((c) => c.name === child)?.id ?? '';
+  const screenTime = async () => {
+    const r = await ipad.signed('GET', `/api/children/${childId}/screen-time`);
+    expect(r.status()).toBe(200);
+    return (await r.json()) as ScreenTime;
+  };
+
+  // A chore and two rewards: a game (an adult says yes) and iPad time (given at once).
+  await adult.goto('/chores');
+  await adult.getByLabel('For').selectOption({ label: child });
+  await adult.getByRole('textbox', { name: 'Chore', exact: true }).fill(chore);
+  await adult.getByLabel('Points').fill('6');
+  await adult.getByRole('button', { name: 'Add chore' }).click();
+  await expect(adult.getByRole('list', { name: 'Chores' })).toContainText(chore);
+  await adult.goto('/rewards');
+  await adult.getByRole('textbox', { name: 'Reward', exact: true }).fill(game);
+  await adult.getByLabel('Cost in points').fill('3');
+  await adult.getByRole('button', { name: 'Add reward' }).click();
+  await expect(adult.getByRole('list', { name: 'Rewards' })).toContainText(game);
+  await adult.getByRole('textbox', { name: 'Reward', exact: true }).fill(ipadTime);
+  await adult.getByLabel('Cost in points').fill('2');
+  await adult.getByLabel('Kind').selectOption('screen_time');
+  await adult.getByLabel('Minutes').fill('20');
+  await adult.getByRole('button', { name: 'Add reward' }).click();
+  await expect(adult.getByRole('list', { name: 'Rewards' })).toContainText(ipadTime);
+
+  // The child ticks the chore on the wall; it waits for an adult, who approves it in the inbox.
+  await wall.reload();
+  const card = wall.getByRole('article', { name: `${child}'s today` });
+  await wall.getByRole('checkbox', { name: chore }).click();
+  await expect(wall.getByRole('checkbox', { name: chore })).toHaveAttribute('aria-checked', 'true');
+  await expect(card.locator('.oc-points-badge')).toHaveText('0 points');
+  await adult.goto('/inbox');
+  await adult.getByRole('button', { name: `Approve: ${chore} (${child})` }).click();
+  await expect(adult.getByRole('button', { name: `Approve: ${chore} (${child})` })).toHaveCount(0);
+  await wall.reload();
+  await expect(card.locator('.oc-points-badge')).toHaveText('6 points');
+
+  // On the wall the child asks for the game. The first answer is lost after the server has spent
+  // the points; asking again must not spend them twice.
+  await wall.getByRole('link', { name: 'Rewards' }).click();
+  await wall.getByRole('button', { name: new RegExp(`^${child}`) }).click();
+  await wall.getByRole('button', { name: new RegExp(game) }).click();
+  await wall.route('**/api/children/*/redemptions', async (route) => {
+    await route.fetch();
+    await route.abort('failed');
+  }, { times: 1 });
+  await wall.getByRole('button', { name: 'Ask for it' }).click();
+  await expect(wall.getByText('Couldn’t reach the server. Check the connection and try again.')).toBeVisible();
+  await wall.getByRole('button', { name: 'Ask for it' }).click();
+  await expect(wall.getByText(`Asked for ${game}`)).toBeVisible();
+  await adult.goto('/inbox');
+  await expect(adult.getByRole('button', { name: `Approve: ${game} (${child})` })).toHaveCount(1);
+  await adult.getByRole('button', { name: `Approve: ${game} (${child})` }).click();
+  await expect(adult.getByRole('button', { name: `Approve: ${game} (${child})` })).toHaveCount(0);
+
+  // On their iPad's kid view the child buys iPad time: no approval, banked at once.
+  const link = await ipad.signed('POST', '/api/device/web-session', '{}');
+  expect(link.status()).toBe(201);
+  const kid = await (await browser.newContext()).newPage();
+  watch(kid);
+  await kid.goto(((await link.json()) as { url: string }).url);
+  await expect(kid.getByRole('heading', { name: new RegExp(`, ${child}$`) })).toBeVisible();
+  await kid.getByRole('link', { name: 'Rewards' }).click();
+  await kid.getByRole('button', { name: new RegExp(ipadTime) }).click();
+  await kid.getByRole('button', { name: 'Ask for it' }).click();
+  await expect.poll(async () => (await screenTime()).bankedSeconds).toBe(1200);
+  await expect(adult.getByRole('button', { name: `Approve: ${ipadTime} (${child})` })).toHaveCount(0);
+  await wall.goto('/display');
+  await expect(card.locator('.oc-points-badge')).toHaveText('1 point');
+
+  // The iPad starts 10 of the 20 minutes; an adult ends it early and refunds what's unused.
+  const spend = await ipad.signed('POST', `/api/children/${childId}/screen-time/spend`, JSON.stringify({ minutes: 10 }));
+  expect(spend.status(), await spend.text()).toBe(200);
+  const running = await screenTime();
+  expect(running.bankedSeconds).toBe(600);
+  expect(Date.parse(running.unlockedUntil ?? '')).toBeGreaterThan(Date.now());
+  const end = await adult.request.post(`/api/children/${childId}/screen-time/end`, {
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+    data: { scope: 'now', refund: true },
+  });
+  expect(end.status(), await end.text()).toBe(200);
+  const ended = (await end.json()) as { refundedSeconds: number };
+  expect(ended.refundedSeconds).toBeGreaterThan(590);
+  expect(ended.refundedSeconds).toBeLessThanOrEqual(600);
+  const after = await screenTime();
+  expect(after.bankedSeconds).toBe(600 + ended.refundedSeconds);
+  expect(after.unlockedUntil === undefined || Date.parse(after.unlockedUntil) <= Date.now()).toBe(true);
+
+  expect(problems).toEqual([]);
+});
