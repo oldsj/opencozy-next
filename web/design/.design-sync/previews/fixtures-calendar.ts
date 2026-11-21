@@ -146,3 +146,43 @@ export const dayHeadings: Record<string, string> = { '2026-09-14': 'Today', '202
 export function dayOf(event: CalendarEvent): string {
   return event.start.slice(0, 10);
 }
+
+/** GET /api/calendar/google/connections: the Google accounts an adult connected. */
+export interface GoogleAccount {
+  id: string;
+  email: string;
+  /** Calendars this household follows from the account. */
+  calendars: number;
+  needsReconnect: boolean;
+  version: number;
+}
+
+export const googleAccounts: GoogleAccount[] = [
+  { id: 'g1', email: 'parent@example.test', calendars: 2, needsReconnect: false, version: 1 },
+  { id: 'g2', email: 'coach@example.test', calendars: 0, needsReconnect: true, version: 3 },
+];
+
+/** GET /api/calendar/google/connections/{id}/calendars: what the account can read. */
+export interface GoogleCalendarChoice {
+  googleId: string;
+  name: string;
+  primary: boolean;
+  /** Set when the household already follows it. */
+  calendarId?: string | undefined;
+}
+
+export const googleChoices: GoogleCalendarChoice[] = [
+  { googleId: 'parent@example.test', name: 'parent@example.test', primary: true },
+  { googleId: 'family@group.calendar.example.test', name: 'Family', primary: false, calendarId: 'k1' },
+  { googleId: 'holidays@group.calendar.example.test', name: 'Holidays', primary: false },
+  { googleId: 'work@group.calendar.example.test', name: 'Work', primary: false, calendarId: 'k4' },
+];
+
+/** Where Google sends an adult back: /calendars?google=<outcome>. One sentence each. */
+export const googleOutcomeText: Record<'denied' | 'expired' | 'failed' | 'scope_missing' | 'too_many', string> = {
+  denied: 'Google wasn’t connected: you chose not to allow it.',
+  expired: 'That sign-in took too long. Try connecting again.',
+  failed: 'Google couldn’t be connected. Try again in a minute.',
+  scope_missing: 'Google was connected without calendar access. Connect again and tick “See your calendars”.',
+  too_many: 'This household has 10 Google accounts. Disconnect one to add another.',
+};
