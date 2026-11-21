@@ -145,11 +145,11 @@ func (q *Queries) CreateGoogleOAuthState(ctx context.Context, arg CreateGoogleOA
 }
 
 const deleteExpiredGoogleOAuthStates = `-- name: DeleteExpiredGoogleOAuthStates :exec
-DELETE FROM google_oauth_state WHERE expires_at < now()
+DELETE FROM google_oauth_state WHERE household_id = $1 AND expires_at < now()
 `
 
-func (q *Queries) DeleteExpiredGoogleOAuthStates(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteExpiredGoogleOAuthStates)
+func (q *Queries) DeleteExpiredGoogleOAuthStates(ctx context.Context, householdID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteExpiredGoogleOAuthStates, householdID)
 	return err
 }
 
@@ -224,11 +224,21 @@ func (q *Queries) GetGoogleConnectionBySubject(ctx context.Context, arg GetGoogl
 }
 
 const googleConnectionNeedsReconnect = `-- name: GoogleConnectionNeedsReconnect :exec
-UPDATE calendar_google_connection SET needs_reconnect = true WHERE id = $1
+
+UPDATE calendar_google_connection SET needs_reconnect = true
+WHERE household_id = $1 AND id = $2 AND refresh_token = $3
 `
 
-func (q *Queries) GoogleConnectionNeedsReconnect(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, googleConnectionNeedsReconnect, id)
+type GoogleConnectionNeedsReconnectParams struct {
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+	ReadToken   *string
+}
+
+// Both take the token that was read: a reconnect in between (a new token) wins, and these do
+// nothing.
+func (q *Queries) GoogleConnectionNeedsReconnect(ctx context.Context, arg GoogleConnectionNeedsReconnectParams) error {
+	_, err := q.db.Exec(ctx, googleConnectionNeedsReconnect, arg.HouseholdID, arg.ID, arg.ReadToken)
 	return err
 }
 
@@ -425,16 +435,24 @@ func (q *Queries) SetGoogleOAuthStateVerifier(ctx context.Context, arg SetGoogle
 }
 
 const setGoogleRefreshToken = `-- name: SetGoogleRefreshToken :exec
-UPDATE calendar_google_connection SET refresh_token = $2 WHERE id = $1
+UPDATE calendar_google_connection SET refresh_token = $3
+WHERE household_id = $1 AND id = $2 AND refresh_token = $4
 `
 
 type SetGoogleRefreshTokenParams struct {
-	ID           uuid.UUID
-	RefreshToken *string
+	HouseholdID uuid.UUID
+	ID          uuid.UUID
+	NewToken    *string
+	ReadToken   *string
 }
 
 func (q *Queries) SetGoogleRefreshToken(ctx context.Context, arg SetGoogleRefreshTokenParams) error {
-	_, err := q.db.Exec(ctx, setGoogleRefreshToken, arg.ID, arg.RefreshToken)
+	_, err := q.db.Exec(ctx, setGoogleRefreshToken,
+		arg.HouseholdID,
+		arg.ID,
+		arg.NewToken,
+		arg.ReadToken,
+	)
 	return err
 }
 

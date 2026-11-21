@@ -1859,6 +1859,8 @@ paths:
     post:
       operationId: cancelRedemption
       summary: Cancel an approved reward, or the unused rest of given screen time, and give the points back
+      description: |
+        iPad time refunds the unused share of its cost, rounded down: 409 `already_used` when none is left, `no_credit` when OpenCozy has no record of the time (so it can't tell how much was used).
       tags:
         - rewards
       x-actors:
@@ -2281,6 +2283,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EndResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        default:
+          $ref: '#/components/responses/Error'
+  /children/{childId}/screen-time/credits/{creditId}/forfeit:
+    post:
+      operationId: forfeitScreenTimeCredit
+      summary: Take back the unused rest of a parent's grant or "yes"
+      description: |
+        The credit keeps what was already spent; the rest leaves the child's bank. Time already started or queued isn't touched (end it with `end`). A reward's time is taken back by cancelling the reward, which refunds its points: 409 `cancel_the_reward`. 409 `nothing_left` when it is all used.
+      tags:
+        - screentime
+      x-actors:
+        - adult
+        - phone
+      x-child-param: childId
+      x-command: true
+      x-body-limit: 64
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ChildId'
+        - name: creditId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Taken back
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - forfeitedSeconds
+                  - screenTime
+                properties:
+                  forfeitedSeconds:
+                    type: integer
+                  screenTime:
+                    $ref: '#/components/schemas/ScreenTime'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3427,7 +3488,8 @@ paths:
         Returns Google's consent page to open in this browser. Google sends the adult back to
         `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
         within ten minutes. 422 `not_configured` when this server has no Google client
-        (GOOGLE_CLIENT_ID); 422 `too_many_connections` past 10 accounts.
+        (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+        (`too_many`), since connecting an account that is already connected must still work.
       tags:
         - calendar
       x-actors:
@@ -3464,8 +3526,9 @@ paths:
         Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
         `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
         calendar permission was unticked), `expired` (no such connect for this adult, or used or
-        older than ten minutes) or `failed`. Connecting an account that is already connected
-        replaces its token and clears "reconnect needed".
+        older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+        token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+        connected replaces its token and clears "reconnect needed".
       tags:
         - calendar
       x-actors:
@@ -3534,8 +3597,10 @@ paths:
       operationId: disconnectGoogle
       summary: Disconnect a Google account, with every calendar followed through it
       description: |
-        Deletes the account's token (and asks Google to revoke it) and stops following its
-        calendars, with their events and who they were for.
+        Deletes the account's token and stops following its calendars, with their events and who
+        they were for. After the change commits, the server asks Google to revoke the token (best
+        effort). Google revokes the whole grant, so the same Google account connected in another
+        household on this server has to be connected again there.
       tags:
         - calendar
       x-actors:
@@ -4596,6 +4661,8 @@ components:
             - reversed
             - redeemed
             - refunded
+            - one_more_minute
+          description: one_more_minute is the child asking for one more minute on the locked iPad (no points)
         title:
           type: string
         points:
@@ -4610,6 +4677,9 @@ components:
         by:
           type: string
           description: The adult who decided it, by name
+        device:
+          type: string
+          description: The device it happened on, by name
     History:
       type: object
       required:
@@ -4966,6 +5036,43 @@ components:
         opensAt:
           type: string
           format: date-time
+    Credit:
+      type: object
+      description: Banked time with some left
+      required:
+        - id
+        - source
+        - minutes
+        - seconds
+        - usedSeconds
+        - createdAt
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        source:
+          type: string
+          enum:
+            - redemption
+            - grant
+            - time_request
+          description: A reward bought with points, a parent's grant, or a yes to "Ask for more time"
+        redemptionId:
+          $ref: '#/components/schemas/Id'
+        rewardTitle:
+          type: string
+        grantedBy:
+          type: string
+          description: The parent who gave it, by name
+        minutes:
+          type: integer
+        seconds:
+          type: integer
+          description: What it holds
+        usedSeconds:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
     ScreenTime:
       type: object
       required:
@@ -4974,6 +5081,7 @@ components:
         - bankedSeconds
         - allowanceSeconds
         - windows
+        - credits
       properties:
         serverTime:
           type: string
@@ -5003,6 +5111,11 @@ components:
           $ref: '#/components/schemas/HoursNow'
         timeRequest:
           $ref: '#/components/schemas/TimeRequest'
+        credits:
+          type: array
+          description: Banked time with some left, oldest first (spent in this order)
+          items:
+            $ref: '#/components/schemas/Credit'
     Minutes:
       type: integer
       minimum: 1

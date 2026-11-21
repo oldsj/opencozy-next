@@ -8,7 +8,8 @@ connect:
       Returns Google's consent page to open in this browser. Google sends the adult back to
       `GET /calendar/google/callback`, which only the same signed-in adult can complete, once,
       within ten minutes. 422 `not_configured` when this server has no Google client
-      (GOOGLE_CLIENT_ID); 422 `too_many_connections` past 10 accounts.
+      (GOOGLE_CLIENT_ID). The 10-account limit is checked when Google sends the adult back
+      (`too_many`), since connecting an account that is already connected must still work.
     tags: [calendar]
     x-actors: [adult]
     x-command: true
@@ -43,8 +44,9 @@ callback:
       Finishes a connect started by this adult and redirects to `/calendars?google=<outcome>`:
       `connected` (with `&connection=<id>`), `denied` (the adult declined), `scope_missing` (the
       calendar permission was unticked), `expired` (no such connect for this adult, or used or
-      older than ten minutes) or `failed`. Connecting an account that is already connected
-      replaces its token and clears "reconnect needed".
+      older than ten minutes), `too_many` (the household already has 10 other accounts; the new
+      token is revoked and nothing is stored) or `failed`. Connecting an account that is already
+      connected replaces its token and clears "reconnect needed".
     tags: [calendar]
     x-actors: [adult]
     parameters:
@@ -108,8 +110,10 @@ connection:
     operationId: disconnectGoogle
     summary: Disconnect a Google account, with every calendar followed through it
     description: |
-      Deletes the account's token (and asks Google to revoke it) and stops following its
-      calendars, with their events and who they were for.
+      Deletes the account's token and stops following its calendars, with their events and who
+      they were for. After the change commits, the server asks Google to revoke the token (best
+      effort). Google revokes the whole grant, so the same Google account connected in another
+      household on this server has to be connected again there.
     tags: [calendar]
     x-actors: [adult, phone]
     x-command: true

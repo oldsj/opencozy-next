@@ -421,6 +421,37 @@ func TestGoogleRefresh(t *testing.T) {
 	if s.fullCalls+s.syncCalls != calls {
 		t.Error("a connection that needs reconnecting still called Google")
 	}
+
+	// A reconnect wins over a refresh that read the old token: marking it "reconnect needed" or
+	// storing a rotated token does nothing once the token has changed.
+	stale, _ := q.GetGoogleConnection(ctx, dbq.GetGoogleConnectionParams{HouseholdID: h, ID: conn})
+	fresh, err := SealGoogleToken(kr, h, conn, "fixture-new-refresh-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := q.ReconnectGoogleConnection(ctx, dbq.ReconnectGoogleConnectionParams{HouseholdID: h, ID: conn, Email: "parent@example.test",
+		Scope: GoogleScope, RefreshToken: &fresh}); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.GoogleConnectionNeedsReconnect(ctx, dbq.GoogleConnectionNeedsReconnectParams{HouseholdID: h, ID: conn, ReadToken: stale.RefreshToken}); err != nil {
+		t.Fatal(err)
+	}
+	other := "v1.k1.stale"
+	if err := q.SetGoogleRefreshToken(ctx, dbq.SetGoogleRefreshTokenParams{HouseholdID: h, ID: conn, NewToken: &other, ReadToken: stale.RefreshToken}); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := q.GetGoogleConnection(ctx, dbq.GetGoogleConnectionParams{HouseholdID: h, ID: conn}); c.NeedsReconnect || c.RefreshToken == nil || *c.RefreshToken != fresh {
+		t.Errorf("a stale refresh undid the reconnect: reconnect=%v", c.NeedsReconnect)
+	}
+
+	// A token issued to another OAuth client (imported, new client) also asks for a reconnect.
+	s.mu.Lock()
+	s.refreshErr = "unauthorized_client"
+	s.mu.Unlock()
+	run()
+	if c, _ := q.GetGoogleConnection(ctx, dbq.GetGoogleConnectionParams{HouseholdID: h, ID: conn}); !c.NeedsReconnect {
+		t.Error("unauthorized_client did not mark the connection reconnect needed")
+	}
 }
 
 func mustDate(s string) day.Date {

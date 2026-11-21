@@ -91,10 +91,12 @@ func (q *Queries) GetApproval(ctx context.Context, arg GetApprovalParams) (Appro
 }
 
 const listPendingApprovals = `-- name: ListPendingApprovals :many
-SELECT a.id, a.kind, a.child_id, c.name AS child_name, c.color AS child_color, a.title, a.points, a.created_at
+SELECT a.id, a.kind, a.child_id, c.name AS child_name, c.color AS child_color, a.title, a.points,
+       COALESCE(tr.asked_at, a.created_at)::timestamptz AS created_at
 FROM approval a JOIN child c ON c.household_id = a.household_id AND c.id = a.child_id
+LEFT JOIN time_request tr ON tr.household_id = a.household_id AND tr.id = a.time_request_id
 WHERE a.household_id = $1 AND a.state = 'pending' AND c.archived_at IS NULL
-ORDER BY a.created_at, a.id
+ORDER BY COALESCE(tr.asked_at, a.created_at), a.id
 LIMIT 200
 `
 
@@ -109,6 +111,7 @@ type ListPendingApprovalsRow struct {
 	CreatedAt  time.Time
 }
 
+// Oldest first. A request for more time is as old as its latest ask: asking again moves it.
 func (q *Queries) ListPendingApprovals(ctx context.Context, householdID uuid.UUID) ([]ListPendingApprovalsRow, error) {
 	rows, err := q.db.Query(ctx, listPendingApprovals, householdID)
 	if err != nil {

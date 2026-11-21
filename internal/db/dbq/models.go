@@ -463,16 +463,19 @@ type RoutineStep struct {
 }
 
 type ScreenTimeCredit struct {
-	ID           uuid.UUID
-	HouseholdID  uuid.UUID
-	ChildID      uuid.UUID
-	Source       string
-	RedemptionID *uuid.UUID
-	GrantedBy    *uuid.UUID
-	Minutes      int32
-	Seconds      int32
-	UsedSeconds  int32
-	CreatedAt    time.Time
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	ChildID          uuid.UUID
+	Source           string
+	RedemptionID     *uuid.UUID
+	GrantedBy        *uuid.UUID
+	Minutes          int32
+	Seconds          int32
+	UsedSeconds      int32
+	CreatedAt        time.Time
+	ForfeitedAt      *time.Time
+	ForfeitedBy      *uuid.UUID
+	ForfeitedSeconds pgtype.Int4
 }
 
 type ScreenTimeCut struct {
