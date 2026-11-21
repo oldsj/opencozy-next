@@ -100,7 +100,7 @@ struct WebSessionTests {
     @Test func aForeignExchangeURLIsRefused() async {
         struct ForeignAPI: OpenCozyAPI {
             func device() async throws -> DeviceInfo { try await FixtureAPI().device() }
-            func screenTime(target: ScreenTimeTarget) async throws -> (ScreenTimeResponse, receivedAt: Date) { try await FixtureAPI().screenTime(target: target) }
+            func screenTime(childId: String) async throws -> (ScreenTime, receivedAt: Date) { try await FixtureAPI().screenTime(childId: childId) }
             func webSession() async throws -> DeviceWebSession { DeviceWebSession(url: "https://example.com/steal") }
         }
         let model = AppModel(preview: ForeignAPI(), config: Self.config())

@@ -240,6 +240,24 @@ func (e DisplayScope) Valid() bool {
 	}
 }
 
+// Defines values for DisplayTvSessionWatcher.
+const (
+	DisplayTvSessionWatcherChild   DisplayTvSessionWatcher = "child"
+	DisplayTvSessionWatcherParents DisplayTvSessionWatcher = "parents"
+)
+
+// Valid indicates whether the value is a known member of the DisplayTvSessionWatcher enum.
+func (e DisplayTvSessionWatcher) Valid() bool {
+	switch e {
+	case DisplayTvSessionWatcherChild:
+		return true
+	case DisplayTvSessionWatcherParents:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EndResultScope.
 const (
 	EndResultScopeNow    EndResultScope = "now"
@@ -342,6 +360,27 @@ func (e NewRewardKind) Valid() bool {
 	case NewRewardKindItem:
 		return true
 	case NewRewardKindScreenTime:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpenTvsDuration.
+const (
+	OpenTvsDurationAllDay OpenTvsDuration = "all_day"
+	OpenTvsDurationN1h    OpenTvsDuration = "1h"
+	OpenTvsDurationN2h    OpenTvsDuration = "2h"
+)
+
+// Valid indicates whether the value is a known member of the OpenTvsDuration enum.
+func (e OpenTvsDuration) Valid() bool {
+	switch e {
+	case OpenTvsDurationAllDay:
+		return true
+	case OpenTvsDurationN1h:
+		return true
+	case OpenTvsDurationN2h:
 		return true
 	default:
 		return false
@@ -480,6 +519,24 @@ func (e RewardEditKind) Valid() bool {
 	}
 }
 
+// Defines values for StartTvSessionWatcher.
+const (
+	StartTvSessionWatcherChild   StartTvSessionWatcher = "child"
+	StartTvSessionWatcherParents StartTvSessionWatcher = "parents"
+)
+
+// Valid indicates whether the value is a known member of the StartTvSessionWatcher enum.
+func (e StartTvSessionWatcher) Valid() bool {
+	switch e {
+	case StartTvSessionWatcherChild:
+		return true
+	case StartTvSessionWatcherParents:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Target.
 const (
 	TargetIpad Target = "ipad"
@@ -500,22 +557,22 @@ func (e Target) Valid() bool {
 
 // Defines values for TimeChoice.
 const (
-	AllDay TimeChoice = "all_day"
-	N1h    TimeChoice = "1h"
-	N30min TimeChoice = "30min"
-	No     TimeChoice = "no"
+	TimeChoiceAllDay TimeChoice = "all_day"
+	TimeChoiceN1h    TimeChoice = "1h"
+	TimeChoiceN30min TimeChoice = "30min"
+	TimeChoiceNo     TimeChoice = "no"
 )
 
 // Valid indicates whether the value is a known member of the TimeChoice enum.
 func (e TimeChoice) Valid() bool {
 	switch e {
-	case AllDay:
+	case TimeChoiceAllDay:
 		return true
-	case N1h:
+	case TimeChoiceN1h:
 		return true
-	case N30min:
+	case TimeChoiceN30min:
 		return true
-	case No:
+	case TimeChoiceNo:
 		return true
 	default:
 		return false
@@ -576,6 +633,261 @@ func (e TodayItemState) Valid() bool {
 	case TodayItemStateOpen:
 		return true
 	case TodayItemStatePending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvAttemptResultState.
+const (
+	TvAttemptResultStateOpen       TvAttemptResultState = "open"
+	TvAttemptResultStatePending    TvAttemptResultState = "pending"
+	TvAttemptResultStateRequested  TvAttemptResultState = "requested"
+	TvAttemptResultStateSuppressed TvAttemptResultState = "suppressed"
+	TvAttemptResultStateUnknown    TvAttemptResultState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the TvAttemptResultState enum.
+func (e TvAttemptResultState) Valid() bool {
+	switch e {
+	case TvAttemptResultStateOpen:
+		return true
+	case TvAttemptResultStatePending:
+		return true
+	case TvAttemptResultStateRequested:
+		return true
+	case TvAttemptResultStateSuppressed:
+		return true
+	case TvAttemptResultStateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvCreditSource.
+const (
+	TvCreditSourceGrant      TvCreditSource = "grant"
+	TvCreditSourceRedemption TvCreditSource = "redemption"
+)
+
+// Valid indicates whether the value is a known member of the TvCreditSource enum.
+func (e TvCreditSource) Valid() bool {
+	switch e {
+	case TvCreditSourceGrant:
+		return true
+	case TvCreditSourceRedemption:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvOpeningAction.
+const (
+	TvOpeningActionClose  TvOpeningAction = "close"
+	TvOpeningActionExtend TvOpeningAction = "extend"
+	TvOpeningActionOpen   TvOpeningAction = "open"
+)
+
+// Valid indicates whether the value is a known member of the TvOpeningAction enum.
+func (e TvOpeningAction) Valid() bool {
+	switch e {
+	case TvOpeningActionClose:
+		return true
+	case TvOpeningActionExtend:
+		return true
+	case TvOpeningActionOpen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvPower.
+const (
+	TvPowerOff     TvPower = "off"
+	TvPowerOn      TvPower = "on"
+	TvPowerUnknown TvPower = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the TvPower enum.
+func (e TvPower) Valid() bool {
+	switch e {
+	case TvPowerOff:
+		return true
+	case TvPowerOn:
+		return true
+	case TvPowerUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvPromptSource.
+const (
+	TvPromptSourceAdult         TvPromptSource = "adult"
+	TvPromptSourceDisplay       TvPromptSource = "display"
+	TvPromptSourceHomeAssistant TvPromptSource = "home_assistant"
+	TvPromptSourceRouter        TvPromptSource = "router"
+)
+
+// Valid indicates whether the value is a known member of the TvPromptSource enum.
+func (e TvPromptSource) Valid() bool {
+	switch e {
+	case TvPromptSourceAdult:
+		return true
+	case TvPromptSourceDisplay:
+		return true
+	case TvPromptSourceHomeAssistant:
+		return true
+	case TvPromptSourceRouter:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvPromptAnswerAnswer.
+const (
+	TvPromptAnswerAnswerChild   TvPromptAnswerAnswer = "child"
+	TvPromptAnswerAnswerNotNow  TvPromptAnswerAnswer = "not_now"
+	TvPromptAnswerAnswerParents TvPromptAnswerAnswer = "parents"
+)
+
+// Valid indicates whether the value is a known member of the TvPromptAnswerAnswer enum.
+func (e TvPromptAnswerAnswer) Valid() bool {
+	switch e {
+	case TvPromptAnswerAnswerChild:
+		return true
+	case TvPromptAnswerAnswerNotNow:
+		return true
+	case TvPromptAnswerAnswerParents:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvPromptAnsweredPromptState.
+const (
+	Answered  TvPromptAnsweredPromptState = "answered"
+	Dismissed TvPromptAnsweredPromptState = "dismissed"
+)
+
+// Valid indicates whether the value is a known member of the TvPromptAnsweredPromptState enum.
+func (e TvPromptAnsweredPromptState) Valid() bool {
+	switch e {
+	case Answered:
+		return true
+	case Dismissed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvSessionEndReason.
+const (
+	TvSessionEndReasonDone           TvSessionEndReason = "done"
+	TvSessionEndReasonLessThannil    TvSessionEndReason = "<nil>"
+	TvSessionEndReasonOpenHours      TvSessionEndReason = "open_hours"
+	TvSessionEndReasonParentEnded    TvSessionEndReason = "parent_ended"
+	TvSessionEndReasonParentOverride TvSessionEndReason = "parent_override"
+	TvSessionEndReasonTimeUp         TvSessionEndReason = "time_up"
+	TvSessionEndReasonTvOff          TvSessionEndReason = "tv_off"
+)
+
+// Valid indicates whether the value is a known member of the TvSessionEndReason enum.
+func (e TvSessionEndReason) Valid() bool {
+	switch e {
+	case TvSessionEndReasonDone:
+		return true
+	case TvSessionEndReasonLessThannil:
+		return true
+	case TvSessionEndReasonOpenHours:
+		return true
+	case TvSessionEndReasonParentEnded:
+		return true
+	case TvSessionEndReasonParentOverride:
+		return true
+	case TvSessionEndReasonTimeUp:
+		return true
+	case TvSessionEndReasonTvOff:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvSessionWatcher.
+const (
+	TvSessionWatcherChild   TvSessionWatcher = "child"
+	TvSessionWatcherParents TvSessionWatcher = "parents"
+)
+
+// Valid indicates whether the value is a known member of the TvSessionWatcher enum.
+func (e TvSessionWatcher) Valid() bool {
+	switch e {
+	case TvSessionWatcherChild:
+		return true
+	case TvSessionWatcherParents:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TvStateOpenReason.
+const (
+	TvStateOpenReasonLessThannil TvStateOpenReason = "<nil>"
+	TvStateOpenReasonOpenHours   TvStateOpenReason = "open_hours"
+	TvStateOpenReasonParent      TvStateOpenReason = "parent"
+)
+
+// Valid indicates whether the value is a known member of the TvStateOpenReason enum.
+func (e TvStateOpenReason) Valid() bool {
+	switch e {
+	case TvStateOpenReasonLessThannil:
+		return true
+	case TvStateOpenReasonOpenHours:
+		return true
+	case TvStateOpenReasonParent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Weekday.
+const (
+	Fri Weekday = "fri"
+	Mon Weekday = "mon"
+	Sat Weekday = "sat"
+	Sun Weekday = "sun"
+	Thu Weekday = "thu"
+	Tue Weekday = "tue"
+	Wed Weekday = "wed"
+)
+
+// Valid indicates whether the value is a known member of the Weekday enum.
+func (e Weekday) Valid() bool {
+	switch e {
+	case Fri:
+		return true
+	case Mon:
+		return true
+	case Sat:
+		return true
+	case Sun:
+		return true
+	case Thu:
+		return true
+	case Tue:
+		return true
+	case Wed:
 		return true
 	default:
 		return false
@@ -799,6 +1111,19 @@ type Child struct {
 // ChildName defines model for ChildName.
 type ChildName = string
 
+// ChildTv defines model for ChildTv.
+type ChildTv struct {
+	// Credits TV time with some left, oldest first (watched in this order)
+	Credits          []TvCredit    `json:"credits"`
+	Hours            *WindowStatus `json:"hours"`
+	SecondsRemaining int           `json:"secondsRemaining"`
+	ServerTime       time.Time     `json:"serverTime"`
+
+	// Waiting TVs asking "Who's watching?" now with nobody on them, oldest first
+	Waiting  []WaitingTv `json:"waiting"`
+	Watching *Watching   `json:"watching"`
+}
+
 // Chore defines model for Chore.
 type Chore struct {
 	ChildId Id `json:"childId"`
@@ -826,8 +1151,17 @@ type ChoreEdit struct {
 	Title           Title   `json:"title"`
 }
 
-// Clock A time of day, HH:MM, 24-hour, household time
+// ChosenTvs Every TV (all) or the ones listed, not both
+type ChosenTvs struct {
+	All   *bool `json:"all,omitempty"`
+	TvIds *[]Id `json:"tvIds,omitempty"`
+}
+
+// Clock HH:MM, household time
 type Clock = string
+
+// Clock2 A time of day, HH:MM, 24-hour, household time
+type Clock2 = string
 
 // Credential defines model for Credential.
 type Credential struct {
@@ -978,6 +1312,41 @@ type Display struct {
 // DisplayScope defines model for DisplayScope.
 type DisplayScope string
 
+// DisplaySession defines model for DisplaySession.
+type DisplaySession struct {
+	Scopes []DisplayScope `json:"scopes"`
+}
+
+// DisplayTv defines model for DisplayTv.
+type DisplayTv struct {
+	Asking       bool              `json:"asking"`
+	Id           Id                `json:"id"`
+	Name         string            `json:"name"`
+	OpenClosesAt *time.Time        `json:"openClosesAt"`
+	OpenUntil    *time.Time        `json:"openUntil"`
+	Power        TvPower           `json:"power"`
+	Room         *string           `json:"room"`
+	Session      *DisplayTvSession `json:"session"`
+}
+
+// DisplayTvList defines model for DisplayTvList.
+type DisplayTvList struct {
+	ServerTime time.Time   `json:"serverTime"`
+	Tvs        []DisplayTv `json:"tvs"`
+}
+
+// DisplayTvSession Who is watching; a parents session has no countdown
+type DisplayTvSession struct {
+	ChildId          *Id                     `json:"childId"`
+	ChildName        *string                 `json:"childName"`
+	EndsAt           *time.Time              `json:"endsAt"`
+	SecondsRemaining *int                    `json:"secondsRemaining"`
+	Watcher          DisplayTvSessionWatcher `json:"watcher"`
+}
+
+// DisplayTvSessionWatcher defines model for DisplayTvSession.Watcher.
+type DisplayTvSessionWatcher string
+
 // Domains defines model for Domains.
 type Domains = []string
 
@@ -999,6 +1368,14 @@ type EndResult struct {
 
 // EndResultScope defines model for EndResult.Scope.
 type EndResultScope string
+
+// EndedTvSession defines model for EndedTvSession.
+type EndedTvSession struct {
+	Session *TvSession `json:"session"`
+}
+
+// EntityId defines model for EntityId.
+type EntityId = string
 
 // Error defines model for Error.
 type Error struct {
@@ -1062,10 +1439,10 @@ type HoursNow struct {
 // HoursWindow defines model for HoursWindow.
 type HoursWindow struct {
 	// End A time of day, HH:MM, 24-hour, household time
-	End Clock `json:"end"`
+	End Clock2 `json:"end"`
 
 	// Start A time of day, HH:MM, 24-hour, household time
-	Start Clock `json:"start"`
+	Start Clock2 `json:"start"`
 }
 
 // Household defines model for Household.
@@ -1088,6 +1465,9 @@ type Id = openapi_types.UUID
 // Inbox defines model for Inbox.
 type Inbox struct {
 	Items []InboxItem `json:"items"`
+
+	// Tvs The TVs asking "Who's watching?" now (only those), with each child's TV time, to answer with answerTvPrompt.
+	Tvs TvList `json:"tvs"`
 }
 
 // InboxItem defines model for InboxItem.
@@ -1146,6 +1526,12 @@ type LearningLink struct {
 
 // LockMessage Shown on a locked device's shield
 type LockMessage = string
+
+// Mac Lower case, colons (any case and dashes are accepted and normalized)
+type Mac = string
+
+// Macs defines model for Macs.
+type Macs = []Mac
 
 // Me defines model for Me.
 type Me struct {
@@ -1270,6 +1656,64 @@ type NewRoutine struct {
 	Points Points  `json:"points"`
 	Steps  []Title `json:"steps"`
 	Title  Title   `json:"title"`
+}
+
+// NewTv defines model for NewTv.
+type NewTv struct {
+	HaEntityId *EntityId  `json:"haEntityId,omitempty"`
+	Macs       Macs       `json:"macs"`
+	Name       TvName     `json:"name"`
+	OpenHours  *OpenHours `json:"openHours,omitempty"`
+	Room       *Room      `json:"room,omitempty"`
+}
+
+// OidcLink defines model for OidcLink.
+type OidcLink struct {
+	// Email The email the provider confirmed when the link was made
+	Email      string     `json:"email"`
+	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
+	LinkedAt   time.Time  `json:"linkedAt"`
+}
+
+// OidcProvider defines model for OidcProvider.
+type OidcProvider struct {
+	Name string `json:"name"`
+}
+
+// OpenHours One daily window, household time, when the TV is simply online. An end before the start runs into the next morning. days are the days it starts on; omitted, every day.
+type OpenHours struct {
+	Days *[]Weekday `json:"days,omitempty"`
+
+	// End HH:MM, household time
+	End Clock `json:"end"`
+
+	// Start HH:MM, household time
+	Start Clock `json:"start"`
+}
+
+// OpenTvs Every TV (all) or the ones listed, not both, for 1 hour, 2 hours or until midnight
+type OpenTvs struct {
+	All      *bool           `json:"all,omitempty"`
+	Duration OpenTvsDuration `json:"duration"`
+	TvIds    *[]Id           `json:"tvIds,omitempty"`
+}
+
+// OpenTvsDuration defines model for OpenTvs.Duration.
+type OpenTvsDuration string
+
+// OpenedTv defines model for OpenedTv.
+type OpenedTv struct {
+	Id           Id         `json:"id"`
+	Name         string     `json:"name"`
+	OpenClosesAt *time.Time `json:"openClosesAt"`
+	OpenUntil    *time.Time `json:"openUntil"`
+}
+
+// OpenedTvs defines model for OpenedTvs.
+type OpenedTvs struct {
+	EndedSessions []TvSession `json:"endedSessions"`
+	ServerTime    time.Time   `json:"serverTime"`
+	Tvs           []OpenedTv  `json:"tvs"`
 }
 
 // Pairing defines model for Pairing.
@@ -1454,6 +1898,9 @@ type Rewards struct {
 	Rewards []Reward `json:"rewards"`
 }
 
+// Room defines model for Room.
+type Room = string
+
 // Routine defines model for Routine.
 type Routine struct {
 	ChildId Id `json:"childId"`
@@ -1527,6 +1974,15 @@ type SetMeal struct {
 	Title           *Title2 `json:"title,omitempty"`
 }
 
+// SignInMethods defines model for SignInMethods.
+type SignInMethods struct {
+	// Oidc The single sign-on provider's button name ("Sign in with <name>"), or null when it isn't set up
+	Oidc *OidcProvider `json:"oidc"`
+
+	// Passkeys Passkeys are set up on this server (WEBAUTHN_RP_ID)
+	Passkeys bool `json:"passkeys"`
+}
+
 // Spend defines model for Spend.
 type Spend struct {
 	// Clipped Allowed hours cut it short; the rest stays banked
@@ -1540,7 +1996,19 @@ type Spend struct {
 type SpendResult struct {
 	ScreenTime ScreenTime `json:"screenTime"`
 	Spend      *Spend     `json:"spend,omitempty"`
+
+	// Tv For TV time given (target tv), the child's TV time now
+	Tv *ChildTv `json:"tv,omitempty"`
 }
+
+// StartTvSession defines model for StartTvSession.
+type StartTvSession struct {
+	ChildId *Id                   `json:"childId,omitempty"`
+	Watcher StartTvSessionWatcher `json:"watcher"`
+}
+
+// StartTvSessionWatcher defines model for StartTvSession.Watcher.
+type StartTvSessionWatcher string
 
 // Steps defines model for Steps.
 type Steps = []string
@@ -1623,8 +2091,294 @@ type TodayItem struct {
 // TodayItemState defines model for TodayItem.State.
 type TodayItemState string
 
+// Tv defines model for Tv.
+type Tv struct {
+	HaEntityId     *string    `json:"haEntityId"`
+	Id             Id         `json:"id"`
+	Macs           []string   `json:"macs"`
+	Name           string     `json:"name"`
+	OpenHours      *OpenHours `json:"openHours"`
+	Power          TvPower    `json:"power"`
+	PowerChangedAt *time.Time `json:"powerChangedAt"`
+	Room           *string    `json:"room"`
+
+	// Version Counts saves; send it back as expectedVersion to save over exactly this one
+	Version Version `json:"version"`
+}
+
+// TvAllowance defines model for TvAllowance.
+type TvAllowance struct {
+	Mac              string `json:"mac"`
+	SecondsRemaining int    `json:"secondsRemaining"`
+}
+
+// TvAllowances defines model for TvAllowances.
+type TvAllowances struct {
+	Allowances []TvAllowance `json:"allowances"`
+	ServerTime time.Time     `json:"serverTime"`
+}
+
+// TvAsked defines model for TvAsked.
+type TvAsked struct {
+	Asking bool `json:"asking"`
+
+	// On Already on (a session) or open
+	On bool `json:"on"`
+}
+
+// TvAttempt defines model for TvAttempt.
+type TvAttempt struct {
+	LastSeenAt time.Time `json:"lastSeenAt"`
+
+	// Mac Lower case, colons (any case and dashes are accepted and normalized)
+	Mac Mac `json:"mac"`
+}
+
+// TvAttemptResult defines model for TvAttemptResult.
+type TvAttemptResult struct {
+	Mac   string               `json:"mac"`
+	State TvAttemptResultState `json:"state"`
+}
+
+// TvAttemptResultState defines model for TvAttemptResult.State.
+type TvAttemptResultState string
+
+// TvAttemptResults defines model for TvAttemptResults.
+type TvAttemptResults struct {
+	Results    []TvAttemptResult `json:"results"`
+	ServerTime time.Time         `json:"serverTime"`
+}
+
+// TvAttempts defines model for TvAttempts.
+type TvAttempts struct {
+	Attempts []TvAttempt `json:"attempts"`
+}
+
+// TvChild A live child as "Turn on for…" and "Who's watching?" offer them.
+type TvChild struct {
+	// CanStartOwn canWatch, not watching, and has a paired device to start it from
+	CanStartOwn bool `json:"canStartOwn"`
+
+	// CanWatch Has TV time, is inside their hours and isn't watching another TV
+	CanWatch bool   `json:"canWatch"`
+	ChildId  Id     `json:"childId"`
+	Color    string `json:"color"`
+
+	// Hours The child's allowed hours now; null with no rule
+	Hours              *WindowStatus `json:"hours"`
+	Name               string        `json:"name"`
+	TvSecondsRemaining int           `json:"tvSecondsRemaining"`
+	WatchingTvId       *Id           `json:"watchingTvId"`
+}
+
+// TvCredit TV time with some left
+type TvCredit struct {
+	CreatedAt time.Time `json:"createdAt"`
+
+	// GrantedBy The parent who gave it, by name
+	GrantedBy *string `json:"grantedBy,omitempty"`
+	Id        Id      `json:"id"`
+
+	// Minutes What it was given as
+	Minutes      int     `json:"minutes"`
+	RedemptionId *Id     `json:"redemptionId,omitempty"`
+	RewardTitle  *string `json:"rewardTitle,omitempty"`
+
+	// Seconds What it holds
+	Seconds int `json:"seconds"`
+
+	// Source A reward bought with points, or a parent's grant
+	Source      TvCreditSource `json:"source"`
+	UsedSeconds int            `json:"usedSeconds"`
+}
+
+// TvCreditSource A reward bought with points, or a parent's grant
+type TvCreditSource string
+
+// TvEdit defines model for TvEdit.
+type TvEdit struct {
+	// ExpectedVersion Counts saves; send it back as expectedVersion to save over exactly this one
+	ExpectedVersion Version    `json:"expectedVersion"`
+	HaEntityId      *EntityId  `json:"haEntityId"`
+	Macs            Macs       `json:"macs"`
+	Name            TvName     `json:"name"`
+	OpenHours       *OpenHours `json:"openHours"`
+	Room            *Room      `json:"room"`
+}
+
+// TvHistory defines model for TvHistory.
+type TvHistory struct {
+	Openings []TvOpening `json:"openings"`
+	Sessions []TvSession `json:"sessions"`
+}
+
+// TvList defines model for TvList.
+type TvList struct {
+	Children   []TvChild `json:"children"`
+	ServerTime time.Time `json:"serverTime"`
+	Tvs        []TvState `json:"tvs"`
+}
+
+// TvName defines model for TvName.
+type TvName = string
+
+// TvOpening defines model for TvOpening.
+type TvOpening struct {
+	Action         TvOpeningAction `json:"action"`
+	At             time.Time       `json:"at"`
+	ByName         *string         `json:"byName"`
+	EndedSessionId *Id             `json:"endedSessionId"`
+	Id             Id              `json:"id"`
+	TvId           Id              `json:"tvId"`
+	TvName         string          `json:"tvName"`
+	Until          *time.Time      `json:"until"`
+	ViaAssistant   bool            `json:"viaAssistant"`
+}
+
+// TvOpeningAction defines model for TvOpening.Action.
+type TvOpeningAction string
+
+// TvPower defines model for TvPower.
+type TvPower string
+
+// TvPowerReport defines model for TvPowerReport.
+type TvPowerReport struct {
+	EntityId    EntityId   `json:"entityId"`
+	LastChanged *time.Time `json:"lastChanged,omitempty"`
+
+	// State The media_player state (on, playing, buffering, idle, paused, off, standby, unavailable, …)
+	State string `json:"state"`
+}
+
+// TvPowerResult defines model for TvPowerResult.
+type TvPowerResult struct {
+	Asking bool    `json:"asking"`
+	Online bool    `json:"online"`
+	Power  TvPower `json:"power"`
+	TvId   Id      `json:"tvId"`
+}
+
+// TvPrompt defines model for TvPrompt.
+type TvPrompt struct {
+	CreatedAt time.Time      `json:"createdAt"`
+	Id        Id             `json:"id"`
+	Source    TvPromptSource `json:"source"`
+
+	// Version Counts saves; send it back as expectedVersion to save over exactly this one
+	Version Version `json:"version"`
+}
+
+// TvPromptSource defines model for TvPrompt.Source.
+type TvPromptSource string
+
+// TvPromptAnswer defines model for TvPromptAnswer.
+type TvPromptAnswer struct {
+	Answer  TvPromptAnswerAnswer `json:"answer"`
+	ChildId *Id                  `json:"childId,omitempty"`
+
+	// ExpectedVersion Counts saves; send it back as expectedVersion to save over exactly this one
+	ExpectedVersion Version `json:"expectedVersion"`
+}
+
+// TvPromptAnswerAnswer defines model for TvPromptAnswer.Answer.
+type TvPromptAnswerAnswer string
+
+// TvPromptAnswered defines model for TvPromptAnswered.
+type TvPromptAnswered struct {
+	Prompt struct {
+		Id    Id                          `json:"id"`
+		State TvPromptAnsweredPromptState `json:"state"`
+
+		// Version Counts saves; send it back as expectedVersion to save over exactly this one
+		Version Version `json:"version"`
+	} `json:"prompt"`
+	Session *TvSession `json:"session"`
+}
+
+// TvPromptAnsweredPromptState defines model for TvPromptAnswered.Prompt.State.
+type TvPromptAnsweredPromptState string
+
+// TvSession defines model for TvSession.
+type TvSession struct {
+	ChildId   *Id                 `json:"childId"`
+	ChildName *string             `json:"childName"`
+	EndReason *TvSessionEndReason `json:"endReason"`
+	EndedAt   *time.Time          `json:"endedAt"`
+
+	// EndsAt A running session's end at the latest (parents, the 4-hour safety cap)
+	EndsAt *time.Time `json:"endsAt"`
+
+	// EndsWithHours The child's allowed hours end it before their time runs out
+	EndsWithHours    bool             `json:"endsWithHours"`
+	Id               Id               `json:"id"`
+	SecondsRemaining *int             `json:"secondsRemaining"`
+	StartedAt        time.Time        `json:"startedAt"`
+	TvId             Id               `json:"tvId"`
+	TvName           string           `json:"tvName"`
+	WatchedSeconds   int              `json:"watchedSeconds"`
+	Watcher          TvSessionWatcher `json:"watcher"`
+}
+
+// TvSessionEndReason defines model for TvSession.EndReason.
+type TvSessionEndReason string
+
+// TvSessionWatcher defines model for TvSession.Watcher.
+type TvSessionWatcher string
+
+// TvState A TV and where it stands now.
+type TvState struct {
+	HaEntityId *string  `json:"haEntityId"`
+	Id         Id       `json:"id"`
+	Macs       []string `json:"macs"`
+	Name       string   `json:"name"`
+
+	// Open Online without a session (open hours, or opened by a parent)
+	Open bool `json:"open"`
+
+	// OpenClosesAt When the open TV is gated again; null while gated
+	OpenClosesAt *time.Time         `json:"openClosesAt"`
+	OpenHours    *OpenHours         `json:"openHours"`
+	OpenHoursNow *WindowStatus      `json:"openHoursNow"`
+	OpenReason   *TvStateOpenReason `json:"openReason"`
+
+	// OpenUntil A parent's "Open TVs" end, while one is active
+	OpenUntil      *time.Time `json:"openUntil"`
+	Power          TvPower    `json:"power"`
+	PowerChangedAt *time.Time `json:"powerChangedAt"`
+	Prompt         *TvPrompt  `json:"prompt"`
+	Room           *string    `json:"room"`
+	Session        *TvSession `json:"session"`
+
+	// Version Counts saves; send it back as expectedVersion to save over exactly this one
+	Version Version `json:"version"`
+}
+
+// TvStateOpenReason defines model for TvState.OpenReason.
+type TvStateOpenReason string
+
 // Version Counts saves; send it back as expectedVersion to save over exactly this one
 type Version = int
+
+// WaitingTv defines model for WaitingTv.
+type WaitingTv struct {
+	Room   *string `json:"room"`
+	TvId   Id      `json:"tvId"`
+	TvName string  `json:"tvName"`
+}
+
+// WatchTv defines model for WatchTv.
+type WatchTv struct {
+	TvId Id `json:"tvId"`
+}
+
+// Watching defines model for Watching.
+type Watching struct {
+	EndsAt           time.Time `json:"endsAt"`
+	EndsWithHours    bool      `json:"endsWithHours"`
+	SecondsRemaining int       `json:"secondsRemaining"`
+	TvId             Id        `json:"tvId"`
+	TvName           string    `json:"tvName"`
+}
 
 // WebFilter Blocked websites: game portals always; games while the child has no iPad time running. Lowercase names; each covers its subdomains.
 type WebFilter struct {
@@ -1638,12 +2392,22 @@ type WebFilterEdit struct {
 	Games       Domains `json:"games"`
 }
 
+// Weekday defines model for Weekday.
+type Weekday string
+
 // Window defines model for Window.
 type Window struct {
 	// EndsAt Its effective end, if a parent ended it early
 	EndsAt   time.Time `json:"endsAt"`
 	Id       Id        `json:"id"`
 	StartsAt time.Time `json:"startsAt"`
+}
+
+// WindowStatus Open until closesAt, or closed until opensAt
+type WindowStatus struct {
+	ClosesAt *time.Time `json:"closesAt,omitempty"`
+	Open     bool       `json:"open"`
+	OpensAt  *time.Time `json:"opensAt,omitempty"`
 }
 
 // ChildId defines model for ChildId.
@@ -1654,6 +2418,9 @@ type IdempotencyKey = string
 
 // ItemId defines model for ItemId.
 type ItemId = Id
+
+// TvId defines model for TvId.
+type TvId = Id
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
@@ -1667,8 +2434,14 @@ type Forbidden = Error
 // NotFound defines model for NotFound.
 type NotFound = Error
 
+// Opened defines model for Opened.
+type Opened = OpenedTvs
+
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = Error
+
+// StartConflict defines model for StartConflict.
+type StartConflict = Error
 
 // TooLarge defines model for TooLarge.
 type TooLarge = Error
@@ -1681,6 +2454,15 @@ type Unauthorized = Error
 
 // UnprocessableEntity defines model for UnprocessableEntity.
 type UnprocessableEntity = Error
+
+// OidcCallbackParams defines parameters for OidcCallback.
+type OidcCallbackParams struct {
+	Code                         *string `form:"code,omitempty" json:"code,omitempty"`
+	State                        *string `form:"state,omitempty" json:"state,omitempty"`
+	Iss                          *string `form:"iss,omitempty" json:"iss,omitempty"`
+	Error                        *string `form:"error,omitempty" json:"error,omitempty"`
+	UnderscoreUnderscoreHostOidc *string `form:"__Host-oidc,omitempty" json:"__Host-oidc,omitempty"`
+}
 
 // ConfirmSignInJSONBody defines parameters for ConfirmSignIn.
 type ConfirmSignInJSONBody struct {
@@ -1840,6 +2622,23 @@ type AskForTimeJSONBody = map[string]interface{}
 
 // AskForTimeParams defines parameters for AskForTime.
 type AskForTimeParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ForfeitTvCreditJSONBody defines parameters for ForfeitTvCredit.
+type ForfeitTvCreditJSONBody = map[string]interface{}
+
+// ForfeitTvCreditParams defines parameters for ForfeitTvCredit.
+type ForfeitTvCreditParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// WatchTvParams defines parameters for WatchTv.
+type WatchTvParams struct {
 	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
 	// same body, gets the first answer (for 30 days) instead of doing it again.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
@@ -2223,6 +3022,97 @@ type CheckRoutineStepParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// AnswerTvPromptParams defines parameters for AnswerTvPrompt.
+type AnswerTvPromptParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ReportTvAttemptsParams defines parameters for ReportTvAttempts.
+type ReportTvAttemptsParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ReportTvPowerParams defines parameters for ReportTvPower.
+type ReportTvPowerParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateTvParams defines parameters for CreateTv.
+type CreateTvParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CloseTvsParams defines parameters for CloseTvs.
+type CloseTvsParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ExtendTvsParams defines parameters for ExtendTvs.
+type ExtendTvsParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// OpenTvsParams defines parameters for OpenTvs.
+type OpenTvsParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// RemoveTvParams defines parameters for RemoveTv.
+type RemoveTvParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateTvParams defines parameters for UpdateTv.
+type UpdateTvParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// AskForTvParams defines parameters for AskForTv.
+type AskForTvParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DoneWatchingParams defines parameters for DoneWatching.
+type DoneWatchingParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// StartTvSessionParams defines parameters for StartTvSession.
+type StartTvSessionParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// EndTvSessionParams defines parameters for EndTvSession.
+type EndTvSessionParams struct {
+	// IdempotencyKey Required on every state change. A retry with the same key, from the same caller with the
+	// same body, gets the first answer (for 30 days) instead of doing it again.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // ConfirmSignInJSONRequestBody defines body for ConfirmSignIn for application/json ContentType.
 type ConfirmSignInJSONRequestBody ConfirmSignInJSONBody
 
@@ -2273,6 +3163,12 @@ type SpendScreenTimeJSONRequestBody SpendScreenTimeJSONBody
 
 // AskForTimeJSONRequestBody defines body for AskForTime for application/json ContentType.
 type AskForTimeJSONRequestBody = AskForTimeJSONBody
+
+// ForfeitTvCreditJSONRequestBody defines body for ForfeitTvCredit for application/json ContentType.
+type ForfeitTvCreditJSONRequestBody = ForfeitTvCreditJSONBody
+
+// WatchTvJSONRequestBody defines body for WatchTv for application/json ContentType.
+type WatchTvJSONRequestBody = WatchTv
 
 // CreateChoreJSONRequestBody defines body for CreateChore for application/json ContentType.
 type CreateChoreJSONRequestBody = NewChore
@@ -2358,8 +3254,38 @@ type CreateRoutineJSONRequestBody = NewRoutine
 // UpdateRoutineJSONRequestBody defines body for UpdateRoutine for application/json ContentType.
 type UpdateRoutineJSONRequestBody = RoutineEdit
 
+// AnswerTvPromptJSONRequestBody defines body for AnswerTvPrompt for application/json ContentType.
+type AnswerTvPromptJSONRequestBody = TvPromptAnswer
+
+// ReportTvAttemptsJSONRequestBody defines body for ReportTvAttempts for application/json ContentType.
+type ReportTvAttemptsJSONRequestBody = TvAttempts
+
+// ReportTvPowerJSONRequestBody defines body for ReportTvPower for application/json ContentType.
+type ReportTvPowerJSONRequestBody = TvPowerReport
+
+// CreateTvJSONRequestBody defines body for CreateTv for application/json ContentType.
+type CreateTvJSONRequestBody = NewTv
+
+// CloseTvsJSONRequestBody defines body for CloseTvs for application/json ContentType.
+type CloseTvsJSONRequestBody = ChosenTvs
+
+// ExtendTvsJSONRequestBody defines body for ExtendTvs for application/json ContentType.
+type ExtendTvsJSONRequestBody = ChosenTvs
+
+// OpenTvsJSONRequestBody defines body for OpenTvs for application/json ContentType.
+type OpenTvsJSONRequestBody = OpenTvs
+
+// UpdateTvJSONRequestBody defines body for UpdateTv for application/json ContentType.
+type UpdateTvJSONRequestBody = TvEdit
+
+// StartTvSessionJSONRequestBody defines body for StartTvSession for application/json ContentType.
+type StartTvSessionJSONRequestBody = StartTvSession
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// OidcCallback Where the provider sends the browser back; redirects to the app
+	// (GET /auth/callback/oidc)
+	OidcCallback(w http.ResponseWriter, r *http.Request, params OidcCallbackParams)
 	// ConfirmSignIn Enter the password again, for operations that need a recent sign-in
 	// (POST /auth/confirm)
 	ConfirmSignIn(w http.ResponseWriter, r *http.Request)
@@ -2372,6 +3298,18 @@ type ServerInterface interface {
 	// GetMe The signed-in adult and their household
 	// (GET /auth/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetSignInMethods How adults can sign in here, for the sign-in page
+	// (GET /auth/methods)
+	GetSignInMethods(w http.ResponseWriter, r *http.Request)
+	// UnlinkOidc Unlink your single sign-on account
+	// (DELETE /auth/oidc/link)
+	UnlinkOidc(w http.ResponseWriter, r *http.Request)
+	// GetOidcLink Your single sign-on link, if you have one
+	// (GET /auth/oidc/link)
+	GetOidcLink(w http.ResponseWriter, r *http.Request)
+	// StartOidcSignIn Start signing in with the single sign-on provider
+	// (POST /auth/oidc/start)
+	StartOidcSignIn(w http.ResponseWriter, r *http.Request)
 	// PasskeySignIn Sign in with a passkey
 	// (POST /auth/passkey)
 	PasskeySignIn(w http.ResponseWriter, r *http.Request)
@@ -2456,6 +3394,15 @@ type ServerInterface interface {
 	// AskForTime Ask the parents for more time
 	// (POST /children/{childId}/time-requests)
 	AskForTime(w http.ResponseWriter, r *http.Request, childId ChildId, params AskForTimeParams)
+	// ChildTv A child's TV time, as the kid view shows it
+	// (GET /children/{childId}/tv)
+	ChildTv(w http.ResponseWriter, r *http.Request, childId ChildId)
+	// ForfeitTvCredit Take back the unused rest of a parent's TV grant
+	// (POST /children/{childId}/tv/credits/{creditId}/forfeit)
+	ForfeitTvCredit(w http.ResponseWriter, r *http.Request, childId ChildId, creditId Id, params ForfeitTvCreditParams)
+	// WatchTv Watch on a TV that is asking (the child's own device)
+	// (POST /children/{childId}/tv/watch)
+	WatchTv(w http.ResponseWriter, r *http.Request, childId ChildId, params WatchTvParams)
 	// ListChores The household's chores
 	// (GET /chores)
 	ListChores(w http.ResponseWriter, r *http.Request)
@@ -2516,6 +3463,9 @@ type ServerInterface interface {
 	// ClaimDisplayPairing A wall display collects its session once an adult has entered its code
 	// (POST /display/pairings/claim)
 	ClaimDisplayPairing(w http.ResponseWriter, r *http.Request, params ClaimDisplayPairingParams)
+	// GetDisplaySession What this wall display may show
+	// (GET /display/session)
+	GetDisplaySession(w http.ResponseWriter, r *http.Request)
 	// ListDisplays The household's paired wall displays
 	// (GET /displays)
 	ListDisplays(w http.ResponseWriter, r *http.Request)
@@ -2642,6 +3592,57 @@ type ServerInterface interface {
 	// CheckRoutineStep Tick a step of today's routine; the last one sends the routine for approval
 	// (POST /today/routines/{routineId}/steps/{stepId}/check)
 	CheckRoutineStep(w http.ResponseWriter, r *http.Request, routineId Id, stepId Id, params CheckRoutineStepParams)
+	// AnswerTvPrompt Answer "Who's watching?"
+	// (POST /tv-prompts/{promptId}/answer)
+	AnswerTvPrompt(w http.ResponseWriter, r *http.Request, promptId Id, params AnswerTvPromptParams)
+	// TvAllowances Which TV MACs may be online, and for how long (the router)
+	// (GET /tv/allowances)
+	TvAllowances(w http.ResponseWriter, r *http.Request)
+	// ReportTvAttempts Blocked TVs trying to go online (the router)
+	// (POST /tv/attempts)
+	ReportTvAttempts(w http.ResponseWriter, r *http.Request, params ReportTvAttemptsParams)
+	// ReportTvPower A TV's power, from Home Assistant
+	// (POST /tv/power)
+	ReportTvPower(w http.ResponseWriter, r *http.Request, params ReportTvPowerParams)
+	// ListTvs Every TV with its state, and each child's TV time
+	// (GET /tvs)
+	ListTvs(w http.ResponseWriter, r *http.Request)
+	// CreateTv Add a TV
+	// (POST /tvs)
+	CreateTv(w http.ResponseWriter, r *http.Request, params CreateTvParams)
+	// CloseTvs Close TVs a parent opened, now
+	// (POST /tvs/close)
+	CloseTvs(w http.ResponseWriter, r *http.Request, params CloseTvsParams)
+	// DisplayTvs The TVs as a wall display shows them
+	// (GET /tvs/display)
+	DisplayTvs(w http.ResponseWriter, r *http.Request)
+	// ExtendTvs Keep open TVs open an hour longer
+	// (POST /tvs/extend)
+	ExtendTvs(w http.ResponseWriter, r *http.Request, params ExtendTvsParams)
+	// TvHistory Recent TV sessions and who opened which TV
+	// (GET /tvs/history)
+	TvHistory(w http.ResponseWriter, r *http.Request)
+	// OpenTvs Open TVs for 1 hour, 2 hours or all day
+	// (POST /tvs/open)
+	OpenTvs(w http.ResponseWriter, r *http.Request, params OpenTvsParams)
+	// RemoveTv Remove a TV
+	// (DELETE /tvs/{tvId})
+	RemoveTv(w http.ResponseWriter, r *http.Request, tvId TvId, params RemoveTvParams)
+	// UpdateTv Edit a TV
+	// (PUT /tvs/{tvId})
+	UpdateTv(w http.ResponseWriter, r *http.Request, tvId TvId, params UpdateTvParams)
+	// AskForTv Ask the parents to turn a TV on
+	// (POST /tvs/{tvId}/ask)
+	AskForTv(w http.ResponseWriter, r *http.Request, tvId TvId, params AskForTvParams)
+	// DoneWatching Done watching
+	// (POST /tvs/{tvId}/done)
+	DoneWatching(w http.ResponseWriter, r *http.Request, tvId TvId, params DoneWatchingParams)
+	// StartTvSession Turn a TV on for parents or a child
+	// (POST /tvs/{tvId}/session)
+	StartTvSession(w http.ResponseWriter, r *http.Request, tvId TvId, params StartTvSessionParams)
+	// EndTvSession Turn a TV off now
+	// (POST /tvs/{tvId}/session/end)
+	EndTvSession(w http.ResponseWriter, r *http.Request, tvId TvId, params EndTvSessionParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -2652,6 +3653,93 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// OidcCallback operation middleware
+func (siw *ServerInterfaceWrapper) OidcCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params OidcCallbackParams
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "iss" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "iss", r.URL.Query(), &params.Iss, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "iss"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "iss", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error", r.URL.Query(), &params.Error, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error", Err: err})
+		}
+		return
+	}
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("__Host-oidc"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "__Host-oidc", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "__Host-oidc", Err: err})
+				return
+			}
+			params.UnderscoreUnderscoreHostOidc = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OidcCallback(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ConfirmSignIn operation middleware
 func (siw *ServerInterfaceWrapper) ConfirmSignIn(w http.ResponseWriter, r *http.Request) {
@@ -2700,6 +3788,62 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSignInMethods operation middleware
+func (siw *ServerInterfaceWrapper) GetSignInMethods(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSignInMethods(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnlinkOidc operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkOidc(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkOidc(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOidcLink operation middleware
+func (siw *ServerInterfaceWrapper) GetOidcLink(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOidcLink(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartOidcSignIn operation middleware
+func (siw *ServerInterfaceWrapper) StartOidcSignIn(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartOidcSignIn(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3736,6 +4880,149 @@ func (siw *ServerInterfaceWrapper) AskForTime(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ChildTv operation middleware
+func (siw *ServerInterfaceWrapper) ChildTv(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "childId" -------------
+	var childId ChildId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childId", r.PathValue("childId"), &childId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChildTv(w, r, childId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ForfeitTvCredit operation middleware
+func (siw *ServerInterfaceWrapper) ForfeitTvCredit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "childId" -------------
+	var childId ChildId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childId", r.PathValue("childId"), &childId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "creditId" -------------
+	var creditId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "creditId", r.PathValue("creditId"), &creditId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "creditId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ForfeitTvCreditParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ForfeitTvCredit(w, r, childId, creditId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// WatchTv operation middleware
+func (siw *ServerInterfaceWrapper) WatchTv(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "childId" -------------
+	var childId ChildId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "childId", r.PathValue("childId"), &childId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "childId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params WatchTvParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.WatchTv(w, r, childId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListChores operation middleware
 func (siw *ServerInterfaceWrapper) ListChores(w http.ResponseWriter, r *http.Request) {
 
@@ -4383,6 +5670,20 @@ func (siw *ServerInterfaceWrapper) ClaimDisplayPairing(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ClaimDisplayPairing(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDisplaySession operation middleware
+func (siw *ServerInterfaceWrapper) GetDisplaySession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDisplaySession(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6107,6 +7408,710 @@ func (siw *ServerInterfaceWrapper) CheckRoutineStep(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// AnswerTvPrompt operation middleware
+func (siw *ServerInterfaceWrapper) AnswerTvPrompt(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "promptId" -------------
+	var promptId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "promptId", r.PathValue("promptId"), &promptId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "promptId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AnswerTvPromptParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AnswerTvPrompt(w, r, promptId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TvAllowances operation middleware
+func (siw *ServerInterfaceWrapper) TvAllowances(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TvAllowances(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReportTvAttempts operation middleware
+func (siw *ServerInterfaceWrapper) ReportTvAttempts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReportTvAttemptsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReportTvAttempts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReportTvPower operation middleware
+func (siw *ServerInterfaceWrapper) ReportTvPower(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReportTvPowerParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReportTvPower(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTvs operation middleware
+func (siw *ServerInterfaceWrapper) ListTvs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTvs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTv operation middleware
+func (siw *ServerInterfaceWrapper) CreateTv(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateTvParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTv(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CloseTvs operation middleware
+func (siw *ServerInterfaceWrapper) CloseTvs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CloseTvsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CloseTvs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisplayTvs operation middleware
+func (siw *ServerInterfaceWrapper) DisplayTvs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisplayTvs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExtendTvs operation middleware
+func (siw *ServerInterfaceWrapper) ExtendTvs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExtendTvsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExtendTvs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TvHistory operation middleware
+func (siw *ServerInterfaceWrapper) TvHistory(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TvHistory(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OpenTvs operation middleware
+func (siw *ServerInterfaceWrapper) OpenTvs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params OpenTvsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenTvs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveTv operation middleware
+func (siw *ServerInterfaceWrapper) RemoveTv(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tvId" -------------
+	var tvId TvId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tvId", r.PathValue("tvId"), &tvId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tvId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RemoveTvParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveTv(w, r, tvId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTv operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTv(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tvId" -------------
+	var tvId TvId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tvId", r.PathValue("tvId"), &tvId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tvId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateTvParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTv(w, r, tvId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AskForTv operation middleware
+func (siw *ServerInterfaceWrapper) AskForTv(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tvId" -------------
+	var tvId TvId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tvId", r.PathValue("tvId"), &tvId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tvId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AskForTvParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AskForTv(w, r, tvId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DoneWatching operation middleware
+func (siw *ServerInterfaceWrapper) DoneWatching(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tvId" -------------
+	var tvId TvId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tvId", r.PathValue("tvId"), &tvId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tvId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DoneWatchingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DoneWatching(w, r, tvId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartTvSession operation middleware
+func (siw *ServerInterfaceWrapper) StartTvSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tvId" -------------
+	var tvId TvId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tvId", r.PathValue("tvId"), &tvId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tvId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StartTvSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartTvSession(w, r, tvId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EndTvSession operation middleware
+func (siw *ServerInterfaceWrapper) EndTvSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "tvId" -------------
+	var tvId TvId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tvId", r.PathValue("tvId"), &tvId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tvId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EndTvSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EndTvSession(w, r, tvId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -6231,6 +8236,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/confirm", wrapper.ConfirmSignIn)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/methods", wrapper.GetSignInMethods)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/oidc/start", wrapper.StartOidcSignIn)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/callback/oidc", wrapper.OidcCallback)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/oidc/link", wrapper.UnlinkOidc)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/oidc/link", wrapper.GetOidcLink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey/options", wrapper.PasskeySignInOptions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey", wrapper.PasskeySignIn)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/passkey/confirm/options", wrapper.PasskeyConfirmOptions)
@@ -6251,6 +8261,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/credential", wrapper.GetOwnCredential)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/display/pairings", wrapper.StartDisplayPairing)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/display/pairings/claim", wrapper.ClaimDisplayPairing)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/display/session", wrapper.GetDisplaySession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/displays", wrapper.ListDisplays)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/displays", wrapper.CreateDisplay)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/displays/{displayId}", wrapper.RevokeDisplay)
@@ -6321,6 +8332,26 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/learning/links", wrapper.LinkLearner)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/learning/links/{linkId}", wrapper.UnlinkLearner)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/learning/awards", wrapper.AwardLearning)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tvs", wrapper.ListTvs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs", wrapper.CreateTv)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tvs/display", wrapper.DisplayTvs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tvs/history", wrapper.TvHistory)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/open", wrapper.OpenTvs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/extend", wrapper.ExtendTvs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/close", wrapper.CloseTvs)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tvs/{tvId}", wrapper.RemoveTv)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/tvs/{tvId}", wrapper.UpdateTv)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/{tvId}/session", wrapper.StartTvSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/{tvId}/session/end", wrapper.EndTvSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/{tvId}/ask", wrapper.AskForTv)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tvs/{tvId}/done", wrapper.DoneWatching)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tv-prompts/{promptId}/answer", wrapper.AnswerTvPrompt)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/children/{childId}/tv", wrapper.ChildTv)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/children/{childId}/tv/credits/{creditId}/forfeit", wrapper.ForfeitTvCredit)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/children/{childId}/tv/watch", wrapper.WatchTv)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tv/allowances", wrapper.TvAllowances)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tv/attempts", wrapper.ReportTvAttempts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tv/power", wrapper.ReportTvPower)
 
 	return m
 }
@@ -6335,7 +8366,11 @@ type ForbiddenJSONResponse Error
 
 type NotFoundJSONResponse Error
 
+type OpenedJSONResponse OpenedTvs
+
 type ServiceUnavailableJSONResponse Error
+
+type StartConflictJSONResponse Error
 
 type TooLargeJSONResponse Error
 
@@ -6344,6 +8379,51 @@ type TooManyRequestsJSONResponse Error
 type UnauthorizedJSONResponse Error
 
 type UnprocessableEntityJSONResponse Error
+
+type OidcCallbackRequestObject struct {
+	Params OidcCallbackParams
+}
+
+type OidcCallbackResponseObject interface {
+	VisitOidcCallbackResponse(w http.ResponseWriter) error
+}
+
+type OidcCallback303ResponseHeaders struct {
+	Location  *string
+	SetCookie *string
+}
+
+type OidcCallback303Response struct {
+	Headers OidcCallback303ResponseHeaders
+}
+
+func (response OidcCallback303Response) VisitOidcCallbackResponse(w http.ResponseWriter) error {
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(303)
+	return nil
+}
+
+type OidcCallbackdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response OidcCallbackdefaultJSONResponse) VisitOidcCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ConfirmSignInRequestObject struct {
 	Body *ConfirmSignInJSONRequestBody
@@ -6662,6 +8742,306 @@ type GetMedefaultJSONResponse struct {
 }
 
 func (response GetMedefaultJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSignInMethodsRequestObject struct {
+}
+
+type GetSignInMethodsResponseObject interface {
+	VisitGetSignInMethodsResponse(w http.ResponseWriter) error
+}
+
+type GetSignInMethods200JSONResponse SignInMethods
+
+func (response GetSignInMethods200JSONResponse) VisitGetSignInMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSignInMethodsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSignInMethodsdefaultJSONResponse) VisitGetSignInMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkOidcRequestObject struct {
+}
+
+type UnlinkOidcResponseObject interface {
+	VisitUnlinkOidcResponse(w http.ResponseWriter) error
+}
+
+type UnlinkOidc204Response struct {
+}
+
+func (response UnlinkOidc204Response) VisitUnlinkOidcResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnlinkOidc401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UnlinkOidc401JSONResponse) VisitUnlinkOidcResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkOidc403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UnlinkOidc403JSONResponse) VisitUnlinkOidcResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkOidc404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UnlinkOidc404JSONResponse) VisitUnlinkOidcResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkOidcdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UnlinkOidcdefaultJSONResponse) VisitUnlinkOidcResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOidcLinkRequestObject struct {
+}
+
+type GetOidcLinkResponseObject interface {
+	VisitGetOidcLinkResponse(w http.ResponseWriter) error
+}
+
+type GetOidcLink200JSONResponse struct {
+	Link *OidcLink `json:"link"`
+}
+
+func (response GetOidcLink200JSONResponse) VisitGetOidcLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOidcLink401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetOidcLink401JSONResponse) VisitGetOidcLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOidcLink403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetOidcLink403JSONResponse) VisitGetOidcLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOidcLink404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetOidcLink404JSONResponse) VisitGetOidcLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOidcLinkdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetOidcLinkdefaultJSONResponse) VisitGetOidcLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOidcSignInRequestObject struct {
+}
+
+type StartOidcSignInResponseObject interface {
+	VisitStartOidcSignInResponse(w http.ResponseWriter) error
+}
+
+type StartOidcSignIn200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type StartOidcSignIn200JSONResponse struct {
+	Body struct {
+		Url string `json:"url"`
+	}
+	Headers StartOidcSignIn200ResponseHeaders
+}
+
+func (response StartOidcSignIn200JSONResponse) VisitStartOidcSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOidcSignIn404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response StartOidcSignIn404JSONResponse) VisitStartOidcSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOidcSignIn409JSONResponse Error
+
+func (response StartOidcSignIn409JSONResponse) VisitStartOidcSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOidcSignIn429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response StartOidcSignIn429JSONResponse) VisitStartOidcSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOidcSignIn503JSONResponse Error
+
+func (response StartOidcSignIn503JSONResponse) VisitStartOidcSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartOidcSignIndefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response StartOidcSignIndefaultJSONResponse) VisitStartOidcSignInResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -9663,6 +12043,357 @@ func (response AskForTimedefaultJSONResponse) VisitAskForTimeResponse(w http.Res
 	return err
 }
 
+type ChildTvRequestObject struct {
+	ChildId ChildId `json:"childId"`
+}
+
+type ChildTvResponseObject interface {
+	VisitChildTvResponse(w http.ResponseWriter) error
+}
+
+type ChildTv200JSONResponse ChildTv
+
+func (response ChildTv200JSONResponse) VisitChildTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChildTv401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChildTv401JSONResponse) VisitChildTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChildTv403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ChildTv403JSONResponse) VisitChildTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChildTv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ChildTv404JSONResponse) VisitChildTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChildTvdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ChildTvdefaultJSONResponse) VisitChildTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCreditRequestObject struct {
+	ChildId  ChildId `json:"childId"`
+	CreditId Id      `json:"creditId"`
+	Params   ForfeitTvCreditParams
+	Body     *ForfeitTvCreditJSONRequestBody
+}
+
+type ForfeitTvCreditResponseObject interface {
+	VisitForfeitTvCreditResponse(w http.ResponseWriter) error
+}
+
+type ForfeitTvCredit200JSONResponse struct {
+	ForfeitedSeconds int     `json:"forfeitedSeconds"`
+	Tv               ChildTv `json:"tv"`
+}
+
+func (response ForfeitTvCredit200JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCredit400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ForfeitTvCredit400JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCredit401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ForfeitTvCredit401JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCredit403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ForfeitTvCredit403JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCredit404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ForfeitTvCredit404JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCredit409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ForfeitTvCredit409JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCredit413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response ForfeitTvCredit413JSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForfeitTvCreditdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ForfeitTvCreditdefaultJSONResponse) VisitForfeitTvCreditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTvRequestObject struct {
+	ChildId ChildId `json:"childId"`
+	Params  WatchTvParams
+	Body    *WatchTvJSONRequestBody
+}
+
+type WatchTvResponseObject interface {
+	VisitWatchTvResponse(w http.ResponseWriter) error
+}
+
+type WatchTv200JSONResponse TvSession
+
+func (response WatchTv200JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response WatchTv400JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response WatchTv401JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response WatchTv403JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response WatchTv404JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv409JSONResponse Error
+
+func (response WatchTv409JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response WatchTv413JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTv422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response WatchTv422JSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type WatchTvdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response WatchTvdefaultJSONResponse) VisitWatchTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListChoresRequestObject struct {
 }
 
@@ -11406,6 +14137,72 @@ type ClaimDisplayPairingdefaultJSONResponse struct {
 }
 
 func (response ClaimDisplayPairingdefaultJSONResponse) VisitClaimDisplayPairingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDisplaySessionRequestObject struct {
+}
+
+type GetDisplaySessionResponseObject interface {
+	VisitGetDisplaySessionResponse(w http.ResponseWriter) error
+}
+
+type GetDisplaySession200JSONResponse DisplaySession
+
+func (response GetDisplaySession200JSONResponse) VisitGetDisplaySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDisplaySession401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetDisplaySession401JSONResponse) VisitGetDisplaySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDisplaySession403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetDisplaySession403JSONResponse) VisitGetDisplaySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDisplaySessiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDisplaySessiondefaultJSONResponse) VisitGetDisplaySessionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -15628,8 +18425,1854 @@ func (response CheckRoutineStepdefaultJSONResponse) VisitCheckRoutineStepRespons
 	return err
 }
 
+type AnswerTvPromptRequestObject struct {
+	PromptId Id `json:"promptId"`
+	Params   AnswerTvPromptParams
+	Body     *AnswerTvPromptJSONRequestBody
+}
+
+type AnswerTvPromptResponseObject interface {
+	VisitAnswerTvPromptResponse(w http.ResponseWriter) error
+}
+
+type AnswerTvPrompt200JSONResponse TvPromptAnswered
+
+func (response AnswerTvPrompt200JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AnswerTvPrompt400JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response AnswerTvPrompt401JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response AnswerTvPrompt403JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AnswerTvPrompt404JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt409JSONResponse Error
+
+func (response AnswerTvPrompt409JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response AnswerTvPrompt413JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPrompt422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response AnswerTvPrompt422JSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnswerTvPromptdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AnswerTvPromptdefaultJSONResponse) VisitAnswerTvPromptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvAllowancesRequestObject struct {
+}
+
+type TvAllowancesResponseObject interface {
+	VisitTvAllowancesResponse(w http.ResponseWriter) error
+}
+
+type TvAllowances200JSONResponse TvAllowances
+
+func (response TvAllowances200JSONResponse) VisitTvAllowancesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvAllowances401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response TvAllowances401JSONResponse) VisitTvAllowancesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvAllowances403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response TvAllowances403JSONResponse) VisitTvAllowancesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvAllowancesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response TvAllowancesdefaultJSONResponse) VisitTvAllowancesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttemptsRequestObject struct {
+	Params ReportTvAttemptsParams
+	Body   *ReportTvAttemptsJSONRequestBody
+}
+
+type ReportTvAttemptsResponseObject interface {
+	VisitReportTvAttemptsResponse(w http.ResponseWriter) error
+}
+
+type ReportTvAttempts200JSONResponse TvAttemptResults
+
+func (response ReportTvAttempts200JSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttempts400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ReportTvAttempts400JSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttempts401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ReportTvAttempts401JSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttempts403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ReportTvAttempts403JSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttempts413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response ReportTvAttempts413JSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttempts422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ReportTvAttempts422JSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvAttemptsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReportTvAttemptsdefaultJSONResponse) VisitReportTvAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPowerRequestObject struct {
+	Params ReportTvPowerParams
+	Body   *ReportTvPowerJSONRequestBody
+}
+
+type ReportTvPowerResponseObject interface {
+	VisitReportTvPowerResponse(w http.ResponseWriter) error
+}
+
+type ReportTvPower200JSONResponse TvPowerResult
+
+func (response ReportTvPower200JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPower400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ReportTvPower400JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPower401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ReportTvPower401JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPower403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ReportTvPower403JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPower404JSONResponse Error
+
+func (response ReportTvPower404JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPower413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response ReportTvPower413JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPower422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ReportTvPower422JSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReportTvPowerdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReportTvPowerdefaultJSONResponse) VisitReportTvPowerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTvsRequestObject struct {
+}
+
+type ListTvsResponseObject interface {
+	VisitListTvsResponse(w http.ResponseWriter) error
+}
+
+type ListTvs200JSONResponse TvList
+
+func (response ListTvs200JSONResponse) VisitListTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTvs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListTvs401JSONResponse) VisitListTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTvs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListTvs403JSONResponse) VisitListTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTvsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListTvsdefaultJSONResponse) VisitListTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTvRequestObject struct {
+	Params CreateTvParams
+	Body   *CreateTvJSONRequestBody
+}
+
+type CreateTvResponseObject interface {
+	VisitCreateTvResponse(w http.ResponseWriter) error
+}
+
+type CreateTv201JSONResponse Tv
+
+func (response CreateTv201JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTv400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateTv400JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTv401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateTv401JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTv403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateTv403JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTv409JSONResponse Error
+
+func (response CreateTv409JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTv413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response CreateTv413JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTv422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CreateTv422JSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTvdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateTvdefaultJSONResponse) VisitCreateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvsRequestObject struct {
+	Params CloseTvsParams
+	Body   *CloseTvsJSONRequestBody
+}
+
+type CloseTvsResponseObject interface {
+	VisitCloseTvsResponse(w http.ResponseWriter) error
+}
+
+type CloseTvs200JSONResponse struct{ OpenedJSONResponse }
+
+func (response CloseTvs200JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CloseTvs400JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CloseTvs401JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CloseTvs403JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CloseTvs404JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvs413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response CloseTvs413JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvs422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response CloseTvs422JSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloseTvsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CloseTvsdefaultJSONResponse) VisitCloseTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisplayTvsRequestObject struct {
+}
+
+type DisplayTvsResponseObject interface {
+	VisitDisplayTvsResponse(w http.ResponseWriter) error
+}
+
+type DisplayTvs200JSONResponse DisplayTvList
+
+func (response DisplayTvs200JSONResponse) VisitDisplayTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisplayTvs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DisplayTvs401JSONResponse) VisitDisplayTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisplayTvs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DisplayTvs403JSONResponse) VisitDisplayTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DisplayTvsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DisplayTvsdefaultJSONResponse) VisitDisplayTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvsRequestObject struct {
+	Params ExtendTvsParams
+	Body   *ExtendTvsJSONRequestBody
+}
+
+type ExtendTvsResponseObject interface {
+	VisitExtendTvsResponse(w http.ResponseWriter) error
+}
+
+type ExtendTvs200JSONResponse struct{ OpenedJSONResponse }
+
+func (response ExtendTvs200JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ExtendTvs400JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ExtendTvs401JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ExtendTvs403JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ExtendTvs404JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs409JSONResponse Error
+
+func (response ExtendTvs409JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response ExtendTvs413JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvs422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ExtendTvs422JSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExtendTvsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ExtendTvsdefaultJSONResponse) VisitExtendTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvHistoryRequestObject struct {
+}
+
+type TvHistoryResponseObject interface {
+	VisitTvHistoryResponse(w http.ResponseWriter) error
+}
+
+type TvHistory200JSONResponse TvHistory
+
+func (response TvHistory200JSONResponse) VisitTvHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvHistory401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response TvHistory401JSONResponse) VisitTvHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvHistory403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response TvHistory403JSONResponse) VisitTvHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TvHistorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response TvHistorydefaultJSONResponse) VisitTvHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvsRequestObject struct {
+	Params OpenTvsParams
+	Body   *OpenTvsJSONRequestBody
+}
+
+type OpenTvsResponseObject interface {
+	VisitOpenTvsResponse(w http.ResponseWriter) error
+}
+
+type OpenTvs200JSONResponse struct{ OpenedJSONResponse }
+
+func (response OpenTvs200JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response OpenTvs400JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response OpenTvs401JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response OpenTvs403JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response OpenTvs404JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs409JSONResponse Error
+
+func (response OpenTvs409JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response OpenTvs413JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvs422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response OpenTvs422JSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenTvsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response OpenTvsdefaultJSONResponse) VisitOpenTvsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveTvRequestObject struct {
+	TvId   TvId `json:"tvId"`
+	Params RemoveTvParams
+}
+
+type RemoveTvResponseObject interface {
+	VisitRemoveTvResponse(w http.ResponseWriter) error
+}
+
+type RemoveTv204Response struct {
+}
+
+func (response RemoveTv204Response) VisitRemoveTvResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveTv401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response RemoveTv401JSONResponse) VisitRemoveTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveTv403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RemoveTv403JSONResponse) VisitRemoveTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveTv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RemoveTv404JSONResponse) VisitRemoveTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveTv422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response RemoveTv422JSONResponse) VisitRemoveTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveTvdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RemoveTvdefaultJSONResponse) VisitRemoveTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTvRequestObject struct {
+	TvId   TvId `json:"tvId"`
+	Params UpdateTvParams
+	Body   *UpdateTvJSONRequestBody
+}
+
+type UpdateTvResponseObject interface {
+	VisitUpdateTvResponse(w http.ResponseWriter) error
+}
+
+type UpdateTv200JSONResponse Tv
+
+func (response UpdateTv200JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateTv400JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateTv401JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateTv403JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateTv404JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv409JSONResponse Error
+
+func (response UpdateTv409JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response UpdateTv413JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTv422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response UpdateTv422JSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTvdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateTvdefaultJSONResponse) VisitUpdateTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskForTvRequestObject struct {
+	TvId   TvId `json:"tvId"`
+	Params AskForTvParams
+}
+
+type AskForTvResponseObject interface {
+	VisitAskForTvResponse(w http.ResponseWriter) error
+}
+
+type AskForTv200JSONResponse TvAsked
+
+func (response AskForTv200JSONResponse) VisitAskForTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskForTv401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response AskForTv401JSONResponse) VisitAskForTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskForTv403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response AskForTv403JSONResponse) VisitAskForTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskForTv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AskForTv404JSONResponse) VisitAskForTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskForTv422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response AskForTv422JSONResponse) VisitAskForTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AskForTvdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AskForTvdefaultJSONResponse) VisitAskForTvResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DoneWatchingRequestObject struct {
+	TvId   TvId `json:"tvId"`
+	Params DoneWatchingParams
+}
+
+type DoneWatchingResponseObject interface {
+	VisitDoneWatchingResponse(w http.ResponseWriter) error
+}
+
+type DoneWatching200JSONResponse EndedTvSession
+
+func (response DoneWatching200JSONResponse) VisitDoneWatchingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DoneWatching401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DoneWatching401JSONResponse) VisitDoneWatchingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DoneWatching403JSONResponse Error
+
+func (response DoneWatching403JSONResponse) VisitDoneWatchingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DoneWatching404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DoneWatching404JSONResponse) VisitDoneWatchingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DoneWatching422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response DoneWatching422JSONResponse) VisitDoneWatchingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DoneWatchingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DoneWatchingdefaultJSONResponse) VisitDoneWatchingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSessionRequestObject struct {
+	TvId   TvId `json:"tvId"`
+	Params StartTvSessionParams
+	Body   *StartTvSessionJSONRequestBody
+}
+
+type StartTvSessionResponseObject interface {
+	VisitStartTvSessionResponse(w http.ResponseWriter) error
+}
+
+type StartTvSession200JSONResponse TvSession
+
+func (response StartTvSession200JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response StartTvSession400JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response StartTvSession401JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response StartTvSession403JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response StartTvSession404JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession409JSONResponse struct{ StartConflictJSONResponse }
+
+func (response StartTvSession409JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession413JSONResponse struct{ TooLargeJSONResponse }
+
+func (response StartTvSession413JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSession422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response StartTvSession422JSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTvSessiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response StartTvSessiondefaultJSONResponse) VisitStartTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndTvSessionRequestObject struct {
+	TvId   TvId `json:"tvId"`
+	Params EndTvSessionParams
+}
+
+type EndTvSessionResponseObject interface {
+	VisitEndTvSessionResponse(w http.ResponseWriter) error
+}
+
+type EndTvSession200JSONResponse EndedTvSession
+
+func (response EndTvSession200JSONResponse) VisitEndTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndTvSession401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response EndTvSession401JSONResponse) VisitEndTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndTvSession403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response EndTvSession403JSONResponse) VisitEndTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndTvSession404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response EndTvSession404JSONResponse) VisitEndTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndTvSession422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response EndTvSession422JSONResponse) VisitEndTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndTvSessiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response EndTvSessiondefaultJSONResponse) VisitEndTvSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// OidcCallback Where the provider sends the browser back; redirects to the app
+	// (GET /auth/callback/oidc)
+	OidcCallback(ctx context.Context, request OidcCallbackRequestObject) (OidcCallbackResponseObject, error)
 	// ConfirmSignIn Enter the password again, for operations that need a recent sign-in
 	// (POST /auth/confirm)
 	ConfirmSignIn(ctx context.Context, request ConfirmSignInRequestObject) (ConfirmSignInResponseObject, error)
@@ -15642,6 +20285,18 @@ type StrictServerInterface interface {
 	// GetMe The signed-in adult and their household
 	// (GET /auth/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetSignInMethods How adults can sign in here, for the sign-in page
+	// (GET /auth/methods)
+	GetSignInMethods(ctx context.Context, request GetSignInMethodsRequestObject) (GetSignInMethodsResponseObject, error)
+	// UnlinkOidc Unlink your single sign-on account
+	// (DELETE /auth/oidc/link)
+	UnlinkOidc(ctx context.Context, request UnlinkOidcRequestObject) (UnlinkOidcResponseObject, error)
+	// GetOidcLink Your single sign-on link, if you have one
+	// (GET /auth/oidc/link)
+	GetOidcLink(ctx context.Context, request GetOidcLinkRequestObject) (GetOidcLinkResponseObject, error)
+	// StartOidcSignIn Start signing in with the single sign-on provider
+	// (POST /auth/oidc/start)
+	StartOidcSignIn(ctx context.Context, request StartOidcSignInRequestObject) (StartOidcSignInResponseObject, error)
 	// PasskeySignIn Sign in with a passkey
 	// (POST /auth/passkey)
 	PasskeySignIn(ctx context.Context, request PasskeySignInRequestObject) (PasskeySignInResponseObject, error)
@@ -15726,6 +20381,15 @@ type StrictServerInterface interface {
 	// AskForTime Ask the parents for more time
 	// (POST /children/{childId}/time-requests)
 	AskForTime(ctx context.Context, request AskForTimeRequestObject) (AskForTimeResponseObject, error)
+	// ChildTv A child's TV time, as the kid view shows it
+	// (GET /children/{childId}/tv)
+	ChildTv(ctx context.Context, request ChildTvRequestObject) (ChildTvResponseObject, error)
+	// ForfeitTvCredit Take back the unused rest of a parent's TV grant
+	// (POST /children/{childId}/tv/credits/{creditId}/forfeit)
+	ForfeitTvCredit(ctx context.Context, request ForfeitTvCreditRequestObject) (ForfeitTvCreditResponseObject, error)
+	// WatchTv Watch on a TV that is asking (the child's own device)
+	// (POST /children/{childId}/tv/watch)
+	WatchTv(ctx context.Context, request WatchTvRequestObject) (WatchTvResponseObject, error)
 	// ListChores The household's chores
 	// (GET /chores)
 	ListChores(ctx context.Context, request ListChoresRequestObject) (ListChoresResponseObject, error)
@@ -15786,6 +20450,9 @@ type StrictServerInterface interface {
 	// ClaimDisplayPairing A wall display collects its session once an adult has entered its code
 	// (POST /display/pairings/claim)
 	ClaimDisplayPairing(ctx context.Context, request ClaimDisplayPairingRequestObject) (ClaimDisplayPairingResponseObject, error)
+	// GetDisplaySession What this wall display may show
+	// (GET /display/session)
+	GetDisplaySession(ctx context.Context, request GetDisplaySessionRequestObject) (GetDisplaySessionResponseObject, error)
 	// ListDisplays The household's paired wall displays
 	// (GET /displays)
 	ListDisplays(ctx context.Context, request ListDisplaysRequestObject) (ListDisplaysResponseObject, error)
@@ -15912,6 +20579,57 @@ type StrictServerInterface interface {
 	// CheckRoutineStep Tick a step of today's routine; the last one sends the routine for approval
 	// (POST /today/routines/{routineId}/steps/{stepId}/check)
 	CheckRoutineStep(ctx context.Context, request CheckRoutineStepRequestObject) (CheckRoutineStepResponseObject, error)
+	// AnswerTvPrompt Answer "Who's watching?"
+	// (POST /tv-prompts/{promptId}/answer)
+	AnswerTvPrompt(ctx context.Context, request AnswerTvPromptRequestObject) (AnswerTvPromptResponseObject, error)
+	// TvAllowances Which TV MACs may be online, and for how long (the router)
+	// (GET /tv/allowances)
+	TvAllowances(ctx context.Context, request TvAllowancesRequestObject) (TvAllowancesResponseObject, error)
+	// ReportTvAttempts Blocked TVs trying to go online (the router)
+	// (POST /tv/attempts)
+	ReportTvAttempts(ctx context.Context, request ReportTvAttemptsRequestObject) (ReportTvAttemptsResponseObject, error)
+	// ReportTvPower A TV's power, from Home Assistant
+	// (POST /tv/power)
+	ReportTvPower(ctx context.Context, request ReportTvPowerRequestObject) (ReportTvPowerResponseObject, error)
+	// ListTvs Every TV with its state, and each child's TV time
+	// (GET /tvs)
+	ListTvs(ctx context.Context, request ListTvsRequestObject) (ListTvsResponseObject, error)
+	// CreateTv Add a TV
+	// (POST /tvs)
+	CreateTv(ctx context.Context, request CreateTvRequestObject) (CreateTvResponseObject, error)
+	// CloseTvs Close TVs a parent opened, now
+	// (POST /tvs/close)
+	CloseTvs(ctx context.Context, request CloseTvsRequestObject) (CloseTvsResponseObject, error)
+	// DisplayTvs The TVs as a wall display shows them
+	// (GET /tvs/display)
+	DisplayTvs(ctx context.Context, request DisplayTvsRequestObject) (DisplayTvsResponseObject, error)
+	// ExtendTvs Keep open TVs open an hour longer
+	// (POST /tvs/extend)
+	ExtendTvs(ctx context.Context, request ExtendTvsRequestObject) (ExtendTvsResponseObject, error)
+	// TvHistory Recent TV sessions and who opened which TV
+	// (GET /tvs/history)
+	TvHistory(ctx context.Context, request TvHistoryRequestObject) (TvHistoryResponseObject, error)
+	// OpenTvs Open TVs for 1 hour, 2 hours or all day
+	// (POST /tvs/open)
+	OpenTvs(ctx context.Context, request OpenTvsRequestObject) (OpenTvsResponseObject, error)
+	// RemoveTv Remove a TV
+	// (DELETE /tvs/{tvId})
+	RemoveTv(ctx context.Context, request RemoveTvRequestObject) (RemoveTvResponseObject, error)
+	// UpdateTv Edit a TV
+	// (PUT /tvs/{tvId})
+	UpdateTv(ctx context.Context, request UpdateTvRequestObject) (UpdateTvResponseObject, error)
+	// AskForTv Ask the parents to turn a TV on
+	// (POST /tvs/{tvId}/ask)
+	AskForTv(ctx context.Context, request AskForTvRequestObject) (AskForTvResponseObject, error)
+	// DoneWatching Done watching
+	// (POST /tvs/{tvId}/done)
+	DoneWatching(ctx context.Context, request DoneWatchingRequestObject) (DoneWatchingResponseObject, error)
+	// StartTvSession Turn a TV on for parents or a child
+	// (POST /tvs/{tvId}/session)
+	StartTvSession(ctx context.Context, request StartTvSessionRequestObject) (StartTvSessionResponseObject, error)
+	// EndTvSession Turn a TV off now
+	// (POST /tvs/{tvId}/session/end)
+	EndTvSession(ctx context.Context, request EndTvSessionRequestObject) (EndTvSessionResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -15951,6 +20669,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// OidcCallback operation middleware
+func (sh *strictHandler) OidcCallback(w http.ResponseWriter, r *http.Request, params OidcCallbackParams) {
+	var request OidcCallbackRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OidcCallback(ctx, request.(OidcCallbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OidcCallback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OidcCallbackResponseObject); ok {
+		if err := validResponse.VisitOidcCallbackResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ConfirmSignIn operation middleware
@@ -16056,6 +20800,102 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSignInMethods operation middleware
+func (sh *strictHandler) GetSignInMethods(w http.ResponseWriter, r *http.Request) {
+	var request GetSignInMethodsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSignInMethods(ctx, request.(GetSignInMethodsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSignInMethods")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSignInMethodsResponseObject); ok {
+		if err := validResponse.VisitGetSignInMethodsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnlinkOidc operation middleware
+func (sh *strictHandler) UnlinkOidc(w http.ResponseWriter, r *http.Request) {
+	var request UnlinkOidcRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkOidc(ctx, request.(UnlinkOidcRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkOidc")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkOidcResponseObject); ok {
+		if err := validResponse.VisitUnlinkOidcResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOidcLink operation middleware
+func (sh *strictHandler) GetOidcLink(w http.ResponseWriter, r *http.Request) {
+	var request GetOidcLinkRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOidcLink(ctx, request.(GetOidcLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOidcLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOidcLinkResponseObject); ok {
+		if err := validResponse.VisitGetOidcLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartOidcSignIn operation middleware
+func (sh *strictHandler) StartOidcSignIn(w http.ResponseWriter, r *http.Request) {
+	var request StartOidcSignInRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartOidcSignIn(ctx, request.(StartOidcSignInRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartOidcSignIn")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartOidcSignInResponseObject); ok {
+		if err := validResponse.VisitStartOidcSignInResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -16892,6 +21732,101 @@ func (sh *strictHandler) AskForTime(w http.ResponseWriter, r *http.Request, chil
 	}
 }
 
+// ChildTv operation middleware
+func (sh *strictHandler) ChildTv(w http.ResponseWriter, r *http.Request, childId ChildId) {
+	var request ChildTvRequestObject
+
+	request.ChildId = childId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChildTv(ctx, request.(ChildTvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChildTv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChildTvResponseObject); ok {
+		if err := validResponse.VisitChildTvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ForfeitTvCredit operation middleware
+func (sh *strictHandler) ForfeitTvCredit(w http.ResponseWriter, r *http.Request, childId ChildId, creditId Id, params ForfeitTvCreditParams) {
+	var request ForfeitTvCreditRequestObject
+
+	request.ChildId = childId
+	request.CreditId = creditId
+	request.Params = params
+
+	var body ForfeitTvCreditJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ForfeitTvCredit(ctx, request.(ForfeitTvCreditRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ForfeitTvCredit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ForfeitTvCreditResponseObject); ok {
+		if err := validResponse.VisitForfeitTvCreditResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// WatchTv operation middleware
+func (sh *strictHandler) WatchTv(w http.ResponseWriter, r *http.Request, childId ChildId, params WatchTvParams) {
+	var request WatchTvRequestObject
+
+	request.ChildId = childId
+	request.Params = params
+
+	var body WatchTvJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.WatchTv(ctx, request.(WatchTvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "WatchTv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(WatchTvResponseObject); ok {
+		if err := validResponse.VisitWatchTvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListChores operation middleware
 func (sh *strictHandler) ListChores(w http.ResponseWriter, r *http.Request) {
 	var request ListChoresRequestObject
@@ -17448,6 +22383,30 @@ func (sh *strictHandler) ClaimDisplayPairing(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ClaimDisplayPairingResponseObject); ok {
 		if err := validResponse.VisitClaimDisplayPairingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDisplaySession operation middleware
+func (sh *strictHandler) GetDisplaySession(w http.ResponseWriter, r *http.Request) {
+	var request GetDisplaySessionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDisplaySession(ctx, request.(GetDisplaySessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDisplaySession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDisplaySessionResponseObject); ok {
+		if err := validResponse.VisitGetDisplaySessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -18688,333 +23647,944 @@ func (sh *strictHandler) CheckRoutineStep(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// AnswerTvPrompt operation middleware
+func (sh *strictHandler) AnswerTvPrompt(w http.ResponseWriter, r *http.Request, promptId Id, params AnswerTvPromptParams) {
+	var request AnswerTvPromptRequestObject
+
+	request.PromptId = promptId
+	request.Params = params
+
+	var body AnswerTvPromptJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AnswerTvPrompt(ctx, request.(AnswerTvPromptRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AnswerTvPrompt")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AnswerTvPromptResponseObject); ok {
+		if err := validResponse.VisitAnswerTvPromptResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TvAllowances operation middleware
+func (sh *strictHandler) TvAllowances(w http.ResponseWriter, r *http.Request) {
+	var request TvAllowancesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TvAllowances(ctx, request.(TvAllowancesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TvAllowances")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TvAllowancesResponseObject); ok {
+		if err := validResponse.VisitTvAllowancesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReportTvAttempts operation middleware
+func (sh *strictHandler) ReportTvAttempts(w http.ResponseWriter, r *http.Request, params ReportTvAttemptsParams) {
+	var request ReportTvAttemptsRequestObject
+
+	request.Params = params
+
+	var body ReportTvAttemptsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReportTvAttempts(ctx, request.(ReportTvAttemptsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReportTvAttempts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReportTvAttemptsResponseObject); ok {
+		if err := validResponse.VisitReportTvAttemptsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReportTvPower operation middleware
+func (sh *strictHandler) ReportTvPower(w http.ResponseWriter, r *http.Request, params ReportTvPowerParams) {
+	var request ReportTvPowerRequestObject
+
+	request.Params = params
+
+	var body ReportTvPowerJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReportTvPower(ctx, request.(ReportTvPowerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReportTvPower")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReportTvPowerResponseObject); ok {
+		if err := validResponse.VisitReportTvPowerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTvs operation middleware
+func (sh *strictHandler) ListTvs(w http.ResponseWriter, r *http.Request) {
+	var request ListTvsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTvs(ctx, request.(ListTvsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTvs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTvsResponseObject); ok {
+		if err := validResponse.VisitListTvsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateTv operation middleware
+func (sh *strictHandler) CreateTv(w http.ResponseWriter, r *http.Request, params CreateTvParams) {
+	var request CreateTvRequestObject
+
+	request.Params = params
+
+	var body CreateTvJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTv(ctx, request.(CreateTvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateTvResponseObject); ok {
+		if err := validResponse.VisitCreateTvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CloseTvs operation middleware
+func (sh *strictHandler) CloseTvs(w http.ResponseWriter, r *http.Request, params CloseTvsParams) {
+	var request CloseTvsRequestObject
+
+	request.Params = params
+
+	var body CloseTvsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CloseTvs(ctx, request.(CloseTvsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CloseTvs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CloseTvsResponseObject); ok {
+		if err := validResponse.VisitCloseTvsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisplayTvs operation middleware
+func (sh *strictHandler) DisplayTvs(w http.ResponseWriter, r *http.Request) {
+	var request DisplayTvsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisplayTvs(ctx, request.(DisplayTvsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisplayTvs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisplayTvsResponseObject); ok {
+		if err := validResponse.VisitDisplayTvsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExtendTvs operation middleware
+func (sh *strictHandler) ExtendTvs(w http.ResponseWriter, r *http.Request, params ExtendTvsParams) {
+	var request ExtendTvsRequestObject
+
+	request.Params = params
+
+	var body ExtendTvsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExtendTvs(ctx, request.(ExtendTvsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExtendTvs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExtendTvsResponseObject); ok {
+		if err := validResponse.VisitExtendTvsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TvHistory operation middleware
+func (sh *strictHandler) TvHistory(w http.ResponseWriter, r *http.Request) {
+	var request TvHistoryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TvHistory(ctx, request.(TvHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TvHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TvHistoryResponseObject); ok {
+		if err := validResponse.VisitTvHistoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// OpenTvs operation middleware
+func (sh *strictHandler) OpenTvs(w http.ResponseWriter, r *http.Request, params OpenTvsParams) {
+	var request OpenTvsRequestObject
+
+	request.Params = params
+
+	var body OpenTvsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpenTvs(ctx, request.(OpenTvsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpenTvs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpenTvsResponseObject); ok {
+		if err := validResponse.VisitOpenTvsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveTv operation middleware
+func (sh *strictHandler) RemoveTv(w http.ResponseWriter, r *http.Request, tvId TvId, params RemoveTvParams) {
+	var request RemoveTvRequestObject
+
+	request.TvId = tvId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveTv(ctx, request.(RemoveTvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveTv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveTvResponseObject); ok {
+		if err := validResponse.VisitRemoveTvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateTv operation middleware
+func (sh *strictHandler) UpdateTv(w http.ResponseWriter, r *http.Request, tvId TvId, params UpdateTvParams) {
+	var request UpdateTvRequestObject
+
+	request.TvId = tvId
+	request.Params = params
+
+	var body UpdateTvJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTv(ctx, request.(UpdateTvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTvResponseObject); ok {
+		if err := validResponse.VisitUpdateTvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AskForTv operation middleware
+func (sh *strictHandler) AskForTv(w http.ResponseWriter, r *http.Request, tvId TvId, params AskForTvParams) {
+	var request AskForTvRequestObject
+
+	request.TvId = tvId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AskForTv(ctx, request.(AskForTvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AskForTv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AskForTvResponseObject); ok {
+		if err := validResponse.VisitAskForTvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DoneWatching operation middleware
+func (sh *strictHandler) DoneWatching(w http.ResponseWriter, r *http.Request, tvId TvId, params DoneWatchingParams) {
+	var request DoneWatchingRequestObject
+
+	request.TvId = tvId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DoneWatching(ctx, request.(DoneWatchingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DoneWatching")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DoneWatchingResponseObject); ok {
+		if err := validResponse.VisitDoneWatchingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartTvSession operation middleware
+func (sh *strictHandler) StartTvSession(w http.ResponseWriter, r *http.Request, tvId TvId, params StartTvSessionParams) {
+	var request StartTvSessionRequestObject
+
+	request.TvId = tvId
+	request.Params = params
+
+	var body StartTvSessionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartTvSession(ctx, request.(StartTvSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartTvSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartTvSessionResponseObject); ok {
+		if err := validResponse.VisitStartTvSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EndTvSession operation middleware
+func (sh *strictHandler) EndTvSession(w http.ResponseWriter, r *http.Request, tvId TvId, params EndTvSessionParams) {
+	var request EndTvSessionRequestObject
+
+	request.TvId = tvId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EndTvSession(ctx, request.(EndTvSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EndTvSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EndTvSessionResponseObject); ok {
+		if err := validResponse.VisitEndTvSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

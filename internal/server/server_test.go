@@ -271,6 +271,12 @@ func TestValidationAndRouting(t *testing.T) {
 	if r := e.send(cred{}, "PUT", "/api/household", nil); r.status != 405 {
 		t.Errorf("unknown method: %d %s", r.status, r.raw)
 	}
+	// The previous server's API tells its apps to update, for any method.
+	for _, m := range []string{"GET", "POST", "PUT", "DELETE"} {
+		if r := e.send(cred{}, m, "/api/v1/device/time-requests", nil); r.status != 410 || r.code() != "update_app" {
+			t.Errorf("%s /api/v1: %d %s", m, r.status, r.raw)
+		}
+	}
 }
 
 // The body cap applies before authentication: an anonymous oversized body is a 413, never read.
@@ -463,8 +469,9 @@ func TestDisplayPairing(t *testing.T) {
 		t.Fatalf("stale sign-in: %d %s", r.status, r.raw)
 	}
 	// Typed loosely: lower case, with spaces.
-	created := pair(h.actors["adult"], strings.ToLower(code[:3]+" "+code[3:]))
-	if created.status != 201 {
+	// Given only tv, it gets today too: every display shows Today.
+	created := e.send(h.actors["adult"], "POST", "/api/displays", map[string]any{"code": strings.ToLower(code[:3] + " " + code[3:]), "name": "Kitchen", "scopes": []string{"tv"}})
+	if created.status != 201 || fmt.Sprint(created.body["scopes"]) != "[today tv]" {
 		t.Fatalf("pair: %d %s", created.status, created.raw)
 	}
 	if r := pair(h.actors["adult"], code); r.status != 404 {
