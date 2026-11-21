@@ -248,6 +248,12 @@ func TestScreenTimeCreditsAndReview(t *testing.T) {
 		e.exec(`UPDATE redemption SET ledger_id = $2 WHERE id = $1`, red, led)
 		// Until the TV gate cancels its own (slice 9a), a TV redemption has no iPad credit either.
 		refused(e.send(adult, "POST", "/api/redemptions/"+red.String()+"/cancel", map[string]any{"expectedVersion": 1}), 409, "no_credit", target+" redemption without a credit")
+		// So the screens don't offer it (an imported redemption looks like this).
+		for _, row := range list(ok(e.send(adult, "GET", "/api/redemptions?status=fulfilled", nil), "list").body, "redemptions") {
+			if m := row.(map[string]any); m["id"] == red.String() && m["cancellable"] != false {
+				t.Errorf("%s redemption without a credit is cancellable: %v", target, m)
+			}
+		}
 	}
 
 	// A parent's 240 minutes, banked by mistake: listed with who gave it, then taken back.

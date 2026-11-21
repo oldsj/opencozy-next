@@ -110,7 +110,7 @@ build: ## The single binary with the SPA embedded, in bin/app
 	CGO_ENABLED=0 go build -tags embedweb -trimpath -o bin/app ./cmd/app
 
 .PHONY: build-e2e
-build-e2e: ## bin/app as an e2e build: its calendar client may reach 127.0.0.1 (never ship it)
+build-e2e: ## bin/app as an e2e build: its calendar and single sign-on clients may reach 127.0.0.1 (never ship it)
 	$(PNPM) build
 	CGO_ENABLED=0 go build -tags embedweb,e2e -trimpath -o bin/app ./cmd/app
 
@@ -128,6 +128,10 @@ security: ## govulncheck, pnpm audit, and osv-scanner (every lockfile, tools inc
 	$(GOTOOL) govulncheck ./...
 	$(PNPM) audit --audit-level=moderate
 	$(GOTOOL) osv-scanner scan source --recursive .
+
+.PHONY: import-rehearsal
+import-rehearsal: ## Rehearse the old app's import with fictional data (Docker); ALLOW_PENDING=1 leaves out unmapped tables
+	scripts/import-rehearsal.sh
 
 .PHONY: image
 image: ## Build the multi-arch image (no push)

@@ -45,7 +45,9 @@ SELECT r.*, c.name AS child_name, c.color AS child_color,
        (COALESCE((SELECT k.used_seconds FROM screen_time_credit k
                   WHERE k.household_id = r.household_id AND k.redemption_id = r.id), 0)
         + COALESCE((SELECT t.used_seconds FROM tv_credit t
-                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds
+                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds,
+       (EXISTS (SELECT 1 FROM screen_time_credit k WHERE k.household_id = r.household_id AND k.redemption_id = r.id)
+        OR EXISTS (SELECT 1 FROM tv_credit t WHERE t.household_id = r.household_id AND t.redemption_id = r.id))::boolean AS has_credit
 FROM redemption r
 JOIN child c ON c.household_id = r.household_id AND c.id = r.child_id
 WHERE r.household_id = $1
@@ -60,7 +62,9 @@ SELECT r.*, c.name AS child_name, c.color AS child_color,
        (COALESCE((SELECT k.used_seconds FROM screen_time_credit k
                   WHERE k.household_id = r.household_id AND k.redemption_id = r.id), 0)
         + COALESCE((SELECT t.used_seconds FROM tv_credit t
-                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds
+                  WHERE t.household_id = r.household_id AND t.redemption_id = r.id), 0))::integer AS used_seconds,
+       (EXISTS (SELECT 1 FROM screen_time_credit k WHERE k.household_id = r.household_id AND k.redemption_id = r.id)
+        OR EXISTS (SELECT 1 FROM tv_credit t WHERE t.household_id = r.household_id AND t.redemption_id = r.id))::boolean AS has_credit
 FROM redemption r
 JOIN child c ON c.household_id = r.household_id AND c.id = r.child_id
 WHERE r.household_id = $1 AND r.id = $2;

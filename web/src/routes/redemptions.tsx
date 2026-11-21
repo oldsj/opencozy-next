@@ -12,7 +12,9 @@ type RedemptionRow = components['schemas']['RedemptionRow'];
 const when = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
 /** What cancelling gives back, as the server works it out: all of it, or screen time's unused share rounded down. */
-export function refundFor(r: Pick<RedemptionRow, 'status' | 'cost' | 'minutes' | 'usedMinutes'>): number {
+export function refundFor(r: Pick<RedemptionRow, 'status' | 'cost' | 'minutes' | 'usedMinutes' | 'cancellable'>): number {
+  // Imported screen time has no record of its own (its time is in the child's balance): no cancel.
+  if (!r.cancellable) return 0;
   if (r.status === 'approved') return r.cost;
   if (r.status !== 'fulfilled' || r.minutes === undefined || r.minutes === 0) return 0;
   const left = r.minutes - Math.min(r.usedMinutes ?? 0, r.minutes);
