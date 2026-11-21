@@ -139,6 +139,8 @@ paths:
     $ref: phones.yaml#/signIn
   /phone/sessions/passkey:
     $ref: phones.yaml#/passkeySignIn
+  /phone/sessions/web:
+    $ref: phones.yaml#/fromWeb
   /phone/session:
     $ref: phones.yaml#/self
   /phone/session/push:

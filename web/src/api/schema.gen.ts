@@ -691,6 +691,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/phone/sessions/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a parent phone in from the web sign-in in its app
+         * @description The iOS app sends its web view's session cookie natively, after the parent signs in there,
+         *     so they sign in once. Needs a recent sign-in. The token is in this response only. A request
+         *     from a web page (`Sec-Fetch-Site` other than `none`) is refused with 403 `use_the_app`, so
+         *     page script can't read a phone token.
+         */
+        post: operations["phoneSignInFromWeb"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/phone/session": {
         parameters: {
             query?: never;
@@ -4963,6 +4986,42 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             413: components["responses"]["TooLarge"];
             429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    phoneSignInFromWeb: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "deviceName": "Alex's iPhone"
+                 *     }
+                 */
+                "application/json": {
+                    deviceName: components["schemas"]["PhoneName"];
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneSignedIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["TooLarge"];
             default: components["responses"]["Error"];
         };
     };

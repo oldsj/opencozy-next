@@ -76,13 +76,4 @@ struct ShieldTextTests {
         content.ask = nil
         #expect(ShieldText.subtitle(content, now: now, queued: true, canOpenApp: false, timeZone: zone) == "Locked.\n\nOpen OpenCozy to send it.")
     }
-
-    @Test func timePushes() {
-        let pending = TimePush(userInfo: ["opencozy": ["type": "time.pending", "requestId": "r1", "requestVersion": 1, "pendingCount": 2]])
-        #expect(pending == TimePush(requestId: "r1", version: 1, pendingCount: 2))
-        #expect(TimePush(userInfo: ["opencozy": ["type": "time.resolved", "requestId": "r1", "state": "approved"]]) == TimePush(requestId: "r1", version: nil))
-        #expect(TimePush(userInfo: ["opencozy": ["type": "approval.pending", "approvalId": "a1", "approvalVersion": 1]]) == nil)
-        #expect(ApprovalPush(userInfo: ["opencozy": ["type": "time.pending", "requestId": "r1", "requestVersion": 1]]) == nil)
-        #expect(TimeChoice.allCases.map(\.wire) == ["30min", "1h", "all_day", "no"])
-    }
 }

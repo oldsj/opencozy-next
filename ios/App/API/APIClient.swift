@@ -93,6 +93,10 @@ struct HTTPOpenCozyAPI: OpenCozyAPI {
         try await http.post("children/\(childId)/time-requests", body: EmptyRequest(),
                             headers: ["Idempotency-Key": requestId], as: TimeRequestStatus.self)
     }
+
+    func registerPushToken(_ request: PushTokenRequest) async throws {
+        _ = try await http.put("device/push", body: request, headers: ["Idempotency-Key": UUID().uuidString.lowercased()], as: PushTokenResponse.self)
+    }
 }
 
 /// `POST /api/device/screen-time-events` → `{ recorded: [id] }`.
@@ -201,8 +205,8 @@ struct APITransport: Sendable {
         try Self.decode(type, from: try await send("POST", path, body: body, headers: headers).0)
     }
 
-    func put<B: Encodable, T: Decodable>(_ path: String, body: B, as type: T.Type) async throws -> T {
-        try Self.decode(type, from: try await send("PUT", path, body: body).0)
+    func put<B: Encodable, T: Decodable>(_ path: String, body: B, headers: [String: String] = [:], as type: T.Type) async throws -> T {
+        try Self.decode(type, from: try await send("PUT", path, body: body, headers: headers).0)
     }
 
     func delete(_ path: String) async throws {

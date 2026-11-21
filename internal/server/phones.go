@@ -99,6 +99,25 @@ func (s *Server) PhoneSignInWithPasskey(ctx context.Context, req api.PhoneSignIn
 	return api.PhoneSignInWithPasskey201JSONResponse(out), nil
 }
 
+// PhoneSignInFromWeb gives the phone of an adult signed in to its app's web view its own session,
+// so the parent signs in once. The app sends the cookie natively; the token never enters the page.
+func (s *Server) PhoneSignInFromWeb(ctx context.Context, req api.PhoneSignInFromWebRequestObject) (api.PhoneSignInFromWebResponseObject, error) {
+	name := strings.TrimSpace(req.Body.DeviceName)
+	if name == "" {
+		return api.PhoneSignInFromWeb400JSONResponse{BadRequestJSONResponse: api.BadRequestJSONResponse(errPhoneName)}, nil
+	}
+	a := mustActor(ctx)
+	adult, err := s.q.GetAdult(ctx, dbq.GetAdultParams{HouseholdID: a.HouseholdID, ID: a.AdultID})
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.startPhoneSession(ctx, adult, name)
+	if err != nil {
+		return nil, err
+	}
+	return api.PhoneSignInFromWeb201JSONResponse(out), nil
+}
+
 // GetPhoneSession returns this phone's session, its adult and household.
 func (s *Server) GetPhoneSession(ctx context.Context, _ api.GetPhoneSessionRequestObject) (api.GetPhoneSessionResponseObject, error) {
 	a := mustActor(ctx)
