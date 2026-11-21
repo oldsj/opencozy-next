@@ -17,6 +17,7 @@
   "include": [
     "vite.config.ts",
     "playwright.config.ts",
+    "playwright.imported.config.ts",
     "e2e",
     "design/vite.config.ts",
     "design/scripts/previews.ts",

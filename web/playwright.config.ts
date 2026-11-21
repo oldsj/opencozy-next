@@ -13,6 +13,8 @@ const secretKeys = `e2e:${randomBytes(32).toString('base64')}`;
 
 export default defineConfig({
   testDir: 'e2e',
+  // Runs only on an imported database (playwright.imported.config.ts).
+  testIgnore: 'imported.spec.ts',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
