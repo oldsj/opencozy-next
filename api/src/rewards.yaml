@@ -131,6 +131,8 @@ redemptions:
     description: >-
       The points are spent at once. Asked for on a display, it waits for an adult, who approves it
       or says no (and the points come back); asked for by an adult, it is approved at once.
+      Screen time needs no approval: it is given (`fulfilled`) at once and its minutes are banked
+      for the child to start later. TV time is 422 `tv_not_ready` until the TV gate arrives.
     tags: [rewards]
     x-actors: [adult, phone, display, device-web]
     x-display-scopes: [today]
@@ -349,6 +351,9 @@ schemas:
         minimum: 1
         maximum: 1440
         description: Required for screen_time, refused otherwise
+      target:
+        $ref: screentime.yaml#/schemas/Target
+        description: For screen_time, which screen (ipad when absent); refused otherwise
   RewardEdit:
     type: object
     additionalProperties: false
@@ -368,6 +373,9 @@ schemas:
         minimum: 1
         maximum: 1440
         description: Required for screen_time, refused otherwise
+      target:
+        $ref: screentime.yaml#/schemas/Target
+        description: For screen_time, which screen (ipad when absent); refused otherwise
       available:
         type: boolean
         description: false hides it from children
@@ -388,6 +396,9 @@ schemas:
         enum: [item, screen_time]
       minutes:
         type: integer
+      target:
+        $ref: screentime.yaml#/schemas/Target
+        description: For screen_time, which screen
       available:
         type: boolean
       version:
@@ -432,9 +443,12 @@ schemas:
       minutes:
         type: integer
         description: Screen time bought
+      target:
+        $ref: screentime.yaml#/schemas/Target
+        description: For screen time, which screen
       usedMinutes:
         type: integer
-        description: Screen time used so far (from slice 8; absent until then)
+        description: iPad time used so far, rounded up
       refundedPoints:
         type: integer
         description: Points given back (a rejection or a cancellation)

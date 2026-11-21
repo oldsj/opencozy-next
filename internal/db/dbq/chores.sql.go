@@ -82,7 +82,7 @@ func (q *Queries) Balances(ctx context.Context, householdID uuid.UUID) ([]Balanc
 const createApproval = `-- name: CreateApproval :one
 INSERT INTO approval (household_id, child_id, kind, occurrence_id, title, points)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id
+RETURNING id, household_id, child_id, kind, occurrence_id, title, points, state, reason, version, decided_at, decided_by, created_at, redemption_id, time_request_id
 `
 
 type CreateApprovalParams struct {
@@ -119,6 +119,7 @@ func (q *Queries) CreateApproval(ctx context.Context, arg CreateApprovalParams) 
 		&i.DecidedBy,
 		&i.CreatedAt,
 		&i.RedemptionID,
+		&i.TimeRequestID,
 	)
 	return i, err
 }
