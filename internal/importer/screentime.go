@@ -7,8 +7,8 @@ import (
 
 // The old app's iPad time. Every credit, window and answered request hangs off a redemption (a
 // purchase, a parent's grant and a "yes" were all redemptions there), and shield events and
-// requests off a device. Redemptions and devices wait on the importer backlog task (slices 5 and
-// 7), so these tables wait with them. Allowed hours are carried with the children.
+// requests off a device. Redemptions and devices are carried now; these tables wait on the
+// screen-time import (next in the importer backlog). Allowed hours are carried with the children.
 //
 // The mapping, for when they land:
 //
@@ -30,10 +30,10 @@ import (
 // Then §13's check: each child's banked seconds (sum of seconds - used_seconds) match before
 // and after.
 var screenTimeTables = []struct{ table, waits string }{
-	{"personal_credit", "redemptions"},
-	{"screen_time_grant", "redemptions"},
-	{"screen_time_grant_cut", "redemptions"},
-	{"time_request", "devices and redemptions"},
+	{"personal_credit", "screen time"},
+	{"screen_time_grant", "screen time"},
+	{"screen_time_grant_cut", "screen time"},
+	{"time_request", "screen time"},
 }
 
 // importScreenTime reports the old screen-time tables that have rows as waiting, and why.

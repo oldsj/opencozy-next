@@ -160,6 +160,7 @@ var domains = []func(context.Context, *run) error{
 	importLedger,
 	importChores,
 	importRewards, // after the ledger: a redemption names its spend
+	importDevices,
 	importCalendars,
 	importRecipes,
 	importMeals,
