@@ -208,3 +208,133 @@ func TestScreenTime(t *testing.T) {
 		t.Errorf("events stored: %d %v", n, err)
 	}
 }
+
+// After review: cancelling fails closed without a credit, parents take back grants, shield events
+// reach the history, reminders move the inbox item, and the paths the first test missed.
+func TestScreenTimeCreditsAndReview(t *testing.T) {
+	e := newEnv(t, nil)
+	h := e.house("a", nil)
+	adult, device := h.actors["adult"], h.actors["device"]
+	ams, _ := time.LoadLocation("Europe/Amsterdam")
+	clk := clock.NewFake(time.Date(2026, 11, 18, 16, 0, 0, 0, ams))
+	e.srv.runner.Clock = clk
+	child1, child2 := "/api/children/"+h.child1.String(), "/api/children/"+h.child2.String()
+	ok := func(r resp, what string) resp {
+		t.Helper()
+		if r.status != 200 && r.status != 201 {
+			t.Fatalf("%s: %d %s", what, r.status, r.raw)
+		}
+		return r
+	}
+	refused := func(r resp, status int, code, what string) {
+		t.Helper()
+		if r.status != status || r.code() != code {
+			t.Errorf("%s: %d %s, want %d %s", what, r.status, r.raw, status, code)
+		}
+	}
+	num := func(m map[string]any, k string) float64 { t.Helper(); f, _ := m[k].(float64); return f }
+	sub := func(m map[string]any, k string) map[string]any { t.Helper(); s, _ := m[k].(map[string]any); return s }
+	list := func(m map[string]any, k string) []any { t.Helper(); l, _ := m[k].([]any); return l }
+	get := func(child string) map[string]any {
+		t.Helper()
+		return ok(e.send(adult, "GET", child+"/screen-time", nil), "get").body
+	}
+
+	// A screen-time redemption with no iPad credit, and a TV one: cancelling refunds nothing.
+	for _, target := range []string{"ipad", "tv"} {
+		red := e.id(`INSERT INTO redemption (household_id, child_id, reward_id, title, cost, minutes, screen_time_target, state, fulfilled_at)
+			VALUES ($1, $2, $3, 'Old time', 4, 30, $4, 'fulfilled', now()) RETURNING id`, h.id, h.child1, h.reward, target)
+		e.exec(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id) VALUES ($1, $2, 4, 'award', 'fixture', gen_random_uuid())`, h.id, h.child1)
+		led := e.id(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id) VALUES ($1, $2, -4, 'redemption', 'redemption', $3) RETURNING id`, h.id, h.child1, red)
+		e.exec(`UPDATE redemption SET ledger_id = $2 WHERE id = $1`, red, led)
+		// Until the TV gate cancels its own (slice 9a), a TV redemption has no iPad credit either.
+		refused(e.send(adult, "POST", "/api/redemptions/"+red.String()+"/cancel", map[string]any{"expectedVersion": 1}), 409, "no_credit", target+" redemption without a credit")
+	}
+
+	// A parent's 240 minutes, banked by mistake: listed with who gave it, then taken back.
+	ok(e.send(adult, "POST", child1+"/screen-time/grant", map[string]any{"minutes": 240}), "grant 240")
+	st := get(child1)
+	credits := list(st, "credits")
+	if len(credits) != 1 || credits[0].(map[string]any)["source"] != "grant" || credits[0].(map[string]any)["grantedBy"] != "Sam" || num(st, "bankedSeconds") != 14400 {
+		t.Fatalf("credits: %v", st)
+	}
+	credit := credits[0].(map[string]any)["id"].(string)
+	forfeit := func(child, id string) resp {
+		return e.send(adult, "POST", child+"/screen-time/credits/"+id+"/forfeit", map[string]any{})
+	}
+	refused(forfeit(child2, credit), 404, "not_found", "another child's credit")
+	r := ok(forfeit(child1, credit), "forfeit")
+	if num(r.body, "forfeitedSeconds") != 14400 || num(sub(r.body, "screenTime"), "bankedSeconds") != 0 || len(list(sub(r.body, "screenTime"), "credits")) != 0 {
+		t.Errorf("forfeited: %s", r.raw)
+	}
+	refused(forfeit(child1, credit), 409, "nothing_left", "forfeit twice")
+
+	// Partly spent, then taken back: ending the running time with a refund gives nothing back.
+	g := ok(e.send(adult, "POST", child1+"/screen-time/grant", map[string]any{"minutes": 20}), "grant 20")
+	ok(e.send(adult, "POST", child1+"/screen-time/spend", map[string]any{"minutes": 10}), "spend 10")
+	part := list(sub(g.body, "screenTime"), "credits")[0].(map[string]any)["id"].(string)
+	if r := ok(forfeit(child1, part), "forfeit the rest"); num(r.body, "forfeitedSeconds") != 600 {
+		t.Errorf("forfeit the rest: %s", r.raw)
+	}
+	clk.Advance(4 * time.Minute)
+	r = ok(e.send(adult, "POST", child1+"/screen-time/end", map[string]any{"scope": "now", "refund": true}), "end a forfeited credit's time")
+	if num(r.body, "cutSeconds") != 360 || num(r.body, "refundedSeconds") != 0 || num(sub(r.body, "screenTime"), "bankedSeconds") != 0 {
+		t.Errorf("end with a refund to a forfeited credit: %s", r.raw)
+	}
+
+	// Ending running time now with a refund puts it back; spending then draws on two credits.
+	ok(e.send(adult, "POST", child1+"/screen-time/grant", map[string]any{"minutes": 10, "startNow": true}), "grant 10 now")
+	clk.Advance(4 * time.Minute)
+	r = ok(e.send(adult, "POST", child1+"/screen-time/end", map[string]any{"scope": "now", "refund": true}), "end now with a refund")
+	if num(r.body, "refundedSeconds") != 360 || num(sub(r.body, "screenTime"), "bankedSeconds") != 360 {
+		t.Errorf("end now, refunded: %s", r.raw)
+	}
+	ok(e.send(adult, "POST", child1+"/screen-time/grant", map[string]any{"minutes": 5}), "grant 5")
+	r = ok(e.send(adult, "POST", child1+"/screen-time/spend", map[string]any{"minutes": 10}), "spend across two credits")
+	ws := list(sub(r.body, "screenTime"), "windows")
+	if num(sub(r.body, "spend"), "seconds") != 600 || len(ws) != 2 || ws[0].(map[string]any)["endsAt"] != ws[1].(map[string]any)["startsAt"] {
+		t.Errorf("two credits, back to back: %s", r.raw)
+	}
+
+	// A cancelled reward's credit takes nothing back when its running time is ended.
+	e.exec(`INSERT INTO point_ledger (household_id, child_id, delta, kind, source_kind, source_id) VALUES ($1, $2, 10, 'award', 'fixture', gen_random_uuid())`, h.id, h.child2)
+	rw := ok(e.send(adult, "POST", "/api/rewards", map[string]any{"title": "30 min of iPad", "cost": 6, "kind": "screen_time", "minutes": 30}), "reward").body["id"]
+	red := ok(e.send(adult, "POST", child2+"/redemptions", map[string]any{"rewardId": rw}), "redeem").body["id"].(string)
+	ok(e.send(adult, "POST", child2+"/screen-time/spend", map[string]any{"minutes": 10}), "child2 spends 10")
+	refused(forfeit(child2, list(get(child2), "credits")[0].(map[string]any)["id"].(string)), 409, "cancel_the_reward", "forfeit a reward's credit")
+	ok(e.send(adult, "POST", "/api/redemptions/"+red+"/cancel", map[string]any{"expectedVersion": 1}), "cancel part-used")
+	clk.Advance(time.Minute)
+	if r := ok(e.send(adult, "POST", child2+"/screen-time/end", map[string]any{"refund": true}), "end"); num(r.body, "refundedSeconds") != 0 {
+		t.Errorf("refund to a cancelled reward: %s", r.raw)
+	}
+
+	// Asking again after two minutes reminds: the request and its inbox item move to the new ask.
+	asked := ok(e.send(device, "POST", child1+"/time-requests", map[string]any{}), "ask").body
+	clk.Advance(3 * time.Minute)
+	again := ok(e.send(device, "POST", child1+"/time-requests", map[string]any{}), "ask again").body
+	if again["id"] != asked["id"] || again["askedAt"] == asked["askedAt"] {
+		t.Errorf("reminder: %v then %v", asked, again)
+	}
+	for _, it := range list(ok(e.send(adult, "GET", "/api/inbox", nil), "inbox").body, "items") {
+		if it := it.(map[string]any); it["kind"] == "time_request" && it["submittedAt"] != again["askedAt"] {
+			t.Errorf("inbox item at %v, want %v", it["submittedAt"], again["askedAt"])
+		}
+	}
+
+	// Shield events show in the history, with the device's name and no points.
+	ok(e.send(device, "POST", "/api/device/screen-time-events", map[string]any{"events": []map[string]any{{"id": uuid.NewString(), "kind": "one_more_minute", "secondsAgo": 30}}}), "event")
+	found := false
+	for _, x := range list(ok(e.send(adult, "GET", child1+"/history", nil), "history").body, "entries") {
+		if x := x.(map[string]any); x["kind"] == "one_more_minute" {
+			found = x["device"] == "iPad" && num(x, "points") == 0
+		}
+	}
+	if !found {
+		t.Error("history has no shield event from the iPad")
+	}
+
+	// Allowed hours are all four or none, in the database too.
+	if _, err := e.owner.Exec(t.Context(), `UPDATE child SET school_night_start = 900 WHERE id = $1`, h.child1); err == nil {
+		t.Error("a partly set rule was stored")
+	}
+}
