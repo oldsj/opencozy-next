@@ -39,20 +39,21 @@ type AdultSession struct {
 }
 
 type Approval struct {
-	ID           uuid.UUID
-	HouseholdID  uuid.UUID
-	ChildID      uuid.UUID
-	Kind         string
-	OccurrenceID *uuid.UUID
-	Title        string
-	Points       int32
-	State        string
-	Reason       *string
-	Version      int32
-	DecidedAt    *time.Time
-	DecidedBy    *uuid.UUID
-	CreatedAt    time.Time
-	RedemptionID *uuid.UUID
+	ID            uuid.UUID
+	HouseholdID   uuid.UUID
+	ChildID       uuid.UUID
+	Kind          string
+	OccurrenceID  *uuid.UUID
+	Title         string
+	Points        int32
+	State         string
+	Reason        *string
+	Version       int32
+	DecidedAt     *time.Time
+	DecidedBy     *uuid.UUID
+	CreatedAt     time.Time
+	RedemptionID  *uuid.UUID
+	TimeRequestID *uuid.UUID
 }
 
 type AwardRule struct {
@@ -128,13 +129,17 @@ type CalendarSource struct {
 }
 
 type Child struct {
-	ID          uuid.UUID
-	HouseholdID uuid.UUID
-	Name        string
-	ArchivedAt  *time.Time
-	Version     int32
-	CreatedAt   time.Time
-	Color       string
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	Name             string
+	ArchivedAt       *time.Time
+	Version          int32
+	CreatedAt        time.Time
+	Color            string
+	SchoolNightStart pgtype.Int2
+	SchoolNightEnd   pgtype.Int2
+	WeekendStart     pgtype.Int2
+	WeekendEnd       pgtype.Int2
 }
 
 type Chore struct {
@@ -402,32 +407,34 @@ type Recipe struct {
 }
 
 type Redemption struct {
-	ID          uuid.UUID
-	HouseholdID uuid.UUID
-	ChildID     uuid.UUID
-	RewardID    uuid.UUID
-	Title       string
-	Cost        int32
-	Minutes     pgtype.Int4
-	State       string
-	LedgerID    *uuid.UUID
-	CreatedAt   time.Time
-	Version     int32
-	FulfilledAt *time.Time
-	CancelledAt *time.Time
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	ChildID          uuid.UUID
+	RewardID         uuid.UUID
+	Title            string
+	Cost             int32
+	Minutes          pgtype.Int4
+	State            string
+	LedgerID         *uuid.UUID
+	CreatedAt        time.Time
+	Version          int32
+	FulfilledAt      *time.Time
+	CancelledAt      *time.Time
+	ScreenTimeTarget *string
 }
 
 type Reward struct {
-	ID          uuid.UUID
-	HouseholdID uuid.UUID
-	Title       string
-	Cost        int32
-	Kind        string
-	Minutes     pgtype.Int4
-	Available   bool
-	ArchivedAt  *time.Time
-	CreatedAt   time.Time
-	Version     int32
+	ID               uuid.UUID
+	HouseholdID      uuid.UUID
+	Title            string
+	Cost             int32
+	Kind             string
+	Minutes          pgtype.Int4
+	Available        bool
+	ArchivedAt       *time.Time
+	CreatedAt        time.Time
+	Version          int32
+	ScreenTimeTarget *string
 }
 
 type Routine struct {
@@ -448,6 +455,63 @@ type RoutineStep struct {
 	RoutineID   uuid.UUID
 	Title       string
 	Position    int16
+}
+
+type ScreenTimeCredit struct {
+	ID           uuid.UUID
+	HouseholdID  uuid.UUID
+	ChildID      uuid.UUID
+	Source       string
+	RedemptionID *uuid.UUID
+	GrantedBy    *uuid.UUID
+	Minutes      int32
+	Seconds      int32
+	UsedSeconds  int32
+	CreatedAt    time.Time
+}
+
+type ScreenTimeCut struct {
+	WindowID        uuid.UUID
+	HouseholdID     uuid.UUID
+	CutAt           time.Time
+	RefundedSeconds int32
+	CutBy           *uuid.UUID
+	CreatedAt       time.Time
+}
+
+type ScreenTimeEvent struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	DeviceID    *uuid.UUID
+	Kind        string
+	OccurredAt  time.Time
+	CreatedAt   time.Time
+}
+
+type ScreenTimeWindow struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ChildID     uuid.UUID
+	CreditID    uuid.UUID
+	StartsAt    time.Time
+	EndsAt      time.Time
+	CreatedAt   time.Time
+}
+
+type TimeRequest struct {
+	ID           uuid.UUID
+	HouseholdID  uuid.UUID
+	ChildID      uuid.UUID
+	DeviceID     *uuid.UUID
+	State        string
+	Choice       *string
+	AskedAt      time.Time
+	DecidedAt    *time.Time
+	DecidedBy    *uuid.UUID
+	CreditID     *uuid.UUID
+	GrantedUntil *time.Time
+	CreatedAt    time.Time
 }
 
 type WebauthnChallenge struct {
