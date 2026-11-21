@@ -317,6 +317,7 @@ func importOccurrences(ctx context.Context, x *run) error {
 		return safe(err)
 	}
 	x.r.check("complete occurrences = active awards", want, got)
+	x.carried[sourceOccurrence] = true
 	return nil
 }
 

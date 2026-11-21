@@ -109,7 +109,7 @@ func Run(ctx context.Context, o Options) error {
 // importAll runs every domain from src into dst and reconciles; it neither prints nor commits.
 func importAll(ctx context.Context, o Options, src, dst pgx.Tx) (*Report, error) {
 	r := &Report{}
-	run := &run{src: src, dst: dst, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret}
+	run := &run{src: src, dst: dst, r: r, adults: map[string]adultRef{}, keys: o.Keys, old: o.OldSecret, carried: map[string]bool{}}
 	if err := dst.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&run.started); err != nil {
 		return nil, safe(err)
 	}
@@ -136,6 +136,8 @@ type run struct {
 	old    *oldsecret.Secret
 	// started is when the import began (the target's clock), for rows the import itself archives.
 	started time.Time
+	// carried lists the ledger source kinds whose rows this import has written.
+	carried map[string]bool
 }
 
 // remarkOldSecret says in the report whether old integration secrets could be opened.
@@ -160,6 +162,7 @@ var domains = []func(context.Context, *run) error{
 	importCalendars,
 	importRecipes,
 	importMeals,
+	checkLedgerSources, // last: every source kind has been imported
 }
 
 type source struct {
