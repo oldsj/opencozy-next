@@ -49,3 +49,18 @@ INSERT INTO device_web_session (household_id, id, device_id, child_id, exchange_
    '2026-03-12T07:00:00Z', '2026-03-12T07:00:30Z', '2026-03-12T07:00:05Z', repeat('3', 64), '2026-03-13T07:00:00Z');
 INSERT INTO screen_time_event (household_id, id, child_id, device_id, kind, occurred_at, created_at) VALUES
   ('0190a000-0000-7000-8000-00000000000a', '0190b000-0000-7000-8000-000000000203', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-0000000000e1', 'one_more_minute', '2026-03-12T16:00:00Z', '2026-03-12T16:00:01Z');
+
+-- Banked iPad time (carried as one balance per child; the fixture has Avery's): a parent gave
+-- Rowan 30 minutes, 10 of them spent in one window, so 1,200 seconds are banked. An adult declined
+-- one of Avery's requests (answered requests aren't carried; the fixture has a waiting one).
+INSERT INTO reward_redemption (household_id, id, reward_id, child_id, name_snapshot, cost_snapshot, reward_version, version, state, created_at, settled_at, fulfilled_at, screen_time_minutes_snapshot, screen_time_target_snapshot) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190b000-0000-7000-8000-000000000331', NULL, '0190a000-0000-7000-8000-0000000000c2', 'Extra time', 0, NULL, 1, 'fulfilled',
+   '2026-03-13T09:00:00Z', '2026-03-13T09:00:00Z', '2026-03-13T09:00:00Z', 30, 'personal');
+INSERT INTO personal_credit (household_id, redemption_id, child_id, minutes, seconds, used_seconds, created_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190b000-0000-7000-8000-000000000331', '0190a000-0000-7000-8000-0000000000c2', 30, 1800, 600, '2026-03-13T09:00:00Z');
+INSERT INTO screen_time_grant (household_id, id, redemption_id, child_id, target, minutes, starts_at, ends_at) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190b000-0000-7000-8000-000000000332', '0190b000-0000-7000-8000-000000000331', '0190a000-0000-7000-8000-0000000000c2', 'personal', 10,
+   '2026-03-13T15:00:00Z', '2026-03-13T15:10:00Z');
+INSERT INTO time_request (household_id, id, child_id, device_id, state, version, created_at, decided_at, decided_by, choice) VALUES
+  ('0190a000-0000-7000-8000-00000000000a', '0190b000-0000-7000-8000-000000000322', '0190a000-0000-7000-8000-0000000000c1', '0190a000-0000-7000-8000-0000000000e1', 'declined', 2,
+   '2026-03-11T17:00:00Z', '2026-03-11T17:05:00Z', 'fixtureOwnerUser01', 'no');
