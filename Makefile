@@ -18,6 +18,7 @@ PG_PORT    ?= 54329
 PG_ADMIN   := postgres://app:app-dev-only@localhost:$(PG_PORT)
 export TEST_DATABASE_URL ?= $(PG_ADMIN)/app?sslmode=disable
 E2E_DATABASE_URL ?= $(PG_ADMIN)/app_e2e?sslmode=disable
+E2E_RELEASE_DATABASE_URL ?= $(PG_ADMIN)/app_e2e_release?sslmode=disable
 # CI passes DB_UP= and E2E_DB_RESET= because its jobs already have a fresh Postgres (a service
 # container, no Docker) at TEST_DATABASE_URL / E2E_DATABASE_URL.
 DB_UP ?= db-up
@@ -122,6 +123,15 @@ e2e: build-e2e $(E2E_DB_RESET) ## Playwright against an e2e build of bin/app and
 e2e-db-reset: db-up
 	docker compose exec -T postgres psql -q -U app -d app \
 		-c 'DROP DATABASE IF EXISTS app_e2e WITH (FORCE)' -c 'CREATE DATABASE app_e2e'
+
+.PHONY: e2e-release
+e2e-release: db-up ## e2e/journey.spec.ts on the release binary (bin/app-release) and a fresh database
+	$(PNPM) build
+	CGO_ENABLED=0 go build -tags embedweb -trimpath -o bin/app-release ./cmd/app
+	scripts/check-release-binary.sh bin/app-release
+	docker compose exec -T postgres psql -q -U app -d app \
+		-c 'DROP DATABASE IF EXISTS app_e2e_release WITH (FORCE)' -c 'CREATE DATABASE app_e2e_release'
+	cd web && DATABASE_URL='$(E2E_RELEASE_DATABASE_URL)' pnpm exec playwright test -c playwright.release.config.ts
 
 .PHONY: security
 security: ## govulncheck, pnpm audit, and osv-scanner (every lockfile, tools included)
