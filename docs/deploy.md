@@ -179,9 +179,10 @@ What changes for things outside this server when a household moves from the old 
   hostname changes, adults sign in with their password and add a passkey again.
 - **Router and Home Assistant:** the old `/api/v1/tv/allowances`, `/api/v1/tv/attempts` and
   `/api/v1/tv/events` become the calls above (`events` → `power`, with HA's own state and an
-  `Idempotency-Key`). Until the router script changes, it gets no allowances, so every gated TV
-  stays offline (fail closed). Imported Service keys keep their scopes. Imported TVs start with
-  power unknown.
+  `Idempotency-Key`). Until the router script changes, its old calls get 410, so it has no
+  allowances: a fail-open router lets every gated TV online, a fail-closed one keeps them all
+  offline. Choose which for the cutover window. Imported Service keys keep their scopes.
+  Imported TVs start with power unknown.
 - **Google:** reuse the old OAuth client (above).
 - **Every `/api/v1/` path answers 410 `update_app`**, so an old app says it is out of date.
 - **iPads:** install the new build, then re-pair from Manage → Devices if the device asks.

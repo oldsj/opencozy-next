@@ -6,7 +6,8 @@
 #
 # Tokens come from the environment, never the command line (it shows in ps and shell history):
 #   OPENCOZY_SMOKE_MCP_TOKEN     an assistant credential's secret (POST /api/mcp tools/list)
-#   OPENCOZY_SMOKE_ROUTER_TOKEN  the router's service credential (tv:gate and games:gate)
+#   OPENCOZY_SMOKE_ROUTER_TOKEN  the router's service credential (tv:gate; games:gate if the
+#                                router gates iPad games, else that check is skipped with a note)
 # Without one, its checks are skipped and the run fails, unless SMOKE_ALLOW_SKIP=1.
 #   SMOKE_TV_MAC                 the MAC asked about (default 00:00:5e:00:53:01, from the range
 #                                RFC 7042 keeps for documentation, so no TV has it)
@@ -18,7 +19,7 @@ set -euo pipefail
 
 base=${1:-}
 if [[ -z $base || $base == -h || $base == --help ]]; then
-  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 fi
 base=${base%/}
@@ -29,11 +30,13 @@ done
 mac=${SMOKE_TV_MAC:-00:00:5e:00:53:01}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-passed=0 failed=0 skipped=0
+passed=0 failed=0 skipped=0 noted=0
 
 pass() { passed=$((passed + 1)); printf '  ok    %s\n' "$1"; }
 fail() { failed=$((failed + 1)); printf '  FAIL  %s\n' "$1"; }
 skip() { skipped=$((skipped + 1)); printf '  skip  %s\n' "$1"; }
+# note: skipped on purpose; it doesn't make the run incomplete.
+note() { noted=$((noted + 1)); printf '  skip  %s\n' "$1"; }
 
 # req <method> <path> [curl args...]: status in $status, body in $work/body, headers in
 # $work/headers. A connection failure is status 000.
@@ -84,8 +87,9 @@ echo "== Discovery and contract"
 req GET /api/auth/methods
 if [[ $status == 200 ]] && jq -e '(.passkeys | type) == "boolean" and has("oidc")' "$work/body" > /dev/null 2>&1; then
   pass "GET /api/auth/methods: passkeys $(jq -r .passkeys "$work/body"), single sign-on $(jq -r '.oidc.name // "off"' "$work/body")"
-  # Imported passkeys sign in only on the name they were made for: WEBAUTHN_RP_ID must be this
-  # site's host (or a parent domain of it), and WEBAUTHN_ORIGINS must list this origin.
+  # Passkeys need WEBAUTHN_RP_ID to be this site's host (or a parent domain of it) and
+  # WEBAUTHN_ORIGINS to list this origin. Imported ones also need the exact RP ID they were made
+  # for, the old app's hostname: a parent domain is a different RP ID (docs/import.md).
   if [[ $(jq -r .passkeys "$work/body") != true ]]; then
     fail "passkeys are off: imported passkeys can't sign in (WEBAUTHN_RP_ID)"
   else
@@ -158,8 +162,11 @@ else
   req GET /api/games/allowances -H @"$work/auth"
   if [[ $status == 200 ]] && jq -e '(.allowances | type) == "array"' "$work/body" > /dev/null 2>&1; then
     pass "games gate answers: $(jq '.allowances | length' "$work/body") children with iPad time running"
+  elif [[ $status == 403 ]]; then
+    # The old router key may have only tv:gate; that's fine if the router doesn't gate games.
+    note "games gate: 403, the router token has no games:gate (add it if the router gates iPad games)"
   else
-    fail "GET /api/games/allowances $status: $(body)$([[ $status == 403 ]] && echo ' (the token needs games:gate)')"
+    fail "GET /api/games/allowances $status: $(body)"
   fi
 fi
 
@@ -180,7 +187,7 @@ cat <<EOF
 EOF
 
 echo
-echo "$passed passed, $failed failed, $skipped skipped"
+echo "$passed passed, $failed failed, $((skipped + noted)) skipped"
 if ((failed > 0)); then
   echo "Smoke test FAILED: no-go until fixed (or roll back)."
   exit 1
