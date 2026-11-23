@@ -17,7 +17,7 @@ export function Tones() {
       <Panel tone="positive" heading="Chore confirmed" description="Ezra put away the board games.">
         <p>10 points added to Ezra’s balance.</p>
       </Panel>
-      <Panel tone="attention" heading="Close to a reward" description="Ada is 8 points from Movie night." />
+      <Panel tone="attention" heading="Close to a reward" description="Abby is 8 points from Movie night." />
       <Panel tone="error" heading="Couldn’t save the chore" description="Check the connection and try again." />
       <Panel tone="info" heading="Meals are coming later" description="Meal planning isn’t ready yet." />
     </div>

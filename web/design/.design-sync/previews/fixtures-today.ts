@@ -45,7 +45,7 @@ export const today: TodayResponse = {
   serverTime: '2026-09-14T07:42:00-04:00',
   children: [
   {
-    child: { id: 'c1', name: 'Ada', color: 'sky', points: 24, earnedToday: 6, completed: 3, total: 5 },
+    child: { id: 'c1', name: 'Abby', color: 'sky', points: 24, earnedToday: 6, completed: 3, total: 5 },
     groups: [
       {
         id: 'g1',

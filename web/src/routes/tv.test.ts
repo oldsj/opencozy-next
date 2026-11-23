@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fromWeekdays, minutesLabel, openHours, parseMacs, secondsUntil, toWeekdays, whoChoices, type TvChild } from './tv';
 
 const kid = (over: Partial<TvChild>): TvChild => ({
-  childId: 'c1', name: 'Ada', color: 'sky', tvSecondsRemaining: 1500, watchingTvId: null, hours: null, canWatch: true, canStartOwn: false, ...over,
+  childId: 'c1', name: 'Abby', color: 'sky', tvSecondsRemaining: 1500, watchingTvId: null, hours: null, canWatch: true, canStartOwn: false, ...over,
 });
 
 describe('whoChoices', () => {

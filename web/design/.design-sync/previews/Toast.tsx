@@ -5,7 +5,7 @@ import { Toast } from '../../src';
 export function Confirmed() {
   return (
     <div className="h-40">
-      <Toast>Nice, Ada! +5 points</Toast>
+      <Toast>Nice, Abby! +5 points</Toast>
     </div>
   );
 }

@@ -7,7 +7,7 @@ export function Default() {
       open
       onClose={() => undefined}
       title="Choose Movie night?"
-      description="This uses 50 points from Ada."
+      description="This uses 50 points from Abby."
       footer={
         <>
           <Button>Not now</Button>
@@ -15,7 +15,7 @@ export function Default() {
         </>
       }
     >
-      <p>Ada will have 18 points left.</p>
+      <p>Abby will have 18 points left.</p>
     </Sheet>
   );
 }

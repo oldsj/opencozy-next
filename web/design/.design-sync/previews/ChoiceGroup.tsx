@@ -10,7 +10,7 @@ export function WhosWatching() {
       onChoose={noop}
       choices={[
         { value: 'parents', label: 'Parents', variant: 'primary' },
-        { value: 'ada', label: 'Ada', detail: '25 min' },
+        { value: 'abby', label: 'Abby', detail: '25 min' },
         { value: 'ezra', label: 'Ezra', detail: 'no time', disabled: true },
         { value: 'ivy', label: 'Ivy', detail: 'from 4:00 pm', disabled: true },
         { value: 'open', label: 'Open 1 hour' },

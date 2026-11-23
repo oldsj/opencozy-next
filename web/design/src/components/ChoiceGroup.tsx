@@ -5,11 +5,11 @@ import { Button, type ButtonVariant } from './Button';
 
 export interface Choice<V extends string = string> {
   value: V;
-  /** What the button says: "Ada", "30 min", "Not now". */
+  /** What the button says: "Abby", "30 min", "Not now". */
   label: string;
   /**
    * A short second part, quieter: "25 min", "no time", "from 4:00 pm". It is part of the button's
-   * name ("Ada 25 min"), so voice control users can say what they see; keep it plain words.
+   * name ("Abby 25 min"), so voice control users can say what they see; keep it plain words.
    */
   detail?: string;
   disabled?: boolean;

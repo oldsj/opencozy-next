@@ -10,7 +10,7 @@ export interface CountdownProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'c
    */
   seconds: number;
   /**
-   * `inline` sits in a sentence or a Tag ("On · Ada · 24:59 left"); `large` is the iPad's own timer;
+   * `inline` sits in a sentence or a Tag ("On · Abby · 24:59 left"); `large` is the iPad's own timer;
    * `hero` fills a TV's own screen, at the clock's size.
    */
   size?: 'inline' | 'large' | 'hero' | undefined;

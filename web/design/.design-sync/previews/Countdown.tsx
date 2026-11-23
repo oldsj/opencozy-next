@@ -4,7 +4,7 @@ import { Countdown, ProfileAvatar, Tag, profileClass } from '../../src';
 export function Inline() {
   return (
     <p>
-      On · Ada · <Countdown seconds={1499} />
+      On · Abby · <Countdown seconds={1499} />
     </p>
   );
 }
@@ -30,7 +30,7 @@ export function Low() {
   return (
     <div className="grid gap-4">
       <p>
-        On · Ada · <Countdown seconds={240} />
+        On · Abby · <Countdown seconds={240} />
       </p>
       <Countdown size="large" seconds={240} />
     </div>
@@ -44,8 +44,8 @@ export function Low() {
 export function TvTimeLeft({ seconds = 240 }: { seconds?: number }) {
   return (
     <div className={`${profileClass('sky')} grid min-h-[60vh] place-content-center justify-items-center gap-6 text-center`}>
-      <ProfileAvatar name="Ada" color="sky" />
-      <p className="m-0 text-section">Ada’s TV time</p>
+      <ProfileAvatar name="Abby" color="sky" />
+      <p className="m-0 text-section">Abby’s TV time</p>
       <Countdown size="hero" seconds={seconds} />
       <p className="m-0 text-muted-foreground">{seconds > 0 ? 'Ask an adult on the iPad for more.' : 'The TV turns off in a moment.'}</p>
     </div>

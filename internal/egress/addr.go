@@ -82,7 +82,7 @@ func inAny(prefixes []netip.Prefix, addr netip.Addr) bool {
 }
 
 // ParsePrivateCIDRs parses and validates a private allowlist, a comma-separated list such as
-// "192.168.40.0/24,fd00:40::/64". Each entry must be a canonical prefix (no host bits set)
+// "192.168.77.0/24,fd00:77::/64". Each entry must be a canonical prefix (no host bits set)
 // inside 10/8, 172.16/12, 192.168/16 or fc00::/7, so an allowlist can never open loopback,
 // link-local (cloud metadata), CGNAT, multicast or a public range. An empty string is an empty
 // list.

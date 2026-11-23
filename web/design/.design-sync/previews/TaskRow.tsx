@@ -6,7 +6,7 @@ export function Open() {
 }
 
 export function Pending() {
-  return <TaskRow title="Feed the cat" assignee="Ada" points={5} metadata="Today · morning" status="pending" onAction={() => undefined} />;
+  return <TaskRow title="Feed the cat" assignee="Abby" points={5} metadata="Today · morning" status="pending" onAction={() => undefined} />;
 }
 
 export function Complete() {

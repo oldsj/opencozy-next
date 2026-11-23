@@ -22,7 +22,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   });
   page.on('pageerror', (e) => problems.push(e.message));
   const run = String(Date.now()).slice(-6);
-  const ada = `Ada ${run}`;
+  const abby = `Abby ${run}`;
   const noor = `Noor ${run}`;
 
   await page.goto('/login');
@@ -31,8 +31,8 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
-  // Two children; Ada earns 14 points (an adult's tick counts at once) and has a chore to move.
-  const a = await post<{ id: string }>(page.request, '/api/children', { name: ada, color: 'teal' });
+  // Two children; Abby earns 14 points (an adult's tick counts at once) and has a chore to move.
+  const a = await post<{ id: string }>(page.request, '/api/children', { name: abby, color: 'teal' });
   await post(page.request, '/api/children', { name: noor, color: 'rose' });
   const earned = await post<{ id: string }>(page.request, '/api/chores', { childId: a.id, title: `Water the plants ${run}`, points: 14 });
   await post(page.request, `/api/today/chores/${earned.id}/complete`, undefined);
@@ -46,7 +46,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   const whose = sheet.getByRole('group', { name: 'Whose chore' });
   if (await whose.count()) await whose.getByRole('button', { name: noor }).click();
   else await sheet.getByLabel('Whose chore').selectOption({ label: noor });
-  await expect(sheet).toContainText(`Moving it to ${noor}: it leaves ${ada}’s list today`);
+  await expect(sheet).toContainText(`Moving it to ${noor}: it leaves ${abby}’s list today`);
   await sheet.getByLabel('Points').fill('5');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toBeHidden();
@@ -79,34 +79,34 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await rsheet.getByRole('button', { name: 'Save' }).click();
   await expect(rsheet).toBeHidden();
 
-  // An adult chooses it for Ada three times (approved at once): two are given, one cancelled with its points back.
+  // An adult chooses it for Abby three times (approved at once): two are given, one cancelled with its points back.
   await post(page.request, `/api/children/${a.id}/redemptions`, { rewardId: reward.id });
   await post(page.request, `/api/children/${a.id}/redemptions`, { rewardId: reward.id });
   await page.getByRole('link', { name: 'Chosen rewards' }).click();
   await expect(page.getByRole('heading', { name: 'Chosen rewards' })).toBeVisible();
   const toGive = page.getByRole('list', { name: 'To give' });
-  await expect(toGive.getByRole('listitem').filter({ hasText: ada })).toHaveCount(2);
-  await toGive.getByRole('button', { name: `Mark Pick the film ${run} as given to ${ada}` }).first().click();
-  await expect(page.getByRole('list', { name: 'Given' }).getByRole('listitem').filter({ hasText: ada })).toHaveCount(1);
+  await expect(toGive.getByRole('listitem').filter({ hasText: abby })).toHaveCount(2);
+  await toGive.getByRole('button', { name: `Mark Pick the film ${run} as given to ${abby}` }).first().click();
+  await expect(page.getByRole('list', { name: 'Given' }).getByRole('listitem').filter({ hasText: abby })).toHaveCount(1);
   // A third, given from another tab while its cancel dialog is open: the stale cancel is refused,
   // and the dialog closes because a given item can't be cancelled.
   await post(page.request, `/api/children/${a.id}/redemptions`, { rewardId: reward.id });
   await page.reload();
-  await expect(toGive.getByRole('listitem').filter({ hasText: ada })).toHaveCount(2);
-  await toGive.getByRole('button', { name: `Cancel Pick the film ${run} for ${ada} and refund` }).first().click();
+  await expect(toGive.getByRole('listitem').filter({ hasText: abby })).toHaveCount(2);
+  await toGive.getByRole('button', { name: `Cancel Pick the film ${run} for ${abby} and refund` }).first().click();
   const open = (await (await page.request.get('/api/redemptions?status=approved')).json()) as { redemptions: { id: string; version: number; child: { name: string } }[] };
-  const shown = open.redemptions.filter((r) => r.child.name === ada);
+  const shown = open.redemptions.filter((r) => r.child.name === abby);
   // The list is newest first, and so is the page: the dialog is for the first one shown.
   await post(page.request, `/api/redemptions/${shown[0].id}/fulfil`, { expectedVersion: shown[0].version });
   await page.getByRole('button', { name: 'Cancel and refund 4 points' }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
-  await expect(page.getByRole('list', { name: 'Given' }).getByRole('listitem').filter({ hasText: ada })).toHaveCount(2);
-  await expect(toGive.getByRole('listitem').filter({ hasText: ada })).toHaveCount(1);
+  await expect(page.getByRole('list', { name: 'Given' }).getByRole('listitem').filter({ hasText: abby })).toHaveCount(2);
+  await expect(toGive.getByRole('listitem').filter({ hasText: abby })).toHaveCount(1);
 
-  await toGive.getByRole('button', { name: `Cancel Pick the film ${run} for ${ada} and refund` }).click();
+  await toGive.getByRole('button', { name: `Cancel Pick the film ${run} for ${abby} and refund` }).click();
   await page.getByRole('button', { name: 'Cancel and refund 4 points' }).click();
-  await expect(page.getByRole('list', { name: 'Cancelled' }).getByRole('listitem').filter({ hasText: ada })).toContainText('4 points back');
-  await expect(page.getByRole('list', { name: 'Given' }).getByRole('button', { name: new RegExp(ada) })).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Cancelled' }).getByRole('listitem').filter({ hasText: abby })).toContainText('4 points back');
+  await expect(page.getByRole('list', { name: 'Given' }).getByRole('button', { name: new RegExp(abby) })).toHaveCount(0);
 
   // The points came back: 14 earned, 12 spent, 4 back.
   await page.goto(`/children/${a.id}/points`);

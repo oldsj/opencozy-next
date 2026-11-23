@@ -69,8 +69,8 @@ describe('foundations', () => {
   });
 
   it('names an avatar by the person, not its colour', () => {
-    render(<ProfileAvatar name="Ada" color="sky" />);
-    expect(screen.getByRole('img', { name: 'Ada' })).toHaveTextContent('A');
+    render(<ProfileAvatar name="Abby" color="sky" />);
+    expect(screen.getByRole('img', { name: 'Abby' })).toHaveTextContent('A');
   });
 });
 
@@ -109,11 +109,11 @@ describe('frame and navigation', () => {
   it('person tabs are tabs that show the name, never colour alone', () => {
     render(
       <div role="tablist" aria-label="Family">
-        <PersonTab name="Ada" color="sky" points={12} selected />
+        <PersonTab name="Abby" color="sky" points={12} selected />
         <PersonTab name="Ezra" color="sage" />
       </div>,
     );
-    expect(screen.getByRole('tab', { name: /Ada/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Abby/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /Ezra/ })).toHaveAttribute('aria-selected', 'false');
   });
 });
@@ -230,12 +230,12 @@ describe('feedback', () => {
   it('toast and empty state carry their text', () => {
     render(
       <>
-        <Toast>Nice, Ada! +5 points</Toast>
+        <Toast>Nice, Abby! +5 points</Toast>
         <EmptyState icon={Gift} title="No rewards yet" action={<Button>Add reward</Button>} />
         <ComingLaterTile icon={CalendarDays} title="Calendar" />
       </>,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Nice, Ada! +5 points');
+    expect(screen.getByRole('status')).toHaveTextContent('Nice, Abby! +5 points');
     expect(screen.getByText('No rewards yet')).toBeInTheDocument();
     expect(screen.getByText('Coming later')).toBeInTheDocument();
   });
@@ -244,13 +244,13 @@ describe('feedback', () => {
 describe('today', () => {
   it('a person card pairs the name with points and progress', () => {
     render(
-      <PersonCard name="Ada" color="sky" points={12} completed={2} total={4}>
+      <PersonCard name="Abby" color="sky" points={12} completed={2} total={4}>
         Tasks
       </PersonCard>,
     );
-    const card = screen.getByRole('article', { name: 'Ada’s today'.replace('’', "'") });
+    const card = screen.getByRole('article', { name: 'Abby’s today'.replace('’', "'") });
     expect(card).toHaveTextContent('2 of 4 done');
-    const bar = within(card).getByRole('progressbar', { name: 'Ada: 2 of 4 done' });
+    const bar = within(card).getByRole('progressbar', { name: 'Abby: 2 of 4 done' });
     expect(bar).toHaveAttribute('value', '2');
     expect(bar).toHaveAttribute('max', '4');
   });
@@ -494,13 +494,13 @@ describe('slice two: inbox', () => {
     const choices = [
       { value: 'parents', label: 'Parents', variant: 'primary' as const },
       { value: 'ezra', label: 'Ezra', detail: 'no time', disabled: true },
-      { value: 'ada', label: 'Ada', detail: '25 min' },
+      { value: 'abby', label: 'Abby', detail: '25 min' },
     ];
     const { rerender } = render(<ChoiceGroup label="Who’s watching?" choices={choices} onChoose={(v) => chosen.push(v)} />);
     expect(screen.getByRole('group', { name: 'Who’s watching?' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ezra no time' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Ada 25 min' }));
-    expect(chosen).toEqual(['ada']);
+    await userEvent.click(screen.getByRole('button', { name: 'Abby 25 min' }));
+    expect(chosen).toEqual(['abby']);
     rerender(<ChoiceGroup label="Who’s watching?" choices={choices} onChoose={(v) => chosen.push(v)} busy />);
     for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled();
   });

@@ -172,7 +172,7 @@ export function InboxSendBack() {
         open
         onClose={noop}
         title="Send back Tidy the hallway?"
-        description="Ada keeps the chore and can tick it again. No points move."
+        description="Abby keeps the chore and can tick it again. No points move."
         footer={
           <>
             <Button>Cancel</Button>
@@ -181,8 +181,8 @@ export function InboxSendBack() {
         }
       >
         <Textarea
-          label="Reason for Ada (optional)"
-          hint={`Shown on Ada’s list. Up to ${String(REJECT_REASON_MAX)} characters.`}
+          label="Reason for Abby (optional)"
+          hint={`Shown on Abby’s list. Up to ${String(REJECT_REASON_MAX)} characters.`}
           maxLength={REJECT_REASON_MAX}
           defaultValue="The shoes are tidied, but the coats still need hanging up."
         />
@@ -852,7 +852,7 @@ export function Devices() {
 }
 
 /**
- * Pairing a device for Ada: the code and QR stay up, with the time left, while the page waits for
+ * Pairing a device for Abby: the code and QR stay up, with the time left, while the page waits for
  * the device. On the iPad, the OpenCozy app scans the QR or takes the code.
  */
 export function DevicePair() {
@@ -862,13 +862,13 @@ export function DevicePair() {
       <Sheet
         open
         onClose={noop}
-        title="Pair a device for Ada"
-        description="On Ada’s iPad, open the OpenCozy app and scan this code, or type it in."
+        title="Pair a device for Abby"
+        description="On Abby’s iPad, open the OpenCozy app and scan this code, or type it in."
         footer={<Button>Cancel</Button>}
       >
         <div className="grid justify-items-center gap-5 text-center">
           <div className="w-60 max-w-full">
-            <QrCode modules={qrModulesFromRows(offer.qrModules)} label="Pairing code for Ada’s iPad" />
+            <QrCode modules={qrModulesFromRows(offer.qrModules)} label="Pairing code for Abby’s iPad" />
           </div>
           <p className="m-0 text-page font-semibold tabular-nums tracking-widest" aria-label={`Code ${offer.code.split('').join(' ')}`}>
             {offer.code}
@@ -902,7 +902,7 @@ export function DeviceReassign() {
           label="Child for Old iPhone"
           onChoose={noop}
           choices={[
-            { value: 'c1', label: 'Ada' },
+            { value: 'c1', label: 'Abby' },
             { value: 'c2', label: 'Ezra' },
             { value: 'c3', label: 'Noor' },
           ]}
@@ -1099,8 +1099,8 @@ export function ChildHours() {
       <Sheet
         open
         onClose={noop}
-        title="Ada’s screen time hours"
-        description="When Ada can use saved iPad time or start TV time. Earning and saving work at any hour; a parent can always give time."
+        title="Abby’s screen time hours"
+        description="When Abby can use saved iPad time or start TV time. Earning and saving work at any hour; a parent can always give time."
         footer={
           <>
             <Button variant="quiet">No limit</Button>
@@ -1136,8 +1136,8 @@ export function GiveTime() {
       <Sheet
         open
         onClose={noop}
-        title="Give Ada time"
-        description="Free, from you. It doesn’t cost Ada any points."
+        title="Give Abby time"
+        description="Free, from you. It doesn’t cost Abby any points."
         footer={
           <>
             <Button>Cancel</Button>
@@ -1165,8 +1165,8 @@ export function GiveTime() {
             ]}
           />
           <div className="flex items-center gap-3">
-            <CheckCircle checked label="Start it now on Ada’s iPad" />
-            <span>Start it now on Ada’s iPad (even outside Ada’s hours)</span>
+            <CheckCircle checked label="Start it now on Abby’s iPad" />
+            <span>Start it now on Abby’s iPad (even outside Abby’s hours)</span>
           </div>
         </div>
       </Sheet>
@@ -1199,7 +1199,7 @@ export function RewardScreenTime() {
           min={1}
           max={240}
           defaultValue={30}
-          hint="1 to 240. It’s saved on Ada’s iPad as soon as Ada chooses it; no need to approve."
+          hint="1 to 240. It’s saved on Abby’s iPad as soon as Abby chooses it; no need to approve."
         />
         <div className="flex gap-3">
           <Button variant="primary" type="submit">
@@ -1659,7 +1659,7 @@ export function ChoreEdit({ conflict = false }: { conflict?: boolean }) {
           {conflict && <Notice tone="attention">{catalogErrorText.version_conflict}</Notice>}
           <Input label="Chore" defaultValue="Tidy the hallway" maxLength={80} required />
           <SegmentedControl label="Whose chore" value="c3" onChange={noop} options={catalogKids.map((k) => ({ value: k.id, label: k.name }))} />
-          <p className="m-0 text-muted-foreground">Moving it to Noor: it leaves Ada’s list today and shows on Noor’s.</p>
+          <p className="m-0 text-muted-foreground">Moving it to Noor: it leaves Abby’s list today and shows on Noor’s.</p>
           <Input label="Points" type="number" inputMode="numeric" min={0} max={1000} defaultValue={5} />
           <Section title="Days">
             <DayPicker label="Days for Tidy the hallway" value={[1, 3, 5]} onChange={noop} />
@@ -1719,7 +1719,7 @@ export function RoutineEdit() {
       <Sheet
         open
         onClose={noop}
-        title="Edit Ada’s morning routine"
+        title="Edit Abby’s morning routine"
         description="Changes apply from today. Steps already checked today stay checked."
         footer={
           <>

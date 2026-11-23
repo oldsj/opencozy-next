@@ -27,7 +27,7 @@ export interface Kid {
 }
 
 export const kids: Kid[] = [
-  { id: 'c1', name: 'Ada', color: 'sky' },
+  { id: 'c1', name: 'Abby', color: 'sky' },
   { id: 'c2', name: 'Ezra', color: 'sage' },
   { id: 'c3', name: 'Noor', color: 'lilac' },
 ];
@@ -112,7 +112,7 @@ export interface RedemptionRow {
 }
 
 export const redemptions: RedemptionRow[] = [
-  { id: 'rd1', child: { id: 'c1', name: 'Ada', color: 'sky' }, title: 'Movie night pick', cost: 30, status: 'approved', requestedAt: 'Today 4:02 PM', version: 2 },
+  { id: 'rd1', child: { id: 'c1', name: 'Abby', color: 'sky' }, title: 'Movie night pick', cost: 30, status: 'approved', requestedAt: 'Today 4:02 PM', version: 2 },
   { id: 'rd2', child: { id: 'c3', name: 'Noor', color: 'lilac' }, title: '30 min of iPad', cost: 20, status: 'fulfilled', requestedAt: 'Today 3:15 PM', fulfilledAt: 'Today 3:15 PM', minutes: 30, usedMinutes: 18, version: 1 },
   { id: 'rd3', child: { id: 'c2', name: 'Ezra', color: 'sage' }, title: 'Stay up 15 minutes', cost: 25, status: 'fulfilled', requestedAt: 'Yesterday', fulfilledAt: 'Yesterday', version: 3 },
   { id: 'rd4', child: { id: 'c2', name: 'Ezra', color: 'sage' }, title: 'Movie night pick', cost: 30, status: 'cancelled', requestedAt: 'Sep 12', refundedPoints: 30, version: 3 },

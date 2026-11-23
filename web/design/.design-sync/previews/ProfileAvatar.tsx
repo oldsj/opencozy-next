@@ -1,7 +1,7 @@
 // @dsCard group="People"
 import { ProfileAvatar, profileColors } from '../../src';
 
-const names = ['Ada', 'Bea', 'Cal', 'Dev', 'Eli', 'Fin', 'Gus', 'Hal'];
+const names = ['Abby', 'Bea', 'Cal', 'Dev', 'Eli', 'Fin', 'Gus', 'Hal'];
 
 export function Palette() {
   return (

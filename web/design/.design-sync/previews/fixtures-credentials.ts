@@ -71,7 +71,7 @@ export interface ChildRow {
 }
 
 export const children: ChildRow[] = [
-  { id: 'c1', name: 'Ada', color: 'sky', archived: false, version: 4 },
+  { id: 'c1', name: 'Abby', color: 'sky', archived: false, version: 4 },
   { id: 'c2', name: 'Ezra', color: 'sage', archived: false, version: 2 },
   { id: 'c3', name: 'Noor', color: 'lilac', archived: false, version: 1 },
   { id: 'c4', name: 'Robin', color: 'peach', archived: true, version: 3 },

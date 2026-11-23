@@ -40,7 +40,7 @@ export function Default() {
 export function Kid() {
   return (
     <AppFrame person="sky" topBar={<TopBar time="7:42" date="Monday, September 14" householdName="Maple House" />}>
-      <PersonCard name="Ada" color="sky" points={24} completed={1} total={2}>
+      <PersonCard name="Abby" color="sky" points={24} completed={1} total={2}>
         <TaskGroup title="Morning" icon={Sunrise} status="3 points">
           <TaskRow title="Make the bed" check={{ status: 'complete', checked: true, label: 'Make the bed' }} />
           <TaskRow title="Pack school bag" check={{ status: 'open', checked: false, label: 'Pack school bag' }} />

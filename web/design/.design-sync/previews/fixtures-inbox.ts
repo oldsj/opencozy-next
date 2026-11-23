@@ -24,8 +24,8 @@ export const REJECT_REASON_MAX = 200;
 export const inbox: InboxResponse = {
   items: [
     { id: 'n1', kind: 'routine', child: { id: 'c2', name: 'Ezra', color: 'sage' }, title: 'Morning', points: 3, submittedAt: '7:55 AM' },
-    { id: 'n2', kind: 'completion', child: { id: 'c1', name: 'Ada', color: 'sky' }, title: 'Tidy the hallway', points: 5, submittedAt: '9:40 AM' },
-    { id: 'n3', kind: 'redemption', child: { id: 'c1', name: 'Ada', color: 'sky' }, title: 'Movie night pick', points: 50, submittedAt: '10:02 AM' },
+    { id: 'n2', kind: 'completion', child: { id: 'c1', name: 'Abby', color: 'sky' }, title: 'Tidy the hallway', points: 5, submittedAt: '9:40 AM' },
+    { id: 'n3', kind: 'redemption', child: { id: 'c1', name: 'Abby', color: 'sky' }, title: 'Movie night pick', points: 50, submittedAt: '10:02 AM' },
     { id: 'n4', kind: 'time_request', child: { id: 'c3', name: 'Noor', color: 'lilac' }, title: 'More iPad time', minutesRequested: 30, submittedAt: '10:15 AM' },
   ],
 };

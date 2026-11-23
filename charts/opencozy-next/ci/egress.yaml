@@ -2,7 +2,7 @@
 egress:
   internet: true
   homeAssistant:
-    cidrs: [192.168.40.0/24, "fd00:40::/64"]
+    cidrs: [192.168.77.0/24, "fd00:77::/64"]
     ports: [8123]
   oidc:
     cidrs: [10.20.30.0/24]

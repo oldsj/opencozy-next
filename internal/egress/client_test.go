@@ -127,10 +127,10 @@ func TestNewChecksOptions(t *testing.T) {
 }
 
 func TestPrivateAllowlist(t *testing.T) {
-	d := &dialer{private: []netip.Prefix{netip.MustParsePrefix("192.168.40.0/24")}}
+	d := &dialer{private: []netip.Prefix{netip.MustParsePrefix("192.168.77.0/24")}}
 	for addr, want := range map[string]bool{
-		"192.168.40.7": true, "192.168.41.7": false, "10.0.0.1": false, "8.8.8.8": true, "127.0.0.1": false,
-		"::ffff:192.168.40.7": false, // a mapped literal is not the allowlisted address
+		"192.168.77.7": true, "192.168.78.7": false, "10.0.0.1": false, "8.8.8.8": true, "127.0.0.1": false,
+		"::ffff:192.168.77.7": false, // a mapped literal is not the allowlisted address
 	} {
 		if got := d.allowed(netip.MustParseAddr(addr)); got != want {
 			t.Errorf("allowed(%s) = %v, want %v", addr, got, want)

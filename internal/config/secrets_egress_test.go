@@ -20,7 +20,7 @@ func TestLoadSecretsAndEgress(t *testing.T) {
 
 	fictional := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32))
 	t.Setenv("OPENCOZY_SECRET_KEYS", "k1:"+fictional)
-	t.Setenv("HOME_ASSISTANT_ALLOWED_PRIVATE_CIDRS", "192.168.40.0/24,fd00:40::/64")
+	t.Setenv("HOME_ASSISTANT_ALLOWED_PRIVATE_CIDRS", "192.168.77.0/24,fd00:77::/64")
 	t.Setenv("OIDC_ALLOWED_PRIVATE_CIDRS", "10.20.0.0/16")
 	cfg, err = Load()
 	if err != nil {
