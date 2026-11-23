@@ -1,6 +1,9 @@
 /* Wide screens: a sticky rail beside the page. Phones: a bar above it, with a Menu sheet. */
 .oc-manage-shell { display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--background); }
-.oc-manage-shell__main { min-width: 0; flex: 1; padding: var(--space-xl) var(--space-lg) var(--space-section); }
+.oc-manage-shell__main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--space-xl); padding: var(--space-xl) var(--space-lg) var(--space-section); }
+/* A page is its header, then notices and sections, as the main column's children: one rhythm everywhere. */
+.oc-manage-shell__main > .oc-page-header { margin-bottom: var(--space-sm); }
+.oc-manage-shell__main > .oc-section + .oc-section { margin-block-start: var(--space-md); }
 .oc-manage-shell__main:focus { outline: none; }
 
 .oc-manage-nav__rail { display: none; }

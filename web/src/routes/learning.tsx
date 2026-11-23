@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
+import { Link2, Sparkles } from 'lucide-react';
 
 import { Button, ChoiceGroup, ConfirmDialog, EmptyState, Input, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet } from '@app/design';
 
@@ -127,7 +128,7 @@ export function LearningPage() {
   const ruleKeyError = ruleError === errorText.rule_exists ? ruleError : undefined;
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader title="Learning" description="Points for learning: what each activity is worth, and which player is which child." />
 
       <Section title="Award rules" count={live.length} actions={<Button variant="primary" onClick={() => { openRule(emptyRule); }}>Add a rule</Button>}>
@@ -153,7 +154,7 @@ export function LearningPage() {
             ))}
           </List>
         ) : (
-          rules.isSuccess && <EmptyState title="No award rules yet" description="Add what an activity is worth before connecting a learning service." variant="surface" />
+          rules.isSuccess && <EmptyState variant="surface" icon={Sparkles} title="No award rules yet" description="Add what an activity is worth before connecting a learning service." />
         )}
       </Section>
 
@@ -190,7 +191,7 @@ export function LearningPage() {
             })}
           </List>
         ) : (
-          links.isSuccess && <EmptyState title="No players linked" description="Link a child’s player ID so their learning earns points." variant="surface" />
+          links.isSuccess && <EmptyState variant="surface" icon={Link2} title="No players linked" description="Link a child’s player ID so their learning earns points." />
         )}
       </Section>
 
@@ -297,6 +298,6 @@ export function LearningPage() {
           unlink.mutate({ params: { ...idempotencyKey(), path: { linkId: unlinking.id } } }, { onSuccess: () => { setUnlinking(null); } });
         }}
       />
-    </section>
+    </>
   );
 }

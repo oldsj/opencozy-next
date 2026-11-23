@@ -22,13 +22,14 @@ test('award rules, players and a learning connection', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
 
-  await page.goto('/chores');
-  await page.getByLabel("Child's name").fill(child);
+  await page.goto('/children');
+  await page.getByRole('button', { name: 'Add a child' }).first().click();
+  await page.getByRole('dialog', { name: 'Add a child' }).getByLabel("Child's name").fill(child);
   await page.getByRole('button', { name: 'Add child' }).click();
-  await expect(page.getByLabel('For').getByRole('option', { name: child })).toHaveCount(1);
+  await expect(page.getByRole('list', { name: 'Children' })).toContainText(child);
 
   // A rule, edited; a second rule for the same activity is refused on the sheet.
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Learning' }).click();
+  await page.getByRole('navigation', { name: 'Adult management' }).getByRole('link', { name: 'Learning' }).click();
   await page.getByRole('button', { name: 'Add a rule' }).click();
   let sheet = page.getByRole('dialog', { name: 'Add a rule' });
   await sheet.getByLabel('Activity key').fill(key);
@@ -61,7 +62,7 @@ test('award rules, players and a learning connection', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Players' })).toContainText(`${child} is Builder_${run}`);
 
   // A learning service's key, for that rule only.
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Connections' }).click();
+  await page.getByRole('navigation', { name: 'Adult management' }).getByRole('link', { name: 'Connections' }).click();
   await page.getByRole('button', { name: 'Add a service' }).click();
   sheet = page.getByRole('dialog', { name: 'Add a connection' });
   await sheet.getByRole('textbox', { name: 'Name', exact: true }).fill(app);

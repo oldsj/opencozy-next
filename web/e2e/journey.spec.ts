@@ -46,6 +46,7 @@ test('a household’s day: chores, approval, points, rewards, screen time, TV', 
   await adult.getByRole('button', { name: /^Sign in( with password)?$/ }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await adult.goto('/displays');
+  await adult.getByRole('button', { name: 'Pair a display' }).first().click();
   await adult.getByLabel('Code on the display').fill(shown);
   await adult.getByLabel('Name').fill(`Kitchen ${run}`);
   await adult.getByLabel('TV', { exact: true }).check();
@@ -54,8 +55,9 @@ test('a household’s day: chores, approval, points, rewards, screen time, TV', 
   await expect(wall.getByText('The Example Family')).toBeVisible({ timeout: 15_000 });
 
   // A child, then their iPad, paired while the sign-in is fresh (pairing needs a recent one).
-  await adult.goto('/chores');
-  await adult.getByLabel("Child's name").fill(child);
+  await adult.goto('/children');
+  await adult.getByRole('button', { name: 'Add a child' }).first().click();
+  await adult.getByRole('dialog', { name: 'Add a child' }).getByLabel("Child's name").fill(child);
   await adult.getByRole('button', { name: 'Add child' }).click();
   await expect(adult.getByRole('list', { name: 'Children' })).toContainText(child);
   await adult.goto('/devices');
@@ -76,21 +78,32 @@ test('a household’s day: chores, approval, points, rewards, screen time, TV', 
 
   // A chore and two rewards: a game (an adult says yes) and iPad time (given at once).
   await adult.goto('/chores');
-  await adult.getByLabel('For').selectOption({ label: child });
-  await adult.getByRole('textbox', { name: 'Chore', exact: true }).fill(chore);
-  await adult.getByLabel('Points').fill('8');
-  await adult.getByRole('button', { name: 'Add chore' }).click();
-  await expect(adult.getByRole('list', { name: 'Chores' })).toContainText(chore);
+  await adult.getByRole('button', { name: 'Add chore' }).first().click();
+  const addChore = adult.getByRole('dialog', { name: 'Add a chore' });
+  // A segmented control for up to five children, a menu beyond that.
+  const forWhom = addChore.getByRole('group', { name: 'For' });
+  if (await forWhom.count()) await forWhom.getByRole('button', { name: child }).click();
+  else await addChore.getByLabel('For').selectOption({ label: child });
+  await addChore.getByRole('textbox', { name: 'Chore', exact: true }).fill(chore);
+  await addChore.getByLabel('Points').fill('8');
+  await addChore.getByRole('button', { name: 'Add chore' }).click();
+  await expect(addChore).toBeHidden();
+  await expect(adult.getByRole('list', { name: `${child}’s chores` })).toContainText(chore);
   await adult.goto('/rewards');
-  await adult.getByRole('textbox', { name: 'Reward', exact: true }).fill(game);
-  await adult.getByLabel('Cost in points').fill('3');
-  await adult.getByRole('button', { name: 'Add reward' }).click();
+  const addReward = adult.getByRole('dialog', { name: 'Add a reward' });
+  await adult.getByRole('button', { name: 'Add reward' }).first().click();
+  await addReward.getByRole('textbox', { name: 'Reward', exact: true }).fill(game);
+  await addReward.getByLabel('Cost in points').fill('3');
+  await addReward.getByRole('button', { name: 'Add reward' }).click();
+  await expect(addReward).toBeHidden();
   await expect(adult.getByRole('list', { name: 'Rewards' })).toContainText(game);
-  await adult.getByRole('textbox', { name: 'Reward', exact: true }).fill(ipadTime);
-  await adult.getByLabel('Cost in points').fill('2');
-  await adult.getByLabel('Kind').selectOption('screen_time');
-  await adult.getByLabel('Minutes').fill('20');
-  await adult.getByRole('button', { name: 'Add reward' }).click();
+  await adult.getByRole('button', { name: 'Add reward' }).first().click();
+  await addReward.getByRole('textbox', { name: 'Reward', exact: true }).fill(ipadTime);
+  await addReward.getByLabel('Cost in points').fill('2');
+  await addReward.getByLabel('Kind').selectOption('screen_time');
+  await addReward.getByLabel('Minutes').fill('20');
+  await addReward.getByRole('button', { name: 'Add reward' }).click();
+  await expect(addReward).toBeHidden();
   await expect(adult.getByRole('list', { name: 'Rewards' })).toContainText(ipadTime);
   // TV time, and a TV (the Rewards form has no TV target yet: through the API).
   const key = () => ({ 'Idempotency-Key': crypto.randomUUID() });

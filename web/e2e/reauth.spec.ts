@@ -16,7 +16,7 @@ test('pairing after the sign-in has gone stale asks for the password again', asy
   await adult.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await expect(adult).toHaveTitle('Home · OpenCozy');
-  await expect(adult.getByRole('navigation', { name: 'Main' })).toBeVisible();
+  await expect(adult.getByRole('navigation', { name: 'Adult management' })).toBeVisible();
 
   await adult.waitForTimeout(16_000);
 
@@ -24,6 +24,7 @@ test('pairing after the sign-in has gone stale asks for the password again', asy
   const code = wall.getByLabel(/^Pairing code/);
   await expect(code).toHaveText(/^[A-Z2-9]{6}$/);
   await adult.goto('/displays');
+  await adult.getByRole('button', { name: 'Pair a display' }).first().click();
   await adult.getByLabel('Code on the display').fill((await code.textContent()) ?? '');
   await adult.getByLabel('Name').fill(`Hallway ${run}`);
   await adult.getByRole('button', { name: 'Pair display' }).click();
@@ -43,7 +44,7 @@ test('a session that ends sends the adult to sign in, saying why', async ({ page
   await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
   await page.context().clearCookies(); // as if it expired, or was signed out elsewhere
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Inbox' }).click();
+  await page.getByRole('navigation', { name: 'Adult management' }).getByRole('link', { name: 'Inbox' }).click();
   await expect(page).toHaveURL(/\/login\?ended=true$/);
   await expect(page.getByText('Your sign-in ended. Sign in again to carry on.')).toBeVisible();
 });

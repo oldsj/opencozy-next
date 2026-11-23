@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
+import { Plug } from 'lucide-react';
 
 import { Button, CheckCircle, ConfirmDialog, EmptyState, Input, List, ListRow, Notice, PageHeader, ProfileAvatar, Section, SegmentedControl, Sheet } from '@app/design';
 
@@ -135,7 +136,7 @@ export function ConnectionsPage() {
 
   const list = credentials.data?.items ?? [];
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Connections"
         description="Home servers, assistants and learning services. Each has its own key and sees only what you allow."
@@ -169,7 +170,7 @@ export function ConnectionsPage() {
           </List>
         </Section>
       ) : (
-        credentials.isSuccess && <EmptyState title="Nothing connected yet" description="Add a home server, an assistant or a learning service." variant="surface" />
+        credentials.isSuccess && <EmptyState variant="surface" icon={Plug} title="Nothing connected yet" description="Add a home server, an assistant or a learning service." />
       )}
 
       <Sheet
@@ -293,6 +294,6 @@ export function ConnectionsPage() {
         }}
       />
       {reauth.dialog}
-    </section>
+    </>
   );
 }

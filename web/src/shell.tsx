@@ -66,6 +66,24 @@ const groups: readonly { label: string; items: readonly Item[] }[] = [
   },
 ];
 
+/**
+ * The navigation for the page at `path`: its section marked current (a child's points under
+ * Children), the inbox's count, and Account only when single sign-on is set up (all it has so far).
+ */
+export function manageGroups(path: string, waiting: number | undefined, sso: boolean): ManageNavGroup[] {
+  return groups.map((g) => {
+    const items: readonly Item[] = g.label === 'Setup' && sso ? [...g.items, { href: '/account', label: 'Account', icon: KeyRound }] : g.items;
+    return {
+      label: g.label,
+      items: items.map(({ also, ...item }) => ({
+        ...item,
+        current: item.href === path || (also?.some((re) => re.test(path)) ?? false),
+        ...(item.href === '/inbox' && waiting ? { badge: waiting } : {}),
+      })),
+    };
+  });
+}
+
 /** How many things wait for an adult: the inbox's items and the TVs asking who's watching. */
 export function useWaiting(enabled = true) {
   const inbox = $api.useQuery('get', '/inbox', {}, { enabled, refetchInterval: TV_REFRESH_MS });
@@ -80,17 +98,7 @@ export function AdultShell({ me }: { me: Me }) {
   const waiting = useWaiting();
   // Account has only single sign-on so far: link it when that is set up.
   const sso = $api.useQuery('get', '/auth/methods').data?.oidc;
-  const navGroups: ManageNavGroup[] = groups.map((g) => {
-    const items = g.label === 'Setup' && sso ? [...g.items, { href: '/account', label: 'Account', icon: KeyRound }] : g.items;
-    return {
-      label: g.label,
-      items: items.map(({ also, ...item }: Item) => ({
-        ...item,
-        current: item.href === path || (also?.some((re) => re.test(path)) ?? false),
-        ...(item.href === '/inbox' && waiting ? { badge: waiting } : {}),
-      })),
-    };
-  });
+  const navGroups = manageGroups(path, waiting, !!sso);
   return (
     <ManageShell
       nav={

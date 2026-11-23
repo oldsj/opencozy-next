@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
 
-import { Button, ButtonPrimary, CodeInput, ConfirmDialog, EmptyState, Input, List, ListRow, Notice, PageHeader } from '@app/design';
+import { MonitorSmartphone } from 'lucide-react';
+
+import { Button, ButtonPrimary, Checkbox, CheckboxGroup, CodeInput, ConfirmDialog, EmptyState, Input, List, ListRow, Notice, PageHeader, Section, Sheet } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, useAttempts, type Display, type DisplayScope } from '../api/client';
 import { useReauth } from './reauth';
@@ -24,6 +26,7 @@ export function DisplaysPage() {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<DisplayScope[]>(['today']);
+  const [pairing, setPairing] = useState(false);
   const [unpairing, setUnpairing] = useState<Display | null>(null);
   const attempts = useAttempts();
   const reauth = useReauth();
@@ -34,7 +37,7 @@ export function DisplaysPage() {
       { params: attempts.params(attempt), body },
       {
         onSettled: attempts.settleIfAnswered(attempt),
-        onSuccess: () => { setCode(''); setName(''); },
+        onSuccess: () => { setCode(''); setName(''); setPairing(false); },
         onError: (error) => { reauth.ask(error, () => { pair(body); }); },
       },
     );
@@ -44,50 +47,75 @@ export function DisplaysPage() {
     pair({ code, name, scopes });
   };
 
+  const openPair = () => { create.reset(); setPairing(true); };
+
   return (
-    <section className="flex flex-col gap-6">
-      <PageHeader title="Displays" description="Wall displays show the family's day. Pair one with the code it shows." />
-      <form onSubmit={submit} className="flex flex-col gap-4" aria-label="Pair a display">
-        <CodeInput label="Code on the display" value={code} onChange={(e) => { setCode(e.target.value.toUpperCase()); }} required />
-        <Input label="Name" value={name} onChange={(e) => { setName(e.target.value); }} placeholder="Kitchen" maxLength={80} required />
-        <fieldset className="flex flex-wrap gap-4">
-          <legend className="text-section mb-2">Shows</legend>
-          {(Object.keys(scopeLabels) as DisplayScope[]).map((s) => (
-            <label key={s} className="flex items-center gap-2">
-              <input
-                type="checkbox"
+    <>
+      <PageHeader
+        title="Displays"
+        description="Wall displays show the family’s day. Pair one with the code it shows."
+        actions={<ButtonPrimary onClick={openPair}>Pair a display</ButtonPrimary>}
+      />
+      {displays.isError && <Notice tone="error">{errorMessage(displays.error)}</Notice>}
+      {displays.data?.length ? (
+        <Section title="Paired displays" count={displays.data.length}>
+          <List aria-label="Paired displays">
+            {displays.data.map((d) => (
+              <ListRow
+                key={d.id}
+                leading={<MonitorSmartphone aria-hidden="true" size={22} />}
+                title={d.name}
+                meta={`Shows ${d.scopes.map((s) => scopeLabels[s]).join(' · ')}`}
+                trailing={
+                  <Button variant="quiet" aria-label={`Unpair ${d.name}`} onClick={() => { setUnpairing(d); }}>
+                    Unpair…
+                  </Button>
+                }
+              />
+            ))}
+          </List>
+        </Section>
+      ) : (
+        displays.isSuccess && (
+          <EmptyState
+            variant="surface"
+            icon={MonitorSmartphone}
+            title="No displays yet"
+            description="Open this app’s /display page on the wall display: it shows a code to pair it with."
+            action={<ButtonPrimary onClick={openPair}>Pair a display</ButtonPrimary>}
+          />
+        )
+      )}
+      <Sheet
+        open={pairing}
+        onClose={() => { setPairing(false); }}
+        title="Pair a display"
+        description="Open /display on the wall display; it shows a six-letter code."
+        footer={
+          <>
+            <Button onClick={() => { setPairing(false); }}>Cancel</Button>
+            <ButtonPrimary type="submit" form="display-pair" disabled={create.isPending || scopes.length === 0}>Pair display</ButtonPrimary>
+          </>
+        }
+      >
+        <form id="display-pair" onSubmit={submit} className="grid gap-5" aria-label="Pair a display">
+          {create.error && !reauth.needsPassword(create.error) && <Notice tone="error">{errorMessage(create.error)}</Notice>}
+          <CodeInput label="Code on the display" value={code} onChange={(e) => { setCode(e.target.value.toUpperCase()); }} required />
+          <Input label="Name" value={name} onChange={(e) => { setName(e.target.value); }} placeholder="Kitchen" maxLength={80} required />
+          <CheckboxGroup legend="Shows" description="Today is on every display.">
+            {(Object.keys(scopeLabels) as DisplayScope[]).map((s) => (
+              <Checkbox
+                key={s}
+                label={scopeLabels[s]}
                 // Today is always on: every display shows it.
                 checked={s === 'today' || scopes.includes(s)}
                 disabled={s === 'today'}
                 onChange={(e) => { setScopes(e.target.checked ? [...scopes, s] : scopes.filter((x) => x !== s)); }}
               />
-              {scopeLabels[s]}
-            </label>
-          ))}
-        </fieldset>
-        {create.error && !reauth.needsPassword(create.error) && <Notice tone="error">{errorMessage(create.error)}</Notice>}
-        <div>
-          <ButtonPrimary type="submit" disabled={create.isPending || scopes.length === 0}>Pair display</ButtonPrimary>
-        </div>
-      </form>
-      {displays.data?.length ? (
-        <List aria-label="Paired displays">
-          {displays.data.map((d) => (
-            <ListRow
-              key={d.id}
-              title={d.name}
-              meta={d.scopes.map((s) => scopeLabels[s]).join(' · ')}
-              trailing={
-                <Button aria-label={`Unpair ${d.name}`} onClick={() => { setUnpairing(d); }}>
-                  Unpair
-                </Button>
-              }
-            />
-          ))}
-        </List>
-      ) : (
-        displays.isSuccess && <EmptyState title="No displays yet" description="Open this app's /display page on the wall display to get a code." variant="surface" />
-      )}
+            ))}
+          </CheckboxGroup>
+        </form>
+      </Sheet>
       <ConfirmDialog
         open={unpairing !== null}
         title={unpairing ? `Unpair ${unpairing.name}?` : ''}
@@ -103,6 +131,6 @@ export function DisplaysPage() {
         }}
       />
       {reauth.dialog}
-    </section>
+    </>
   );
 }

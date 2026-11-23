@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
+import { Tv } from 'lucide-react';
 
 import {
   Button,
@@ -263,7 +264,7 @@ export function TvsPage() {
   };
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="TVs"
         description="A TV goes online when someone is watching: a parent, or a child spending their TV time."
@@ -297,7 +298,7 @@ export function TvsPage() {
             })}
           </List>
         ) : (
-          tvs.isSuccess && <EmptyState variant="surface" title="No TVs yet" description="Add a TV with its network addresses (MACs) so the router can keep it offline until someone is watching." />
+          tvs.isSuccess && <EmptyState variant="surface" icon={Tv} title="No TVs yet" description="Add a TV with its network addresses (MACs) so the router can keep it offline until someone is watching." />
         )}
       </Section>
 
@@ -447,6 +448,6 @@ export function TvsPage() {
           remove.mutate({ params: { ...k.params, path: { tvId: removing.id } } }, { onSuccess: () => { setRemoving(null); setEditing(null); }, ...k.settled });
         }}
       />
-    </section>
+    </>
   );
 }
