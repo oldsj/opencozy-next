@@ -110,4 +110,12 @@
     border-right: 1px solid var(--border);
     background: var(--surface-soft);
   }
+  /* On a short window the links scroll; the adult and Sign out stay in view at the foot. */
+  .oc-manage-nav__rail .oc-manage-nav__footer {
+    position: sticky;
+    bottom: calc(-1 * var(--space-xl));
+    margin-bottom: calc(-1 * var(--space-xl));
+    padding-bottom: var(--space-xl);
+    background: var(--surface-soft);
+  }
 }

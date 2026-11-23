@@ -348,7 +348,11 @@ function BlockedWebsites() {
   return (
     <Section title="Blocked websites" description="On the children’s iPads and the home network. Each name covers its subdomains: example.com blocks www.example.com too.">
       {filter.isError && <Notice tone="error">{errorMessage(filter.error)}</Notice>}
-      {filter.data && <WebFilterForm key={JSON.stringify(filter.data)} filter={filter.data} pending={save.isPending} error={save.error} saved={save.isSuccess} onSave={(body, params) => { save.mutate({ params, body }); }} />}
+      {filter.data && (
+        <Panel>
+          <WebFilterForm key={JSON.stringify(filter.data)} filter={filter.data} pending={save.isPending} error={save.error} saved={save.isSuccess} onSave={(body, params) => { save.mutate({ params, body }); }} />
+        </Panel>
+      )}
     </Section>
   );
 }
