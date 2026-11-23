@@ -86,7 +86,7 @@ export const calendarErrorText: Record<CalendarErrorCode, string> = {
 export const providerLabels: Record<CalendarSource['provider'], string> = { ics: 'Calendar link', google: 'Google', icloud: 'iCloud' };
 
 export const kids: Record<string, { name: string; color: ProfileColor }> = {
-  c1: { name: 'Ada', color: 'sky' },
+  c1: { name: 'Abby', color: 'sky' },
   c2: { name: 'Ezra', color: 'sage' },
   c3: { name: 'Noor', color: 'lilac' },
 };

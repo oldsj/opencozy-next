@@ -137,9 +137,9 @@ export function WatchingNow() {
     <Widget title="Watching now" icon={Tv}>
       <List>
         <ListRow
-          leading={<ProfileAvatar name="Ada" color="sky" size="small" aria-hidden="true" />}
+          leading={<ProfileAvatar name="Abby" color="sky" size="small" aria-hidden="true" />}
           title="Living room TV"
-          meta="Ada"
+          meta="Abby"
           trailing={
             <Tag tone="attention">
               <Countdown seconds={240} />

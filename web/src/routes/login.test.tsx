@@ -46,7 +46,7 @@ describe('LoginPage', () => {
     });
     renderPage();
 
-    await userEvent.type(screen.getByLabelText('Email'), 'ada@example.com');
+    await userEvent.type(screen.getByLabelText('Email'), 'abby@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'a long enough password');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 

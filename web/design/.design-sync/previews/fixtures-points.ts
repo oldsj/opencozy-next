@@ -25,7 +25,7 @@ export interface HistoryResponse {
   entries: LedgerEntry[];
 }
 
-export const historyChild: { id: string; name: string; color: ProfileColor } = { id: 'c1', name: 'Ada', color: 'sky' };
+export const historyChild: { id: string; name: string; color: ProfileColor } = { id: 'c1', name: 'Abby', color: 'sky' };
 
 export const history: HistoryResponse = {
   balance: 24,

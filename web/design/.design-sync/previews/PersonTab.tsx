@@ -4,7 +4,7 @@ import { PersonTab } from '../../src';
 export function Family() {
   return (
     <div role="tablist" aria-label="Choose a family member" className="flex flex-wrap gap-2">
-      <PersonTab name="Ada" points={42} color="sky" selected />
+      <PersonTab name="Abby" points={42} color="sky" selected />
       <PersonTab name="Ezra" points={18} color="sage" />
       <PersonTab name="Ivy" points={6} color="rose" />
       <PersonTab name="Noor" points={30} color="lilac" />

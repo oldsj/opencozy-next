@@ -19,7 +19,7 @@ export function Tiles() {
 function KioskRewardsPage({ children }: { children?: React.ReactNode }) {
   return (
     <AppFrame person="sky" topBar={<TopBar time="4:05" date="Monday, September 14" householdName="Maple House" />}>
-      <PageHeader title="Ada’s rewards" description="Choose one, then an adult says yes." actions={<PointsBadge points={balance} />} />
+      <PageHeader title="Abby’s rewards" description="Choose one, then an adult says yes." actions={<PointsBadge points={balance} />} />
       {children}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {rewards.rewards.map((reward) => (
@@ -44,7 +44,7 @@ export function KioskRedeem() {
         open
         onClose={noop}
         title="Choose 20 minutes of iPad?"
-        description="This uses 10 of Ada’s 24 points. If an adult says no, the points come back."
+        description="This uses 10 of Abby’s 24 points. If an adult says no, the points come back."
         footer={
           <>
             <Button>Not now</Button>

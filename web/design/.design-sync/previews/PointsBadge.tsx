@@ -19,7 +19,7 @@ export function Values() {
 export function InContext() {
   return (
     <div className="flex items-center gap-2">
-      <strong className="font-heading">Ada</strong>
+      <strong className="font-heading">Abby</strong>
       <PointsBadge points={24} />
     </div>
   );

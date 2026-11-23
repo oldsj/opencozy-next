@@ -62,7 +62,7 @@ export interface Tv {
 export const durationLabels = { '1h': '1 hour', '2h': '2 hours', all_day: 'All day' } as const;
 
 const kidsOffered: PromptChild[] = [
-  { childId: 'c1', name: 'Ada', color: 'sky', tvSecondsRemaining: 45 * 60, canWatch: true },
+  { childId: 'c1', name: 'Abby', color: 'sky', tvSecondsRemaining: 45 * 60, canWatch: true },
   { childId: 'c2', name: 'Ezra', color: 'sage', tvSecondsRemaining: 0, canWatch: false, reason: 'no TV time' },
   { childId: 'c3', name: 'Noor', color: 'lilac', tvSecondsRemaining: 20 * 60, canWatch: false, reason: 'from 4:00 PM' },
 ];

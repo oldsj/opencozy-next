@@ -27,7 +27,7 @@ function Reauth({ waiting = false, error }: { waiting?: boolean; error?: string 
     <ConfirmDialog
       open
       title="Confirm it’s you"
-      description="You signed in a while ago. Confirm it’s you to pair Ada’s iPad."
+      description="You signed in a while ago. Confirm it’s you to pair Abby’s iPad."
       confirmLabel="Confirm with password"
       pending={waiting}
       error={error}

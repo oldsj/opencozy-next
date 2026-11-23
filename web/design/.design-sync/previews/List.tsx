@@ -59,7 +59,7 @@ export function Inbox() {
               onChoose={noop}
               choices={[
                 { value: 'parents', label: 'Parents', variant: 'primary' },
-                { value: 'ada', label: 'Ada', detail: '25 min' },
+                { value: 'abby', label: 'Abby', detail: '25 min' },
                 { value: 'ezra', label: 'Ezra', detail: 'no time', disabled: true },
                 { value: 'not_now', label: 'Not now', variant: 'quiet' },
               ]}
@@ -92,9 +92,9 @@ export function Inbox() {
         <List>
           <ListRow
             stackOnNarrow
-            leading={<ProfileAvatar name="Ada" color="sky" size="small" aria-hidden="true" />}
+            leading={<ProfileAvatar name="Abby" color="sky" size="small" aria-hidden="true" />}
             title="Tidy the hallway"
-            meta="Ada · 5 points · Chore · 9:40 AM"
+            meta="Abby · 5 points · Chore · 9:40 AM"
             trailing={
               <>
                 <Button variant="danger">Reject…</Button>
@@ -148,7 +148,7 @@ export function Redemptions() {
         <List>
           <ListRow
             stackOnNarrow
-            title="Ada · 45 min TV time"
+            title="Abby · 45 min TV time"
             meta="From “Movie afternoon” · spent only while watching"
             trailing={<Button variant="danger">Cancel unused time</Button>}
           />

@@ -5,7 +5,7 @@ import { pairingModules } from './fixtures';
 export function Pairing() {
   return (
     <div className="max-w-60">
-      <QrCode modules={pairingModules} label="Pairing code for Ada’s iPad" />
+      <QrCode modules={pairingModules} label="Pairing code for Abby’s iPad" />
     </div>
   );
 }

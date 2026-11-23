@@ -31,7 +31,7 @@ export function Today() {
   return (
     <div className="max-w-md">
       <PersonCard
-        name="Ada"
+        name="Abby"
         color="sky"
         points={24}
         completed={1}
@@ -53,7 +53,7 @@ export function Today() {
   );
 }
 
-const ada = today.children[0];
+const abby = today.children[0];
 
 function KidFrame({ tab = 'today', children, busy = false }: { tab?: 'today' | 'rewards'; children: React.ReactNode; busy?: boolean }) {
   return (
@@ -83,12 +83,12 @@ function kidCheck(item: TodayItem) {
 }
 
 function KidDay({ failed = false }: { failed?: boolean }) {
-  if (!ada) return null;
+  if (!abby) return null;
   return (
     <>
-      <PageHeader title={`Good morning, ${kid.name}`} actions={<PointsBadge points={ada.child.points} />} />
+      <PageHeader title={`Good morning, ${kid.name}`} actions={<PointsBadge points={abby.child.points} />} />
       <Section title="Your list">
-      {ada.groups.map((group) => (
+      {abby.groups.map((group) => (
         <TaskGroup
           key={group.id}
           title={group.title}
@@ -135,10 +135,10 @@ export function KidToday() {
 export function KidRewards() {
   return (
     <KidFrame tab="rewards">
-      <PageHeader title="Rewards" description="Choose one, then an adult says yes." actions={<PointsBadge points={ada?.child.points ?? 0} />} />
+      <PageHeader title="Rewards" description="Choose one, then an adult says yes." actions={<PointsBadge points={abby?.child.points ?? 0} />} />
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         {rewards.rewards.map((r) => (
-          <RewardTile key={r.id} name={r.title} cost={r.cost} balance={ada?.child.points ?? 0} disabled={!r.available} onSelect={() => undefined} />
+          <RewardTile key={r.id} name={r.title} cost={r.cost} balance={abby?.child.points ?? 0} disabled={!r.available} onSelect={() => undefined} />
         ))}
       </div>
     </KidFrame>
@@ -166,7 +166,7 @@ export function KidOffline() {
 export function KidNothingToday() {
   return (
     <KidFrame>
-      <PageHeader title={`Good morning, ${kid.name}`} actions={<PointsBadge points={ada?.child.points ?? 0} />} />
+      <PageHeader title={`Good morning, ${kid.name}`} actions={<PointsBadge points={abby?.child.points ?? 0} />} />
       <EmptyState variant="surface" title="Nothing on your list today" description="When a routine or chore is ready, it will show up here." />
     </KidFrame>
   );

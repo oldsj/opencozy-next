@@ -48,7 +48,7 @@ export const platformLabels: Record<Device['platform'], string> = { ios: 'iOS', 
 
 export const devices: DevicesResponse = {
   devices: [
-    { id: 'd1', name: 'Ada’s iPad', platform: 'ios', child: { id: 'c1', name: 'Ada', color: 'sky' }, pairedAt: 'Sep 3', lastSeenAt: '2 minutes ago' },
+    { id: 'd1', name: 'Abby’s iPad', platform: 'ios', child: { id: 'c1', name: 'Abby', color: 'sky' }, pairedAt: 'Sep 3', lastSeenAt: '2 minutes ago' },
     { id: 'd2', name: 'Ezra’s iPad', platform: 'ios', child: { id: 'c2', name: 'Ezra', color: 'sage' }, pairedAt: 'Sep 3', lastSeenAt: 'Yesterday' },
     { id: 'd3', name: 'Old iPhone', platform: 'ios', child: null, pairedAt: 'Jun 18' },
   ],
@@ -66,4 +66,4 @@ export const offer: PairingOffer = {
 };
 
 /** The kid view's session (the device's own child). */
-export const kid = { id: 'c1', name: 'Ada', color: 'sky' as ProfileColor };
+export const kid = { id: 'c1', name: 'Abby', color: 'sky' as ProfileColor };

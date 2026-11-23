@@ -65,11 +65,11 @@ func TestLiteralHost(t *testing.T) {
 }
 
 func TestParsePrivateCIDRs(t *testing.T) {
-	got, err := ParsePrivateCIDRs(" 192.168.40.0/24, 10.20.0.0/16,172.16.5.0/24 ,fd00:40::/64,")
+	got, err := ParsePrivateCIDRs(" 192.168.77.0/24, 10.20.0.0/16,172.16.5.0/24 ,fd00:77::/64,")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 4 || got[0].String() != "192.168.40.0/24" || got[3].String() != "fd00:40::/64" {
+	if len(got) != 4 || got[0].String() != "192.168.77.0/24" || got[3].String() != "fd00:77::/64" {
 		t.Fatalf("got %v", got)
 	}
 	if got, err := ParsePrivateCIDRs(""); err != nil || got != nil {
@@ -90,8 +90,8 @@ func TestParsePrivateCIDRs(t *testing.T) {
 		"fc00::/6":            "only ranges inside",
 		"::/0":                "only ranges inside",
 		"::ffff:10.0.0.0/104": "IPv4 form",
-		"192.168.40.1/24":     "host bits",
-		"192.168.40.1":        "not a CIDR",
+		"192.168.77.1/24":     "host bits",
+		"192.168.77.1":        "not a CIDR",
 		"10.0.0.0/8,lan":      "not a CIDR",
 	} {
 		if _, err := ParsePrivateCIDRs(in); err == nil || !strings.Contains(err.Error(), want) {

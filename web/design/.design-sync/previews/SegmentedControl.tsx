@@ -12,7 +12,7 @@ export function Default() {
       onChange={setValue}
       options={[
         { value: 'all', label: 'Everyone' },
-        { value: 'ada', label: 'Ada' },
+        { value: 'abby', label: 'Abby' },
         { value: 'ezra', label: 'Ezra' },
         { value: 'ivy', label: 'Ivy' },
       ]}
