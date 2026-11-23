@@ -1,6 +1,7 @@
 /* Wide screens: a sticky rail beside the page. Phones: a bar above it, with a Menu sheet. */
 .oc-manage-shell { display: flex; min-height: 100vh; min-height: 100dvh; flex-direction: column; background: var(--background); }
 .oc-manage-shell__main { min-width: 0; flex: 1; padding: var(--space-xl) var(--space-lg) var(--space-section); }
+.oc-manage-shell__main:focus { outline: none; }
 
 .oc-manage-nav__rail { display: none; }
 .oc-manage-nav__bar {
@@ -67,7 +68,7 @@
 .oc-manage-nav__items { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .oc-manage-nav__item svg { flex: none; color: var(--muted-foreground); }
 .oc-manage-nav__label { min-width: 0; flex: 1; }
-.oc-manage-nav__item--current { border-color: var(--border); background: var(--primary-soft); color: var(--primary); }
+.oc-manage-nav__item--current { background: var(--primary-soft); color: var(--primary); }
 .oc-manage-nav__item--current svg { color: var(--primary); }
 .oc-manage-nav__badge {
   display: inline-grid;
@@ -82,6 +83,8 @@
   font-variant-numeric: tabular-nums;
 }
 .oc-manage-nav__footer { margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid var(--border); }
+/* Account and Sign out sit like the links above them. */
+.oc-manage-nav__footer .oc-button { width: 100%; justify-content: flex-start; padding-inline: var(--space-md); }
 
 @media (max-width: 479px) {
   /* The shortcut keeps its icon and badge; its word goes to save room. */
@@ -97,11 +100,11 @@
     position: sticky;
     top: 0;
     display: block;
-    max-height: 100vh;
-    max-height: 100dvh;
+    height: 100vh;
+    height: 100dvh;
     overflow-y: auto;
     padding: var(--space-xl) var(--space-md);
     border-right: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--surface-soft);
   }
 }

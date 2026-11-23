@@ -161,14 +161,21 @@ export function ManageNav({
 export interface ManageShellProps extends HTMLAttributes<HTMLDivElement> {
   /** A ManageNav. */
   nav: ReactNode;
+  /** Id of the main landmark, the skip link's target. */
+  mainId?: string;
 }
 
-/** The adult pages' frame: the ManageNav rail beside the page on a wide screen, its bar above it on a phone. */
-export function ManageShell({ children, className, nav, ...props }: ManageShellProps) {
+/** The adult pages' frame: a skip link, the ManageNav rail beside the page on a wide screen, its bar above it on a phone. */
+export function ManageShell({ children, className, mainId = 'main-content', nav, ...props }: ManageShellProps) {
   return (
     <div {...props} className={cx('oc-manage-shell', className)}>
+      <a className="oc-app-frame__skip-link" href={`#${mainId}`}>
+        Skip to content
+      </a>
       {nav}
-      <main className="oc-manage-shell__main">{children}</main>
+      <main className="oc-manage-shell__main" id={mainId} tabIndex={-1}>
+        {children}
+      </main>
     </div>
   );
 }

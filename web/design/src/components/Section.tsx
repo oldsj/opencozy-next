@@ -8,7 +8,7 @@ export interface SectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'>
   /** Optional short note under the heading. */
   description?: ReactNode;
   /** Optional item count, shown quietly beside the heading. */
-  count?: number;
+  count?: number | undefined;
   /** Controls for this section only (a filter, an add button). */
   actions?: ReactNode;
   /** Hide the heading visually, keeping it for assistive technology. */

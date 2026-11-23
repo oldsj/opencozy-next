@@ -11,7 +11,7 @@ src/tokens.css            Every token as a CSS variable: OpenCozy's whole identi
 src/theme.css             Tailwind 4 theme: maps tokens to utilities (bg-surface, text-page, rounded-panel, ...). No values.
 src/styles.css            What the app imports after Tailwind: tokens, theme, fonts, component CSS, element defaults.
 src/components/*.tsx      The components (plain `oc-*` classes, each with its .css). Exported from src/index.ts.
-src/fonts/                Lora and Work Sans (variable WOFF2) and their SIL Open Font Licenses.
+src/fonts/                Fraunces and Atkinson Hyperlegible Next (variable TTF) and their SIL Open Font Licenses.
 src/test/                 Vitest tests of the components' semantics.
 .design-sync/previews/    One <Component>.tsx per component: each named export is a story. fixtures.ts holds shared data.
 .design-sync/config.json  design-sync settings (package shape, CSS entry, build command).
