@@ -104,14 +104,16 @@ Register `PUBLIC_ORIGIN/api/auth/callback/oidc`, e.g.
   tokens only work with the client that issued them; with a new client every imported account
   shows "Sign in again". The old tokens are carried only with `app import --old-auth-secret-file`.
 
-### Router (TV gate)
-The router script authenticates with a Service key with scope `tv:gate` (Manage → Connections):
-`Authorization: Bearer ocz_…`.
+### Router (TV and games gates)
+The router's agents authenticate with Service keys (Manage → Connections), `Authorization: Bearer
+ocz_…`: one with scope `tv:gate` for the TV gate, one with scope `games:gate` (limited to the
+children whose game sites it opens) for the games gate.
 
 | Call | What |
 |---|---|
 | `GET /api/tv/allowances` | → `{serverTime, allowances: [{mac, secondsRemaining}]}`. Each allowance is at most 300 s, so a router that loses the server closes TVs within 5 minutes. Poll every few seconds. |
 | `POST /api/tv/attempts` | `{attempts: [{mac, lastSeenAt}]}`, at most 50, at most once a minute per MAC. Needs a **new `Idempotency-Key` header on every report** (1–128 printable characters). |
+| `GET /api/games/allowances` | Scope `games:gate`. → `{serverTime, allowances: [{childId, secondsRemaining}]}`: the key's children with iPad time running now, each at most 300 s. The router opens those children's game sites in its DNS for a lease of at most a minute. |
 
 ### Home Assistant (TV power)
 Home Assistant pushes power states with a Service key with scope `tv:report`; OpenCozy does not
@@ -177,12 +179,24 @@ What changes for things outside this server when a household moves from the old 
 - **Passkeys:** keep the same hostname. `WEBAUTHN_RP_ID` must be the old app's hostname and
   `WEBAUTHN_ORIGINS` must include the old origin; then imported passkeys sign in as before. If the
   hostname changes, adults sign in with their password and add a passkey again.
-- **Router and Home Assistant:** the old `/api/v1/tv/allowances`, `/api/v1/tv/attempts` and
-  `/api/v1/tv/events` become the calls above (`events` → `power`, with HA's own state and an
-  `Idempotency-Key`). Until the router script changes, its old calls get 410, so it has no
-  allowances: a fail-open router lets every gated TV online, a fail-closed one keeps them all
-  offline. Choose which for the cutover window. Imported Service keys keep their scopes.
-  Imported TVs start with power unknown.
+- **Router:** the old `/api/v1/tv/allowances`, `/api/v1/tv/attempts` and
+  `/api/v1/games/allowances` become the calls above. The olds.network router's TV and games
+  agents already follow the move: on a 410 from `/api/v1/` they switch to `/api/` in the same poll
+  and stay there (and back on a 404), so the cutover needs no router deploy. A router script that
+  only knows `/api/v1/` has no allowances after the cutover: a fail-open TV gate lets every gated
+  TV online, a fail-closed one (and the games gate, always) keeps them closed. Imported Service
+  keys keep their scopes and children, so the router's keys keep working.
+- **Home Assistant:** `POST /api/v1/tv/events` becomes `POST /api/tv/power`, and Home Assistant's
+  `rest_command` must change at the cutover (it gets 410 until then, so TVs turning on ask no one).
+  What changes, against the example above:
+  - the URL (`/api/tv/power`);
+  - a new `Idempotency-Key` header on every call;
+  - the payload: HA's own `media_player` state (not one mapped to `on`/`off`) and its
+    `lastChanged`;
+  - a resend every 5 minutes (a `time_pattern` trigger), since a TV idle or paused for 15
+    minutes counts as unknown, judged when a report arrives.
+  The `tv:report` key (imported) and each TV's entity (imported with the TV) stay as they are.
+  Imported TVs start with power unknown until the first report.
 - **Google:** reuse the old OAuth client (above).
 - **Every `/api/v1/` path answers 410 `update_app`**, so an old app says it is out of date.
 - **iPads:** install the new build, then re-pair from Manage → Devices if the device asks.
