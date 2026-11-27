@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type SyntheticEvent } from 'react';
+import { CalendarDays, CalendarPlus } from 'lucide-react';
 
 import {
   Button,
@@ -22,6 +23,7 @@ import {
 } from '@app/design';
 
 import { $api, errorCode, errorMessage, idempotencyKey, useAttempts } from '../api/client';
+import { RouterButtonLink } from '../link';
 import type { components } from '../api/schema.gen';
 import { GoogleAccounts, googleOutcomeText, useConnectGoogle, type GoogleOutcome } from './calendar-google';
 
@@ -103,7 +105,7 @@ export function CalendarPage() {
   const today = zone ? todayIn(zone) : undefined;
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Calendar"
         description={from ? `${dayLabel(from)} to ${dayLabel(addDays(from, 6))}.` : undefined}
@@ -112,14 +114,14 @@ export function CalendarPage() {
             <>
               <Button onClick={() => { setStart(addDays(from, -7)); }}>Previous week</Button>
               <Button onClick={() => { setStart(addDays(from, 7)); }}>Next week</Button>
-              <Link to="/calendars" className="oc-button oc-button--quiet">Calendars</Link>
+              <RouterButtonLink to="/calendars" variant="quiet">Calendars</RouterButtonLink>
             </>
           )
         }
       />
       {events.error && <Notice tone="error">{errorMessage(events.error)}</Notice>}
       {events.isSuccess && events.data.events.length === 0 && (
-        <EmptyState title="Nothing this week" description="Events from the calendars you follow show here." variant="surface" />
+        <EmptyState variant="surface" icon={CalendarDays} title="Nothing this week" description="Events from the calendars you follow show here." />
       )}
       {days.map((d) => {
         const list = byDay.get(d);
@@ -141,7 +143,7 @@ export function CalendarPage() {
           </Section>
         );
       })}
-    </section>
+    </>
   );
 }
 
@@ -177,11 +179,11 @@ export function CalendarEventPage({ eventId }: { eventId: string }) {
   };
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title={title}
         description={`${dayLabel(e.start.slice(0, 10))} · ${when(e)} · ${e.calendar.name}${e.recurring ? ' · repeats' : ''}`}
-        actions={<Link to="/calendar" className="oc-button oc-button--quiet">Back to calendar</Link>}
+        actions={<RouterButtonLink to="/calendar" variant="quiet">Back to calendar</RouterButtonLink>}
       />
       {e.location ? <p className="m-0">{e.location}</p> : null}
       {e.description ? <p className="m-0 whitespace-pre-line">{e.description}</p> : null}
@@ -242,7 +244,7 @@ export function CalendarEventPage({ eventId }: { eventId: string }) {
           {assign.error && <Notice tone="error">{errorMessage(assign.error)}</Notice>}
         </div>
       </Sheet>
-    </section>
+    </>
   );
 }
 
@@ -317,14 +319,14 @@ export function CalendarsPage({ google, connection }: { google?: GoogleOutcome |
   const saveError = add.error ?? update.error;
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Calendars"
         description="Choose which ones show on the wall display."
         actions={
           <>
             <Button variant="primary" onClick={() => { open({ name: '', url: '', color: 'sky', showOnDisplay: true }); }}>Add a calendar link</Button>
-            <Link to="/calendar" className="oc-button oc-button--quiet">Calendar</Link>
+            <RouterButtonLink to="/calendar" variant="quiet">Calendar</RouterButtonLink>
           </>
         }
       />
@@ -367,7 +369,7 @@ export function CalendarsPage({ google, connection }: { google?: GoogleOutcome |
           </List>
         </Section>
       ) : (
-        sources.isSuccess && <EmptyState title="No calendars yet" description="Add a calendar link from school, a club or your own calendar app, or connect Google." variant="surface" />
+        sources.isSuccess && <EmptyState variant="surface" icon={CalendarPlus} title="No calendars yet" description="Add a calendar link from school, a club or your own calendar app, or connect Google." />
       )}
       <GoogleAccounts choose={choose} onChoose={setChoose} usedColors={list.map((s) => s.color)} />
       {connectGoogle.error && <Notice tone="error">{errorMessage(connectGoogle.error)}</Notice>}
@@ -445,6 +447,6 @@ export function CalendarsPage({ google, connection }: { google?: GoogleOutcome |
           );
         }}
       />
-    </section>
+    </>
   );
 }

@@ -50,7 +50,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
   await sheet.getByLabel('Points').fill('5');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toBeHidden();
-  await expect(page.getByRole('list', { name: 'Chores' }).getByRole('listitem').filter({ hasText: `Tidy the hallway ${run}` })).toContainText(`${noor} · 5 points`);
+  await expect(page.getByRole('list', { name: `${noor}’s chores` }).getByRole('listitem').filter({ hasText: `Tidy the hallway ${run}` })).toContainText('5 points');
 
   // The reward is hidden from the children.
   await page.goto('/rewards');
@@ -126,7 +126,7 @@ test('manage: edit and reassign, hide, give and cancel, household', async ({ pag
 
   // A TV: added, opened for everyone for an hour, closed again, removed.
   const tv = `Den TV ${run}`;
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'TVs' }).click();
+  await page.getByRole('navigation', { name: 'Adult management' }).getByRole('link', { name: 'TVs' }).click();
   await page.getByRole('button', { name: 'Add a TV' }).click();
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(tv);
   await page.getByLabel('Network addresses (MACs)').fill(`02:00:5e:${run.slice(0, 2)}:${run.slice(2, 4)}:${run.slice(4, 6)}`);

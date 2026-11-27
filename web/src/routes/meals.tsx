@@ -4,6 +4,7 @@ import { useState, type SyntheticEvent } from 'react';
 import { Button, ButtonPrimary, Input, List, ListRow, Notice, PageHeader, Section, Sheet, Textarea } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type Meal, type MealSlot, type RecipeSummary } from '../api/client';
+import { RouterButtonLink } from '../link';
 
 const slots: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 const slotLabels: Record<MealSlot, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
@@ -38,7 +39,7 @@ export function MealsPage() {
   const start = plan.data?.weekStart;
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Meals this week"
         description={start ? `Week of ${dayLabel(start)}.` : undefined}
@@ -47,6 +48,7 @@ export function MealsPage() {
             <>
               <Button onClick={() => { setWeek(shiftWeek(start, -1)); }}>Previous week</Button>
               <Button onClick={() => { setWeek(shiftWeek(start, 1)); }}>Next week</Button>
+              <RouterButtonLink to="/recipes" variant="quiet">Recipes</RouterButtonLink>
             </>
           )
         }
@@ -87,7 +89,7 @@ export function MealsPage() {
           }}
         />
       )}
-    </section>
+    </>
   );
 }
 

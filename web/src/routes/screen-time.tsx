@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type SyntheticEvent } from 'react';
+import { Users } from 'lucide-react';
 
 import {
   Button,
@@ -23,6 +24,7 @@ import {
 } from '@app/design';
 
 import { $api, errorMessage, useAttempts, type Child } from '../api/client';
+import { RouterButtonLink } from '../link';
 import type { components } from '../api/schema.gen';
 import { EditError } from './edit-error';
 import {
@@ -49,15 +51,15 @@ export function ScreenTimePage() {
   const children = $api.useQuery('get', '/children');
   const kids = children.data?.items ?? [];
   return (
-    <section className="flex flex-col gap-8">
+    <>
       <PageHeader title="Screen time" description="iPad time each child can use, and when. Time bought with points is cancelled under Chosen rewards." />
       {children.isError && <Notice tone="error">{errorMessage(children.error)}</Notice>}
       {kids.map((c) => (
         <ChildScreenTime key={c.id} child={c} />
       ))}
-      {children.isSuccess && kids.length === 0 && <EmptyState title="No children yet" variant="surface" />}
+      {children.isSuccess && kids.length === 0 && <EmptyState variant="surface" icon={Users} title="No children yet" description="Add a child to give them iPad time." action={<RouterButtonLink to="/children" variant="primary">Add a child</RouterButtonLink>} />}
       <BlockedWebsites />
-    </section>
+    </>
   );
 }
 
@@ -346,7 +348,11 @@ function BlockedWebsites() {
   return (
     <Section title="Blocked websites" description="On the children’s iPads and the home network. Each name covers its subdomains: example.com blocks www.example.com too.">
       {filter.isError && <Notice tone="error">{errorMessage(filter.error)}</Notice>}
-      {filter.data && <WebFilterForm key={JSON.stringify(filter.data)} filter={filter.data} pending={save.isPending} error={save.error} saved={save.isSuccess} onSave={(body, params) => { save.mutate({ params, body }); }} />}
+      {filter.data && (
+        <Panel>
+          <WebFilterForm key={JSON.stringify(filter.data)} filter={filter.data} pending={save.isPending} error={save.error} saved={save.isSuccess} onSave={(body, params) => { save.mutate({ params, body }); }} />
+        </Panel>
+      )}
     </Section>
   );
 }

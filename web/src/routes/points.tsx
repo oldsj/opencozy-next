@@ -34,7 +34,7 @@ export function PointsPage({ childId }: { childId: string }) {
 
   const name = child.data?.name ?? '';
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title={
           <span className="flex items-center gap-3">
@@ -98,6 +98,6 @@ export function PointsPage({ childId }: { childId: string }) {
           );
         }}
       />
-    </section>
+    </>
   );
 }

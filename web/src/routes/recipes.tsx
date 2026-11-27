@@ -1,10 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState, type SyntheticEvent } from 'react';
+import { BookOpen } from 'lucide-react';
 
 import { Button, ButtonPrimary, EmptyState, Input, List, ListRow, Notice, PageHeader, Section, Textarea } from '@app/design';
 
 import { $api, errorMessage, idempotencyKey, type Recipe } from '../api/client';
+import { RouterButtonLink } from '../link';
 import { RECIPE_TITLE_MAX } from './meals';
 
 const INGREDIENT_MAX = 200;
@@ -17,13 +19,13 @@ export function RecipesPage() {
   const recipes = $api.useQuery('get', '/recipes', { params: { query: archived ? { archived: true } : {} } });
   const list = recipes.data?.recipes ?? [];
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Recipes"
         description="What the family cooks."
         actions={
           <>
-            <Link to="/recipes/$recipeId" params={{ recipeId: 'new' }}>Add recipe</Link>
+            <RouterButtonLink to="/recipes/$recipeId" params={{ recipeId: 'new' }} variant="primary">Add recipe</RouterButtonLink>
             <Button variant="quiet" onClick={() => { setArchived(!archived); }}>
               {archived ? 'Hide archived' : 'Show archived'}
             </Button>
@@ -51,9 +53,9 @@ export function RecipesPage() {
           </List>
         </Section>
       ) : (
-        recipes.isSuccess && <EmptyState title="No recipes yet" description="Add the family's favourites to plan meals with them." variant="surface" />
+        recipes.isSuccess && <EmptyState variant="surface" icon={BookOpen} title="No recipes yet" description="Add the family’s favourites to plan meals with them." />
       )}
-    </section>
+    </>
   );
 }
 
@@ -69,13 +71,13 @@ export function RecipePage({ recipeId }: { recipeId: string }) {
   const r = recipe.data;
   if (editing) return <RecipeForm recipe={r} onDone={() => { setEditing(false); }} />;
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title={r.title}
         description={[`Serves ${String(r.servings)}`, r.archived && 'Archived'].filter(Boolean).join(' · ')}
         actions={
           <>
-            <Link to="/recipes">All recipes</Link>
+            <RouterButtonLink to="/recipes" variant="quiet">All recipes</RouterButtonLink>
             <Button onClick={() => { setEditing(true); }}>Edit</Button>
           </>
         }
@@ -94,7 +96,7 @@ export function RecipePage({ recipeId }: { recipeId: string }) {
           ))}
         </ol>
       </Section>
-    </section>
+    </>
   );
 }
 
@@ -138,7 +140,7 @@ function RecipeForm({ recipe, onDone }: { recipe?: Recipe; onDone?: () => void }
   const pending = create.isPending || update.isPending;
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader title={recipe ? 'Edit recipe' : 'Add recipe'} />
       <form onSubmit={save(recipe?.archived ?? false)} className="grid gap-6" aria-label={recipe ? 'Edit recipe' : 'Add recipe'}>
         <Input label="Name" value={title} onChange={(e) => { setTitle(e.target.value); }} maxLength={RECIPE_TITLE_MAX} required />
@@ -183,9 +185,9 @@ function RecipeForm({ recipe, onDone }: { recipe?: Recipe; onDone?: () => void }
               {recipe.archived ? 'Restore' : 'Archive'}
             </Button>
           )}
-          {recipe ? <Button onClick={onDone}>Cancel</Button> : <Link to="/recipes">Cancel</Link>}
+          {recipe ? <Button onClick={onDone}>Cancel</Button> : <RouterButtonLink to="/recipes">Cancel</RouterButtonLink>}
         </div>
       </form>
-    </section>
+    </>
   );
 }

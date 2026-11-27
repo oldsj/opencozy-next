@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { Inbox } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button, ChoiceGroup, EmptyState, List, ListRow, Notice, PageHeader, pointsLabel, ProfileAvatar, Section, Sheet, Textarea } from '@app/design';
@@ -46,7 +47,7 @@ export function InboxPage() {
   };
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader title="Inbox" description="Approve what the children finished. Oldest first." />
       {error && <Notice tone="error">{errorMessage(error)}</Notice>}
       <TvsAsking list={inbox.data?.tvs} />
@@ -95,7 +96,7 @@ export function InboxPage() {
           </List>
         </Section>
       ) : (
-        inbox.isSuccess && !inbox.data.tvs.tvs.length && <EmptyState title="Nothing waiting" description="When a child finishes a chore or routine, or asks for more iPad time, it shows here." variant="surface" />
+        inbox.isSuccess && !inbox.data.tvs.tvs.length && <EmptyState variant="surface" icon={Inbox} title="Nothing waiting" description="When a child finishes a chore or routine, or asks for more iPad time, it shows here." />
       )}
       <Sheet
         open={sendingBack !== null}
@@ -122,6 +123,6 @@ export function InboxPage() {
           onChange={(e) => { setReason(e.target.value); }}
         />
       </Sheet>
-    </section>
+    </>
   );
 }

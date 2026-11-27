@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode, type SyntheticEvent } from 'react';
 
-import { ButtonPrimary, Input, Notice, PageHeader } from '@app/design';
+import { ButtonPrimary, Input, Notice, PageHeader, Panel } from '@app/design';
 
 import { $api, useAttempts } from '../api/client';
 import type { components } from '../api/schema.gen';
@@ -32,15 +32,15 @@ export function HouseholdPage() {
   };
 
   return (
-    <section className="flex flex-col gap-6">
-      <PageHeader title="Household" />
+    <>
+      <PageHeader title="Household" description="The name everyone sees, and the time zone the household’s day follows." />
       {household.data && (
         <HouseholdForm key={household.data.version} household={household.data} pending={save.isPending} onSave={(body) => { submit(household.data, body); }}>
           <EditError error={save.error} />
           {saved && !save.error && <Notice tone="success">Saved.</Notice>}
         </HouseholdForm>
       )}
-    </section>
+    </>
   );
 }
 
@@ -52,7 +52,8 @@ function HouseholdForm({ household, pending, onSave, children }: { household: Ho
     onSave({ name, timeZone });
   };
   return (
-    <form onSubmit={submit} className="grid max-w-xl gap-6" aria-label="Household settings">
+    <Panel className="max-w-xl">
+    <form onSubmit={submit} className="grid gap-6" aria-label="Household settings">
       {children}
       <Input label="Name" value={name} onChange={(e) => { setName(e.target.value); }} maxLength={80} hint="On the wall display and the children’s screens." required />
       <Input
@@ -72,5 +73,6 @@ function HouseholdForm({ household, pending, onSave, children }: { household: Ho
         <ButtonPrimary type="submit" disabled={pending}>Save</ButtonPrimary>
       </div>
     </form>
+    </Panel>
   );
 }

@@ -3,21 +3,21 @@ name: OpenCozy
 description: A bright, calm family board where children see their day and tick it off, and parents keep it running from their phones.
 # Colours (light theme) mirror web/design/src/tokens.css, the source of truth; `make design` fails when they differ.
 colors:
-  background: "#f4f3ef"
-  surface: "#ffffff"
+  background: "#f3efeb"
+  surface: "#fffdfa"
   surface-raised: "#ffffff"
-  surface-soft: "#f9f8f5"
-  surface-muted: "#eceae4"
-  foreground: "#1d2433"
-  muted-foreground: "#5f6677"
-  placeholder: "#6b7180"
-  border: "#dedbd3"
-  border-strong: "#c4c0b6"
-  input: "#888d96"
+  surface-soft: "#f8f5f1"
+  surface-muted: "#eee9e4"
+  foreground: "#342f2c"
+  muted-foreground: "#665f5a"
+  placeholder: "#6f6863"
+  border: "#ded8d3"
+  border-strong: "#c5bdb7"
+  input: "#8c847f"
   ring: "#c2410c"
-  primary: "#2f4fc4"
-  primary-foreground: "#ffffff"
-  primary-soft: "#eaedf9"
+  primary: "#3f625b"
+  primary-foreground: "#fffdfa"
+  primary-soft: "#e6efeb"
   positive: "#2f8f5b"
   positive-ink: "#216440"
   positive-soft: "#e4f0ea"
@@ -109,8 +109,10 @@ spacing:
 # OpenCozy design direction
 
 OpenCozy is designed from the product, not from the earlier app's CSS. The earlier app's features,
-flows and screens (what each screen does, for whom, on which device) are the parity target; its look
-is not. The feature checklist is the rewrite inventory's screen list
+flows and screens (what each screen does, for whom, on which device) are the parity target. Its
+palette (warm paper neutrals, one deep green) and its adult layout (a grouped side rail; every page a
+serif title, one line of description, its main action top right, then sections) were kept on
+purpose: families preferred them. The feature checklist is the rewrite inventory's screen list
 (`docs/rewrite/old/ui-and-clients.md`).
 
 ## Who looks at it, and where
@@ -128,7 +130,7 @@ A parent must be able to clear the inbox with one thumb while doing something el
 
 ## Principles
 
-1. **People are the colour.** The chrome is quiet daylight neutrals and one ink blue. Each child's
+1. **People are the colour.** The chrome is quiet warm paper neutrals and one deep green. Each child's
    colour carries their column, avatar and progress, so a child finds themselves before reading.
 2. **Big where it is touched, calm where it is read.** Child actions are 64px targets with generous
    gaps; ambient information is large type, not more boxes.
@@ -143,9 +145,10 @@ A parent must be able to clear the inbox with one thumb while doing something el
 
 ### Colour
 
-- **Neutrals**: a clean, slightly warm daylight (`background` #f4f3ef, white surfaces) and a deep
-  navy ink (`foreground` #1d2433). Muted text passes 4.5:1 on every surface and soft fill.
-- **Primary**: ink blue (`primary` #2f4fc4), for the one main action per view and the current tab.
+- **Neutrals**: warm paper (`background` #f3efeb, `surface` #fffdfa) and a deep warm brown-black
+  ink (`foreground` #342f2c). Muted text passes 4.5:1 on every surface and soft fill.
+- **Primary**: deep green (`primary` #3f625b), for the one main action per view and the current
+  section (its `primary-soft` pill).
 - **Focus**: a warm orange ring (`ring` #c2410c), 3px with a 3px offset, never the primary colour, so
   focus is visible on primary buttons and on every person colour.
 - **Status lanes**: positive (green), attention (amber: saving, waiting for approval, stale), danger
@@ -153,7 +156,7 @@ A parent must be able to clear the inbox with one thumb while doing something el
 - **People**: rose, sage, sky, butter, lilac, peach, teal and sand (the names the server stores).
   Each has soft (their column's header), base (avatar, progress), ink (text on soft or wash, 7:1),
   line, track and wash (their task rows). All are precomputed: no `color-mix()`.
-- **Dark theme**: the same tokens on a deep blue-black, for phones in dark mode, TV views and the
+- **Dark theme**: the same tokens on a deep warm black, for phones in dark mode, TV views and the
   wall display at night (the app sets `data-theme="dark"`). Person colours stay recognisable:
   their soft fills become deep tints and their inks become light.
 
@@ -194,10 +197,11 @@ together.
   (calendar, meals, the TV) sit under the board. Settings hide behind a small icon for adults.
 - **iPad** (`/kid`, default scale). One child's colour frames the page: their header, their tasks, a
   rewards shelf, and their iPad-time bank with "Ask for more time".
-- **Phone** (default). Single column, bottom tab bar for the manage areas with the inbox first,
-  bottom sheets for forms and confirmations, sticky primary action at the thumb.
-- **Desktop** (default, from 1024px). A side rail for manage navigation, content up to 72rem, side
-  sheets.
+- **Phone** (default). Single column. The manage navigation is a slim bar at the top: the current
+  section, a shortcut to the inbox with its count, and Menu, which opens every section in a bottom
+  sheet. Bottom sheets for forms and confirmations.
+- **Desktop** (default, from 1024px). A side rail for manage navigation, grouped Family, Home and
+  Setup, with the adult's account and Sign out at its foot; content up to 72rem; side sheets.
 - **TV** (`data-surface="tv"`, root 160%, usually dark). No controls; widgets in an ordered list that
   flows into columns; nothing smaller than body text.
 

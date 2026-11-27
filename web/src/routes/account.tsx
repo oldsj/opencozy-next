@@ -15,10 +15,10 @@ export function AccountPage() {
   const methods = $api.useQuery('get', '/auth/methods');
   const provider = methods.data?.oidc?.name;
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader title="Account" description={me ? `Signed in as ${me.adult.email}.` : undefined} />
       {provider !== undefined && <SingleSignOn provider={provider} email={me?.adult.email} />}
-    </section>
+    </>
   );
 }
 

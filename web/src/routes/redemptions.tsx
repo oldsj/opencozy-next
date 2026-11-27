@@ -1,9 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Gift } from 'lucide-react';
 
 import { Button, ButtonPrimary, ConfirmDialog, EmptyState, List, ListRow, PageHeader, pointsLabel, ProfileAvatar, Section } from '@app/design';
 
 import { $api, errorMessage, useAttempts } from '../api/client';
+import { RouterButtonLink } from '../link';
 import type { components } from '../api/schema.gen';
 import { EditError } from './edit-error';
 
@@ -76,10 +78,10 @@ export function RedemptionsPage() {
   const partly = cancelling?.status === 'fulfilled';
 
   return (
-    <section className="flex flex-col gap-6">
-      <PageHeader title="Chosen rewards" description="Approved rewards to give, and what’s been given." />
+    <>
+      <PageHeader title="Chosen rewards" description="Approved rewards to give, and what’s been given." actions={<RouterButtonLink to="/rewards">All rewards</RouterButtonLink>} />
       <EditError error={fulfil.error} />
-      {loaded && toGive.length + given.length + cancelled.length === 0 && <EmptyState title="Nothing chosen yet" description="Rewards you approve in the inbox show here, to give." variant="surface" />}
+      {loaded && toGive.length + given.length + cancelled.length === 0 && <EmptyState variant="surface" icon={Gift} title="Nothing chosen yet" description="Rewards you approve in the inbox show here, to give." />}
       {toGive.length > 0 && (
         <Section title="To give" count={toGive.length}>
           <List aria-label="To give">
@@ -154,6 +156,6 @@ export function RedemptionsPage() {
         onCancel={() => { setCancelling(null); cancel.reset(); }}
         onConfirm={confirmCancel}
       />
-    </section>
+    </>
   );
 }

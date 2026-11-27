@@ -1,7 +1,6 @@
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import {
-  Link,
   Outlet,
   createRootRouteWithContext,
   createRoute,
@@ -10,11 +9,13 @@ import {
   useMatches,
 } from '@tanstack/react-router';
 
-import { $api, meQuery, onSignedOut } from './api/client';
+import { meQuery, onSignedOut } from './api/client';
+import { AdultShell } from './shell';
 import { LoginPage, isSsoError, type SsoError } from './routes/login';
 import { AccountPage } from './routes/account';
 import { HomePage } from './routes/home';
 import { DisplayPage } from './routes/display';
+import { ChildrenPage } from './routes/children';
 import { ChoresPage } from './routes/chores';
 import { InboxPage } from './routes/inbox';
 import { PointsPage } from './routes/points';
@@ -51,47 +52,23 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: Root,
 });
 
-const nav = [
-  { to: '/', label: 'Home' },
-  { to: '/inbox', label: 'Inbox' },
-  { to: '/chores', label: 'Chores' },
-  { to: '/rewards', label: 'Rewards' },
-  { to: '/screen-time', label: 'Screen time' },
-  { to: '/tvs', label: 'TVs' },
-  { to: '/calendar', label: 'Calendar' },
-  { to: '/meals', label: 'Meals' },
-  { to: '/recipes', label: 'Recipes' },
-  { to: '/displays', label: 'Displays' },
-  { to: '/learning', label: 'Learning' },
-  { to: '/connections', label: 'Connections' },
-  { to: '/devices', label: 'Devices' },
-  { to: '/household', label: 'Household' },
-  { to: '/account', label: 'Account' },
-] as const;
+// Signed-in pages: redirect to /login when there is no session. The server enforces this
+// independently; this only spares the user a page of errors.
+async function signedIn({ context }: { context: RouterContext }) {
+  const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
+  // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
+  if (!me) throw redirect({ to: '/login' });
+  return { me };
+}
 
-// The manage pages' column, with the main navigation once signed in.
+// Signed in: the adult shell, with its navigation. Signed out (the sign-in page): one quiet column.
 function PageLayout() {
   const me = useQuery(meQuery).data;
-  // Account has only single sign-on so far (slice 10b): list it when that is set up.
-  const sso = $api.useQuery('get', '/auth/methods', {}, { enabled: !!me }).data?.oidc;
-  const links = nav.filter((n) => n.to !== '/account' || sso);
+  if (me) return <AdultShell me={me} />;
   return (
-    <>
-      {me && (
-        <header className="mx-auto max-w-2xl px-4 pt-6">
-          <nav aria-label="Main" className="flex flex-wrap gap-x-5">
-            {links.map((n) => (
-              <Link key={n.to} to={n.to} className="inline-flex min-h-11 items-center" activeOptions={{ exact: n.to === '/' }} activeProps={{ className: 'font-semibold' }}>
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-        </header>
-      )}
-      <main className="mx-auto max-w-2xl px-4 py-10">
-        <Outlet />
-      </main>
-    </>
+    <main className="mx-auto max-w-2xl px-4 py-10">
+      <Outlet />
+    </main>
   );
 }
 
@@ -102,18 +79,12 @@ const pageRoute = createRoute({
   component: PageLayout,
 });
 
-// Signed-in pages: redirect to /login when there is no session. The server enforces this
-// independently; this only spares the user a page of errors.
+// The adult's overview: what's waiting, each child's day, the screens.
 const homeRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/',
-  staticData: { title: 'Home' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-    return { me };
-  },
+  staticData: { title: 'Overview' },
+  beforeLoad: signedIn,
   component: function Home() {
     return <HomePage me={homeRoute.useRouteContext().me} />;
   },
@@ -139,11 +110,7 @@ const displaysRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/displays',
   staticData: { title: 'Displays' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: DisplaysPage,
 });
 
@@ -152,11 +119,7 @@ const choresRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/chores',
   staticData: { title: 'Chores' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: ChoresPage,
 });
 
@@ -165,12 +128,17 @@ const inboxRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/inbox',
   staticData: { title: 'Inbox' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: InboxPage,
+});
+
+// Manage: the children, each with their points.
+const childrenRoute = createRoute({
+  getParentRoute: () => pageRoute,
+  path: '/children',
+  staticData: { title: 'Children' },
+  beforeLoad: signedIn,
+  component: ChildrenPage,
 });
 
 // Manage: one child's points history.
@@ -178,11 +146,7 @@ const pointsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/children/$childId/points',
   staticData: { title: 'Points' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: function Points() {
     return <PointsPage childId={pointsRoute.useParams().childId} />;
   },
@@ -193,11 +157,7 @@ const mealsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/meals',
   staticData: { title: 'Meals' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: MealsPage,
 });
 
@@ -205,11 +165,7 @@ const recipesRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/recipes',
   staticData: { title: 'Recipes' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: RecipesPage,
 });
 
@@ -217,11 +173,7 @@ const recipeRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/recipes/$recipeId',
   staticData: { title: 'Recipe' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: function Recipe() {
     const { recipeId } = recipeRoute.useParams();
     return <RecipePage key={recipeId} recipeId={recipeId} />;
@@ -233,11 +185,7 @@ const rewardsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/rewards',
   staticData: { title: 'Rewards' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: RewardsPage,
 });
 
@@ -246,11 +194,7 @@ const redemptionsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/redemptions',
   staticData: { title: 'Chosen rewards' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: RedemptionsPage,
 });
 // Manage: the children's iPad time, allowed hours and blocked websites.
@@ -258,11 +202,7 @@ const screenTimeRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/screen-time',
   staticData: { title: 'Screen time' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: ScreenTimePage,
 });
 // Account: how the signed-in adult signs in.
@@ -270,22 +210,14 @@ const accountRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/account',
   staticData: { title: 'Account' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: AccountPage,
 });
 const householdRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/household',
   staticData: { title: 'Household' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: HouseholdPage,
 });
 
@@ -294,11 +226,7 @@ const calendarRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/calendar',
   staticData: { title: 'Calendar' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: CalendarPage,
 });
 
@@ -306,11 +234,7 @@ const calendarEventRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/calendar/events/$eventId',
   staticData: { title: 'Event' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: function CalendarEvent() {
     const { eventId } = calendarEventRoute.useParams();
     return <CalendarEventPage key={eventId} eventId={eventId} />;
@@ -327,11 +251,7 @@ const calendarsRoute = createRoute({
     const connection = typeof search.connection === 'string' && /^[0-9a-f-]{36}$/.test(search.connection) ? search.connection : undefined;
     return google ? { google, ...(connection ? { connection } : {}) } : {};
   },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: function Calendars() {
     const { google, connection } = calendarsRoute.useSearch();
     return <CalendarsPage google={google} connection={connection} />;
@@ -343,11 +263,7 @@ const connectionsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/connections',
   staticData: { title: 'Connections' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: ConnectionsPage,
 });
 
@@ -356,11 +272,7 @@ const learningRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/learning',
   staticData: { title: 'Learning' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: LearningPage,
 });
 
@@ -369,11 +281,7 @@ const tvsRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/tvs',
   staticData: { title: 'TVs' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: TvsPage,
 });
 
@@ -382,11 +290,7 @@ const devicesRoute = createRoute({
   getParentRoute: () => pageRoute,
   path: '/devices',
   staticData: { title: 'Devices' },
-  beforeLoad: async ({ context }) => {
-    const me = await context.queryClient.query({ ...meQuery, staleTime: 'static' });
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect is thrown by design
-    if (!me) throw redirect({ to: '/login' });
-  },
+  beforeLoad: signedIn,
   component: DevicesPage,
 });
 
@@ -413,7 +317,7 @@ const displayRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute, tvsRoute, accountRoute]),
+  pageRoute.addChildren([homeRoute, loginRoute, displaysRoute, childrenRoute, choresRoute, inboxRoute, pointsRoute, mealsRoute, recipesRoute, recipeRoute, rewardsRoute, calendarRoute, calendarEventRoute, calendarsRoute, connectionsRoute, learningRoute, devicesRoute, redemptionsRoute, screenTimeRoute, householdRoute, tvsRoute, accountRoute]),
   displayRoute,
   kidRoute,
   deviceExpiredRoute,

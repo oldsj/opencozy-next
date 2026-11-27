@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { Smartphone } from 'lucide-react';
 
 import {
   Button,
@@ -119,7 +120,7 @@ export function DevicesPage() {
   };
 
   return (
-    <section className="flex flex-col gap-6">
+    <>
       <PageHeader
         title="Devices"
         description="The children’s iPads and phones. Each shows only its own child’s day."
@@ -133,7 +134,7 @@ export function DevicesPage() {
       {offer.error && !reauth.needsPassword(offer.error) && !pairing && <Notice tone="error">{errorMessage(offer.error)}</Notice>}
       <Section title="Paired" count={list.length}>
         {list.length === 0 ? (
-          <EmptyState title="No devices yet" description="Pair a child’s iPad or phone, and it shows their day and rewards." />
+          <EmptyState variant="surface" icon={Smartphone} title="No devices yet" description="Pair a child’s iPad or phone, and it shows their day and rewards." />
         ) : (
           <List aria-label="Paired devices">
             {list.map((d) => (
@@ -253,7 +254,7 @@ export function DevicesPage() {
         tone="danger"
       />
       {reauth.dialog}
-    </section>
+    </>
   );
 }
 
