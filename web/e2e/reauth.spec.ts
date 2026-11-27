@@ -15,7 +15,7 @@ test('pairing after the sign-in has gone stale asks for the password again', asy
   await adult.getByLabel('Password').fill(owner.password);
   await adult.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(adult.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
-  await expect(adult).toHaveTitle('Home · OpenCozy');
+  await expect(adult).toHaveTitle('Overview · OpenCozy');
   await expect(adult.getByRole('navigation', { name: 'Adult management' })).toBeVisible();
 
   await adult.waitForTimeout(16_000);
@@ -43,6 +43,9 @@ test('a session that ends sends the adult to sign in, saying why', async ({ page
   await page.getByLabel('Password').fill(owner.password);
   await page.getByRole('button', { name: 'Sign in with password' }).click();
   await expect(page.getByRole('heading', { name: 'The Example Family' })).toBeVisible();
+  // The overview loads several things at once: let them land, so the click is what finds the
+  // session gone rather than one of those first requests.
+  await page.waitForLoadState('networkidle');
   await page.context().clearCookies(); // as if it expired, or was signed out elsewhere
   await page.getByRole('navigation', { name: 'Adult management' }).getByRole('link', { name: 'Inbox' }).click();
   await expect(page).toHaveURL(/\/login\?ended=true$/);
